@@ -22,10 +22,8 @@ export function LifePage() {
   const { message, show, dismiss } = usePendingNotice()
 
   return (
-    <div className="px-4 pb-7 pt-3">
+    <div className="px-4 pb-7 pt-4">
       <PageHeader
-        backTo="/"
-        backLabel="返回首页"
         icon={Gift}
         title="惠生活"
         subtitle="居民权益 · 积分好礼 · 本地服务"

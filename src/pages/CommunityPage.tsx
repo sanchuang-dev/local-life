@@ -19,10 +19,8 @@ export function CommunityPage() {
   const { message, show, dismiss } = usePendingNotice()
 
   return (
-    <div className="px-4 pb-7 pt-3">
+    <div className="px-4 pb-7 pt-4">
       <PageHeader
-        backTo="/"
-        backLabel="返回首页"
         icon={Users}
         title="社区"
         subtitle="街坊日常生活入口"

@@ -5,7 +5,6 @@ import { PendingNotice } from '../components/PendingNotice'
 import { SectionHeading } from '../components/home/SectionHeading'
 import { usePendingNotice } from '../hooks/usePendingNotice'
 import {
-  demoIndexGroups,
   meDemoNote,
   meProfile,
   meServices,
@@ -149,36 +148,6 @@ export function MePage() {
               <ServiceRow item={item} onPending={show} />
             </div>
           ))}
-        </div>
-      </section>
-
-      <section className="mt-6">
-        <SectionHeading title="原型演示导航" note="非产品导航" />
-        <div className="rounded-[18px] border border-dashed border-teal-300/70 bg-[#f7fbf9] p-4">
-          <p className="text-[11px] leading-5 text-[#52786c]">
-            汇总 V0.3 已迁页面，仅用于浏览回归与产品减法讨论；首页/社区/健康/惠生活/我的五个历史模块不是新版信息架构定案。
-          </p>
-          <div className="mt-3 space-y-3">
-            {demoIndexGroups.map((group) => (
-              <div key={group.id}>
-                <h3 className="text-[12px] font-semibold text-slate-600">{group.title}</h3>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {group.entries.map((entry) => (
-                    <Link
-                      key={entry.to}
-                      to={entry.to}
-                      className="inline-flex min-h-[40px] items-center rounded-full border border-teal-200/80 bg-white px-3 text-[11px] font-medium text-teal-700 transition-colors hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
-                    >
-                      {entry.label}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-          <p className="mt-3 text-[11px] leading-5 text-slate-400">
-            「我的」即当前页；设备、积分与广电入口同时出现在上方“我的服务”中。
-          </p>
         </div>
       </section>
 
