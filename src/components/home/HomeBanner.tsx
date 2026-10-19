@@ -1,12 +1,12 @@
-import { CalendarDays, MapPin } from 'lucide-react'
+import { CalendarDays, ChevronRight, MapPin } from 'lucide-react'
+import { Link } from 'react-router'
 import type { HomeBannerContent } from '../../mocks/home'
 
 type HomeBannerProps = {
   banner: HomeBannerContent
-  onAction: () => void
 }
 
-export function HomeBanner({ banner, onAction }: HomeBannerProps) {
+export function HomeBanner({ banner }: HomeBannerProps) {
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-[#116d63] via-[#138b79] to-[#47ad91] px-5 pb-[74px] pt-6 text-white">
       <div
@@ -38,17 +38,15 @@ export function HomeBanner({ banner, onAction }: HomeBannerProps) {
         {banner.description}
       </p>
 
-      <button
-        type="button"
-        onClick={onAction}
+      <Link
+        to={banner.to}
+        state={{ from: '/' }}
         className="relative mt-5 inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-white/25 bg-white/15 px-3.5 text-[12px] font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
       >
         <CalendarDays size={15} aria-hidden="true" />
         {banner.actionLabel}
-        <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[10px] font-medium text-white/90">
-          待接入
-        </span>
-      </button>
+        <ChevronRight size={14} aria-hidden="true" />
+      </Link>
     </section>
   )
 }

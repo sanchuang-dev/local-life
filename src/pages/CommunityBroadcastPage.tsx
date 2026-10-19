@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import { PageHeader } from '../components/PageHeader'
 import { DemoNote } from '../components/DemoNote'
+import { useBackTarget } from '../hooks/useBackTarget'
 import {
   communityBroadcasts,
   type CommunityBroadcastPeriod,
@@ -19,13 +20,14 @@ const emergencyBroadcast = communityBroadcasts.find((item) => item.emergency)
 export function CommunityBroadcastPage() {
   const [period, setPeriod] = useState<CommunityBroadcastPeriod>('current')
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const { backTo, backLabel } = useBackTarget('/community', '返回社区')
   const visible = communityBroadcasts.filter((item) => item.period === period)
 
   return (
     <div className="px-4 pb-7 pt-3">
       <PageHeader
-        backTo="/community"
-        backLabel="返回社区"
+        backTo={backTo}
+        backLabel={backLabel}
         icon={Megaphone}
         title="社区广播"
         subtitle="应急通知 · 活动广播 · 广播信息回看"
@@ -152,6 +154,7 @@ export function CommunityBroadcastPage() {
                     {item.activityTo ? (
                       <Link
                         to={item.activityTo}
+                        state={{ from: '/community/broadcast' }}
                         className="mt-2.5 flex min-h-[44px] w-full items-center justify-center rounded-xl border border-teal-200/80 bg-teal-50/60 text-[13px] font-semibold text-teal-700 transition-colors hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
                       >
                         查看广播对应活动

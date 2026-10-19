@@ -67,9 +67,11 @@ function MiniProgramTopBar() {
     subPageTitles[pathname] ??
     (pathname.startsWith('/community/notice/')
       ? '消息详情'
-      : pathname.startsWith('/life/product/')
-        ? '商品详情'
-        : demoTabs.find((item) => item.path === pathname)?.label)
+      : pathname.startsWith('/community/activity/')
+        ? '活动详情'
+        : pathname.startsWith('/life/product/')
+          ? '商品详情'
+          : demoTabs.find((item) => item.path === pathname)?.label)
 
   return (
     <header className="relative z-10 shrink-0 border-b border-slate-100/80 bg-white">

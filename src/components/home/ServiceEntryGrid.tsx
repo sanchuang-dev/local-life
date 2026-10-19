@@ -38,7 +38,7 @@ export function ServiceEntryGrid({ entries, onPending }: ServiceEntryGridProps) 
           'flex min-h-[88px] flex-col items-center rounded-xl py-1 text-center transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600'
 
         return to ? (
-          <Link key={id} to={to} className={`${itemClass} hover:bg-slate-50`}>
+          <Link key={id} to={to} state={{ from: '/' }} className={`${itemClass} hover:bg-slate-50`}>
             {content}
           </Link>
         ) : (
