@@ -4,6 +4,9 @@ import { CommunityActivitySection } from '../components/home/CommunityActivitySe
 import { CommunityMessageSection } from '../components/home/CommunityMessageSection'
 import { GdFeatureCard } from '../components/home/GdFeatureCard'
 import { HomeBanner } from '../components/home/HomeBanner'
+import { HomeHealthLectureSection } from '../components/home/HomeHealthLectureSection'
+import { HomeLifeProductSection } from '../components/home/HomeLifeProductSection'
+import { HomePointsSection } from '../components/home/HomePointsSection'
 import { SectionHeading } from '../components/home/SectionHeading'
 import { ServiceEntryGrid } from '../components/home/ServiceEntryGrid'
 import { usePendingNotice } from '../hooks/usePendingNotice'
@@ -53,6 +56,12 @@ export function HomePage() {
       />
 
       <CommunityActivitySection activities={homeCommunityActivities} />
+
+      <HomePointsSection />
+
+      <HomeHealthLectureSection />
+
+      <HomeLifeProductSection />
 
       <div className="mx-4 mt-7 flex gap-3 rounded-[16px] border border-dashed border-teal-300/70 bg-[#eef7f2] p-4 text-[#52786c]">
         <CircleHelp size={19} className="mt-0.5 shrink-0" aria-hidden="true" />
