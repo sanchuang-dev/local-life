@@ -5,6 +5,7 @@ import { CommunityBroadcastPage } from './pages/CommunityBroadcastPage'
 import { CommunityCulturePage } from './pages/CommunityCulturePage'
 import { CommunityNoticePage } from './pages/CommunityNoticePage'
 import { CommunityPage } from './pages/CommunityPage'
+import { ExchangePage } from './pages/ExchangePage'
 import { GdPage } from './pages/GdPage'
 import { HealthAssistantPage } from './pages/HealthAssistantPage'
 import { HealthDevicePage } from './pages/HealthDevicePage'
@@ -12,6 +13,9 @@ import { HealthDevicesPage } from './pages/HealthDevicesPage'
 import { HealthLecturePage } from './pages/HealthLecturePage'
 import { HealthPage } from './pages/HealthPage'
 import { HomePage } from './pages/HomePage'
+import { LifePage } from './pages/LifePage'
+import { PointsPage } from './pages/PointsPage'
+import { ProductPage } from './pages/ProductPage'
 import { ScaffoldPage } from './pages/ScaffoldPage'
 
 export default function App() {
@@ -29,6 +33,10 @@ export default function App() {
         <Route path="/health/assistant" element={<HealthAssistantPage />} />
         <Route path="/health/device" element={<HealthDevicePage />} />
         <Route path="/health/lecture" element={<HealthLecturePage />} />
+        <Route path="/life" element={<LifePage />} />
+        <Route path="/life/exchange" element={<ExchangePage />} />
+        <Route path="/life/product/:productId" element={<ProductPage />} />
+        <Route path="/points" element={<PointsPage />} />
         <Route path="/me/devices" element={<HealthDevicesPage />} />
         <Route
           path="/discover"
