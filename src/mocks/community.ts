@@ -363,6 +363,58 @@ export const communityActivityDetails: CommunityActivityDetail[] = [
 
 export const defaultCommunityActivityDetail = performanceActivity
 
+/* ------------------------------------------------------------ scene cards */
+
+export type CommunityScene = {
+  id: string
+  /** Life-scene prompt shown as the card's primary label. */
+  prompt: string
+  activityTitle: string
+  schedule: string
+  place: string
+  tags: string[]
+  to: string
+  icon: LucideIcon
+  tone: EntryTone
+}
+
+const sceneField = (detail: CommunityActivityDetail, label: string) =>
+  detail.fields.find((field) => field.label === label)?.value.replace('（演示）', '') ?? ''
+
+/**
+ * Top-level life scenes on `/community`. They only point at the existing
+ * chess/dance activity fixtures, so the scene and its detail cannot drift into
+ * two different sessions.
+ */
+const buildCommunityScene = (
+  activityId: string,
+  prompt: string,
+  icon: LucideIcon,
+  tone: EntryTone,
+): CommunityScene => {
+  const detail = communityActivityDetails.find((item) => item.id === activityId)
+  if (!detail) {
+    throw new Error(`Missing community activity detail for scene: ${activityId}`)
+  }
+
+  return {
+    id: detail.id,
+    prompt,
+    activityTitle: detail.title,
+    schedule: sceneField(detail, '时间'),
+    place: sceneField(detail, '地点'),
+    tags: detail.tags.filter((tag) => tag !== '示例活动'),
+    to: `/community/activity/${detail.id}`,
+    icon,
+    tone,
+  }
+}
+
+export const communityScenes: CommunityScene[] = [
+  buildCommunityScene('chess', '下午一起下棋', ChessKnight, 'mint'),
+  buildCommunityScene('dance', '晚上去跳舞', Music2, 'peach'),
+]
+
 /* ----------------------------------------------------------- culture courses */
 
 export type CultureCourseStatusTone = 'open' | 'plain' | 'warn'

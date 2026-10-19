@@ -1,5 +1,6 @@
 import { ChevronRight, Users } from 'lucide-react'
 import { Link } from 'react-router'
+import { CommunitySceneCards } from '../components/community/CommunitySceneCards'
 import { PageHeader } from '../components/PageHeader'
 import { DemoNote } from '../components/DemoNote'
 import { PendingNotice } from '../components/PendingNotice'
@@ -8,6 +9,7 @@ import {
   communityActivityList,
   communityEntries,
   communityNotices,
+  communityScenes,
 } from '../mocks/community'
 
 const toneStyles = {
@@ -30,7 +32,9 @@ export function CommunityPage() {
         本页依据 V0.3 社区页迁移，消息、广播与活动均为演示数据，未接入真实社区服务。
       </DemoNote>
 
-      <section className="mt-5">
+      <CommunitySceneCards scenes={communityScenes} />
+
+      <section className="mt-6">
         <h2 className="mb-3 text-[17px] font-semibold tracking-tight text-slate-900">社区入口</h2>
         <div className="grid grid-cols-2 gap-3">
           {communityEntries.map(({ id, label, badge, icon: Icon, tone, to, pendingNotice }) => {
