@@ -42,7 +42,8 @@ export type HomeBannerContent = {
   title: string
   description: string
   actionLabel: string
-  pendingNotice: string
+  /** Matches the banner's own event instead of reusing an unrelated activity. */
+  to: string
 }
 
 export const homeBanner: HomeBannerContent = {
@@ -51,7 +52,7 @@ export const homeBanner: HomeBannerContent = {
   title: '周末便民服务日',
   description: '广电手机卡、宽带咨询，社区活动和健康服务一次看齐。',
   actionLabel: '查看活动',
-  pendingNotice: '演示：便民服务日的活动详情尚未迁移，当前不能报名。',
+  to: '/community/activity/welfare-day',
 }
 
 export type GdQuickEntry = {

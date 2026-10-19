@@ -130,7 +130,7 @@ const broadcastPerformance: CommunityBroadcast = {
   icon: RadioTower,
   summary:
     '面向社区播报今晚文艺演出的时间与地点；可继续查看对应活动的详情与签到演示。',
-  activityTo: '/community/activity',
+  activityTo: '/community/activity/performance',
 }
 
 const broadcastWater: CommunityBroadcast = {
@@ -212,7 +212,7 @@ export const homeCommunityActivities: CommunityActivity[] = [
     meta: '14:30 · 余 6 位',
     icon: ChessKnight,
     tone: 'mint',
-    to: '/community',
+    to: '/community/activity/chess',
   },
   {
     id: 'dance',
@@ -220,7 +220,7 @@ export const homeCommunityActivities: CommunityActivity[] = [
     meta: '19:00 · 免费',
     icon: Music2,
     tone: 'peach',
-    to: '/community',
+    to: '/community/activity/dance',
   },
 ]
 
@@ -233,7 +233,7 @@ export const communityActivityList: CommunityActivity[] = [
     tags: ['文艺', '今晚'],
     icon: CalendarDays,
     tone: 'mint',
-    to: '/community/activity',
+    to: '/community/activity/performance',
   },
   {
     id: 'health-check',
@@ -260,16 +260,23 @@ export const communityActivityList: CommunityActivity[] = [
 export type ActivityField = { label: string; value: string }
 export type ActivityProgrammeItem = { time: string; title: string }
 
-export const communityActivityDetail: {
+export type CommunityActivityDetail = {
+  id: string
   title: string
+  subtitle: string
   tags: string[]
   fields: ActivityField[]
-  programme: ActivityProgrammeItem[]
-  signInNotice: string
-  reminderNotice: string
+  programme?: ActivityProgrammeItem[]
+  /** Only activities with an actual sign-in demo keep this button. */
+  signInNotice?: string
+  reminderNotice?: string
   footer: string
-} = {
+}
+
+const performanceActivity: CommunityActivityDetail = {
+  id: 'performance',
   title: '社区文艺演出 · 粤曲与合唱专场',
+  subtitle: '社区活动时间、地点与节目安排',
   tags: ['文艺', '社区活动', '示例活动'],
   fields: [
     { label: '时间', value: '今天 19:00–21:00' },
@@ -290,6 +297,71 @@ export const communityActivityDetail: {
   footer:
     '本活动为演示数据；实际报名、签到与积分规则以社区正式发布为准。组织方为示例名称，不代表任何真实社区、单位或公职部门。',
 }
+
+const welfareDayActivity: CommunityActivityDetail = {
+  id: 'welfare-day',
+  title: '周末便民服务日',
+  subtitle: '广电咨询 · 健康服务 · 社区事务',
+  tags: ['便民服务', '周末', '示例活动'],
+  fields: [
+    { label: '时间', value: '本周六 09:00–12:00（演示）' },
+    { label: '地点', value: '幸福里社区中心广场' },
+    { label: '服务内容', value: '广电手机卡/宽带咨询、健康检测、社区事务咨询' },
+    { label: '组织方', value: '幸福里社区 + 广电服务点（演示名称）' },
+    { label: '参与方式', value: '现场参与，无需报名（演示）' },
+  ],
+  reminderNotice: '演示：活动提醒不会发送真实通知。',
+  footer:
+    '本活动为演示数据；实际服务项目、时间与地点以社区及广电服务点正式发布为准。',
+}
+
+const chessActivity: CommunityActivityDetail = {
+  id: 'chess',
+  title: '象棋友谊赛',
+  subtitle: '社区棋友交流 · 现场报名',
+  tags: ['文体', '棋牌', '示例活动'],
+  fields: [
+    { label: '时间', value: '今天 14:30–16:30（演示）' },
+    { label: '地点', value: '幸福里社区活动室 1 楼' },
+    { label: '名额', value: '已报名 18 / 24（余 6）' },
+    { label: '组织方', value: '社区棋友会（演示名称）' },
+    { label: '参与方式', value: '现场报名，先到先得（演示）' },
+  ],
+  signInNotice: '演示：扫码签到不会产生真实签到记录或积分。',
+  reminderNotice: '演示：活动提醒不会发送真实通知。',
+  footer:
+    '本活动为演示数据；实际赛程、名额与报名方式以社区正式发布为准。',
+}
+
+const danceActivity: CommunityActivityDetail = {
+  id: 'dance',
+  title: '广场舞教学',
+  subtitle: '免费教学 · 社区广场',
+  tags: ['文体', '舞蹈', '示例活动'],
+  fields: [
+    { label: '时间', value: '今天 19:00–20:00（演示）' },
+    { label: '地点', value: '幸福里社区中心广场' },
+    { label: '费用', value: '免费（演示）' },
+    { label: '组织方', value: '社区文体队（演示名称）' },
+    { label: '参与方式', value: '现场参与，无需报名（演示）' },
+  ],
+  reminderNotice: '演示：活动提醒不会发送真实通知。',
+  footer:
+    '本活动为演示数据；实际教学安排、时间与地点以社区正式发布为准。',
+}
+
+/**
+ * Activity details keyed by the id in `/community/activity/:activityId`.
+ * `/community/activity` without an id keeps the original performance detail.
+ */
+export const communityActivityDetails: CommunityActivityDetail[] = [
+  performanceActivity,
+  welfareDayActivity,
+  chessActivity,
+  danceActivity,
+]
+
+export const defaultCommunityActivityDetail = performanceActivity
 
 /* ----------------------------------------------------------- culture courses */
 
@@ -378,7 +450,7 @@ export const communityEntries: CommunityEntry[] = [
     badge: '3 场示例',
     icon: CalendarDays,
     tone: 'peach',
-    to: '/community/activity',
+    to: '/community/activity/performance',
   },
   {
     id: 'culture',

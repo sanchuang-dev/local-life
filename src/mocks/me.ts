@@ -179,7 +179,7 @@ export const demoIndexGroups: DemoIndexGroup[] = [
     entries: [
       { label: '社区首页', to: '/community' },
       { label: '社区广播', to: '/community/broadcast' },
-      { label: '活动详情', to: '/community/activity' },
+      { label: '活动详情', to: '/community/activity/performance' },
       { label: '党群文化中心', to: '/community/culture' },
       { label: '消息详情', to: '/community/notice/water' },
     ],
@@ -203,6 +203,15 @@ export const demoIndexGroups: DemoIndexGroup[] = [
       { label: '积分兑换', to: '/life/exchange' },
       { label: '商品详情', to: '/life/product/rice-5kg' },
       { label: '我的积分', to: '/points' },
+    ],
+  },
+  {
+    id: 'me',
+    title: '我的',
+    entries: [
+      { label: '我的', to: '/me' },
+      { label: '我的积分', to: '/points' },
+      { label: '我的设备', to: '/me/devices' },
     ],
   },
 ]

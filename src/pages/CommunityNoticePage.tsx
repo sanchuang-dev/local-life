@@ -2,21 +2,23 @@ import { ArrowLeft, ChevronRight } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 import { PageHeader } from '../components/PageHeader'
 import { DemoNote } from '../components/DemoNote'
+import { useBackTarget } from '../hooks/useBackTarget'
 import { communityNotices } from '../mocks/community'
 
 export function CommunityNoticePage() {
   const { noticeId } = useParams()
+  const { backTo, backLabel } = useBackTarget('/community', '返回社区')
   const notice = communityNotices.find((item) => item.id === noticeId)
 
   if (!notice) {
     return (
       <div className="px-4 pb-7 pt-3">
         <Link
-          to="/community"
+          to={backTo}
           className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg text-[13px] font-medium text-slate-500 transition-colors hover:text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
         >
           <ArrowLeft size={16} aria-hidden="true" />
-          返回社区
+          {backLabel}
         </Link>
         <div className="mt-6 rounded-[18px] border border-dashed border-slate-200 bg-white px-4 py-12 text-center">
           <p className="text-[14px] font-semibold text-slate-500">消息不存在</p>
@@ -39,8 +41,8 @@ export function CommunityNoticePage() {
   return (
     <div className="px-4 pb-7 pt-3">
       <PageHeader
-        backTo="/community"
-        backLabel="返回社区"
+        backTo={backTo}
+        backLabel={backLabel}
         icon={notice.icon}
         title={notice.title}
         subtitle={`${notice.time} · ${notice.source}`}

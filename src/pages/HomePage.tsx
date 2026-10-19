@@ -24,7 +24,7 @@ export function HomePage() {
 
   return (
     <div className="pb-6">
-      <HomeBanner banner={homeBanner} onAction={() => show(homeBanner.pendingNotice)} />
+      <HomeBanner banner={homeBanner} />
 
       <section className="relative z-[1] mx-4 -mt-[49px] rounded-[20px] border border-slate-100 bg-white px-4 pb-5 pt-5 shadow-[0_12px_36px_rgba(15,52,44,0.08)]">
         <div className="mb-4 flex items-center justify-between">

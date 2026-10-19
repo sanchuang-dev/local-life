@@ -35,6 +35,7 @@ export function CommunityMessageSection({
         </div>
         <Link
           to={broadcast.to}
+          state={{ from: '/' }}
           className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl border border-teal-200/80 bg-teal-50/60 text-[12px] font-semibold text-teal-700 transition-colors hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
         >
           <Volume2 size={15} aria-hidden="true" />
@@ -49,6 +50,7 @@ export function CommunityMessageSection({
             <Link
               key={notice.id}
               to={`/community/notice/${notice.id}`}
+              state={{ from: '/' }}
               className={`flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-teal-600 ${
                 index > 0 ? 'border-t border-slate-100' : ''
               }`}

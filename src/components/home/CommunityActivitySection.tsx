@@ -18,8 +18,8 @@ type CommunityActivitySectionProps = {
 }
 
 /**
- * Home "今天社区有什么" cards. These entries lead into the C03 community
- * pages rather than a pending notice, so the home behaviour stays honest.
+ * Home "今天社区有什么" cards. Each card opens its own activity detail so the
+ * home entry never falls back to an unrelated activity or a pending notice.
  */
 export function CommunityActivitySection({ activities }: CommunityActivitySectionProps) {
   return (
@@ -47,7 +47,7 @@ export function CommunityActivitySection({ activities }: CommunityActivitySectio
             'overflow-hidden rounded-[18px] border border-slate-100 bg-white text-left shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600'
 
           return to ? (
-            <Link key={id} to={to} className={cardClass}>
+            <Link key={id} to={to} state={{ from: '/' }} className={cardClass}>
               {card}
             </Link>
           ) : (

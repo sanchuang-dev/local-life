@@ -2,6 +2,7 @@ import { Users } from 'lucide-react'
 import { useState } from 'react'
 import { PageHeader } from '../components/PageHeader'
 import { DemoNote } from '../components/DemoNote'
+import { useBackTarget } from '../hooks/useBackTarget'
 import { cultureCategories, cultureCourses } from '../mocks/community'
 
 const statusStyles = {
@@ -14,6 +15,7 @@ const ALL = '全部'
 
 export function CommunityCulturePage() {
   const [category, setCategory] = useState(ALL)
+  const { backTo, backLabel } = useBackTarget('/community', '返回社区')
   const visible =
     category === ALL
       ? cultureCourses
@@ -22,8 +24,8 @@ export function CommunityCulturePage() {
   return (
     <div className="px-4 pb-7 pt-3">
       <PageHeader
-        backTo="/community"
-        backLabel="返回社区"
+        backTo={backTo}
+        backLabel={backLabel}
         icon={Users}
         title="党群文化中心"
         subtitle="课程排期 · 演示报名状态"
