@@ -3,10 +3,13 @@ import { useLocation } from 'react-router'
 const backLabels: Record<string, string> = {
   '/': '返回首页',
   '/me': '返回我的',
+  '/gd': '返回广电服务',
   '/community': '返回社区',
   '/community/broadcast': '返回社区广播',
   '/health': '返回健康服务',
   '/life': '返回惠生活',
+  '/life/exchange': '返回积分兑换',
+  '/points': '返回我的积分',
 }
 
 /**

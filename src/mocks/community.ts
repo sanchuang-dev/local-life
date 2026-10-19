@@ -187,7 +187,7 @@ export type CommunityBroadcastSummary = {
 export const communityBroadcastSummary: CommunityBroadcastSummary = {
   title: `刚刚社区广播：${broadcastPerformance.title}`,
   meta: `${broadcastPerformance.time} · 演示来源`,
-  actionLabel: '重听',
+  actionLabel: '查看广播',
   to: '/community/broadcast',
 }
 

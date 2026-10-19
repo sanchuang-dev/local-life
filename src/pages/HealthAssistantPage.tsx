@@ -3,11 +3,13 @@ import { type FormEvent, useState } from 'react'
 import { DemoNote } from '../components/DemoNote'
 import { PageHeader } from '../components/PageHeader'
 import { PendingNotice } from '../components/PendingNotice'
+import { useBackTarget } from '../hooks/useBackTarget'
 import { usePendingNotice } from '../hooks/usePendingNotice'
 import { healthAssistant } from '../mocks/health'
 
 export function HealthAssistantPage() {
   const { message, show, dismiss } = usePendingNotice()
+  const { backTo, backLabel } = useBackTarget('/health', '返回健康服务')
   const [draft, setDraft] = useState('')
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -22,8 +24,8 @@ export function HealthAssistantPage() {
   return (
     <div className="px-4 pb-7 pt-3">
       <PageHeader
-        backTo="/health"
-        backLabel="返回健康服务"
+        backTo={backTo}
+        backLabel={backLabel}
         icon={Sparkles}
         title="社区助手"
         subtitle="演示对话 · 未接入真实 AI"

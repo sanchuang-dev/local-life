@@ -2,6 +2,7 @@ import { Info, ScanFace } from 'lucide-react'
 import { DemoNote } from '../components/DemoNote'
 import { PageHeader } from '../components/PageHeader'
 import { PendingNotice } from '../components/PendingNotice'
+import { useBackTarget } from '../hooks/useBackTarget'
 import { usePendingNotice } from '../hooks/usePendingNotice'
 import {
   healthDeviceDisclaimer,
@@ -11,12 +12,13 @@ import {
 
 export function HealthDevicePage() {
   const { message, show, dismiss } = usePendingNotice()
+  const { backTo, backLabel } = useBackTarget('/health', '返回健康服务')
 
   return (
     <div className="px-4 pb-7 pt-3">
       <PageHeader
-        backTo="/health"
-        backLabel="返回健康服务"
+        backTo={backTo}
+        backLabel={backLabel}
         icon={ScanFace}
         title="魔镜健康终端"
         subtitle="设备能力展示 · 未绑定真实硬件"

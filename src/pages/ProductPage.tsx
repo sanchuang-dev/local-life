@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router'
 import { DemoNote } from '../components/DemoNote'
 import { PageHeader } from '../components/PageHeader'
 import { PendingNotice } from '../components/PendingNotice'
+import { useBackTarget } from '../hooks/useBackTarget'
 import { usePendingNotice } from '../hooks/usePendingNotice'
 import {
   lifePoints,
@@ -18,17 +19,18 @@ const toneStyles = {
 export function ProductPage() {
   const { productId } = useParams()
   const { message, show, dismiss } = usePendingNotice()
+  const { backTo, backLabel } = useBackTarget('/life', '返回惠生活')
   const product = lifeProducts.find((item) => item.id === productId)
 
   if (!product) {
     return (
       <div className="px-4 pb-7 pt-3">
         <Link
-          to="/life"
+          to={backTo}
           className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg text-[13px] font-medium text-slate-500 transition-colors hover:text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
         >
           <ArrowLeft size={16} aria-hidden="true" />
-          返回惠生活
+          {backLabel}
         </Link>
         <div className="mt-6 rounded-[18px] border border-dashed border-slate-200 bg-white px-4 py-12 text-center">
           <p className="text-[14px] font-semibold text-slate-500">商品不存在</p>
@@ -36,10 +38,10 @@ export function ProductPage() {
             该示例商品可能已下线，或链接有误。
           </p>
           <Link
-            to="/life"
+            to={backTo}
             className="mt-4 inline-flex min-h-[44px] items-center rounded-xl bg-teal-700 px-4 text-[13px] font-semibold text-white transition-colors hover:bg-teal-800"
           >
-            返回惠生活
+            {backLabel}
           </Link>
         </div>
       </div>
@@ -58,8 +60,8 @@ export function ProductPage() {
   return (
     <div className="px-4 pb-7 pt-3">
       <PageHeader
-        backTo="/life"
-        backLabel="返回惠生活"
+        backTo={backTo}
+        backLabel={backLabel}
         icon={Gift}
         title={product.name}
         subtitle={`${product.category} · 示例商品`}
