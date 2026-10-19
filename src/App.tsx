@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router'
 import { MiniProgramShell } from './components/MiniProgramShell'
+import { GdPage } from './pages/GdPage'
 import { HomePage } from './pages/HomePage'
 import { ScaffoldPage } from './pages/ScaffoldPage'
 
@@ -8,6 +9,7 @@ export default function App() {
     <MiniProgramShell>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/gd" element={<GdPage />} />
         <Route
           path="/discover"
           element={<ScaffoldPage variant="discover" />}

@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { type ReactNode, useEffect, useRef } from 'react'
 import {
   BatteryFull,
   CircleDot,
@@ -9,7 +9,7 @@ import {
   UserRound,
   Wifi,
 } from 'lucide-react'
-import { NavLink, useLocation } from 'react-router'
+import { Link, useLocation } from 'react-router'
 
 type Tab = {
   path: string
@@ -27,9 +27,21 @@ const demoTabs: Tab[] = [
   { path: '/me', label: '我的', icon: UserRound },
 ]
 
+/**
+ * Reachable sub-pages that are not tabs yet. Only their top-bar title is
+ * registered here so the shell does not grow a second navigation model.
+ */
+const subPageTitles: Record<string, string> = {
+  '/gd': '广电服务',
+}
+
+/** Sub-pages keep their parent tab highlighted (the V0.3 behaviour). */
+const tabPathFor = (pathname: string) => (pathname === '/gd' ? '/' : pathname)
+
 function MiniProgramTopBar() {
   const { pathname } = useLocation()
-  const pageTitle = demoTabs.find((item) => item.path === pathname)?.label
+  const pageTitle =
+    subPageTitles[pathname] ?? demoTabs.find((item) => item.path === pathname)?.label
 
   return (
     <header className="relative z-10 shrink-0 border-b border-slate-100/80 bg-white">
@@ -66,6 +78,15 @@ function MiniProgramTopBar() {
 }
 
 export function MiniProgramShell({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation()
+  const mainRef = useRef<HTMLElement>(null)
+  const currentTab = tabPathFor(pathname)
+
+  // The shell owns the scroll container, so route changes must reset it here.
+  useEffect(() => {
+    if (mainRef.current) mainRef.current.scrollTop = 0
+  }, [pathname])
+
   return (
     <div className="min-h-dvh bg-[#e8f1ee] md:flex md:items-center md:justify-center md:p-5">
       <div className="hidden md:pointer-events-none md:fixed md:left-10 md:top-10 md:block">
@@ -77,7 +98,11 @@ export function MiniProgramShell({ children }: { children: ReactNode }) {
       <div className="flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-[#f5f7f7] shadow-2xl shadow-teal-900/10 md:h-[min(844px,calc(100dvh-40px))] md:max-w-[390px] md:rounded-[28px] md:border md:border-white/80">
         <MiniProgramTopBar />
 
-        <main id="main-content" className="mini-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <main
+          id="main-content"
+          ref={mainRef}
+          className="mini-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        >
           {children}
         </main>
 
@@ -85,36 +110,34 @@ export function MiniProgramShell({ children }: { children: ReactNode }) {
           aria-label="示例底部导航"
           className="relative z-10 grid shrink-0 grid-cols-3 border-t border-slate-200/70 bg-white pb-[max(env(safe-area-inset-bottom),8px)] pt-2 shadow-[0_-6px_22px_rgba(15,23,42,0.025)]"
         >
-          {demoTabs.map(({ path, label, icon: Icon }) => (
-            <NavLink
-              key={path}
-              to={path}
-              end
-              className={({ isActive }) =>
-                `flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-teal-600 ${
+          {demoTabs.map(({ path, label, icon: Icon }) => {
+            const isActive = path === currentTab
+            return (
+              <Link
+                key={path}
+                to={path}
+                aria-current={isActive ? 'page' : undefined}
+                className={`flex min-h-[52px] flex-col items-center justify-center gap-1 rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-teal-600 ${
                   isActive ? 'text-teal-700' : 'text-slate-400 hover:text-slate-600'
-                }`
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <span className="relative">
-                    <Icon
-                      size={23}
-                      strokeWidth={isActive ? 2.5 : 1.9}
-                      aria-hidden="true"
-                    />
-                    {isActive && (
-                      <span className="absolute -bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-teal-600" />
-                    )}
-                  </span>
-                  <span className={`text-[11px] leading-none ${isActive ? 'font-semibold' : 'font-medium'}`}>
-                    {label}
-                  </span>
-                </>
-              )}
-            </NavLink>
-          ))}
+                }`}
+              >
+                <span className="relative">
+                  <Icon
+                    size={23}
+                    strokeWidth={isActive ? 2.5 : 1.9}
+                    aria-hidden="true"
+                  />
+                  {isActive && (
+                    <span className="absolute -bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-teal-600" />
+                  )}
+                </span>
+                <span className={`text-[11px] leading-none ${isActive ? 'font-semibold' : 'font-medium'}`}>
+                  {label}
+                  {isActive ? <span className="sr-only">（当前）</span> : null}
+                </span>
+              </Link>
+            )
+          })}
         </nav>
       </div>
 

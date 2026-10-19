@@ -3,7 +3,8 @@
 这是基于 React + Vite + Tailwind CSS + React Router + Lucide React 的 **H5 可视化原型**，不是可直接提交微信审核的原生小程序。
 
 - `src/components/MiniProgramShell.tsx`：顶栏、模拟微信胶囊、内容滚动容器、底部导航和安全区处理。
-- `src/pages/HomePage.tsx`：首页布局槽位示范，没有获批的业务模块。
+- `src/pages/HomePage.tsx`：按 [C01 迁移地图](migration/v03-map.md) 迁入的首页演示内容（Banner、常用服务、广电入口、社区消息与活动）；未迁入页面以“待接入”提示说明，不代表正式产品定稿。
+- `src/pages/GdPage.tsx`：广电服务最低展示页（`/gd`），手机卡/宽带/电视/上门服务均明确标注演示、待接入。
 - `src/pages/ScaffoldPage.tsx`：其它标签页的占位容器及 404 回退。
 - 主路由在 `src/App.tsx`，沿用现有 `HashRouter` 以兼容静态 Pages。
 - **底部首页/发现/我的仅用于验证三 Tab 样式、切换和页面骨架，并非正式产品信息架构**。产品决策后更换导航表、对应路由和占位页。
