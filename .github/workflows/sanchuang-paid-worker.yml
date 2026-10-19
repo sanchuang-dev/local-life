@@ -1,0 +1,93 @@
+# Local Life paid Worker enrollment: default main registers Actions only.
+# All implementation and Draft PR delivery target dev; manual dispatch only.
+# Existing /free-worker run stays on the separate FREE caller.
+name: Sanchuang Paid Worker (OpenCode Go)
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Existing explicitly authorized OPEN Issue number
+        required: true
+        type: number
+
+permissions:
+  contents: read
+
+# Share the free Worker's per-Issue lock to avoid simultaneous paid/free work.
+concurrency:
+  group: free-worker-${{ github.repository }}-${{ inputs.issue_number }}
+  queue: max
+  cancel-in-progress: false
+
+jobs:
+  enrollment:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+    outputs:
+      issue_number: ${{ steps.guard.outputs.issue_number }}
+    steps:
+      - name: Enforce explicit paid opt-in and live Issue guard
+        id: guard
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO_DEFAULT: ${{ github.event.repository.default_branch }}
+          ACTOR: ${{ github.actor }}
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+        run: |
+          set -euo pipefail
+          # Only a reviewed workflow at the latest default-branch tip is trusted.
+          test "$REPO_DEFAULT" = "main"
+          test "$GITHUB_REF" = "refs/heads/$REPO_DEFAULT"
+          live_tip="$(gh api "repos/$GITHUB_REPOSITORY/branches/$REPO_DEFAULT" --jq '.commit.sha')"
+          test "$GITHUB_SHA" = "$live_tip" || {
+            echo "::error::Dispatch from the current main tip, not a stale revision." >&2
+            exit 1
+          }
+          # main is a workflow registration branch, NOT an implementation base.
+          gh api "repos/$GITHUB_REPOSITORY/branches/dev" --jq '.name' | grep -Fxq dev
+          case "$ISSUE_NUMBER" in
+            ''|*[!0-9]*|0)
+              echo "::error::Issue number must be a positive integer." >&2
+              exit 1 ;;
+          esac
+          # Workflow dispatch normally requires repository Write; confirm the
+          # authenticated actor still has maintainer/write access at run time.
+          permission="$(gh api "repos/$GITHUB_REPOSITORY/collaborators/$ACTOR/permission" --jq '.permission')"
+          case "$permission" in
+            admin|maintain|write) ;;
+            *) echo "::error::Dispatcher lacks live repository write permission." >&2; exit 1 ;;
+          esac
+          issue="$(gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE_NUMBER")"
+          jq -e '.state == "open" and (has("pull_request") | not) and
+                 ((.body // "" | gsub("[[:space:]]"; "") | length) > 0)' \
+            <<< "$issue" >/dev/null || {
+            echo "::error::Only an existing open work-item Issue is eligible." >&2
+            exit 1
+          }
+          echo "issue_number=$ISSUE_NUMBER" >> "$GITHUB_OUTPUT"
+
+  worker:
+    needs: enrollment
+    permissions:
+      contents: write
+      issues: read
+      pull-requests: write
+    uses: sanchuang-dev/.github/.github/workflows/sanchuang-paid-worker.yml@43a2aa17be3451c90cce6cb82425012b26096811
+    with:
+      issue_number: ${{ fromJSON(needs.enrollment.outputs.issue_number) }}
+      base_branch: dev
+      provider: opencode-go
+      model: deepseek-v4.1-flash
+      verification_command: |
+        set -euo pipefail
+        git diff --cached --check
+        # Keep lint, TypeScript build and the composite quality gate meaningful.
+        node -e 'const s=require("./package.json").scripts; for(const k of ["lint","build","check"]) if(typeof s?.[k]!=="string" || !s[k].trim() || /^(true|echo|:|exit 0)/.test(s[k].trim())) throw Error("Missing meaningful quality check: "+k)'
+        npm ci --no-audit --no-fund
+        npm run check
+    secrets:
+      opencode_go_api_key: ${{ secrets.SANCHUANG_OPENCODE_GO_API_KEY }}
