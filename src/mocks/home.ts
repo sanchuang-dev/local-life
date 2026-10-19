@@ -2,13 +2,9 @@ import {
   Bell,
   BookOpen,
   CalendarDays,
-  ChessKnight,
-  Droplets,
   FileText,
-  Gift,
   HeartHandshake,
   HeartPulse,
-  Music2,
   Phone,
   Plus,
   RadioTower,
@@ -25,6 +21,7 @@ import {
 /**
  * Home fixtures ported from the V0.3 home screen.
  * They are demonstration content only; no service or API is connected.
+ * Community messages/broadcasts/activities now live in `community.ts`.
  */
 
 export type EntryTone = 'mint' | 'peach'
@@ -53,7 +50,7 @@ export const homeBanner: HomeBannerContent = {
   title: '周末便民服务日',
   description: '广电手机卡、宽带咨询，社区活动和健康服务一次看齐。',
   actionLabel: '查看活动',
-  pendingNotice: '演示：活动详情与报名页面将在 C03 接入，当前不能报名。',
+  pendingNotice: '演示：便民服务日的活动详情尚未迁移，当前不能报名。',
 }
 
 export type GdQuickEntry = {
@@ -76,7 +73,7 @@ export const homeQuickEntries: ServiceEntry[] = [
     label: '社区广播',
     icon: RadioTower,
     tone: 'mint',
-    pendingNotice: '演示：社区广播页面将在 C03 接入。',
+    to: '/community/broadcast',
   },
   {
     id: 'health',
@@ -90,14 +87,14 @@ export const homeQuickEntries: ServiceEntry[] = [
     label: '党群文化',
     icon: Users,
     tone: 'mint',
-    pendingNotice: '演示：党群文化页面将在 C03 接入。',
+    to: '/community/culture',
   },
   {
     id: 'activity',
     label: '社区活动',
     icon: CalendarDays,
     tone: 'peach',
-    pendingNotice: '演示：社区活动页面将在 C03 接入。',
+    to: '/community',
   },
 ]
 
@@ -157,78 +154,5 @@ export const homeMoreServices: ServiceEntry[] = [
     icon: Plus,
     tone: 'mint',
     pendingNotice: '演示：更多服务尚未配置。',
-  },
-]
-
-export type CommunityBroadcastContent = {
-  title: string
-  meta: string
-  actionLabel: string
-  pendingNotice: string
-}
-
-export const communityBroadcast: CommunityBroadcastContent = {
-  title: '刚刚社区广播：今晚 19:00 篮球场有文艺演出',
-  meta: '今天 16:20 · 幸福里社区党群服务中心',
-  actionLabel: '重听',
-  pendingNotice: '演示：广播重听需要 C03 广播页面与音频能力，当前不可播放。',
-}
-
-export type CommunityNotice = {
-  id: string
-  title: string
-  meta: string
-  tag: string
-  tone: 'warn' | 'plain'
-  icon: LucideIcon
-  pendingNotice: string
-}
-
-export const communityNotices: CommunityNotice[] = [
-  {
-    id: 'water',
-    title: '今晚 20:00–22:00 东片区计划停水',
-    meta: '社区公共提醒 · 请提前储水',
-    tag: '通知',
-    tone: 'warn',
-    icon: Droplets,
-    pendingNotice: '演示：通知详情尚未接入。',
-  },
-  {
-    id: 'welfare',
-    title: '周六集体福利领取通知',
-    meta: '时间、地点与领取对象请查看详情（示例）',
-    tag: '街坊',
-    tone: 'plain',
-    icon: Gift,
-    pendingNotice: '演示：通知详情尚未接入。',
-  },
-]
-
-export type CommunityActivity = {
-  id: string
-  title: string
-  meta: string
-  icon: LucideIcon
-  tone: EntryTone
-  pendingNotice: string
-}
-
-export const communityActivities: CommunityActivity[] = [
-  {
-    id: 'chess',
-    title: '象棋友谊赛',
-    meta: '14:30 · 余 6 位',
-    icon: ChessKnight,
-    tone: 'mint',
-    pendingNotice: '演示：活动详情与报名将在 C03 接入。',
-  },
-  {
-    id: 'dance',
-    title: '广场舞教学',
-    meta: '19:00 · 免费',
-    icon: Music2,
-    tone: 'peach',
-    pendingNotice: '演示：活动详情与报名将在 C03 接入。',
   },
 ]
