@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { DemoNote } from '../components/DemoNote'
 import { PageHeader } from '../components/PageHeader'
 import { PendingNotice } from '../components/PendingNotice'
+import { useBackTarget } from '../hooks/useBackTarget'
 import { usePendingNotice } from '../hooks/usePendingNotice'
 import {
   healthLectureFilters,
@@ -18,6 +19,7 @@ const toneStyles = {
 
 export function HealthLecturePage() {
   const { message, show, dismiss } = usePendingNotice()
+  const { backTo, backLabel } = useBackTarget('/health', '返回健康服务')
   const [filter, setFilter] = useState<HealthLectureFilter>('全部')
   const visible =
     filter === '全部'
@@ -27,8 +29,8 @@ export function HealthLecturePage() {
   return (
     <div className="px-4 pb-7 pt-3">
       <PageHeader
-        backTo="/health"
-        backLabel="返回健康服务"
+        backTo={backTo}
+        backLabel={backLabel}
         icon={BookOpen}
         title="健康讲堂"
         subtitle="科普内容 · 商业标识 · 演示播放"

@@ -10,12 +10,20 @@ const toneStyles = {
  * Goods tile shared by the life and exchange screens. Every tile links to its
  * own product id so a detail page does not substitute one product for another.
  */
-export function LifeProductCard({ product }: { product: LifeProduct }) {
+export function LifeProductCard({
+  product,
+  from,
+}: {
+  product: LifeProduct
+  /** Optional entry module so the shared detail page can return where it came from. */
+  from?: string
+}) {
   const Icon = product.icon
 
   return (
     <Link
       to={`/life/product/${product.id}`}
+      state={from ? { from } : undefined}
       className="group flex min-w-0 flex-col overflow-hidden rounded-[18px] border border-slate-100 bg-white shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
     >
       <span

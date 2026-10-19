@@ -52,6 +52,7 @@ export function PointsPage() {
         </div>
         <Link
           to="/life/exchange"
+          state={{ from: '/points' }}
           className="mt-4 flex min-h-[44px] w-full items-center justify-center rounded-xl bg-teal-700 text-[13px] font-semibold text-white transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
         >
           去兑换好礼
@@ -92,7 +93,7 @@ export function PointsPage() {
             }`
 
             return to ? (
-              <Link key={id} to={to} className={`${className} hover:bg-slate-50`}>
+              <Link key={id} to={to} state={{ from: '/points' }} className={`${className} hover:bg-slate-50`}>
                 {content}
               </Link>
             ) : (

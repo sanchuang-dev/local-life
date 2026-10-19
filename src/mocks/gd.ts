@@ -89,6 +89,3 @@ export const gdMyServices: GdMyService[] = [
     pendingNotice: '演示：广电权益数据尚未接入。',
   },
 ]
-
-export const gdBroadcastNotice =
-  '演示：社区广播页面将在 C03 接入，当前无法查看广播列表。'
