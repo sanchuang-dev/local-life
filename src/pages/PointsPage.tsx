@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import { DemoNote } from '../components/DemoNote'
 import { PageHeader } from '../components/PageHeader'
 import { SectionHeading } from '../components/home/SectionHeading'
+import { useBackTarget } from '../hooks/useBackTarget'
 import {
   lifePoints,
   pointsRules,
@@ -16,11 +17,13 @@ const toneStyles = {
 } as const
 
 export function PointsPage() {
+  const { backTo, backLabel } = useBackTarget('/life', '返回惠生活')
+
   return (
     <div className="px-4 pb-7 pt-3">
       <PageHeader
-        backTo="/life"
-        backLabel="返回惠生活"
+        backTo={backTo}
+        backLabel={backLabel}
         icon={Coins}
         title="我的积分"
         subtitle="余额 · 获取任务 · 明细与规则"

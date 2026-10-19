@@ -87,7 +87,12 @@ export function HealthPage() {
       </section>
 
       <section className="mt-6">
-        <SectionHeading title="健康档案" actionLabel="我的设备" actionTo="/me/devices" />
+        <SectionHeading
+          title="健康档案"
+          actionLabel="我的设备"
+          actionTo="/me/devices"
+          actionState={{ from: '/health' }}
+        />
         <article className="rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm">
           <div className="grid grid-cols-2 gap-3">
             {healthMetrics.map((metric) => (
