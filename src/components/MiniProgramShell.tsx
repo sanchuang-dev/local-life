@@ -37,11 +37,25 @@ const subPageTitles: Record<string, string> = {
   '/community/broadcast': '社区广播',
   '/community/activity': '活动详情',
   '/community/culture': '党群文化中心',
+  '/health': '健康服务',
+  '/health/assistant': '社区助手',
+  '/health/device': '魔镜健康终端',
+  '/health/lecture': '健康讲堂',
+  '/me/devices': '我的设备',
 }
 
 /** Sub-pages keep their parent tab highlighted (the V0.3 behaviour). */
-const tabPathFor = (pathname: string) =>
-  pathname === '/gd' || pathname.startsWith('/community') ? '/' : pathname
+const tabPathFor = (pathname: string) => {
+  if (
+    pathname === '/gd' ||
+    pathname.startsWith('/community') ||
+    pathname.startsWith('/health')
+  ) {
+    return '/'
+  }
+  if (pathname.startsWith('/me/')) return '/me'
+  return pathname
+}
 
 function MiniProgramTopBar() {
   const { pathname } = useLocation()

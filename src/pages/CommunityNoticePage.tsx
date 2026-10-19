@@ -1,7 +1,7 @@
 import { ArrowLeft, ChevronRight } from 'lucide-react'
 import { Link, useParams } from 'react-router'
-import { CommunityHeader } from '../components/community/CommunityHeader'
-import { DemoNote } from '../components/community/DemoNote'
+import { PageHeader } from '../components/PageHeader'
+import { DemoNote } from '../components/DemoNote'
 import { communityNotices } from '../mocks/community'
 
 export function CommunityNoticePage() {
@@ -38,7 +38,7 @@ export function CommunityNoticePage() {
 
   return (
     <div className="px-4 pb-7 pt-3">
-      <CommunityHeader
+      <PageHeader
         backTo="/community"
         backLabel="返回社区"
         icon={notice.icon}

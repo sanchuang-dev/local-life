@@ -1,7 +1,7 @@
 import { ArrowLeft, type LucideIcon } from 'lucide-react'
 import { Link } from 'react-router'
 
-type CommunityHeaderProps = {
+type PageHeaderProps = {
   backTo: string
   backLabel: string
   icon: LucideIcon
@@ -10,16 +10,17 @@ type CommunityHeaderProps = {
 }
 
 /**
- * Shared header for the C03 community pages: an explicit back link (the shell
- * has no community tab) plus the page icon, title and subtitle.
+ * Shared header for migrated sub-pages that are not bottom tabs: an explicit
+ * back link plus the page icon, title and subtitle. Community and health pages
+ * use the same structure so the back affordance stays consistent.
  */
-export function CommunityHeader({
+export function PageHeader({
   backTo,
   backLabel,
   icon: Icon,
   title,
   subtitle,
-}: CommunityHeaderProps) {
+}: PageHeaderProps) {
   return (
     <>
       <Link
