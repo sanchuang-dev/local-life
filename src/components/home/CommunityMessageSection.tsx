@@ -1,28 +1,24 @@
 import { RadioTower, Volume2 } from 'lucide-react'
-import type {
-  CommunityBroadcastContent,
-  CommunityNotice,
-} from '../../mocks/home'
+import { Link } from 'react-router'
+import type { CommunityBroadcastSummary, CommunityNotice } from '../../mocks/community'
 import { SectionHeading } from './SectionHeading'
 
 type CommunityMessageSectionProps = {
-  broadcast: CommunityBroadcastContent
+  broadcast: CommunityBroadcastSummary
   notices: CommunityNotice[]
-  onPending: (notice: string) => void
 }
 
+/**
+ * Home community messages. The broadcast and notice entries now link to the
+ * C03 community pages instead of showing a "not migrated yet" notice.
+ */
 export function CommunityMessageSection({
   broadcast,
   notices,
-  onPending,
 }: CommunityMessageSectionProps) {
   return (
     <section className="mx-4 mt-7">
-      <SectionHeading
-        title="社区消息"
-        actionLabel="全部消息"
-        onAction={() => onPending('演示：社区广播与消息列表将在 C03 接入。')}
-      />
+      <SectionHeading title="社区消息" actionLabel="全部消息" actionTo="/community" />
 
       <article className="rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
         <div className="flex items-start gap-3">
@@ -37,27 +33,22 @@ export function CommunityMessageSection({
             <p className="mt-1 text-[11px] leading-5 text-slate-400">{broadcast.meta}</p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => onPending(broadcast.pendingNotice)}
+        <Link
+          to={broadcast.to}
           className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl border border-teal-200/80 bg-teal-50/60 text-[12px] font-semibold text-teal-700 transition-colors hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
         >
           <Volume2 size={15} aria-hidden="true" />
           {broadcast.actionLabel}
-          <span className="rounded-full bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
-            待接入
-          </span>
-        </button>
+        </Link>
       </article>
 
       <div className="mt-3 overflow-hidden rounded-[18px] border border-slate-100 bg-white shadow-sm">
         {notices.map((notice, index) => {
           const Icon = notice.icon
           return (
-            <button
+            <Link
               key={notice.id}
-              type="button"
-              onClick={() => onPending(notice.pendingNotice)}
+              to={`/community/notice/${notice.id}`}
               className={`flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-teal-600 ${
                 index > 0 ? 'border-t border-slate-100' : ''
               }`}
@@ -87,7 +78,7 @@ export function CommunityMessageSection({
               >
                 {notice.tag}
               </span>
-            </button>
+            </Link>
           )
         })}
       </div>

@@ -8,9 +8,11 @@ import { SectionHeading } from '../components/home/SectionHeading'
 import { ServiceEntryGrid } from '../components/home/ServiceEntryGrid'
 import { usePendingNotice } from '../hooks/usePendingNotice'
 import {
-  communityActivities,
-  communityBroadcast,
-  communityNotices,
+  communityBroadcastSummary,
+  homeCommunityActivities,
+  homeCommunityNotices,
+} from '../mocks/community'
+import {
   homeBanner,
   homeGdEntries,
   homeMoreServices,
@@ -46,12 +48,11 @@ export function HomePage() {
       </section>
 
       <CommunityMessageSection
-        broadcast={communityBroadcast}
-        notices={communityNotices}
-        onPending={show}
+        broadcast={communityBroadcastSummary}
+        notices={homeCommunityNotices}
       />
 
-      <CommunityActivitySection activities={communityActivities} onPending={show} />
+      <CommunityActivitySection activities={homeCommunityActivities} />
 
       <div className="mx-4 mt-7 flex gap-3 rounded-[16px] border border-dashed border-teal-300/70 bg-[#eef7f2] p-4 text-[#52786c]">
         <CircleHelp size={19} className="mt-0.5 shrink-0" aria-hidden="true" />

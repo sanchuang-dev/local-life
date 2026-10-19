@@ -1,5 +1,10 @@
 import { Route, Routes } from 'react-router'
 import { MiniProgramShell } from './components/MiniProgramShell'
+import { CommunityActivityPage } from './pages/CommunityActivityPage'
+import { CommunityBroadcastPage } from './pages/CommunityBroadcastPage'
+import { CommunityCulturePage } from './pages/CommunityCulturePage'
+import { CommunityNoticePage } from './pages/CommunityNoticePage'
+import { CommunityPage } from './pages/CommunityPage'
 import { GdPage } from './pages/GdPage'
 import { HomePage } from './pages/HomePage'
 import { ScaffoldPage } from './pages/ScaffoldPage'
@@ -10,6 +15,11 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/gd" element={<GdPage />} />
+        <Route path="/community" element={<CommunityPage />} />
+        <Route path="/community/broadcast" element={<CommunityBroadcastPage />} />
+        <Route path="/community/activity" element={<CommunityActivityPage />} />
+        <Route path="/community/culture" element={<CommunityCulturePage />} />
+        <Route path="/community/notice/:noticeId" element={<CommunityNoticePage />} />
         <Route
           path="/discover"
           element={<ScaffoldPage variant="discover" />}

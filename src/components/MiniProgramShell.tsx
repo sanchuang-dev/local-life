@@ -33,15 +33,23 @@ const demoTabs: Tab[] = [
  */
 const subPageTitles: Record<string, string> = {
   '/gd': '广电服务',
+  '/community': '社区',
+  '/community/broadcast': '社区广播',
+  '/community/activity': '活动详情',
+  '/community/culture': '党群文化中心',
 }
 
 /** Sub-pages keep their parent tab highlighted (the V0.3 behaviour). */
-const tabPathFor = (pathname: string) => (pathname === '/gd' ? '/' : pathname)
+const tabPathFor = (pathname: string) =>
+  pathname === '/gd' || pathname.startsWith('/community') ? '/' : pathname
 
 function MiniProgramTopBar() {
   const { pathname } = useLocation()
   const pageTitle =
-    subPageTitles[pathname] ?? demoTabs.find((item) => item.path === pathname)?.label
+    subPageTitles[pathname] ??
+    (pathname.startsWith('/community/notice/')
+      ? '消息详情'
+      : demoTabs.find((item) => item.path === pathname)?.label)
 
   return (
     <header className="relative z-10 shrink-0 border-b border-slate-100/80 bg-white">
