@@ -4,6 +4,7 @@ import { DemoNote } from '../components/DemoNote'
 import { LifeProductCard } from '../components/life/LifeProductCard'
 import { PointsSummaryCard } from '../components/life/PointsSummaryCard'
 import { PageHeader } from '../components/PageHeader'
+import { useBackTarget } from '../hooks/useBackTarget'
 import {
   lifeExchangeNote,
   lifeProductFilters,
@@ -12,6 +13,7 @@ import {
 } from '../mocks/life'
 
 export function ExchangePage() {
+  const { backTo, backLabel } = useBackTarget('/life', '返回惠生活')
   const [filter, setFilter] = useState<LifeProductFilter>('全部')
   const visible =
     filter === '全部'
@@ -21,8 +23,8 @@ export function ExchangePage() {
   return (
     <div className="px-4 pb-7 pt-3">
       <PageHeader
-        backTo="/life"
-        backLabel="返回惠生活"
+        backTo={backTo}
+        backLabel={backLabel}
         icon={Ticket}
         title="积分兑换"
         subtitle="好礼与权益列表 · 演示兑换"
@@ -33,7 +35,7 @@ export function ExchangePage() {
       </DemoNote>
 
       <div className="mt-4">
-        <PointsSummaryCard />
+        <PointsSummaryCard from="/life/exchange" />
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2" aria-label="兑换分类">
@@ -67,7 +69,7 @@ export function ExchangePage() {
       ) : (
         <div className="mt-4 grid grid-cols-2 gap-3">
           {visible.map((product) => (
-            <LifeProductCard key={product.id} product={product} />
+            <LifeProductCard key={product.id} product={product} from="/life/exchange" />
           ))}
         </div>
       )}

@@ -3,7 +3,7 @@ import { Link } from 'react-router'
 import { PendingNotice } from '../components/PendingNotice'
 import { useBackTarget } from '../hooks/useBackTarget'
 import { usePendingNotice } from '../hooks/usePendingNotice'
-import { gdBroadcastNotice, gdMyServices, gdPackage, gdServices } from '../mocks/gd'
+import { gdMyServices, gdPackage, gdServices } from '../mocks/gd'
 
 export function GdPage() {
   const { message, show, dismiss } = usePendingNotice()
@@ -134,7 +134,7 @@ export function GdPage() {
       <section className="mt-6 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
         <h2 className="text-[16px] font-semibold text-slate-800">社区广播联动</h2>
         <p className="mt-2 text-[12px] leading-6 text-slate-500">
-          社区广播承担公共触达，小程序负责重听、查看文字、报名与后续服务；公共广播不作为商业广告渠道。
+          社区广播承担公共触达；规划中由小程序提供广播文字回看与后续服务，音频重听尚未接入。公共广播不作为商业广告渠道。
         </p>
         <div className="mt-2.5 flex flex-wrap gap-1.5" aria-hidden="true">
           {['广播', '通知', '活动', '服务'].map((tag) => (
@@ -146,13 +146,16 @@ export function GdPage() {
             </span>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={() => show(gdBroadcastNotice)}
-          className="mt-3 min-h-[44px] w-full rounded-xl border border-teal-200/80 bg-teal-50/60 text-[13px] font-semibold text-teal-700 transition-colors hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+        <Link
+          to="/community/broadcast"
+          state={{ from: '/gd' }}
+          className="mt-3 flex min-h-[44px] w-full items-center justify-center rounded-xl border border-teal-200/80 bg-teal-50/60 text-[13px] font-semibold text-teal-700 transition-colors hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
         >
-          查看社区广播 · 待接入
-        </button>
+          查看社区广播
+        </Link>
+        <p className="mt-2 text-[11px] leading-5 text-slate-400">
+          广播列表与文字详情已可浏览；音频重听仍未接入。
+        </p>
       </section>
 
       <div className="mt-6 flex gap-3 rounded-[16px] border border-dashed border-teal-300/70 bg-[#eef7f2] p-4 text-[#52786c]">
@@ -160,7 +163,7 @@ export function GdPage() {
         <div>
           <p className="text-[12px] font-semibold">仅作界面展示</p>
           <p className="mt-1 text-[11px] leading-[1.7]">
-            本页迁自 V0.3 广电服务页，未接入运营商接口、订单或支付；所有按钮都会明确提示待接入。
+            本页迁自 V0.3 广电服务页，未接入运营商接口、订单或支付；办理与权益按钮都会明确提示待接入。
           </p>
         </div>
       </div>

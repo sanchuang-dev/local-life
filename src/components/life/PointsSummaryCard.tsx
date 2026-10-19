@@ -6,7 +6,7 @@ import { lifePoints } from '../../mocks/life'
  * The resident-points balance block shared by the life and exchange screens.
  * The balance is static fixture data, never a real account value.
  */
-export function PointsSummaryCard() {
+export function PointsSummaryCard({ from }: { from?: string }) {
   return (
     <article className="rounded-[20px] border border-[#e8d2a8] bg-[#fff7ec] p-4">
       <div className="flex items-end justify-between gap-3">
@@ -25,6 +25,7 @@ export function PointsSummaryCard() {
         </div>
         <Link
           to="/points"
+          state={from ? { from } : undefined}
           className="inline-flex min-h-[44px] shrink-0 items-center gap-0.5 rounded-xl border border-[#e8d2a8] bg-white px-3 text-[12px] font-semibold text-[#8a6132] transition-colors hover:bg-[#fffdf8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
         >
           积分明细
