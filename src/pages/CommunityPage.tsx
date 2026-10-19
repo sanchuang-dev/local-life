@@ -1,7 +1,7 @@
 import { ChevronRight, Users } from 'lucide-react'
 import { Link } from 'react-router'
-import { CommunityHeader } from '../components/community/CommunityHeader'
-import { DemoNote } from '../components/community/DemoNote'
+import { PageHeader } from '../components/PageHeader'
+import { DemoNote } from '../components/DemoNote'
 import { PendingNotice } from '../components/PendingNotice'
 import { usePendingNotice } from '../hooks/usePendingNotice'
 import {
@@ -20,7 +20,7 @@ export function CommunityPage() {
 
   return (
     <div className="px-4 pb-7 pt-3">
-      <CommunityHeader
+      <PageHeader
         backTo="/"
         backLabel="返回首页"
         icon={Users}

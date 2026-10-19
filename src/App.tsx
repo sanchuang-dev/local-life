@@ -6,6 +6,11 @@ import { CommunityCulturePage } from './pages/CommunityCulturePage'
 import { CommunityNoticePage } from './pages/CommunityNoticePage'
 import { CommunityPage } from './pages/CommunityPage'
 import { GdPage } from './pages/GdPage'
+import { HealthAssistantPage } from './pages/HealthAssistantPage'
+import { HealthDevicePage } from './pages/HealthDevicePage'
+import { HealthDevicesPage } from './pages/HealthDevicesPage'
+import { HealthLecturePage } from './pages/HealthLecturePage'
+import { HealthPage } from './pages/HealthPage'
 import { HomePage } from './pages/HomePage'
 import { ScaffoldPage } from './pages/ScaffoldPage'
 
@@ -20,6 +25,11 @@ export default function App() {
         <Route path="/community/activity" element={<CommunityActivityPage />} />
         <Route path="/community/culture" element={<CommunityCulturePage />} />
         <Route path="/community/notice/:noticeId" element={<CommunityNoticePage />} />
+        <Route path="/health" element={<HealthPage />} />
+        <Route path="/health/assistant" element={<HealthAssistantPage />} />
+        <Route path="/health/device" element={<HealthDevicePage />} />
+        <Route path="/health/lecture" element={<HealthLecturePage />} />
+        <Route path="/me/devices" element={<HealthDevicesPage />} />
         <Route
           path="/discover"
           element={<ScaffoldPage variant="discover" />}

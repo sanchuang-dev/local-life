@@ -21,8 +21,8 @@ const toneStyles = {
 } as const
 
 /**
- * Static "this is a demonstration" banner shared by the community pages so the
- * demo semantics stay identical instead of being re-worded per page.
+ * Static "this is a demonstration" banner shared by migrated pages so the demo
+ * semantics stay identical instead of being re-worded per page.
  */
 export function DemoNote({ children, tone = 'info' }: DemoNoteProps) {
   const { box, icon, Icon } = toneStyles[tone]

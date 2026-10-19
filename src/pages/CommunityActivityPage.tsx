@@ -1,6 +1,6 @@
 import { CalendarDays, QrCode, BellRing } from 'lucide-react'
-import { CommunityHeader } from '../components/community/CommunityHeader'
-import { DemoNote } from '../components/community/DemoNote'
+import { PageHeader } from '../components/PageHeader'
+import { DemoNote } from '../components/DemoNote'
 import { PendingNotice } from '../components/PendingNotice'
 import { usePendingNotice } from '../hooks/usePendingNotice'
 import { communityActivityDetail } from '../mocks/community'
@@ -12,7 +12,7 @@ export function CommunityActivityPage() {
 
   return (
     <div className="px-4 pb-7 pt-3">
-      <CommunityHeader
+      <PageHeader
         backTo="/community"
         backLabel="返回社区"
         icon={CalendarDays}

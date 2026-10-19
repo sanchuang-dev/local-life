@@ -80,7 +80,7 @@ export const homeQuickEntries: ServiceEntry[] = [
     label: '健康服务',
     icon: HeartPulse,
     tone: 'peach',
-    pendingNotice: '演示：健康服务页面将在 C04 接入。',
+    to: '/health',
   },
   {
     id: 'culture',

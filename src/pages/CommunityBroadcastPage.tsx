@@ -1,8 +1,8 @@
 import { ChevronDown, Info, Megaphone, ShieldAlert } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { CommunityHeader } from '../components/community/CommunityHeader'
-import { DemoNote } from '../components/community/DemoNote'
+import { PageHeader } from '../components/PageHeader'
+import { DemoNote } from '../components/DemoNote'
 import {
   communityBroadcasts,
   type CommunityBroadcastPeriod,
@@ -23,7 +23,7 @@ export function CommunityBroadcastPage() {
 
   return (
     <div className="px-4 pb-7 pt-3">
-      <CommunityHeader
+      <PageHeader
         backTo="/community"
         backLabel="返回社区"
         icon={Megaphone}
