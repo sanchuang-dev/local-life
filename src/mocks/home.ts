@@ -3,6 +3,7 @@ import {
   BookOpen,
   CalendarDays,
   FileText,
+  Gift,
   HeartHandshake,
   HeartPulse,
   Phone,
@@ -81,6 +82,13 @@ export const homeQuickEntries: ServiceEntry[] = [
     icon: HeartPulse,
     tone: 'peach',
     to: '/health',
+  },
+  {
+    id: 'life',
+    label: '惠生活',
+    icon: Gift,
+    tone: 'mint',
+    to: '/life',
   },
   {
     id: 'culture',

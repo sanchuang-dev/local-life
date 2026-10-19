@@ -41,6 +41,9 @@ const subPageTitles: Record<string, string> = {
   '/health/assistant': '社区助手',
   '/health/device': '魔镜健康终端',
   '/health/lecture': '健康讲堂',
+  '/life': '惠生活',
+  '/life/exchange': '积分兑换',
+  '/points': '我的积分',
   '/me/devices': '我的设备',
 }
 
@@ -49,11 +52,12 @@ const tabPathFor = (pathname: string) => {
   if (
     pathname === '/gd' ||
     pathname.startsWith('/community') ||
-    pathname.startsWith('/health')
+    pathname.startsWith('/health') ||
+    pathname.startsWith('/life')
   ) {
     return '/'
   }
-  if (pathname.startsWith('/me/')) return '/me'
+  if (pathname === '/points' || pathname.startsWith('/me/')) return '/me'
   return pathname
 }
 
@@ -63,7 +67,9 @@ function MiniProgramTopBar() {
     subPageTitles[pathname] ??
     (pathname.startsWith('/community/notice/')
       ? '消息详情'
-      : demoTabs.find((item) => item.path === pathname)?.label)
+      : pathname.startsWith('/life/product/')
+        ? '商品详情'
+        : demoTabs.find((item) => item.path === pathname)?.label)
 
   return (
     <header className="relative z-10 shrink-0 border-b border-slate-100/80 bg-white">
