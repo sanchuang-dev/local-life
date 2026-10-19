@@ -1,20 +1,44 @@
-# Local Life — Repository Engineering Contract
+# 本地生活 · 前端施工规约
 
-Before work read the current `sanchuang-dev/.github/AGENTS.md`, then this file and the active Issue/PR/task contract. Do not substitute remembered policies.
+本仓库继承 [三创组织宪法](https://github.com/sanchuang-dev/.github/blob/main/AGENTS.md)。施工前读取组织现行规则、本文件与当前任务契约。本文件只规定本项目特例，不复制组织的派卡、权限和验收流程。
 
-## Purpose
-This repository owns **new, maintainable** local-life frontend source. React + TypeScript, Vite, Tailwind CSS, React Router are the maintainer-approved stack. The ongoing product simplification is undecided: do not assume legacy V0.3 screens must be copied wholesale.
+## 1. 定位与技术
 
-The old `sanchuang-dev/base-prototype/demo/local-life` is the **archived-style historical presentation source** and still powers the old public `/base-prototype/local-life/` route. Until a separately approved cutover, do not modify its publishing flow, copy the same business source into two live projects, or promise feature parity.
+- 这是持续维护的**移动端优先、可独立预览**的本地生活原型，不是真实生产系统。
+- 固定技术栈：React + TypeScript + Vite + Tailwind CSS + React Router + Lucide React；实际依赖版本以 `package.json`、lockfile 为准。
+- 这一轮产品做减法/加法，**新版功能与 Tab 尚未定稿**。旧 [V0.3](https://github.com/sanchuang-dev/base-prototype/blob/demo/local-life/docs/PRD-V0.3.md) 只是历史参考，不得自动全量复刻，更不得改动旧预览发布链路。
+- 默认选简单直白的实现。**不为原型引入状态管理框架、组件库、后端、复杂设计系统或目录搬家**；确有需要再单独讨论。
 
-## Branches
-Follow `feat/* -> dev -> test -> prod`. `main` is the default-branch policy and workflow registration surface, **not** a deployment environment. `dev` may deploy to the separate GitHub Pages *development preview*, never claim this is `prod`. Only `prod` could become a production source under separately approved deployment rules.
+## 2. 代码怎么放（按需创建目录）
 
-## Implementation
-Prefer small, typed feature modules; keep page components separate from demo data and adapters when product screens are introduced. Do not introduce APIs, sensitive personal/medical data, fake government endorsements, real payments, or production secrets. Clearly label all demo actions. Do not add navigation/features without an explicit product decision.
+```text
+src/
+  App.tsx           # 当前集中注册路由
+  pages/            # 路由级页面；一个页面一个文件/小目录
+  components/       # 真正复用的组件；通用组件可放 components/ui/
+  layouts/          # 多个页面共用布局时再建
+  mocks/            # 原型样例数据与演示场景
+  services/         # 确有接口接入时再建，统一数据边界
+  index.css         # 现有 Tailwind 入口和少量全局样式
+```
 
-## Verification
-Node 22 + npm. `npm ci`, `npm run check` (Oxlint, TypeScript compile, Vite build), verify internal links and visible behavior for UI work. CSS/JS bundled by Vite, base path `/local-life/`. GitHub Pages static preview uses React Router HashRouter for safe deep links. A green CI does not prove device/browser interaction; report the gap.
+- 上面是**放置约定，不是要求一次性建空目录**；现有简单页面可继续留在 `App.tsx`，新增正式业务页再逐步拆出。
+- 页面负责展示、页面级交互和状态，重复出现的 UI 再抽组件；先查已有组件，避免「一页一个自造按钮」或过度封装。
+- 路由统一走 React Router，复用现有 `HashRouter`（GitHub Pages 静态托管），不新增第二套路由逻辑。
+- TypeScript 明确约束业务数据与 Props，不用无边界 `any`；不安装一套项目尚不需要的全局状态框架。
 
-## Worker
-Only repository-approved Organization V2 caller with exact immutable SHA and verified base `dev` may dispatch, on an authorized open Issue. Independent readonly verification and Draft PR delivery are required; model must not merge, close Issues, deploy or approve its own work. Never weaken checks merely to pass.
+## 3. UI 与数据
+
+- **移动端优先**：以 375 × 812 为主要查看基准，兼顾常见窄屏、触控面积、滚动与底部安全区；不要为了桌面效果损坏移动端。
+- 设计依据按优先级：**当前用户确认 > 新版已确认原型/截图 > 已验收页面 > 旧版 V0.3 参考 > 实现者推断**。若关键功能、视觉方向未确认，不擅自定稿。
+- Tailwind 优先；Lucide 用于通用图标。共享的颜色/间距/圆角需要一致，但**不照搬卡博士的金橙 Com Design 主题**；品牌视觉以后续产品决策为准。
+- 原型列表、卡片等展示用样例数据放 `mocks/` 或独立数据文件，保持稳定可复现；不要把大段假数据散落在 JSX。极少量纯静态演示文案无需为此建立 service。
+- 真 API 出现后由 `services/` 收敛访问入口，页面不散写接口 URL 或 `fetch`。Mock/真实数据必须能明确区分，不能用 Mock 成功掩盖接口失败。
+- 交互涉及的加载、空、错误、禁用和成功状态按任务需求覆盖；所有未接入的服务、提交、支付等必须明确标记**演示**，不得模拟成真实操作或使用用户隐私数据。
+
+## 4. 分支、验证与牛马
+
+- `main` 是默认分支及工作流入口，**不是生产分支**；业务工作 `feat/* → dev → test → prod`。目前只有 `dev` 的 GitHub Pages 开发预览，不代表生产发布。
+- 小步施工，只修改任务范围；不顺手迁移所有旧页面、重构无关模块或删除旧原型证据。
+- 代码提交前至少运行 `npm ci`（安装/锁文件变化时）及 `npm run check`（Oxlint + TypeScript + Vite build）；改交互/路由还需实际验证对应入口、返回及可见状态，没验证不得宣称通过。
+- 三创 V2 免费 Worker 调用器已安装于 `main`，实现 PR 目标为 `dev`。只允许针对明确授权的 Open Issue 施工并交付 Draft PR；牛马无自行合并、关卡或发布权。**本仓库 Issue → Draft PR 的真实 E2E 尚待验收**。
