@@ -23,10 +23,8 @@ export function HealthPage() {
   const AssistantIcon = healthAssistantEntry.icon
 
   return (
-    <div className="px-4 pb-7 pt-3">
+    <div className="px-4 pb-7 pt-4">
       <PageHeader
-        backTo="/"
-        backLabel="返回首页"
         icon={HeartPulse}
         title="健康服务"
         subtitle="社区助手 · 家庭设备 · 健康讲堂"

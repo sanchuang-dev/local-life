@@ -2,63 +2,85 @@ import { type ReactNode, useEffect, useRef } from 'react'
 import {
   BatteryFull,
   CircleDot,
-  Compass,
   Ellipsis,
+  Gift,
+  HeartPulse,
   House,
   Signal,
   UserRound,
+  Users,
   Wifi,
 } from 'lucide-react'
 import { Link, useLocation } from 'react-router'
 
+type TabPath = '/' | '/community' | '/health' | '/life' | '/me'
+
 type Tab = {
-  path: string
+  path: TabPath
   label: string
   icon: typeof House
 }
 
-/**
- * Temporary demo tabs only. The product owner will decide the final
- * navigation before business pages are implemented.
- */
-const demoTabs: Tab[] = [
+/** Confirmed demo information architecture: five business modules. */
+const tabs: Tab[] = [
   { path: '/', label: '首页', icon: House },
-  { path: '/discover', label: '发现', icon: Compass },
+  { path: '/community', label: '社区', icon: Users },
+  { path: '/health', label: '健康', icon: HeartPulse },
+  { path: '/life', label: '惠生活', icon: Gift },
   { path: '/me', label: '我的', icon: UserRound },
 ]
 
+const tabPaths = new Set(tabs.map((tab) => tab.path))
+
 /**
- * Reachable sub-pages that are not tabs yet. Only their top-bar title is
+ * Reachable sub-pages that are not tabs. Only their top-bar title is
  * registered here so the shell does not grow a second navigation model.
  */
 const subPageTitles: Record<string, string> = {
   '/gd': '广电服务',
-  '/community': '社区',
   '/community/broadcast': '社区广播',
   '/community/activity': '活动详情',
   '/community/culture': '党群文化中心',
-  '/health': '健康服务',
   '/health/assistant': '社区助手',
   '/health/device': '魔镜健康终端',
   '/health/lecture': '健康讲堂',
-  '/life': '惠生活',
   '/life/exchange': '积分兑换',
   '/points': '我的积分',
   '/me/devices': '我的设备',
 }
 
-/** Sub-pages keep their parent tab highlighted (the V0.3 behaviour). */
-const tabPathFor = (pathname: string) => {
-  if (
-    pathname === '/gd' ||
-    pathname.startsWith('/community') ||
-    pathname.startsWith('/health') ||
-    pathname.startsWith('/life')
-  ) {
-    return '/'
+/**
+ * Detail pages that can be opened from more than one module. They use the
+ * link source when it resolves to a tab; direct visits fall back to the
+ * page's stable primary module.
+ */
+const sharedSubPageTabs: Record<string, TabPath> = {
+  '/gd': '/',
+  '/points': '/life',
+  '/me/devices': '/me',
+}
+
+/** Resolve a pathname to the module that owns it, or undefined for 404. */
+const tabForPath = (pathname: string): TabPath | undefined => {
+  if (pathname === '/') return '/'
+  if (pathname.startsWith('/community')) return '/community'
+  if (pathname.startsWith('/health')) return '/health'
+  if (pathname.startsWith('/life')) return '/life'
+  if (pathname === '/me' || pathname.startsWith('/me/')) return '/me'
+  return undefined
+}
+
+const activeTabFor = (pathname: string, state: unknown): TabPath | undefined => {
+  const fallback = sharedSubPageTabs[pathname]
+  if (fallback) {
+    const from = (state as { from?: unknown } | null)?.from
+    if (typeof from === 'string' && from.startsWith('/') && !from.startsWith('//')) {
+      const sourceTab = tabForPath(from)
+      if (sourceTab && tabPaths.has(sourceTab)) return sourceTab
+    }
+    return fallback
   }
-  if (pathname === '/points' || pathname.startsWith('/me/')) return '/me'
-  return pathname
+  return tabForPath(pathname)
 }
 
 function MiniProgramTopBar() {
@@ -71,7 +93,7 @@ function MiniProgramTopBar() {
         ? '活动详情'
         : pathname.startsWith('/life/product/')
           ? '商品详情'
-          : demoTabs.find((item) => item.path === pathname)?.label)
+          : tabs.find((item) => item.path === pathname)?.label)
 
   return (
     <header className="relative z-10 shrink-0 border-b border-slate-100/80 bg-white">
@@ -108,9 +130,9 @@ function MiniProgramTopBar() {
 }
 
 export function MiniProgramShell({ children }: { children: ReactNode }) {
-  const { pathname } = useLocation()
+  const { pathname, state } = useLocation()
   const mainRef = useRef<HTMLElement>(null)
-  const currentTab = tabPathFor(pathname)
+  const currentTab = activeTabFor(pathname, state)
 
   // The shell owns the scroll container, so route changes must reset it here.
   useEffect(() => {
@@ -137,10 +159,10 @@ export function MiniProgramShell({ children }: { children: ReactNode }) {
         </main>
 
         <nav
-          aria-label="示例底部导航"
-          className="relative z-10 grid shrink-0 grid-cols-3 border-t border-slate-200/70 bg-white pb-[max(env(safe-area-inset-bottom),8px)] pt-2 shadow-[0_-6px_22px_rgba(15,23,42,0.025)]"
+          aria-label="主导航"
+          className="relative z-10 grid shrink-0 grid-cols-5 border-t border-slate-200/70 bg-white pb-[max(env(safe-area-inset-bottom),8px)] pt-2 shadow-[0_-6px_22px_rgba(15,23,42,0.025)]"
         >
-          {demoTabs.map(({ path, label, icon: Icon }) => {
+          {tabs.map(({ path, label, icon: Icon }) => {
             const isActive = path === currentTab
             return (
               <Link
@@ -173,7 +195,7 @@ export function MiniProgramShell({ children }: { children: ReactNode }) {
 
       <div className="hidden md:pointer-events-none md:fixed md:bottom-10 md:right-10 md:block md:text-right">
         <p className="text-xs text-slate-500">375 × 812 优先 · 页面内容可滚动</p>
-        <p className="mt-1 text-xs text-slate-400">底部导航为临时示例，非产品定稿</p>
+        <p className="mt-1 text-xs text-slate-400">五大业务模块 · 本轮演示导航</p>
       </div>
     </div>
   )

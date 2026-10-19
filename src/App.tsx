@@ -5,7 +5,6 @@ import { CommunityBroadcastPage } from './pages/CommunityBroadcastPage'
 import { CommunityCulturePage } from './pages/CommunityCulturePage'
 import { CommunityNoticePage } from './pages/CommunityNoticePage'
 import { CommunityPage } from './pages/CommunityPage'
-import { DiscoverPage } from './pages/DiscoverPage'
 import { ExchangePage } from './pages/ExchangePage'
 import { GdPage } from './pages/GdPage'
 import { HealthAssistantPage } from './pages/HealthAssistantPage'
@@ -41,7 +40,6 @@ export default function App() {
         <Route path="/life/product/:productId" element={<ProductPage />} />
         <Route path="/points" element={<PointsPage />} />
         <Route path="/me/devices" element={<HealthDevicesPage />} />
-        <Route path="/discover" element={<DiscoverPage />} />
         <Route path="/me" element={<MePage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
