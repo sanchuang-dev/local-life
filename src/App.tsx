@@ -14,6 +14,7 @@ import { HealthLecturePage } from './pages/HealthLecturePage'
 import { HealthPage } from './pages/HealthPage'
 import { HomePage } from './pages/HomePage'
 import { LifePage } from './pages/LifePage'
+import { MePage } from './pages/MePage'
 import { PointsPage } from './pages/PointsPage'
 import { ProductPage } from './pages/ProductPage'
 import { ScaffoldPage } from './pages/ScaffoldPage'
@@ -42,10 +43,7 @@ export default function App() {
           path="/discover"
           element={<ScaffoldPage variant="discover" />}
         />
-        <Route
-          path="/me"
-          element={<ScaffoldPage variant="me" />}
-        />
+        <Route path="/me" element={<MePage />} />
         <Route path="*" element={<ScaffoldPage variant="not-found" />} />
       </Routes>
     </MiniProgramShell>

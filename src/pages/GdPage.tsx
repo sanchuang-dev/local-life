@@ -1,20 +1,22 @@
 import { ArrowLeft, ChevronRight, CircleHelp, House, Info, Tv } from 'lucide-react'
 import { Link } from 'react-router'
 import { PendingNotice } from '../components/PendingNotice'
+import { useBackTarget } from '../hooks/useBackTarget'
 import { usePendingNotice } from '../hooks/usePendingNotice'
 import { gdBroadcastNotice, gdMyServices, gdPackage, gdServices } from '../mocks/gd'
 
 export function GdPage() {
   const { message, show, dismiss } = usePendingNotice()
+  const { backTo, backLabel } = useBackTarget('/', '返回首页')
 
   return (
     <div className="px-4 pb-7 pt-3">
       <Link
-        to="/"
+        to={backTo}
         className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg text-[13px] font-medium text-slate-500 transition-colors hover:text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
       >
         <ArrowLeft size={16} aria-hidden="true" />
-        返回首页
+        {backLabel}
       </Link>
 
       <div className="mt-1 flex items-center gap-3">

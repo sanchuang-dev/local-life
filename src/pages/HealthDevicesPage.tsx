@@ -2,6 +2,7 @@ import { Plus, Watch } from 'lucide-react'
 import { DemoNote } from '../components/DemoNote'
 import { PageHeader } from '../components/PageHeader'
 import { PendingNotice } from '../components/PendingNotice'
+import { useBackTarget } from '../hooks/useBackTarget'
 import { usePendingNotice } from '../hooks/usePendingNotice'
 import {
   addDeviceNotice,
@@ -11,12 +12,13 @@ import {
 
 export function HealthDevicesPage() {
   const { message, show, dismiss } = usePendingNotice()
+  const { backTo, backLabel } = useBackTarget('/me', '返回我的')
 
   return (
     <div className="px-4 pb-7 pt-3">
       <PageHeader
-        backTo="/me"
-        backLabel="返回我的"
+        backTo={backTo}
+        backLabel={backLabel}
         icon={Watch}
         title="我的设备"
         subtitle="设备能力演示 · 未绑定真实硬件"
