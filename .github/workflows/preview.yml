@@ -16,8 +16,28 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Production source updates must refresh the shared Pages artifact, but
+  # this repo's github-pages environment only admits deployments from dev.
+  # GITHUB_TOKEN workflow_dispatch is an explicitly supported GitHub Actions
+  # event; it re-runs the reviewed dev workflow, which reads prod source.
+  request-pages-on-prod:
+    if: github.event_name == 'push' && github.ref_name == 'prod'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch the dev Pages publisher after prod changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/preview.yml/dispatches" \
+            -f ref=dev
+
   build:
-    if: github.ref_name == 'dev' || github.ref_name == 'prod'
+    # The github-pages environment allows deployment from dev only.
+    if: github.ref_name == 'dev'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout current development branch
