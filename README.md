@@ -30,7 +30,7 @@ npm run build
 - `dev`：集成分支；GitHub Pages 开发预览：https://sanchuang-dev.github.io/local-life/ 。
 - `test`：验收集成分支，CI 检查，不单独部署。
 - `prod`：正式演示版本源码，GitHub Pages 展示：https://sanchuang-dev.github.io/local-life/prod/ 。
-- **部署机制**：单仓库 Pages 只有一个站点，`.github/workflows/preview.yml` 将 `dev` 打包到根目录，将 `prod` 以 Vite 基路径 `/local-life/prod/` 独立打包到 `prod/`；两份构建共用一次 Pages 发布。它们是演示站点，不代表真实支付/订单/设备服务已上线。URL 在 Pages 工作流首次成功完成后生效。
+- **部署机制**：单仓库 Pages 只有一个站点，`.github/workflows/preview.yml` 将 `dev` 打包到根目录，将 `prod` 使用 Vite CLI `--base /local-life/prod/` 独立打包到 `prod/`；两份构建共用一次 Pages 发布。它们是演示站点，不代表真实支付/订单/设备服务已上线。URL 在 Pages 工作流首次成功完成后生效。
 - 校验：`npm run check`（Oxlint + TypeScript + Vite Build）。
 
 ## 历史原型与产品决策
