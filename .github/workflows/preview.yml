@@ -1,8 +1,11 @@
-name: Local Life Dev Pages Preview
+# A GitHub Pages repository has one site. Publish dev at the existing root
+# and the separately built prod branch under /prod/ in one atomic artifact.
+# The source for the production showcase is always the prod branch.
+name: Local Life Pages (Dev and Prod)
 
 on:
   push:
-    branches: [dev]
+    branches: [dev, prod]
   workflow_dispatch:
 
 permissions:
@@ -10,24 +13,65 @@ permissions:
 
 concurrency:
   group: local-life-dev-preview
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
-    if: github.ref_name == 'dev'
+    if: github.ref_name == 'dev' || github.ref_name == 'prod'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout current development branch
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          path: dev-source
+          persist-credentials: false
+
+      - name: Checkout current production branch
+        uses: actions/checkout@v4
+        with:
+          ref: prod
+          path: prod-source
+          persist-credentials: false
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-      - run: npm ci --no-audit --no-fund
-      - run: npm run check
+          cache-dependency-path: dev-source/package-lock.json
+
+      - name: Check and build development preview
+        working-directory: dev-source
+        run: |
+          npm ci --no-audit --no-fund
+          npm run check
+
+      - name: Check and build production showcase from prod
+        working-directory: prod-source
+        run: |
+          npm ci --no-audit --no-fund
+          npm run check
+          # --base overrides both old and new prod Vite configurations.
+          # This works on the very first dev deploy, before prod is promoted.
+          npx vite build --base /local-life/prod/
+
+      - name: Assemble both environments in one Pages artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p pages-site/prod
+          cp -a dev-source/dist/. pages-site/
+          cp -a prod-source/dist/. pages-site/prod/
+          touch pages-site/.nojekyll
+          test -f pages-site/index.html
+          test -f pages-site/prod/index.html
+          grep -q '/local-life/prod/assets/' pages-site/prod/index.html
+          grep -q '/local-life/assets/' pages-site/index.html
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: pages-site
 
   deploy:
     needs: build
