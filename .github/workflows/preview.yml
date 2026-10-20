@@ -48,7 +48,6 @@ jobs:
 
       - name: Check and build production showcase from prod
         working-directory: prod-source
-        env:
         run: |
           npm ci --no-audit --no-fund
           npm run check
