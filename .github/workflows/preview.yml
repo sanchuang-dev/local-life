@@ -49,10 +49,12 @@ jobs:
       - name: Check and build production showcase from prod
         working-directory: prod-source
         env:
-          VITE_BASE_PATH: /local-life/prod/
         run: |
           npm ci --no-audit --no-fund
           npm run check
+          # --base overrides both old and new prod Vite configurations.
+          # This works on the very first dev deploy, before prod is promoted.
+          npx vite build --base /local-life/prod/
 
       - name: Assemble both environments in one Pages artifact
         shell: bash
