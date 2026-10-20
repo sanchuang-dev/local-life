@@ -7,6 +7,7 @@
 - React + TypeScript / Vite
 - Tailwind CSS（官方 Vite 插件）
 - React Router（静态 Pages 使用 HashRouter，避免刷新深链接返回 404）
+- Lucide React（通用图标）
 - npm lockfile；Node.js 22
 
 ## 本地开发
@@ -18,7 +19,9 @@ npm run check
 npm run build
 ```
 
-构建产物在 `dist/`。当前只有工程首页、工程信息页和 404 兜底页；**不代表 V0.3 功能已经实现**。
+构建产物在 `dist/`。V0.3 的 16 个历史界面已全部迁入 React 演示：首页、广电、社区、健康、惠生活与“我的”均可浏览。底部导航已按本轮演示信息架构归位为**首页 / 社区 / 健康 / 惠生活 / 我的**五个业务模块；旧「发现」技术路由目录已退场（`/discover` 落到 404），「我的」页不再展示原型演示导航。详见 [C06 迁移回归矩阵](docs/migration/c06-regression.md) 与 [I03 导航归位记录](docs/migration/i03-navigation.md)。未接入的服务、订单、支付、设备与账号均明确标注演示，不会发起真实业务。
+
+**前端施工规约**：[AGENTS.md](AGENTS.md)。参照卡博士 Web 的页面、组件、数据边界，但不照搬 WebView / JSBridge / Com Design 规范。
 
 ## 仓库及环境
 
@@ -37,4 +40,4 @@ https://sanchuang-dev.github.io/base-prototype/local-life/ 。
 
 ## 自动化与牛马
 
-CI 对环境分支与 PR 执行真实构建校验。免费 Worker 使用 [三创组织标准接入](https://github.com/sanchuang-dev/.github/blob/main/docs/engineering/free-worker-onboarding.md)，须在独立审查 PR 中启用仓库调用器，完成本仓库真实 Issue → Draft PR 验证后才能称为可用。牛马只负责实现和交付 Draft PR，不具备验收、合并或发布权限。
+CI 对环境分支与 PR 执行真实构建校验。免费 Worker 已通过 [PR #1](https://github.com/sanchuang-dev/local-life/pull/1) 接入当前 [三创组织标准](https://github.com/sanchuang-dev/.github/blob/main/docs/engineering/free-worker-onboarding.md)，但本仓库 Issue → Draft PR 真实 E2E **尚未验证**。牛马只负责实现和交付 Draft PR，不具备验收、合并或发布权限。
