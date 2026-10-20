@@ -1,6 +1,6 @@
 # 三创 · 本地生活（Local Life）
 
-独立可维护的本地生活前端项目。**当前阶段是工程初始化，不是业务功能迁移完成。**
+独立可维护的本地生活前端项目。**当前阶段为可演示的前端原型，不是已接入真实业务的生产系统。**
 
 ## 技术栈
 
@@ -27,8 +27,10 @@ npm run build
 
 - `main`：默认分支，工作流入口和基线记录；**不是生产环境**。
 - `feat/*` → `dev` → `test` → `prod`：依三创组织环境约定。
-- `dev`：集成分支；GitHub Pages 可发布**开发预览**，不等于生产发布。
-- `test`、`prod`：暂不配置自动部署。
+- `dev`：集成分支；GitHub Pages 开发预览：https://sanchuang-dev.github.io/local-life/ 。
+- `test`：验收集成分支，CI 检查，不单独部署。
+- `prod`：正式演示版本源码，GitHub Pages 展示：https://sanchuang-dev.github.io/local-life/prod/ 。
+- **部署机制**：单仓库 Pages 只有一个站点，`.github/workflows/preview.yml` 将 `dev` 打包到根目录，将 `prod` 以 Vite 基路径 `/local-life/prod/` 独立打包到 `prod/`；两份构建共用一次 Pages 发布。它们是演示站点，不代表真实支付/订单/设备服务已上线。URL 在 Pages 工作流首次成功完成后生效。
 - 校验：`npm run check`（Oxlint + TypeScript + Vite Build）。
 
 ## 历史原型与产品决策
