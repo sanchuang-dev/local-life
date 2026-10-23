@@ -227,6 +227,15 @@ export const homeCommunityActivities: CommunityActivity[] = [
 /** The `正在发生的社区活动` list on `/community`. */
 export const communityActivityList: CommunityActivity[] = [
   {
+    id: 'silver-neighborhood',
+    title: '银发社区欢乐季 · 三人成团天天有礼',
+    meta: '10月26日–31日 · 幸福里社区 · 二期设计演示',
+    tags: ['三人成团', '天天有奖'],
+    icon: Gift,
+    tone: 'peach',
+    to: '/community/activity/silver-neighborhood',
+  },
+  {
     id: 'performance',
     title: '社区文艺演出 · 粤曲合唱专场',
     meta: '19:00 · 社区篮球场 · 已报名 128/200',
