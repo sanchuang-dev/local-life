@@ -11,7 +11,6 @@ import {
   Medal,
   PartyPopper,
   Share2,
-  ShoppingBag,
   Sparkles,
   Store,
   Ticket,
