@@ -48,11 +48,11 @@ export type HomeBannerContent = {
 
 export const homeBanner: HomeBannerContent = {
   location: '幸福街道 · 幸福里社区',
-  eyebrow: '本周重点',
-  title: '周末便民服务日',
-  description: '广电手机卡、宽带咨询，社区活动和健康服务一次看齐。',
-  actionLabel: '查看活动',
-  to: '/community/activity/welfare-day',
+  eyebrow: '本周主活动',
+  title: '银发社区欢乐季',
+  description: '三人成团，签到有礼；每天还能抽奖、冲社区榜、赢活动大奖。',
+  actionLabel: '立即组队',
+  to: '/community/activity/silver-neighborhood',
 }
 
 export type GdQuickEntry = {
@@ -103,7 +103,7 @@ export const homeQuickEntries: ServiceEntry[] = [
     label: '社区活动',
     icon: CalendarDays,
     tone: 'peach',
-    to: '/community',
+    to: '/community/activity/silver-neighborhood',
   },
 ]
 
