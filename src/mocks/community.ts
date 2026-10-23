@@ -508,10 +508,10 @@ export const communityEntries: CommunityEntry[] = [
   {
     id: 'activity',
     label: '社区活动',
-    badge: '3 场示例',
+    badge: '主活动',
     icon: CalendarDays,
     tone: 'peach',
-    to: '/community/activity/performance',
+    to: '/community/activity/silver-neighborhood',
   },
   {
     id: 'culture',
