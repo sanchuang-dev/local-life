@@ -2,8 +2,10 @@ import { useState } from 'react'
 import {
   Award,
   CalendarDays,
+  Check,
   CheckCircle2,
   ChevronRight,
+  Clipboard,
   Clock3,
   Crown,
   Gift,
@@ -19,15 +21,29 @@ import {
   UsersRound,
 } from 'lucide-react'
 import { Link } from 'react-router'
-import { PendingNotice } from '../components/PendingNotice'
-import { usePendingNotice } from '../hooks/usePendingNotice'
+import { CampaignSheet } from '../components/CampaignSheet'
 
 type TaskMode = 'checkin' | 'purchase'
+type SheetKind =
+  | 'rules'
+  | 'share'
+  | 'checkin-reward'
+  | 'purchase-reward'
+  | 'my-rewards'
+  | 'grand-prize'
+  | 'merchant'
+  | null
+
+type ShareStatus = 'idle' | 'shared' | 'copied' | 'cancelled' | 'error'
 
 const communityRanks = [
   { rank: 1, name: '悦和社区', teams: 52, score: '326人参与' },
   { rank: 2, name: '幸福里社区', teams: 36, score: '228人参与', current: true },
   { rank: 3, name: '榕树湾社区', teams: 31, score: '196人参与' },
+  { rank: 4, name: '文艺社区', teams: 24, score: '158人参与' },
+  { rank: 5, name: '滨江社区', teams: 20, score: '132人参与' },
+  { rank: 6, name: '新城社区', teams: 18, score: '116人参与' },
+  { rank: 7, name: '和平社区', teams: 16, score: '102人参与' },
 ]
 
 const supplies = [
@@ -37,20 +53,23 @@ const supplies = [
     title: '老手艺体验券',
     desc: '参考价值 ¥100 · 到店预约体验',
     tone: 'bg-[#fff3e6] text-[#ba7635]',
+    sheet: 'merchant' as const,
   },
   {
     icon: Tv2,
     badge: '广电精选',
     title: '智能家居体验礼包',
-    desc: '活动价与服务内容待真实供给确认',
+    desc: '查看现有广电服务与家庭场景展示',
     tone: 'bg-[#e8f6f0] text-[#247963]',
+    to: '/gd',
   },
   {
     icon: Sparkles,
     badge: '魔镜体验',
     title: '银发焕新体验',
-    desc: '现场体验 · 奖励资格以活动规则为准',
+    desc: '查看现有魔镜终端能力展示',
     tone: 'bg-[#f1edff] text-[#6d57a8]',
+    to: '/health/device',
   },
 ]
 
@@ -62,20 +81,83 @@ const drawPrizes = [
   { level: '五等奖', prize: '社区小礼物' },
 ]
 
+const activityPath = '/community/activity/silver-neighborhood'
+
+const getActivityUrl = () =>
+  `${window.location.origin}${window.location.pathname}#${activityPath}`
+
+const fallbackCopy = (value: string) => {
+  const textarea = document.createElement('textarea')
+  textarea.value = value
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.select()
+  const copied = document.execCommand('copy')
+  document.body.removeChild(textarea)
+  return copied
+}
+
 export function SilverNeighborhoodCampaignPage() {
   const [taskMode, setTaskMode] = useState<TaskMode>('checkin')
-  const [showRules, setShowRules] = useState(false)
-  const [drawResult, setDrawResult] = useState<string | null>(null)
-  const { message, show, dismiss } = usePendingNotice()
+  const [activeSheet, setActiveSheet] = useState<SheetKind>(null)
+  const [shareStatus, setShareStatus] = useState<ShareStatus>('idle')
+  const [drawResult, setDrawResult] = useState<(typeof drawPrizes)[number] | null>(null)
+  const [showFullRanking, setShowFullRanking] = useState(false)
+
+  const visibleRanks = showFullRanking ? communityRanks : communityRanks.slice(0, 3)
+  const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+
+  const openSheet = (sheet: SheetKind) => {
+    if (sheet === 'share') setShareStatus('idle')
+    setActiveSheet(sheet)
+  }
 
   const scrollToTeam = () => {
     document.getElementById('my-team')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
+  const handleCopyLink = async () => {
+    const value = getActivityUrl()
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value)
+      } else if (!fallbackCopy(value)) {
+        throw new Error('copy failed')
+      }
+      setShareStatus('copied')
+    } catch {
+      setShareStatus('error')
+    }
+  }
+
+  const handleSystemShare = async () => {
+    if (!canNativeShare) {
+      await handleCopyLink()
+      return
+    }
+
+    try {
+      await navigator.share({
+        title: '银发社区欢乐季',
+        text: '还差 1 位街坊，来一起组成三人团。',
+        url: getActivityUrl(),
+      })
+      setShareStatus('shared')
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setShareStatus('cancelled')
+      } else {
+        setShareStatus('error')
+      }
+    }
+  }
+
   const handleDraw = () => {
-    const result = '三等奖 · 生活纸品'
-    setDrawResult(result)
-    show('设计演示：本次展示结果为“三等奖 · 生活纸品”，不会产生真实中奖或奖品发放。')
+    if (drawResult) return
+    setDrawResult(drawPrizes[2])
   }
 
   return (
@@ -99,11 +181,11 @@ export function SilverNeighborhoodCampaignPage() {
           </Link>
 
           <div className="mt-5 flex flex-wrap gap-2">
-            <span className="rounded-full bg-[#fff0c8] px-2.5 py-1 text-[11px] font-bold text-[#915f16]">
+            <span className="rounded-full bg-[#fff0c8] px-2.5 py-1 text-[12px] font-bold text-[#915f16]">
               银发社区欢乐季
             </span>
-            <span className="rounded-full bg-white/12 px-2.5 py-1 text-[11px] font-medium text-white/90">
-              二期高保真设计演示
+            <span className="rounded-full bg-white/12 px-2.5 py-1 text-[12px] font-medium text-white/90">
+              互动原型
             </span>
           </div>
 
@@ -116,14 +198,14 @@ export function SilverNeighborhoodCampaignPage() {
             找两位街坊一起参加。签到成团领生活礼，活动期间还能抽奖、冲社区榜、赢大奖。
           </p>
 
-          <div className="mt-4 grid gap-2 text-[12px] text-white/90">
+          <div className="mt-4 grid gap-2 text-[13px] text-white/90">
             <span className="flex items-center gap-2">
               <CalendarDays size={16} aria-hidden="true" />
-              10月26日–31日 · 设计示例
+              10月26日–31日 · 示例排期
             </span>
             <span className="flex items-center gap-2">
               <MapPin size={16} aria-hidden="true" />
-              幸福里社区活动广场 · 设计示例
+              幸福里社区活动广场 · 示例场地
             </span>
           </div>
 
@@ -138,37 +220,29 @@ export function SilverNeighborhoodCampaignPage() {
             </button>
             <button
               type="button"
-              onClick={() => setShowRules((value) => !value)}
+              onClick={() => openSheet('rules')}
               className="min-h-[48px] rounded-[14px] border border-white/25 bg-white/10 px-4 text-[13px] font-semibold text-white backdrop-blur-sm"
-              aria-expanded={showRules}
             >
               活动规则
             </button>
           </div>
-
-          {showRules ? (
-            <div className="mt-3 rounded-[16px] border border-white/20 bg-[#0c594f]/70 p-3.5 text-[12px] leading-5 text-white/90 backdrop-blur-sm">
-              本页按“团长占一席 + 再邀请两位成员”做交互演示。真实活动的身份、签到、成交、抽奖概率、
-              奖品库存和兑奖方式都必须在运营前另行确认。
-            </div>
-          ) : null}
         </div>
       </section>
 
       <section
         id="my-team"
-        className="relative z-[2] mx-4 -mt-14 rounded-[22px] border border-slate-100 bg-white p-4 shadow-[0_16px_40px_rgba(15,52,44,0.12)] scroll-mt-4"
+        className="relative z-[2] mx-4 -mt-14 scroll-mt-4 rounded-[22px] border border-slate-100 bg-white p-4 shadow-[0_16px_40px_rgba(15,52,44,0.12)]"
       >
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <span className="rounded-full bg-[#e8f6f0] px-2.5 py-1 text-[11px] font-bold text-teal-700">
+              <span className="rounded-full bg-[#e8f6f0] px-2.5 py-1 text-[12px] font-bold text-teal-700">
                 我的三人团
               </span>
               <span className="text-[12px] font-semibold text-orange-600">2 / 3</span>
             </div>
             <h2 className="mt-2 text-[20px] font-bold tracking-tight text-slate-900">还差 1 位街坊</h2>
-            <p className="mt-1 text-[12px] leading-5 text-slate-500">
+            <p className="mt-1 text-[13px] leading-5 text-slate-500">
               三人完成签到后，解锁一份团队生活礼。
             </p>
           </div>
@@ -183,38 +257,38 @@ export function SilverNeighborhoodCampaignPage() {
               我
             </div>
             <p className="mt-2 text-[12px] font-semibold text-slate-700">团长</p>
-            <p className="mt-0.5 text-[10px] text-teal-700">已加入</p>
+            <p className="mt-0.5 text-[11px] text-teal-700">已加入</p>
           </div>
           <div className="rounded-[16px] border border-teal-100 bg-[#f4fbf8] p-3 text-center">
             <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#d8efe7] text-[14px] font-bold text-teal-800">
               王
             </div>
             <p className="mt-2 text-[12px] font-semibold text-slate-700">王阿姨</p>
-            <p className="mt-0.5 text-[10px] text-teal-700">已加入</p>
+            <p className="mt-0.5 text-[11px] text-teal-700">已加入</p>
           </div>
           <button
             type="button"
-            onClick={() => show('设计演示：这里会唤起真实活动分享卡或二维码；当前不会发送邀请。')}
+            onClick={() => openSheet('share')}
             className="min-h-[96px] rounded-[16px] border border-dashed border-orange-200 bg-[#fffaf3] p-3 text-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
           >
             <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#fff0d7] text-[22px] font-light text-orange-600">
               +
             </div>
             <p className="mt-2 text-[12px] font-semibold text-slate-700">邀请街坊</p>
-            <p className="mt-0.5 text-[10px] text-orange-600">还差 1 人</p>
+            <p className="mt-0.5 text-[11px] text-orange-600">还差 1 人</p>
           </button>
         </div>
 
         <button
           type="button"
-          onClick={() => show('设计演示：这里会打开分享卡、二维码或微信分享能力；本页不产生真实传播关系。')}
+          onClick={() => openSheet('share')}
           className="mt-3 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-[14px] bg-teal-700 px-4 text-[14px] font-bold text-white transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
         >
           <Share2 size={17} aria-hidden="true" />
           邀请 1 位街坊来成团
         </button>
-        <p className="mt-2 text-center text-[11px] leading-5 text-slate-400">
-          设计假设：本活动团长占一席；真实规则待运营确认。
+        <p className="mt-2 text-center text-[12px] leading-5 text-slate-400">
+          当前按“团长占一席”展示；邀请操作不会写入真实关系数据。
         </p>
       </section>
 
@@ -224,7 +298,7 @@ export function SilverNeighborhoodCampaignPage() {
             <p className="text-[11px] font-bold tracking-[0.16em] text-teal-700">TEAM QUEST</p>
             <h2 className="mt-1 text-[19px] font-bold tracking-tight text-slate-900">成团任务</h2>
           </div>
-          <span className="text-[11px] text-slate-400">两条任务独立计算</span>
+          <span className="text-[12px] text-slate-400">两条任务独立计算</span>
         </div>
 
         <div className="rounded-[20px] border border-slate-100 bg-white p-3 shadow-sm">
@@ -234,9 +308,7 @@ export function SilverNeighborhoodCampaignPage() {
               onClick={() => setTaskMode('checkin')}
               aria-pressed={taskMode === 'checkin'}
               className={`min-h-[42px] rounded-[11px] px-3 text-[13px] font-bold transition ${
-                taskMode === 'checkin'
-                  ? 'bg-white text-teal-700 shadow-sm'
-                  : 'text-slate-500'
+                taskMode === 'checkin' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500'
               }`}
             >
               签到组队
@@ -246,9 +318,7 @@ export function SilverNeighborhoodCampaignPage() {
               onClick={() => setTaskMode('purchase')}
               aria-pressed={taskMode === 'purchase'}
               className={`min-h-[42px] rounded-[11px] px-3 text-[13px] font-bold transition ${
-                taskMode === 'purchase'
-                  ? 'bg-white text-teal-700 shadow-sm'
-                  : 'text-slate-500'
+                taskMode === 'purchase' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500'
               }`}
             >
               消费组队
@@ -269,23 +339,27 @@ export function SilverNeighborhoodCampaignPage() {
               <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
                 <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-teal-600 to-[#55b99b]" />
               </div>
-              <div className="mt-3 flex items-center gap-3 rounded-[15px] bg-[#f7faf9] p-3">
+              <button
+                type="button"
+                onClick={() => openSheet('checkin-reward')}
+                className="mt-3 flex min-h-[68px] w-full items-center gap-3 rounded-[15px] bg-[#f7faf9] p-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+              >
                 <Gift size={22} className="shrink-0 text-orange-500" aria-hidden="true" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-bold text-slate-700">团队生活礼</p>
-                  <p className="mt-0.5 text-[11px] leading-4 text-slate-500">
-                    鸡蛋 / 纸巾等活动小礼 · 具体以现场奖池为准
-                  </p>
-                </div>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-bold text-slate-700">团队生活礼</span>
+                  <span className="mt-0.5 block text-[12px] leading-5 text-slate-500">
+                    鸡蛋 / 纸巾等活动小礼 · 查看解锁与领取说明
+                  </span>
+                </span>
                 <ChevronRight size={17} className="text-slate-300" aria-hidden="true" />
-              </div>
+              </button>
             </div>
           ) : (
             <div className="mt-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[14px] font-bold text-slate-800">三人有效购买 + 团队达标</p>
-                  <p className="mt-1 text-[12px] text-slate-500">2 / 3 人已购 · ¥228 / ¥300（设计样例）</p>
+                  <p className="mt-1 text-[12px] text-slate-500">2 / 3 人已购 · ¥228 / ¥300（示例）</p>
                 </div>
                 <span className="shrink-0 rounded-full bg-[#f1edff] px-2.5 py-1 text-[11px] font-bold text-[#725aa9]">
                   高价值礼
@@ -294,16 +368,20 @@ export function SilverNeighborhoodCampaignPage() {
               <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
                 <div className="h-full w-[76%] rounded-full bg-gradient-to-r from-[#6e5ab0] to-[#a68bd5]" />
               </div>
-              <div className="mt-3 flex items-center gap-3 rounded-[15px] bg-[#faf8ff] p-3">
+              <button
+                type="button"
+                onClick={() => openSheet('purchase-reward')}
+                className="mt-3 flex min-h-[68px] w-full items-center gap-3 rounded-[15px] bg-[#faf8ff] p-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+              >
                 <Award size={22} className="shrink-0 text-[#765caf]" aria-hidden="true" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[13px] font-bold text-slate-700">团队惊喜权益</p>
-                  <p className="mt-0.5 text-[11px] leading-4 text-slate-500">
-                    参考价值约 ¥100 · 实物或本地体验权益，非现金返还
-                  </p>
-                </div>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-bold text-slate-700">团队惊喜权益</span>
+                  <span className="mt-0.5 block text-[12px] leading-5 text-slate-500">
+                    参考价值约 ¥100 · 查看达标与团队分配说明
+                  </span>
+                </span>
                 <ChevronRight size={17} className="text-slate-300" aria-hidden="true" />
-              </div>
+              </button>
             </div>
           )}
         </div>
@@ -336,37 +414,41 @@ export function SilverNeighborhoodCampaignPage() {
               <p className={`text-[15px] font-bold ${reached ? 'text-orange-700' : 'text-slate-700'}`}>
                 {target}
               </p>
-              <p className="mt-1 text-[10px] leading-4 text-slate-500">{reward}</p>
-              <p className={`mt-1 text-[10px] font-semibold ${reached ? 'text-orange-600' : 'text-slate-400'}`}>
+              <p className="mt-1 text-[11px] leading-4 text-slate-500">{reward}</p>
+              <p className={`mt-1 text-[11px] font-semibold ${reached ? 'text-orange-600' : 'text-slate-400'}`}>
                 {reached ? '已解锁' : '待解锁'}
               </p>
             </div>
           ))}
         </div>
 
-        <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
+        <div className="mt-3 flex items-center justify-between gap-3 text-[12px] text-slate-500">
           <span>幸福里社区已成功 36 团</span>
-          <span className="font-semibold text-orange-600">距离 50 团还差 14 团</span>
+          <span className="text-right font-semibold text-orange-600">距离 50 团还差 14 团</span>
         </div>
       </section>
 
       <section className="mx-4 mt-6">
-        <div className="mb-3 flex items-end justify-between">
+        <div className="mb-3 flex min-h-[44px] items-end justify-between gap-3">
           <div>
             <p className="text-[11px] font-bold tracking-[0.16em] text-teal-700">DAILY LUCK</p>
             <h2 className="mt-1 text-[19px] font-bold text-slate-900">今日抽奖</h2>
           </div>
-          <span className="rounded-full bg-[#e8f6f0] px-2.5 py-1 text-[11px] font-bold text-teal-700">
-            今日 1 次
-          </span>
+          <button
+            type="button"
+            onClick={() => openSheet('my-rewards')}
+            className="min-h-[44px] rounded-full bg-[#e8f6f0] px-3 text-[12px] font-bold text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+          >
+            我的奖励
+          </button>
         </div>
 
         <div className="overflow-hidden rounded-[22px] bg-[#173e38] p-4 text-white shadow-[0_12px_28px_rgba(14,59,51,0.12)]">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[16px] font-bold">五档惊喜奖池</p>
-              <p className="mt-1 text-[11px] leading-5 text-white/65">
-                有效参与者每天可获得机会；真实概率与库存上线前公示。
+              <p className="mt-1 text-[12px] leading-5 text-white/70">
+                当前页面提供一次可重复验收的演示抽奖，不代表真实中奖概率或发奖。
               </p>
             </div>
             <Ticket size={26} className="text-[#ffd991]" aria-hidden="true" />
@@ -382,43 +464,57 @@ export function SilverNeighborhoodCampaignPage() {
                     : 'border-white/12 bg-white/8'
                 }`}
               >
-                <p className="text-[9px] font-bold">{item.level}</p>
-                <p className="mt-1 text-[9px] leading-3 opacity-80">{item.prize}</p>
+                <p className="text-[11px] font-bold">{item.level}</p>
+                <p className="mt-1 text-[11px] leading-4 opacity-85">{item.prize}</p>
               </div>
             ))}
           </div>
 
-          {drawResult ? (
-            <div className="mt-3 flex items-center gap-2 rounded-[14px] bg-white/10 p-3 text-[12px]">
-              <Sparkles size={18} className="shrink-0 text-[#ffd991]" aria-hidden="true" />
-              <span>
-                设计结果：<strong>{drawResult}</strong> · 不产生真实奖品
-              </span>
-            </div>
-          ) : null}
+          <div aria-live="polite">
+            {drawResult ? (
+              <div className="mt-3 flex items-center gap-2 rounded-[14px] bg-white/10 p-3 text-[13px]">
+                <Check size={18} className="shrink-0 text-[#ffd991]" aria-hidden="true" />
+                <span>
+                  本次演示结果：<strong>{drawResult.level} · {drawResult.prize}</strong>
+                </span>
+              </div>
+            ) : null}
+          </div>
 
           <button
             type="button"
             onClick={handleDraw}
-            className="mt-3 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-[14px] bg-[#ffd991] px-4 text-[14px] font-bold text-[#5b3d0c]"
+            disabled={Boolean(drawResult)}
+            className={`mt-3 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-[14px] px-4 text-[14px] font-bold ${
+              drawResult
+                ? 'cursor-default bg-white/15 text-white/70'
+                : 'bg-[#ffd991] text-[#5b3d0c]'
+            }`}
           >
             <Sparkles size={17} aria-hidden="true" />
-            试试今日手气 · 设计演示
+            {drawResult ? '今日演示已抽' : '试试今日手气'}
           </button>
         </div>
       </section>
 
       <section className="mx-4 mt-6">
-        <div className="mb-3 flex items-end justify-between gap-3">
+        <div className="mb-3 flex min-h-[44px] items-end justify-between gap-3">
           <div>
             <p className="text-[11px] font-bold tracking-[0.16em] text-teal-700">COMMUNITY RANK</p>
             <h2 className="mt-1 text-[19px] font-bold text-slate-900">社区热力榜</h2>
           </div>
-          <span className="text-[11px] text-slate-400">按有效成团数 · 设计口径</span>
+          <button
+            type="button"
+            onClick={() => setShowFullRanking((value) => !value)}
+            className="min-h-[44px] rounded-full px-3 text-[12px] font-semibold text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+            aria-expanded={showFullRanking}
+          >
+            {showFullRanking ? '收起' : '查看全部'}
+          </button>
         </div>
 
         <div className="overflow-hidden rounded-[20px] border border-slate-100 bg-white shadow-sm">
-          {communityRanks.map((item) => (
+          {visibleRanks.map((item) => (
             <div
               key={item.name}
               className={`flex items-center gap-3 border-b border-slate-100 px-4 py-3.5 last:border-b-0 ${
@@ -431,7 +527,9 @@ export function SilverNeighborhoodCampaignPage() {
                     ? 'bg-[#fff1c9] text-[#9b6714]'
                     : item.rank === 2
                       ? 'bg-[#edf1f3] text-slate-600'
-                      : 'bg-[#f7e8de] text-[#966044]'
+                      : item.rank === 3
+                        ? 'bg-[#f7e8de] text-[#966044]'
+                        : 'bg-slate-100 text-slate-500'
                 }`}
               >
                 {item.rank}
@@ -440,20 +538,23 @@ export function SilverNeighborhoodCampaignPage() {
                 <div className="flex items-center gap-2">
                   <p className="truncate text-[14px] font-bold text-slate-800">{item.name}</p>
                   {item.current ? (
-                    <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[9px] font-bold text-teal-700">
+                    <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[11px] font-bold text-teal-700">
                       我们社区
                     </span>
                   ) : null}
                 </div>
-                <p className="mt-0.5 text-[11px] text-slate-400">{item.score}</p>
+                <p className="mt-0.5 text-[12px] text-slate-400">{item.score}</p>
               </div>
               <div className="text-right">
                 <p className="text-[15px] font-bold text-teal-700">{item.teams}</p>
-                <p className="text-[10px] text-slate-400">有效团</p>
+                <p className="text-[11px] text-slate-400">有效团</p>
               </div>
             </div>
           ))}
         </div>
+        <p className="mt-2 text-[12px] leading-5 text-slate-400">
+          当前榜单按“有效成团数”展示示例数据；正式活动需在规则发布时冻结统计口径。
+        </p>
       </section>
 
       <section className="mx-4 mt-6 overflow-hidden rounded-[22px] border border-[#eadbb7] bg-gradient-to-br from-[#fff8e8] via-white to-[#f4fbf8] p-4 shadow-sm">
@@ -474,20 +575,18 @@ export function SilverNeighborhoodCampaignPage() {
           <div className="rounded-[15px] bg-white p-3 shadow-sm">
             <Trophy size={20} className="text-[#b17b18]" aria-hidden="true" />
             <p className="mt-2 text-[13px] font-bold text-slate-800">大奖示例</p>
-            <p className="mt-1 text-[11px] leading-4 text-slate-500">广电硬件 / 魔镜体验设备</p>
+            <p className="mt-1 text-[12px] leading-5 text-slate-500">广电硬件 / 魔镜体验设备</p>
           </div>
           <div className="rounded-[15px] bg-white p-3 shadow-sm">
             <Clock3 size={20} className="text-teal-700" aria-hidden="true" />
             <p className="mt-2 text-[13px] font-bold text-slate-800">剩余 4 天</p>
-            <p className="mt-1 text-[11px] leading-4 text-slate-500">10月31日 20:00 结束 · 示例</p>
+            <p className="mt-1 text-[12px] leading-5 text-slate-500">10月31日 20:00 结束 · 示例</p>
           </div>
         </div>
 
         <button
           type="button"
-          onClick={() =>
-            show('设计演示：大奖采用“前 20 名取得抽奖资格”的单一口径；真实奖品、名额与开奖方式仍需运营确认。')
-          }
+          onClick={() => openSheet('grand-prize')}
           className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-[13px] border border-[#dfc98e] bg-white text-[13px] font-bold text-[#8d681f]"
         >
           查看大奖规则
@@ -505,26 +604,39 @@ export function SilverNeighborhoodCampaignPage() {
         </div>
 
         <div className="grid gap-3">
-          {supplies.map(({ icon: Icon, badge, title, desc, tone }) => (
-            <button
-              key={title}
-              type="button"
-              onClick={() =>
-                show(`设计演示：打开“${title}”的活动供给详情；当前不会创建订单、支付或预约。`)
-              }
-              className="flex min-h-[82px] w-full items-center gap-3 rounded-[18px] border border-slate-100 bg-white p-3.5 text-left shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
-            >
-              <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] ${tone}`}>
-                <Icon size={23} aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="text-[10px] font-bold text-teal-700">{badge}</span>
-                <span className="mt-0.5 block text-[14px] font-bold text-slate-800">{title}</span>
-                <span className="mt-1 block text-[11px] leading-4 text-slate-500">{desc}</span>
-              </span>
-              <ChevronRight size={18} className="shrink-0 text-slate-300" aria-hidden="true" />
-            </button>
-          ))}
+          {supplies.map(({ icon: Icon, badge, title, desc, tone, to, sheet }) => {
+            const content = (
+              <>
+                <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] ${tone}`}>
+                  <Icon size={23} aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="text-[11px] font-bold text-teal-700">{badge}</span>
+                  <span className="mt-0.5 block text-[14px] font-bold text-slate-800">{title}</span>
+                  <span className="mt-1 block text-[12px] leading-5 text-slate-500">{desc}</span>
+                </span>
+                <ChevronRight size={18} className="shrink-0 text-slate-300" aria-hidden="true" />
+              </>
+            )
+
+            const className =
+              'flex min-h-[82px] w-full items-center gap-3 rounded-[18px] border border-slate-100 bg-white p-3.5 text-left shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600'
+
+            return to ? (
+              <Link key={title} to={to} state={{ from: activityPath }} className={className}>
+                {content}
+              </Link>
+            ) : (
+              <button
+                key={title}
+                type="button"
+                onClick={() => openSheet(sheet ?? 'merchant')}
+                className={className}
+              >
+                {content}
+              </button>
+            )
+          })}
         </div>
       </section>
 
@@ -532,21 +644,264 @@ export function SilverNeighborhoodCampaignPage() {
         <div className="flex items-start gap-3">
           <CheckCircle2 size={19} className="mt-0.5 shrink-0 text-teal-700" aria-hidden="true" />
           <div>
-            <p className="text-[13px] font-bold text-slate-700">这是高保真交互设计，不是真实活动</p>
-            <p className="mt-1 text-[11px] leading-[1.7] text-slate-500">
-              人数、金额、社区、奖品和开奖结果均为设计样例。后续真实试运营必须接入持久化、身份去重、
-              现场核验、奖品库存、兑奖和运营审计。
+            <p className="text-[13px] font-bold text-slate-700">当前是可交互原型，不是真实活动</p>
+            <p className="mt-1 text-[12px] leading-[1.7] text-slate-500">
+              人数、金额、社区、奖品和抽奖结果均为样例；分享和复制是真实浏览器操作，但不会写入邀请关系、
+              签到、订单、库存或兑奖记录。
             </p>
           </div>
         </div>
       </section>
 
-      <div className="mx-4 mt-4 flex items-center justify-center gap-2 text-[10px] text-slate-400">
+      <div className="mx-4 mt-4 flex items-center justify-center gap-2 text-[11px] text-slate-400">
         <Medal size={14} aria-hidden="true" />
         三人成团 · 天天有奖 · 社区争榜 · 活动冲大奖
       </div>
 
-      <PendingNotice message={message} onDismiss={dismiss} />
+      <CampaignSheet
+        open={activeSheet === 'rules'}
+        title="活动规则"
+        eyebrow="SILVER NEIGHBORHOOD"
+        onClose={() => setActiveSheet(null)}
+      >
+        <ol className="grid gap-3">
+          {[
+            '本原型按“团长占一席，再邀请两位街坊”展示三人团。',
+            '签到任务与消费任务独立计算；同一成员的两个行为分别计入对应进度。',
+            '社区榜当前按有效成团数展示；正式活动上线前需冻结统计与并列规则。',
+            '活动大奖采用“前 20 名取得抽奖资格”的单一演示口径，并非前 20 名直接获得大奖。',
+          ].map((rule, index) => (
+            <li key={rule} className="flex gap-3 rounded-[14px] bg-slate-50 p-3">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-teal-700 text-[12px] font-bold text-white">
+                {index + 1}
+              </span>
+              <span>{rule}</span>
+            </li>
+          ))}
+        </ol>
+        <p className="mt-4 rounded-[14px] bg-[#fff7ec] p-3 text-[12px] leading-5 text-[#8a6132]">
+          当前页面用于确认玩法和交互。真实活动的身份去重、签到核验、支付/成交、库存、中奖概率与兑奖规则仍需由正式业务系统承载。
+        </p>
+      </CampaignSheet>
+
+      <CampaignSheet
+        open={activeSheet === 'share'}
+        title="邀请最后 1 位街坊"
+        eyebrow="TEAM 2 / 3"
+        onClose={() => setActiveSheet(null)}
+        footer={
+          <div className="grid gap-2">
+            {canNativeShare ? (
+              <button
+                type="button"
+                onClick={handleSystemShare}
+                className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] bg-teal-700 px-4 text-[14px] font-bold text-white"
+              >
+                <Share2 size={18} aria-hidden="true" />
+                系统分享
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] border border-slate-200 bg-white px-4 text-[14px] font-bold text-slate-700"
+            >
+              <Clipboard size={18} aria-hidden="true" />
+              复制活动链接
+            </button>
+          </div>
+        }
+      >
+        <div className="rounded-[16px] bg-[#f2faf6] p-4">
+          <p className="text-[16px] font-bold text-slate-800">幸福里 · 三人成团</p>
+          <p className="mt-1 text-[13px] leading-6 text-slate-500">
+            我们已经 2 / 3 人，还差你一个。打开活动页后可以查看规则、任务、奖励和社区榜。
+          </p>
+        </div>
+        <div className="mt-3 rounded-[14px] border border-slate-200 bg-white p-3">
+          <p className="text-[12px] font-semibold text-slate-500">活动直达链接</p>
+          <p className="mt-1 break-all text-[12px] leading-5 text-slate-700">{typeof window === 'undefined' ? activityPath : getActivityUrl()}</p>
+        </div>
+        <div className="mt-3 min-h-[24px] text-[12px] font-medium" aria-live="polite">
+          {shareStatus === 'shared' ? <p className="text-teal-700">系统分享已完成。是否加入队伍仍由对方打开活动后确认。</p> : null}
+          {shareStatus === 'copied' ? <p className="text-teal-700">活动链接已复制，可以直接发给街坊。</p> : null}
+          {shareStatus === 'cancelled' ? <p className="text-slate-500">已取消系统分享，你也可以直接复制链接。</p> : null}
+          {shareStatus === 'error' ? <p className="text-orange-700">当前浏览器未能完成分享或复制，请长按上方链接手动复制。</p> : null}
+        </div>
+      </CampaignSheet>
+
+      <CampaignSheet
+        open={activeSheet === 'checkin-reward'}
+        title="团队生活礼"
+        eyebrow="签到任务 · 2 / 3"
+        onClose={() => setActiveSheet(null)}
+      >
+        <div className="rounded-[16px] bg-[#f2faf6] p-4">
+          <p className="text-[15px] font-bold text-slate-800">解锁条件</p>
+          <p className="mt-1">三位团员都完成一次有效到场签到后，团队解锁一份生活礼。</p>
+        </div>
+        <dl className="mt-3 divide-y divide-slate-100 rounded-[16px] border border-slate-100 bg-white px-4">
+          <div className="flex justify-between gap-4 py-3">
+            <dt>当前进度</dt>
+            <dd className="font-semibold text-slate-800">2 / 3 人</dd>
+          </div>
+          <div className="flex justify-between gap-4 py-3">
+            <dt>奖励示例</dt>
+            <dd className="text-right font-semibold text-slate-800">鸡蛋 / 纸巾</dd>
+          </div>
+          <div className="flex justify-between gap-4 py-3">
+            <dt>领取方式</dt>
+            <dd className="text-right font-semibold text-slate-800">活动现场核验领取</dd>
+          </div>
+        </dl>
+        <p className="mt-3 text-[12px] leading-5 text-slate-400">
+          当前只展示状态结构，不生成真实签到记录、领取码或库存占用。
+        </p>
+      </CampaignSheet>
+
+      <CampaignSheet
+        open={activeSheet === 'purchase-reward'}
+        title="团队惊喜权益"
+        eyebrow="消费任务 · 2 / 3"
+        onClose={() => setActiveSheet(null)}
+      >
+        <div className="rounded-[16px] bg-[#faf8ff] p-4">
+          <p className="text-[15px] font-bold text-slate-800">当前示例条件</p>
+          <p className="mt-1">
+            三位团员分别有有效购买记录，团队净实付累计达到 ¥300 后，解锁一份参考价值约 ¥100 的团队权益。
+          </p>
+        </div>
+        <dl className="mt-3 divide-y divide-slate-100 rounded-[16px] border border-slate-100 bg-white px-4">
+          <div className="flex justify-between gap-4 py-3">
+            <dt>成员完成</dt>
+            <dd className="font-semibold text-slate-800">2 / 3 人</dd>
+          </div>
+          <div className="flex justify-between gap-4 py-3">
+            <dt>金额进度</dt>
+            <dd className="font-semibold text-slate-800">¥228 / ¥300</dd>
+          </div>
+          <div className="flex justify-between gap-4 py-3">
+            <dt>奖励形式</dt>
+            <dd className="text-right font-semibold text-slate-800">实物 / 本地体验权益</dd>
+          </div>
+        </dl>
+        <p className="mt-3 text-[12px] leading-5 text-slate-400">
+          团队奖励归属与团内抽取方式仍属于活动规则配置项；本原型不把它写死为真实业务。
+        </p>
+      </CampaignSheet>
+
+      <CampaignSheet
+        open={activeSheet === 'my-rewards'}
+        title="我的奖励"
+        eyebrow="ACTIVITY WALLET"
+        onClose={() => setActiveSheet(null)}
+      >
+        <div className="grid gap-3">
+          <div className="rounded-[16px] border border-slate-100 bg-white p-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-bold text-slate-800">团队生活礼</p>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500">待达成</span>
+            </div>
+            <p className="mt-1 text-[12px] text-slate-500">签到 2 / 3 人，还差 1 位团员。</p>
+          </div>
+          <div className="rounded-[16px] border border-slate-100 bg-white p-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-bold text-slate-800">团队惊喜权益</p>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500">待达成</span>
+            </div>
+            <p className="mt-1 text-[12px] text-slate-500">购买成员 2 / 3，金额 ¥228 / ¥300。</p>
+          </div>
+          <div className="rounded-[16px] border border-slate-100 bg-white p-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="font-bold text-slate-800">今日抽奖</p>
+              <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                drawResult ? 'bg-[#fff3e6] text-orange-700' : 'bg-[#e8f6f0] text-teal-700'
+              }`}>
+                {drawResult ? '待领取 · 演示' : '可抽取'}
+              </span>
+            </div>
+            <p className="mt-1 text-[12px] text-slate-500">
+              {drawResult
+                ? `本次演示中奖：${drawResult.level} · ${drawResult.prize}。`
+                : '今天还有 1 次演示抽奖机会。'}
+            </p>
+          </div>
+        </div>
+        <p className="mt-3 text-[12px] leading-5 text-slate-400">
+          “待领取”仅用于验证奖励状态设计，不生成真实券码或兑奖凭证。
+        </p>
+      </CampaignSheet>
+
+      <CampaignSheet
+        open={activeSheet === 'grand-prize'}
+        title="活动压轴大奖"
+        eyebrow="FINAL PRIZE"
+        onClose={() => setActiveSheet(null)}
+      >
+        <div className="rounded-[16px] bg-[#fff8e8] p-4">
+          <p className="text-[15px] font-bold text-slate-800">当前设计口径</p>
+          <p className="mt-1">
+            活动结束时，社区榜前 20 名参与者获得一次大奖抽取资格；前 20 名不是直接获得大奖。
+          </p>
+        </div>
+        <dl className="mt-3 divide-y divide-slate-100 rounded-[16px] border border-slate-100 bg-white px-4">
+          <div className="flex justify-between gap-4 py-3">
+            <dt>示例结束时间</dt>
+            <dd className="text-right font-semibold text-slate-800">10月31日 20:00</dd>
+          </div>
+          <div className="flex justify-between gap-4 py-3">
+            <dt>资格名额</dt>
+            <dd className="font-semibold text-slate-800">前 20 名</dd>
+          </div>
+          <div className="flex justify-between gap-4 py-3">
+            <dt>大奖示例</dt>
+            <dd className="text-right font-semibold text-slate-800">广电硬件 / 魔镜设备</dd>
+          </div>
+        </dl>
+        <p className="mt-3 text-[12px] leading-5 text-slate-400">
+          正式活动需要在开始前公布奖品数量、抽取方式、结果公示与复核规则。
+        </p>
+      </CampaignSheet>
+
+      <CampaignSheet
+        open={activeSheet === 'merchant'}
+        title="老手艺体验券"
+        eyebrow="LOCAL MERCHANT"
+        onClose={() => setActiveSheet(null)}
+        footer={
+          <Link
+            to="/life"
+            state={{ from: activityPath }}
+            className="flex min-h-[48px] w-full items-center justify-center rounded-[14px] bg-teal-700 px-4 text-[14px] font-bold text-white"
+          >
+            去惠生活看看
+          </Link>
+        }
+      >
+        <div className="rounded-[16px] bg-[#fff7ec] p-4">
+          <p className="text-[16px] font-bold text-slate-800">参考价值 ¥100 · 示例权益</p>
+          <p className="mt-1 text-[13px] leading-6 text-slate-500">
+            用一张可核销的本地体验券替代部分实物奖励，让活动把用户真正带到社区周边商户。
+          </p>
+        </div>
+        <dl className="mt-3 divide-y divide-slate-100 rounded-[16px] border border-slate-100 bg-white px-4">
+          <div className="flex justify-between gap-4 py-3">
+            <dt>内容示例</dt>
+            <dd className="text-right font-semibold text-slate-800">手作 / 老手艺体验一次</dd>
+          </div>
+          <div className="flex justify-between gap-4 py-3">
+            <dt>使用方式</dt>
+            <dd className="text-right font-semibold text-slate-800">到店预约后核销</dd>
+          </div>
+          <div className="flex justify-between gap-4 py-3">
+            <dt>有效期</dt>
+            <dd className="font-semibold text-slate-800">活动结束后 30 天</dd>
+          </div>
+        </dl>
+        <p className="mt-3 text-[12px] leading-5 text-slate-400">
+          商户名称、实际售价、采购价和可核销内容必须由真实合作确认后替换；此处只验证权益详情交互结构。
+        </p>
+      </CampaignSheet>
     </div>
   )
 }
