@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useRef } from 'react'
 import {
+  ArrowLeft,
   BatteryFull,
   CircleDot,
   Ellipsis,
@@ -109,11 +110,24 @@ function MiniProgramTopBar() {
         </div>
       </div>
       <div className="relative flex h-[53px] items-center justify-center px-5">
-        <div className="absolute left-5 flex items-center gap-2">
-          <span className="h-6 w-1 rounded-full bg-teal-600" aria-hidden="true" />
-          <span className="text-[16px] font-semibold tracking-tight text-slate-900">
-            {pageTitle === '首页' ? '本地生活' : (pageTitle ?? '本地生活')}
-          </span>
+        <div className="absolute left-4 flex items-center gap-2">
+          {pathname === '/community/activity/silver-neighborhood' ? (
+            <Link
+              to="/community"
+              aria-label="返回社区"
+              className="flex min-h-11 items-center gap-1 rounded-lg pr-2 text-[16px] font-semibold text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+            >
+              <ArrowLeft size={20} aria-hidden="true" />
+              活动详情
+            </Link>
+          ) : (
+            <>
+              <span className="h-6 w-1 rounded-full bg-teal-600" aria-hidden="true" />
+              <span className="text-[16px] font-semibold tracking-tight text-slate-900">
+                {pageTitle === '首页' ? '本地生活' : (pageTitle ?? '本地生活')}
+              </span>
+            </>
+          )}
         </div>
         <div
           className="absolute right-4 flex h-[32px] w-[87px] items-center justify-around rounded-full border border-slate-200 bg-white px-2 text-slate-800"
