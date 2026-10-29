@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useRef } from 'react'
 import {
-  ArrowLeft,
+  ChevronLeft,
   BatteryFull,
   CircleDot,
   Ellipsis,
@@ -12,7 +12,7 @@ import {
   Users,
   Wifi,
 } from 'lucide-react'
-import { Link, useLocation } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 
 type TabPath = '/' | '/community' | '/health' | '/life' | '/me'
 
@@ -86,15 +86,35 @@ const activeTabFor = (pathname: string, state: unknown): TabPath | undefined => 
 
 function MiniProgramTopBar() {
   const { pathname } = useLocation()
+  const navigate = useNavigate()
+  const isRootTab = tabPaths.has(pathname as TabPath)
   const pageTitle =
     subPageTitles[pathname] ??
     (pathname.startsWith('/community/notice/')
       ? '消息详情'
-      : pathname.startsWith('/community/activity/')
-        ? '活动详情'
-        : pathname.startsWith('/life/product/')
-          ? '商品详情'
-          : tabs.find((item) => item.path === pathname)?.label)
+      : pathname.startsWith('/community/activity/silver-neighborhood/products/')
+        ? '商品详情'
+        : pathname === '/community/activity/silver-neighborhood/products'
+          ? '活动商品'
+          : pathname.startsWith('/community/activity/')
+            ? '活动详情'
+            : pathname.startsWith('/life/product/')
+              ? '商品详情'
+              : tabs.find((item) => item.path === pathname)?.label)
+
+  const handleBack = () => {
+    // HashRouter tracks its own entry index. A direct deep link can have browser
+    // history but no in-app predecessor; do not accidentally leave the prototype.
+    const index = (window.history.state as { idx?: unknown } | null)?.idx
+    if (typeof index === 'number' && index > 0) {
+      navigate(-1)
+      return
+    }
+
+    // Without an in-app predecessor, use the owning module as a safe landing
+    // page. This is a fallback, never a substitute for real navigation history.
+    navigate(tabForPath(pathname) ?? '/', { replace: true })
+  }
 
   return (
     <header className="relative z-10 shrink-0 border-b border-slate-100/80 bg-white">
@@ -109,30 +129,28 @@ function MiniProgramTopBar() {
           <BatteryFull size={19} strokeWidth={2.2} />
         </div>
       </div>
-      <div className="relative flex h-[53px] items-center justify-center px-5">
-        <div className="absolute left-4 flex items-center gap-2">
-          {pathname === '/community/activity/silver-neighborhood' ? (
-            <Link
-              to="/community"
-              aria-label="返回社区"
-              className="flex min-h-11 items-center gap-1 rounded-lg pr-2 text-[16px] font-semibold text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
-            >
-              <ArrowLeft size={20} aria-hidden="true" />
-              活动详情
-            </Link>
-          ) : (
-            <>
-              <span className="h-6 w-1 rounded-full bg-teal-600" aria-hidden="true" />
-              <span className="text-[16px] font-semibold tracking-tight text-slate-900">
-                {pageTitle === '首页' ? '本地生活' : (pageTitle ?? '本地生活')}
-              </span>
-            </>
-          )}
-        </div>
+
+      <div className="relative flex h-[44px] items-center justify-center bg-white">
+        {!isRootTab && (
+          <button
+            type="button"
+            onClick={handleBack}
+            aria-label="返回上一页"
+            className="absolute left-2 top-0 flex h-11 w-11 items-center justify-center rounded-lg text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-teal-600"
+          >
+            <ChevronLeft size={25} strokeWidth={2} aria-hidden="true" />
+          </button>
+        )}
+        <span
+          className="pointer-events-none max-w-[calc(100%-200px)] truncate text-center text-[16px] font-semibold tracking-tight text-slate-900"
+          title={pageTitle === '首页' ? '本地生活' : (pageTitle ?? '本地生活')}
+        >
+          {pageTitle === '首页' ? '本地生活' : (pageTitle ?? '本地生活')}
+        </span>
         <div
-          className="absolute right-4 flex h-[32px] w-[87px] items-center justify-around rounded-full border border-slate-200 bg-white px-2 text-slate-800"
+          className="absolute right-3 flex h-[32px] w-[87px] items-center justify-around rounded-full border border-slate-200 bg-white px-2 text-slate-800"
           aria-hidden="true"
-          title="小程序系统胶囊（视觉示意）"
+          title="小程序系统胶囊（视觉示意，非功能按钮）"
         >
           <Ellipsis size={21} strokeWidth={2.7} />
           <span className="h-[17px] w-px bg-slate-200" />
@@ -187,16 +205,11 @@ export function MiniProgramShell({ children }: { children: ReactNode }) {
                   isActive ? 'text-teal-700' : 'text-slate-400 hover:text-slate-600'
                 }`}
               >
-                <span className="relative">
-                  <Icon
-                    size={23}
-                    strokeWidth={isActive ? 2.5 : 1.9}
-                    aria-hidden="true"
-                  />
-                  {isActive && (
-                    <span className="absolute -bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-teal-600" />
-                  )}
-                </span>
+                <Icon
+                  size={23}
+                  strokeWidth={isActive ? 2.5 : 1.9}
+                  aria-hidden="true"
+                />
                 <span className={`text-[11px] leading-none ${isActive ? 'font-semibold' : 'font-medium'}`}>
                   {label}
                   {isActive ? <span className="sr-only">（当前）</span> : null}
