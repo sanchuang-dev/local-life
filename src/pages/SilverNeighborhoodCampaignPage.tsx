@@ -1,27 +1,23 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
-  Award,
-  CalendarDays,
-  Check,
   CheckCircle2,
+  Check,
+  LockKeyhole,
   ChevronRight,
-  Clipboard,
-  Clock3,
-  Crown,
+  CircleHelp,
+  ImageDown,
   Gift,
   MapPin,
   Medal,
-  PartyPopper,
   Share2,
   Sparkles,
   Store,
-  Ticket,
-  Trophy,
   Tv2,
-  UsersRound,
 } from 'lucide-react'
 import { Link } from 'react-router'
+import { QRCodeSVG } from 'qrcode.react'
 import { CampaignSheet } from '../components/CampaignSheet'
+import { luckyPrizes, luckyGridSlots, type LuckyPrize } from '../mocks/silverLuckyPrizes'
 
 type TaskMode = 'checkin' | 'purchase'
 type SheetKind =
@@ -30,7 +26,9 @@ type SheetKind =
   | 'checkin-reward'
   | 'purchase-reward'
   | 'my-rewards'
+  | 'lucky-draw'
   | 'grand-prize'
+  | 'community-goal'
   | 'merchant'
   | null
 
@@ -45,6 +43,20 @@ const communityRanks = [
   { rank: 6, name: '新城社区', teams: 18, score: '116人参与' },
   { rank: 7, name: '和平社区', teams: 16, score: '102人参与' },
 ]
+
+const communityMilestones = [
+  { target: 20, reward: '鸡蛋加码礼', prize: luckyPrizes[0] },
+  { target: 50, reward: '体验券加码', prize: luckyPrizes[2] },
+  { target: 100, reward: '惊喜礼加码', prize: luckyPrizes[4] },
+] as const
+
+// The rail has three evenly spaced milestone stops. Progress between stops
+// is interpolated from actual completed-team counts, not guessed from a date.
+function milestoneRailFill(teams: number): number {
+  if (teams <= 20) return 0
+  if (teams < 50) return ((teams - 20) / 30) * 50
+  return 50 + (Math.min(teams, 100) - 50)
+}
 
 const supplies = [
   {
@@ -73,18 +85,108 @@ const supplies = [
   },
 ]
 
-const drawPrizes = [
-  { level: '一等奖', prize: '惊喜硬件礼包' },
-  { level: '二等奖', prize: '本地体验券' },
-  { level: '三等奖', prize: '生活纸品' },
-  { level: '四等奖', prize: '鸡蛋兑换券' },
-  { level: '五等奖', prize: '社区小礼物' },
-]
+function LuckyPrizeImage({ prize, size = 60 }: { prize: LuckyPrize; size?: number }) {
+  return (
+    <span
+      role="img"
+      aria-label={prize.name}
+      className="block shrink-0 bg-no-repeat"
+      style={{
+        width: size,
+        height: size,
+        backgroundImage: 'url("' + import.meta.env.BASE_URL + 'images/silver-draw-prizes.webp")',
+        backgroundSize: '600% 100%',
+        backgroundPosition: (prize.imageIndex * 20) + '% center',
+      }}
+    />
+  )
+}
+
+const taskPrizePreviews = {
+  checkin: [
+    { name: '鸡蛋1盒', hint: '到场礼', position: '0%' },
+    { name: '纸巾1提', hint: '到场礼', position: '50%' },
+  ],
+  purchase: [
+    { name: '100元体验券', hint: '消费达标解锁', position: '100%' },
+  ],
+} as const
+
+// The campaign's existing sample schedule is 10/26–10/31, with awards ending
+// at 20:00 China Standard Time on 10/31 (see the rules on this page).
+const activityStartsAt = Date.parse('2026-10-26T00:00:00+08:00')
+const activityEndsAt = Date.parse('2026-10-31T20:00:00+08:00')
+
+function ActivityCountdown() {
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const beforeStart = now < activityStartsAt
+  const finished = now >= activityEndsAt
+  const remainder = Math.max(0, (beforeStart ? activityStartsAt : activityEndsAt) - now)
+  const totalSeconds = Math.ceil(remainder / 1000)
+  const days = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  const twoDigits = (value: number) => String(value).padStart(2, '0')
+
+  const numberBlock = (value: number, label: string) => (
+    <span
+      aria-label={label}
+      className="inline-flex h-[27px] min-w-[28px] items-center justify-center rounded-[5px] bg-[#154f2c] px-1 text-[16px] font-bold leading-none text-white shadow-[0_2px_4px_rgba(12,67,34,0.18)] tabular-nums"
+    >
+      {twoDigits(value)}
+    </span>
+  )
+
+  return (
+    <div className="relative z-[1] mx-3 -mt-2">
+      <div
+        className="relative rounded-t-[12px] bg-gradient-to-b from-[#d8f0cc] via-[#e1f3d8]/85 to-transparent px-2.5 pb-5 pt-2.5 text-[#275942]"
+        role="timer"
+        aria-label={finished ? '本期活动已结束' : '活动倒计时'}
+      >
+      <div className="flex items-center justify-center gap-2 text-[11px] leading-4">
+        <span className={finished ? 'font-semibold text-[#687c6c]' : 'font-bold text-[#126c38]'}>
+          {finished ? '活动已结束' : beforeStart ? '活动即将开始' : '活动进行中'}
+        </span>
+        <span className="font-medium text-[#375e40]">2026.10.26 - 10.31</span>
+      </div>
+      {finished ? (
+        <p className="mt-2 text-center text-[13px] font-semibold leading-6">本期活动已结束</p>
+      ) : (
+        <div className="mt-1.5 flex items-center justify-center gap-1 text-[12px] font-semibold text-[#285039]">
+          <span className="mr-0.5">还剩</span>
+          {numberBlock(days, '天数')}
+          <span className="mx-0.5">天</span>
+          {numberBlock(hours, '小时')}
+          <span>:</span>
+          {numberBlock(minutes, '分钟')}
+          <span>:</span>
+          {numberBlock(seconds, '秒')}
+        </div>
+      )}
+      </div>
+    </div>
+  )
+}
 
 const activityPath = '/community/activity/silver-neighborhood'
 
-const getActivityUrl = () =>
-  `${window.location.origin}${window.location.pathname}#${activityPath}`
+const publicActivityUrl = 'https://sanchuang-dev.github.io/local-life/#' + activityPath
+
+const getActivityUrl = () => {
+  // A QR code shown on localhost must not direct other phones to a loopback address.
+  if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
+    return publicActivityUrl
+  }
+  return window.location.origin + window.location.pathname + '#' + activityPath
+}
 
 const fallbackCopy = (value: string) => {
   const textarea = document.createElement('textarea')
@@ -103,8 +205,30 @@ export function SilverNeighborhoodCampaignPage() {
   const [taskMode, setTaskMode] = useState<TaskMode>('checkin')
   const [activeSheet, setActiveSheet] = useState<SheetKind>(null)
   const [shareStatus, setShareStatus] = useState<ShareStatus>('idle')
-  const [drawResult, setDrawResult] = useState<(typeof drawPrizes)[number] | null>(null)
+  const [drawResult, setDrawResult] = useState<LuckyPrize | null>(null)
+  const [drawPhase, setDrawPhase] = useState<'ready' | 'spinning' | 'result'>('ready')
+  const [drawStep, setDrawStep] = useState(-1)
   const [showFullRanking, setShowFullRanking] = useState(false)
+
+  // Fixed, inspectable front-end demonstration, not a real prize draw.
+  useEffect(() => {
+    if (activeSheet !== 'lucky-draw' || drawPhase !== 'spinning') return
+    let step = 0
+    const timer = window.setInterval(() => {
+      step += 1
+      setDrawStep(step - 1)
+      if (step === 26) {
+        window.clearInterval(timer)
+        setDrawResult(luckyPrizes[1])
+        setDrawPhase('result')
+      }
+    }, 90)
+    return () => window.clearInterval(timer)
+  }, [activeSheet, drawPhase])
+
+  const communityCompletedTeams = communityRanks.find((rank) => rank.current)?.teams ?? 0
+  const nextMilestone = communityMilestones.find((milestone) => communityCompletedTeams < milestone.target)
+  const milestoneFill = milestoneRailFill(communityCompletedTeams)
 
   const visibleRanks = showFullRanking ? communityRanks : communityRanks.slice(0, 3)
   const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
@@ -112,10 +236,6 @@ export function SilverNeighborhoodCampaignPage() {
   const openSheet = (sheet: SheetKind) => {
     if (sheet === 'share') setShareStatus('idle')
     setActiveSheet(sheet)
-  }
-
-  const scrollToTeam = () => {
-    document.getElementById('my-team')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   const handleCopyLink = async () => {
@@ -155,74 +275,53 @@ export function SilverNeighborhoodCampaignPage() {
     }
   }
 
-  const handleDraw = () => {
-    if (drawResult) return
-    setDrawResult(drawPrizes[2])
+  const openLuckyDraw = () => {
+    setDrawStep(-1)
+    setDrawPhase(drawResult ? 'result' : 'ready')
+    setActiveSheet('lucky-draw')
+  }
+
+  const startLuckyDraw = () => {
+    if (drawResult || drawPhase !== 'ready') return
+    setDrawStep(-1)
+    setDrawPhase('spinning')
+  }
+
+  const closeLuckyDraw = () => {
+    setActiveSheet(null)
+    if (!drawResult) {
+      setDrawPhase('ready')
+      setDrawStep(-1)
+    }
   }
 
   return (
     <div className="pb-7">
-      <section className="relative overflow-hidden bg-gradient-to-br from-[#0f665c] via-[#158370] to-[#48aa8f] px-4 pb-20 pt-4 text-white">
-        <div
-          className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-white/10"
-          aria-hidden="true"
-        />
-        <div
-          className="pointer-events-none absolute -bottom-20 -left-14 h-40 w-40 rounded-full bg-[#ffe2a8]/15"
-          aria-hidden="true"
-        />
-
+      <section className="relative overflow-hidden bg-[#eaf5e9]">
         <div className="relative">
-          <Link
-            to="/community"
-            className="inline-flex min-h-[44px] items-center rounded-full bg-white/12 px-3 text-[13px] font-semibold text-white backdrop-blur-sm"
-          >
-            返回社区
-          </Link>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            <span className="rounded-full bg-[#fff0c8] px-2.5 py-1 text-[12px] font-bold text-[#915f16]">
-              银发社区欢乐季
-            </span>
-            <span className="rounded-full bg-white/12 px-2.5 py-1 text-[12px] font-medium text-white/90">
-              互动原型
-            </span>
-          </div>
-
-          <h1 className="mt-3 text-[30px] font-bold leading-[1.18] tracking-tight">
-            邻里三人成团
-            <br />
-            天天有礼
-          </h1>
-          <p className="mt-3 max-w-[310px] text-[14px] leading-6 text-white/88">
-            找两位街坊一起参加。签到成团领生活礼，活动期间还能抽奖、冲社区榜、赢大奖。
-          </p>
-
-          <div className="mt-4 grid gap-2 text-[13px] text-white/90">
-            <span className="flex items-center gap-2">
-              <CalendarDays size={16} aria-hidden="true" />
-              10月26日–31日 · 示例排期
-            </span>
-            <span className="flex items-center gap-2">
-              <MapPin size={16} aria-hidden="true" />
-              幸福里社区活动广场 · 示例场地
-            </span>
-          </div>
-
-          <div className="mt-5 flex gap-2.5">
-            <button
-              type="button"
-              onClick={scrollToTeam}
-              className="flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-[14px] bg-[#fff2cf] px-4 text-[14px] font-bold text-[#6f4a12] shadow-[0_9px_24px_rgba(60,43,10,0.14)]"
+          <img
+            src={import.meta.env.BASE_URL + 'images/silver-neighborhood-hero.webp'}
+            alt="银发社区欢乐季，三人成团·天天有礼。三位长者在欢乐的社区活动中相聚。"
+            className="block aspect-[4/3] w-full object-cover"
+            fetchPriority="high"
+          />
+        </div>
+        <ActivityCountdown />
+        <div className="relative -mt-px bg-gradient-to-b from-[#edf8e9] via-[#e8f5ec] to-[#d8eee5] px-4 pb-16 pt-0">
+          <div className="flex min-h-[48px] items-center gap-2">
+            <p
+              className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] font-medium text-[#386857]"
+              title="幸福里社区活动广场 · 示例场地"
             >
-              <UsersRound size={18} aria-hidden="true" />
-              看我的团
-            </button>
+              <MapPin size={16} className="shrink-0" aria-hidden="true" />
+              <span className="min-w-0 truncate">幸福里社区活动广场 · 示例场地</span>
+            </p>
             <button
               type="button"
               onClick={() => openSheet('rules')}
-              className="min-h-[48px] rounded-[14px] border border-white/25 bg-white/10 px-4 text-[13px] font-semibold text-white backdrop-blur-sm"
+              className="inline-flex min-h-[44px] shrink-0 items-center gap-1 px-1 text-[13px] font-medium text-[#27725b] hover:underline focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
             >
+              <CircleHelp size={16} aria-hidden="true" />
               活动规则
             </button>
           </div>
@@ -287,9 +386,44 @@ export function SilverNeighborhoodCampaignPage() {
           <Share2 size={17} aria-hidden="true" />
           邀请 1 位街坊来成团
         </button>
-        <p className="mt-2 text-center text-[12px] leading-5 text-slate-400">
-          当前按“团长占一席”展示；邀请操作不会写入真实关系数据。
-        </p>
+      </section>
+
+      <section className="mx-4 mt-4" aria-labelledby="team-gifts-heading">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 id="team-gifts-heading" className="text-[16px] font-bold text-[#225c4c]">
+            成团好礼
+          </h2>
+          <span className="text-[11px] text-slate-400">示例奖品</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { name: '鸡蛋1盒', hint: '到场礼', position: '0%', tone: 'bg-[#fff8eb]' },
+            { name: '纸巾1提', hint: '到场礼', position: '50%', tone: 'bg-[#eff9f6]' },
+            { name: '100元体验券', hint: '成团购', position: '100%', tone: 'bg-[#fff3eb]' },
+          ].map((prize) => (
+            <div
+              key={prize.name}
+              className={`flex min-w-0 flex-col items-center rounded-[16px] border border-white/75 ${prize.tone} px-1.5 pb-2 pt-1.5 text-center shadow-[0_3px_10px_rgba(27,73,57,0.035)]`}
+            >
+              <span
+                role="img"
+                aria-label={prize.name}
+                className="block h-14 w-14 shrink-0 bg-no-repeat"
+                style={{
+                  backgroundImage: `url("${import.meta.env.BASE_URL}images/silver-prize-sprite.png")`,
+                  backgroundSize: '300% 100%',
+                  backgroundPosition: prize.position + ' center',
+                }}
+              />
+              <span className="mt-0.5 block text-[11px] font-bold leading-[17px] text-slate-800">
+                {prize.name}
+              </span>
+              <span className="mt-0.5 block text-[10px] font-medium leading-[14px] text-[#aa7436]">
+                {prize.hint}
+              </span>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="mx-4 mt-5">
@@ -339,20 +473,6 @@ export function SilverNeighborhoodCampaignPage() {
               <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
                 <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-teal-600 to-[#55b99b]" />
               </div>
-              <button
-                type="button"
-                onClick={() => openSheet('checkin-reward')}
-                className="mt-3 flex min-h-[68px] w-full items-center gap-3 rounded-[15px] bg-[#f7faf9] p-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
-              >
-                <Gift size={22} className="shrink-0 text-orange-500" aria-hidden="true" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13px] font-bold text-slate-700">团队生活礼</span>
-                  <span className="mt-0.5 block text-[12px] leading-5 text-slate-500">
-                    鸡蛋 / 纸巾等活动小礼 · 查看解锁与领取说明
-                  </span>
-                </span>
-                <ChevronRight size={17} className="text-slate-300" aria-hidden="true" />
-              </button>
             </div>
           ) : (
             <div className="mt-4">
@@ -368,71 +488,151 @@ export function SilverNeighborhoodCampaignPage() {
               <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
                 <div className="h-full w-[76%] rounded-full bg-gradient-to-r from-[#6e5ab0] to-[#a68bd5]" />
               </div>
-              <button
-                type="button"
-                onClick={() => openSheet('purchase-reward')}
-                className="mt-3 flex min-h-[68px] w-full items-center gap-3 rounded-[15px] bg-[#faf8ff] p-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+              <Link
+                to="/community/activity/silver-neighborhood/products"
+                className="mt-3 flex min-h-[44px] items-center justify-between rounded-[13px] bg-[#f2f7f4] px-3 text-[13px] font-semibold text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
               >
-                <Award size={22} className="shrink-0 text-[#765caf]" aria-hidden="true" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13px] font-bold text-slate-700">团队惊喜权益</span>
-                  <span className="mt-0.5 block text-[12px] leading-5 text-slate-500">
-                    参考价值约 ¥100 · 查看达标与团队分配说明
-                  </span>
+                <span className="flex items-center gap-2">
+                  <Store size={17} aria-hidden="true" />
+                  查看参与活动商品
                 </span>
-                <ChevronRight size={17} className="text-slate-300" aria-hidden="true" />
-              </button>
+                <ChevronRight size={17} aria-hidden="true" />
+              </Link>
             </div>
           )}
+
+          <div className="mt-2 flex items-start justify-center gap-7 py-2" aria-label="团队奖励预览">
+            {taskPrizePreviews[taskMode].map((prize) => (
+              <button
+                key={prize.name}
+                type="button"
+                onClick={() => openSheet(taskMode === 'checkin' ? 'checkin-reward' : 'purchase-reward')}
+                aria-label={`查看${prize.name}奖励说明`}
+                className="group flex min-h-[116px] min-w-[92px] flex-col items-center justify-center rounded-xl px-2 text-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+              >
+                <span
+                  role="img"
+                  aria-label={prize.name}
+                  className="block h-[76px] w-[76px] bg-no-repeat transition-transform group-hover:scale-105"
+                  style={{
+                    backgroundImage: `url("${import.meta.env.BASE_URL}images/silver-prize-sprite.png")`,
+                    backgroundSize: '300% 100%',
+                    backgroundPosition: prize.position + ' center',
+                  }}
+                />
+                <span className="mt-0.5 text-[12px] font-semibold leading-5 text-slate-800">
+                  {prize.name}
+                </span>
+                <span className="text-[11px] leading-4 text-slate-500">{prize.hint}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </section>
 
-      <section className="mx-4 mt-6 rounded-[20px] border border-orange-100 bg-gradient-to-br from-[#fffaf1] to-white p-4 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
+      <section className="mx-4 mt-6 rounded-[22px] bg-gradient-to-b from-[#fffaf0] via-[#fffdf5] to-[#f4faf5] px-3.5 pb-3.5 pt-4" aria-labelledby="community-goal-heading">
+        <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[11px] font-bold tracking-[0.14em] text-orange-600">COMMUNITY GOAL</p>
-            <h2 className="mt-1 text-[18px] font-bold text-slate-900">社区一起解锁更多礼</h2>
+            <h2 id="community-goal-heading" className="mt-1 text-[18px] font-bold text-slate-900">社区一起解锁更多礼</h2>
           </div>
-          <PartyPopper size={26} className="text-orange-500" aria-hidden="true" />
+          <img
+            src={import.meta.env.BASE_URL + 'images/community-goal-deco.webp'}
+            alt=""
+            aria-hidden="true"
+            width={64}
+            height={64}
+            loading="lazy"
+            decoding="async"
+            className="-mr-1.5 -mt-2 h-16 w-16 shrink-0 object-contain"
+          />
         </div>
         <p className="mt-2 text-[12px] leading-5 text-slate-500">
-          每个团仍然只有 3 人；这里统计整个社区成功团数，不把大家拼成九人、十八人大团。
+          每团仍是 3 人；全社区累计成功团数，共同解锁里程碑奖励。
         </p>
 
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          {[
-            ['20团', '鸡蛋加码', true],
-            ['50团', '体验券加码', false],
-            ['100团', '惊喜礼加码', false],
-          ].map(([target, reward, reached]) => (
-            <div
-              key={target as string}
-              className={`rounded-[15px] border p-2.5 text-center ${
-                reached ? 'border-orange-200 bg-[#fff3dc]' : 'border-slate-100 bg-white'
-              }`}
-            >
-              <p className={`text-[15px] font-bold ${reached ? 'text-orange-700' : 'text-slate-700'}`}>
-                {target}
-              </p>
-              <p className="mt-1 text-[11px] leading-4 text-slate-500">{reward}</p>
-              <p className={`mt-1 text-[11px] font-semibold ${reached ? 'text-orange-600' : 'text-slate-400'}`}>
-                {reached ? '已解锁' : '待解锁'}
-              </p>
+        <div className="mt-4" aria-label="社区里程碑活动轴">
+          <div className="grid grid-cols-3 text-center">
+            {communityMilestones.map(({ target }) => {
+              const unlocked = communityCompletedTeams >= target
+              const active = nextMilestone?.target === target
+              return (
+                <span
+                  key={target}
+                  className={'mx-auto rounded-full px-2 py-1 text-[12px] font-bold leading-4 ' +
+                    (unlocked ? 'bg-[#e4f5df] text-[#197753]' : active ? 'bg-[#fff0d8] text-[#dc6631]' : 'bg-[#eef1f2] text-slate-500')}
+                >
+                  {target}团
+                </span>
+              )
+            })}
+          </div>
+
+          <div className="relative mt-1.5 h-9">
+            <div className="absolute left-[16.6667%] right-[16.6667%] top-[14px] h-[7px] rounded-full bg-[#e1e5e4]" />
+            <div className="absolute left-[16.6667%] top-[14px] h-[7px] rounded-full bg-gradient-to-r from-[#a7d97c] to-[#f7a95d] transition-[width] duration-300"
+              style={{ width: (milestoneFill * 2 / 3) + '%' }}
+            />
+            <div className="relative z-[1] grid grid-cols-3">
+              {communityMilestones.map(({ target }) => {
+                const unlocked = communityCompletedTeams >= target
+                const active = nextMilestone?.target === target
+                return (
+                  <span key={target} className="flex h-9 items-center justify-center" aria-label={target + '团' + (unlocked ? '已解锁' : active ? '下一目标' : '待解锁')}>
+                    <span className={'flex h-[29px] w-[29px] items-center justify-center rounded-full border-[3px] border-white shadow-sm ' +
+                      (unlocked ? 'bg-[#12966f] text-white' : active ? 'bg-[#f57137] text-white' : 'bg-[#e4e9e9] text-slate-500')}>
+                      {unlocked ? <Check size={17} strokeWidth={3} aria-hidden="true" /> :
+                        active ? <span className="h-2.5 w-2.5 rounded-full bg-white" /> :
+                          <LockKeyhole size={15} aria-hidden="true" />}
+                    </span>
+                  </span>
+                )
+              })}
             </div>
-          ))}
+          </div>
+
+          <div className="mt-1 grid grid-cols-3 gap-1 text-center">
+            {communityMilestones.map(({ target, reward, prize }) => {
+              const unlocked = communityCompletedTeams >= target
+              const active = nextMilestone?.target === target
+              return (
+                <div key={target} className="flex min-w-0 flex-col items-center">
+                  <LuckyPrizeImage prize={prize} size={70} />
+                  <p className="mt-0.5 text-[12px] font-bold leading-[18px] text-slate-800">{reward}</p>
+                  <p className={'mt-0.5 text-[11px] font-semibold leading-4 ' +
+                    (unlocked ? 'text-teal-700' : active ? 'text-orange-600' : 'text-slate-400')}>
+                    {unlocked ? '已解锁' : active ? '冲刺中' : '待解锁'}
+                  </p>
+                </div>
+              )
+            })}
+          </div>
         </div>
 
-        <div className="mt-3 flex items-center justify-between gap-3 text-[12px] text-slate-500">
-          <span>幸福里社区已成功 36 团</span>
-          <span className="text-right font-semibold text-orange-600">距离 50 团还差 14 团</span>
+        <div className="mt-4 flex items-center justify-between gap-2 border-t border-[#eadfc9]/60 pt-3">
+          <div className="min-w-0">
+            <p className="text-[12px] font-medium text-slate-600">
+              已成团 <strong className="text-[17px] font-bold tabular-nums text-[#e65f35]">{communityCompletedTeams}</strong> 团
+            </p>
+            <p className="text-[11px] text-slate-500">
+              {nextMilestone ? <>距离 {nextMilestone.target} 团还差 <strong className="font-bold text-orange-600">{nextMilestone.target - communityCompletedTeams}</strong> 团</> : '全部里程碑已解锁'}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => openSheet('community-goal')}
+            className="flex min-h-[44px] shrink-0 items-center gap-0.5 rounded-full px-1 text-[12px] font-semibold text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+          >
+            奖励规则 <ChevronRight size={16} aria-hidden="true" />
+          </button>
         </div>
       </section>
 
-      <section className="mx-4 mt-6">
-        <div className="mb-3 flex min-h-[44px] items-end justify-between gap-3">
+      <section className="mx-4 mt-6" aria-labelledby="lucky-heading">
+        <div className="mb-2 flex min-h-[44px] items-center justify-between gap-3">
           <div>
             <p className="text-[11px] font-bold tracking-[0.16em] text-teal-700">DAILY LUCK</p>
-            <h2 className="mt-1 text-[19px] font-bold text-slate-900">今日抽奖</h2>
+            <h2 id="lucky-heading" className="mt-1 text-[19px] font-bold text-slate-900">今日抽奖</h2>
           </div>
           <button
             type="button"
@@ -442,59 +642,30 @@ export function SilverNeighborhoodCampaignPage() {
             我的奖励
           </button>
         </div>
-
-        <div className="overflow-hidden rounded-[22px] bg-[#173e38] p-4 text-white shadow-[0_12px_28px_rgba(14,59,51,0.12)]">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[16px] font-bold">五档惊喜奖池</p>
-              <p className="mt-1 text-[12px] leading-5 text-white/70">
-                当前页面提供一次可重复验收的演示抽奖，不代表真实中奖概率或发奖。
-              </p>
+        <p className="mb-3 text-[12px] leading-5 text-slate-500">
+          每日一次演示机会，看看今天有什么惊喜
+        </p>
+        <div className="grid grid-cols-3 gap-x-2 gap-y-3" aria-label="今日奖品六宫格">
+          {luckyPrizes.map((prize) => (
+            <div key={prize.id} className="flex min-w-0 flex-col items-center text-center">
+              <span className="flex h-[80px] w-full max-w-[106px] items-center justify-center rounded-[14px] bg-[#fff5e7]/85">
+                <LuckyPrizeImage prize={prize} size={68} />
+              </span>
+              <span className="mt-1 text-[11px] font-semibold leading-4 text-[#455a51]">{prize.name}</span>
             </div>
-            <Ticket size={26} className="text-[#ffd991]" aria-hidden="true" />
-          </div>
-
-          <div className="mt-4 grid grid-cols-5 gap-1.5">
-            {drawPrizes.map((item, index) => (
-              <div
-                key={item.level}
-                className={`rounded-[12px] border px-1 py-2 text-center ${
-                  index === 2 && drawResult
-                    ? 'border-[#ffd88b] bg-[#ffd88b] text-[#65430d]'
-                    : 'border-white/12 bg-white/8'
-                }`}
-              >
-                <p className="text-[11px] font-bold">{item.level}</p>
-                <p className="mt-1 text-[11px] leading-4 opacity-85">{item.prize}</p>
-              </div>
-            ))}
-          </div>
-
-          <div aria-live="polite">
-            {drawResult ? (
-              <div className="mt-3 flex items-center gap-2 rounded-[14px] bg-white/10 p-3 text-[13px]">
-                <Check size={18} className="shrink-0 text-[#ffd991]" aria-hidden="true" />
-                <span>
-                  本次演示结果：<strong>{drawResult.level} · {drawResult.prize}</strong>
-                </span>
-              </div>
-            ) : null}
-          </div>
-
-          <button
-            type="button"
-            onClick={handleDraw}
-            disabled={Boolean(drawResult)}
-            className={`mt-3 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-[14px] px-4 text-[14px] font-bold ${
-              drawResult
-                ? 'cursor-default bg-white/15 text-white/70'
-                : 'bg-[#ffd991] text-[#5b3d0c]'
-            }`}
-          >
-            <Sparkles size={17} aria-hidden="true" />
-            {drawResult ? '今日演示已抽' : '试试今日手气'}
-          </button>
+          ))}
         </div>
+        <button
+          type="button"
+          onClick={openLuckyDraw}
+          className="mt-4 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-full bg-[#ff763e] px-3 text-[14px] font-bold text-white shadow-[0_3px_8px_rgba(253,117,62,0.15)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600"
+        >
+          <Sparkles size={17} aria-hidden="true" />
+          {drawResult ? '查看今日抽奖结果' : '试试今日手气'}
+        </button>
+        <p className="mt-2 text-center text-[11px] leading-4 text-slate-400">
+          奖品与抽取均为前端演示，不代表真实发放
+        </p>
       </section>
 
       <section className="mx-4 mt-6">
@@ -557,37 +728,50 @@ export function SilverNeighborhoodCampaignPage() {
         </p>
       </section>
 
-      <section className="mx-4 mt-6 overflow-hidden rounded-[22px] border border-[#eadbb7] bg-gradient-to-br from-[#fff8e8] via-white to-[#f4fbf8] p-4 shadow-sm">
-        <div className="flex items-start gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#2c554c] text-[#ffe09d]">
-            <Crown size={25} aria-hidden="true" />
+      <section className="mx-4 mt-7" aria-labelledby="grand-prize-heading">
+        <div className="flex items-end justify-between gap-2">
+          <div>
+            <p className="text-[11px] font-bold tracking-[0.16em] text-[#ab7b30]">FINAL PRIZE</p>
+            <h2 id="grand-prize-heading" className="mt-1 text-[19px] font-bold text-slate-900">
+              活动压轴大奖
+            </h2>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-bold tracking-[0.15em] text-[#9b711f]">FINAL PRIZE</p>
-            <h2 className="mt-1 text-[19px] font-bold text-slate-900">活动压轴大奖</h2>
-            <p className="mt-1 text-[12px] leading-5 text-slate-500">
-              活动结束时，社区榜前 20 名参与者获得大奖抽取资格。不是“前 20 名必得大奖”。
-            </p>
-          </div>
+          <p className="pb-0.5 text-[11px] font-semibold text-[#9d7849]">10月31日 20:00 截止</p>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2.5">
-          <div className="rounded-[15px] bg-white p-3 shadow-sm">
-            <Trophy size={20} className="text-[#b17b18]" aria-hidden="true" />
-            <p className="mt-2 text-[13px] font-bold text-slate-800">大奖示例</p>
-            <p className="mt-1 text-[12px] leading-5 text-slate-500">广电硬件 / 魔镜体验设备</p>
+        <div className="relative mt-2 overflow-hidden rounded-[18px] bg-gradient-to-b from-[#fff8e9] via-[#fffbf5] to-transparent pt-1">
+          <div className="relative mx-auto h-[224px] max-w-[312px]">
+            <img
+              src={import.meta.env.BASE_URL + 'images/silver-grand-screen.webp'}
+              alt="大奖示例：金色奖杯旁的家庭智能屏，配有彩带与礼盒"
+              className="absolute bottom-0 left-1/2 h-[224px] w-[250px] -translate-x-1/2 object-contain"
+              loading="eager"
+            />
+            <img
+              src={import.meta.env.BASE_URL + 'images/silver-grand-top20.webp'}
+              alt="社区榜前20名享有大奖抽取资格"
+              className="absolute right-1 top-0 h-[78px] w-[78px] object-contain"
+              loading="eager"
+            />
           </div>
-          <div className="rounded-[15px] bg-white p-3 shadow-sm">
-            <Clock3 size={20} className="text-teal-700" aria-hidden="true" />
-            <p className="mt-2 text-[13px] font-bold text-slate-800">剩余 4 天</p>
-            <p className="mt-1 text-[12px] leading-5 text-slate-500">10月31日 20:00 结束 · 示例</p>
-          </div>
+          <p className="mt-0.5 text-center text-[15px] font-bold text-[#264d40]">
+            广电智能硬件 · 魔镜体验设备
+          </p>
+          <p className="mt-1 text-center text-[11px] leading-5 text-slate-500">
+            奖品仅作活动示例，实际型号与数量待确定
+          </p>
         </div>
 
+        <p className="mt-1 text-center text-[13px] font-semibold leading-6 text-[#315f4d]">
+          社区榜前 20 名，获得一次大奖抽取资格
+        </p>
+        <p className="text-center text-[12px] leading-5 text-slate-500">
+          获得资格不等于直接中奖
+        </p>
         <button
           type="button"
           onClick={() => openSheet('grand-prize')}
-          className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-[13px] border border-[#dfc98e] bg-white text-[13px] font-bold text-[#8d681f]"
+          className="mx-auto mt-2 flex min-h-[44px] items-center justify-center gap-1.5 px-4 text-[13px] font-semibold text-[#8d681f] focus-visible:rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
         >
           查看大奖规则
           <ChevronRight size={16} aria-hidden="true" />
@@ -688,45 +872,80 @@ export function SilverNeighborhoodCampaignPage() {
         open={activeSheet === 'share'}
         title="邀请最后 1 位街坊"
         eyebrow="TEAM 2 / 3"
+        variant="poster"
         onClose={() => setActiveSheet(null)}
         footer={
-          <div className="grid gap-2">
-            {canNativeShare ? (
+          <>
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={handleSystemShare}
-                className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] bg-teal-700 px-4 text-[14px] font-bold text-white"
+                className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-[13px] bg-teal-700 px-2 text-[13px] font-semibold text-white transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
               >
-                <Share2 size={18} aria-hidden="true" />
-                系统分享
+                <Share2 size={17} aria-hidden="true" />
+                转发给好友
               </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={handleCopyLink}
-              className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] border border-slate-200 bg-white px-4 text-[14px] font-bold text-slate-700"
-            >
-              <Clipboard size={18} aria-hidden="true" />
-              复制活动链接
-            </button>
-          </div>
+              <button
+                type="button"
+                disabled
+                aria-describedby="screenshot-unavailable"
+                className="flex min-h-[48px] cursor-not-allowed items-center justify-center gap-1.5 rounded-[13px] border border-slate-200 bg-slate-50 px-2 text-[13px] font-semibold text-slate-400"
+              >
+                <ImageDown size={17} aria-hidden="true" />
+                截图保存
+              </button>
+            </div>
+            <p id="screenshot-unavailable" className="mt-2 text-center text-[11px] leading-4 text-slate-400">
+              截图保存暂未开放
+            </p>
+            <div className="text-center text-[12px] font-medium" aria-live="polite">
+              {shareStatus === 'shared' ? <p className="mt-1 text-teal-700">已调起系统分享，是否加入还需好友确认。</p> : null}
+              {shareStatus === 'copied' ? <p className="mt-1 text-teal-700">活动链接已复制，可粘贴发送给好友。</p> : null}
+              {shareStatus === 'cancelled' ? <p className="mt-1 text-slate-500">已取消分享，可再次点击转发。</p> : null}
+              {shareStatus === 'error' ? <p className="mt-1 text-orange-700">分享或复制未成功，请稍后重试。</p> : null}
+            </div>
+          </>
         }
       >
-        <div className="rounded-[16px] bg-[#f2faf6] p-4">
-          <p className="text-[16px] font-bold text-slate-800">幸福里 · 三人成团</p>
-          <p className="mt-1 text-[13px] leading-6 text-slate-500">
-            我们已经 2 / 3 人，还差你一个。打开活动页后可以查看规则、任务、奖励和社区榜。
-          </p>
-        </div>
-        <div className="mt-3 rounded-[14px] border border-slate-200 bg-white p-3">
-          <p className="text-[12px] font-semibold text-slate-500">活动直达链接</p>
-          <p className="mt-1 break-all text-[12px] leading-5 text-slate-700">{typeof window === 'undefined' ? activityPath : getActivityUrl()}</p>
-        </div>
-        <div className="mt-3 min-h-[24px] text-[12px] font-medium" aria-live="polite">
-          {shareStatus === 'shared' ? <p className="text-teal-700">系统分享已完成。是否加入队伍仍由对方打开活动后确认。</p> : null}
-          {shareStatus === 'copied' ? <p className="text-teal-700">活动链接已复制，可以直接发给街坊。</p> : null}
-          {shareStatus === 'cancelled' ? <p className="text-slate-500">已取消系统分享，你也可以直接复制链接。</p> : null}
-          {shareStatus === 'error' ? <p className="text-orange-700">当前浏览器未能完成分享或复制，请长按上方链接手动复制。</p> : null}
+        <div className="mx-auto w-full max-w-[300px] overflow-hidden rounded-[20px] border border-[#deebdf] bg-[#f4faf3] shadow-[0_9px_25px_rgba(26,88,62,0.08)]">
+          <img
+            src={import.meta.env.BASE_URL + 'images/silver-neighborhood-hero.webp'}
+            alt="银发社区欢乐季活动海报"
+            className="block aspect-[4/3] w-full object-cover"
+          />
+          <div className="px-3 pb-3 pt-3">
+            <div className="text-center">
+              <p className="text-[17px] font-bold leading-6 text-[#176149]">还差你，三人成团领好礼</p>
+              <p className="mt-1 text-[12px] text-[#547c6c]">幸福里社区 · 已有 2 / 3 位街坊</p>
+            </div>
+            <div className="mt-3 rounded-[14px] border border-[#deece1] bg-white px-3 py-3 text-center">
+              <div className="relative mx-auto w-fit rounded-lg bg-white">
+                <QRCodeSVG
+                  value={getActivityUrl()}
+                  size={148}
+                  level="H"
+                  marginSize={3}
+                  fgColor="#195B4C"
+                  bgColor="#FFFFFF"
+                  title="银发社区欢乐季活动直达二维码"
+                />
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <span
+                    aria-label="演示团长头像"
+                    className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#247D67] text-[13px] font-bold text-white shadow-sm"
+                  >
+                    我
+                  </span>
+                </div>
+              </div>
+              <p className="mt-2 text-[12px] font-semibold text-[#2f765f]">
+                扫码查看活动 · 邻里一起领好礼
+              </p>
+            </div>
+            <p className="mt-2 text-center text-[11px] leading-4 text-slate-500">
+              演示海报 · 扫码仅打开活动页，不自动加入队伍
+            </p>
+          </div>
         </div>
       </CampaignSheet>
 
@@ -791,6 +1010,83 @@ export function SilverNeighborhoodCampaignPage() {
       </CampaignSheet>
 
       <CampaignSheet
+        open={activeSheet === 'lucky-draw'}
+        title={drawPhase === 'result' && drawResult ? '恭喜你！' : '今日抽奖'}
+        eyebrow="DAILY LUCK · 演示抽奖"
+        variant="poster"
+        onClose={closeLuckyDraw}
+      >
+        {drawPhase === 'result' && drawResult ? (
+          <div className="py-2 text-center" aria-live="polite">
+            <p className="text-[14px] font-bold text-[#225b44]">
+              获得 {drawResult.name}
+            </p>
+            <div className="mx-auto mt-3 flex h-[168px] w-[168px] items-center justify-center rounded-full bg-[radial-gradient(circle,#fff0b9_0%,#fff9ed_65%,transparent_72%)]">
+              <LuckyPrizeImage prize={drawResult} size={132} />
+            </div>
+            <p className="mt-2 text-[16px] font-bold text-slate-900">{drawResult.name}</p>
+            <p className="mt-1 text-[12px] leading-5 text-slate-500">
+              {drawResult.level} · 前端演示结果，不生成真实领奖凭证
+            </p>
+            <button
+              type="button"
+              onClick={() => openSheet('my-rewards')}
+              className="mt-5 flex min-h-[48px] w-full items-center justify-center rounded-full bg-[#ff763e] text-[14px] font-bold text-white"
+            >
+              查看我的奖励
+            </button>
+            <button
+              type="button"
+              onClick={closeLuckyDraw}
+              className="mt-2 flex min-h-[44px] w-full items-center justify-center rounded-full bg-[#e9f6ed] text-[13px] font-semibold text-[#226b52]"
+            >
+              继续逛逛
+            </button>
+          </div>
+        ) : (
+          <div className="py-1">
+            <p className="mb-3 text-center text-[12px] text-slate-500">
+              {drawPhase === 'spinning' ? '好运正在靠近你…' : '今日剩余 1 次演示机会'}
+            </p>
+            <div className="grid grid-cols-3 gap-2 rounded-[17px] bg-gradient-to-b from-[#fff0c5] to-[#fff7e8] p-2" aria-label="九宫格抽奖盘">
+              {luckyGridSlots.map((prizeIndex, cellIndex) => {
+                if (prizeIndex === null) {
+                  return (
+                    <button
+                      key="start"
+                      type="button"
+                      onClick={startLuckyDraw}
+                      disabled={drawPhase === 'spinning'}
+                      aria-label="开始抽奖"
+                      className="flex min-h-[87px] flex-col items-center justify-center rounded-[13px] bg-[#ff753e] text-[17px] font-bold leading-6 text-white shadow-[0_3px_10px_rgba(255,117,62,0.2)] disabled:cursor-wait disabled:opacity-90"
+                    >
+                      {drawPhase === 'spinning' ? '抽奖中…' : <>开始<br />抽奖</>}
+                    </button>
+                  )
+                }
+                const prize = luckyPrizes[prizeIndex]
+                const ringOrder = [0, 1, 2, 5, 8, 7, 6, 3]
+                const selected = drawPhase === 'spinning' && ringOrder[drawStep % 8] === cellIndex
+                return (
+                  <div
+                    key={prize.id + '-' + cellIndex}
+                    className={'flex min-h-[87px] min-w-0 flex-col items-center justify-center rounded-[13px] border px-0.5 py-1 text-center transition-colors ' +
+                      (selected ? 'border-[#ff904e] bg-[#ffe0a4] shadow-[0_0_0_2px_#ffb65a]' : 'border-white/75 bg-white/80')}
+                  >
+                    <LuckyPrizeImage prize={prize} size={57} />
+                    <span className="mt-0.5 text-[10px] font-semibold leading-[14px] text-[#5a594b]">{prize.name}</span>
+                  </div>
+                )
+              })}
+            </div>
+            <p className="mt-3 text-center text-[11px] leading-4 text-slate-400">
+              前端演示 · 不代表真实中奖概率或奖品发放
+            </p>
+          </div>
+        )}
+      </CampaignSheet>
+
+      <CampaignSheet
         open={activeSheet === 'my-rewards'}
         title="我的奖励"
         eyebrow="ACTIVITY WALLET"
@@ -822,13 +1118,40 @@ export function SilverNeighborhoodCampaignPage() {
             </div>
             <p className="mt-1 text-[12px] text-slate-500">
               {drawResult
-                ? `本次演示中奖：${drawResult.level} · ${drawResult.prize}。`
+                ? `本次演示中奖：${drawResult.level} · ${drawResult.name}。`
                 : '今天还有 1 次演示抽奖机会。'}
             </p>
           </div>
         </div>
         <p className="mt-3 text-[12px] leading-5 text-slate-400">
           “待领取”仅用于验证奖励状态设计，不生成真实券码或兑奖凭证。
+        </p>
+      </CampaignSheet>
+
+      <CampaignSheet
+        open={activeSheet === 'community-goal'}
+        title="社区里程碑奖励"
+        eyebrow="COMMUNITY GOAL"
+        onClose={() => setActiveSheet(null)}
+      >
+        <p className="mb-3 text-[13px] leading-6 text-slate-600">
+          每个小团仍为 3 人，里程碑按照整个幸福里社区的成功成团数累计计算，不是把不同团队合并为大团。
+        </p>
+        <div className="space-y-3">
+          {communityMilestones.map(({ target, reward, prize }) => (
+            <div key={target} className="flex items-center gap-3 border-b border-slate-100 pb-3 last:border-0">
+              <LuckyPrizeImage prize={prize} size={62} />
+              <div>
+                <p className="text-[14px] font-bold text-slate-800">{target} 团 · {reward}</p>
+                <p className="mt-1 text-[12px] leading-5 text-slate-500">
+                  社区累计成功 {target} 团后解锁这一奖励档位，正式领取与分配方式待活动规则确认。
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="mt-2 text-[12px] leading-5 text-slate-400">
+          当前成团数、奖品及进度为演示数据，不产生真实奖励领取资格。
         </p>
       </CampaignSheet>
 
