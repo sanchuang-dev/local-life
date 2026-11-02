@@ -11,6 +11,13 @@ node_modules
 dist
 dist-ssr
 *.local
+*.tsbuildinfo
+
+# pnpm / workspace caches
+.pnpm-store
+
+# Local runtime data (future SQLite/Drizzle boundary)
+.data
 
 # Editor directories and files
 .vscode/*

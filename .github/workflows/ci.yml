@@ -1,4 +1,6 @@
-name: Frontend CI
+# Workspace CI: install once, then lint, typecheck, API tests and all builds.
+# Branch deployments stay in preview.yml; this workflow never deploys.
+name: Workspace CI
 
 on:
   push:
@@ -15,9 +17,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.19.0
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-      - run: npm ci --no-audit --no-fund
-      - run: npm run check
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
