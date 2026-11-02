@@ -184,5 +184,5 @@ jobs:
       verification_command: |
         set -euo pipefail
         git diff --cached --check
-        npm ci --no-audit --no-fund
-        npm run check
+        # The immutable verifier runs on a fresh runner; bootstrap the workspace's exact Node/pnpm toolchain.
+        npm exec --yes --package=node@22 --package=pnpm@10.19.0 --call 'node --version && pnpm --version && pnpm install --frozen-lockfile && pnpm check'
