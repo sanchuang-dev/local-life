@@ -1,45 +1,62 @@
 # 三创 · 本地生活（Local Life）
 
-独立可维护的本地生活前端项目。**当前阶段为可演示的前端原型，不是已接入真实业务的生产系统。**
+本地生活的 Pre-MVP 工程仓库：pnpm workspace 管理**居民移动端 H5**、**管理台**与 **Node API**。当前交付的是可运行、可审查的工程基座，不是已上线的业务系统。
 
-## 技术栈
+## 目录
 
-- React + TypeScript / Vite
-- Tailwind CSS（官方 Vite 插件）
-- React Router（静态 Pages 使用 HashRouter，避免刷新深链接返回 404）
-- Lucide React（通用图标）
-- npm lockfile；Node.js 22
+```text
+apps/web/            居民移动端 H5（React + Vite + Tailwind，原已评审页面）
+apps/admin/          管理台（React + Vite + Ant Design 6，空布局 + 未实现入口）
+apps/api/            API（Node 22 + Hono + zod，GET /healthz）
+packages/contracts/  共享 DTO/校验 schema（zod）
+docs/engineering/    工程边界与验证证据
+```
 
 ## 本地开发
 
 ```bash
-npm ci
-npm run dev
-npm run check
-npm run build
+pnpm install --frozen-lockfile
+pnpm dev            # 并行启动 web(5173) + admin(5174) + api(127.0.0.1:4080)
+pnpm check          # oxlint + typecheck + API 测试 + 全部构建
 ```
 
-构建产物在 `dist/`。V0.3 的 16 个历史界面已全部迁入 React 演示：首页、广电、社区、健康、惠生活与“我的”均可浏览。底部导航已按本轮演示信息架构归位为**首页 / 社区 / 健康 / 惠生活 / 我的**五个业务模块；旧「发现」技术路由目录已退场（`/discover` 落到 404），「我的」页不再展示原型演示导航。详见 [C06 迁移回归矩阵](docs/migration/c06-regression.md) 与 [I03 导航归位记录](docs/migration/i03-navigation.md)。未接入的服务、订单、支付、设备与账号均明确标注演示，不会发起真实业务。
+单独启动：`pnpm dev:web` / `pnpm dev:admin` / `pnpm dev:api`。API 健康检查：
 
-**前端施工规约**：[AGENTS.md](AGENTS.md)。参照卡博士 Web 的页面、组件、数据边界，但不照搬 WebView / JSBridge / Com Design 规范。
+```bash
+curl -s http://127.0.0.1:4080/healthz
+# {"status":"ok","service":"local-life-api","version":"0.0.0","uptimeSeconds":1,"timestamp":"..."}
+```
 
-## 仓库及环境
+管理台通过 Vite 代理请求 `/api/healthz`，接口不可达时会显示真实错误，不会伪造成功状态。
 
-- `main`：默认分支，工作流入口和基线记录；**不是生产环境**。
-- `feat/*` → `dev` → `test` → `prod`：依三创组织环境约定。
-- `dev`：集成分支；GitHub Pages 开发预览：https://sanchuang-dev.github.io/local-life/ 。
-- `test`：验收集成分支，CI 检查，不单独部署。
-- `prod`：正式演示版本源码，GitHub Pages 展示：https://sanchuang-dev.github.io/local-life/prod/ 。
-- **部署机制**：单仓库 Pages 只有一个站点，`.github/workflows/preview.yml` 将 `dev` 打包到根目录，将 `prod` 使用 Vite CLI `--base /local-life/prod/` 独立打包到 `prod/`；两份构建共用一次 Pages 发布。`prod` 分支更新会通过 GitHub Actions `workflow_dispatch` 通知允许部署的 `dev` Pages 工作流，以最新 `prod` 源码重新发布；`prod` 分支本身不直接获取 Pages 部署权限。它们是演示站点，不代表真实支付/订单/设备服务已上线。URL 在 Pages 工作流首次成功完成后生效。
-- 校验：`npm run check`（Oxlint + TypeScript + Vite Build）。
+## 当前边界（重要）
 
-## 历史原型与产品决策
+- **已实现**：H5 现有页面与路由原样保留；workspace 脚本与单锁文件；Hono API 的配置校验、结构化错误、`/healthz`；管理台可打开的空布局；共享契约包；dev/prod 双 Pages 构建。
+- **未实现**：管理员登录/权限、任何业务 CRUD、SQLite/Drizzle 数据库、微信 OAuth、真实支付/订单/设备。管理台对应入口均显式标注「未实现」。
+- **不发布**：管理台与 API 不进 GitHub Pages；Pages 只有静态 H5，不冒充在线 API。
+- **prod 分支**在晋级前仍是旧单包布局，Pages 工作流保留有注释的兼容构建路径；`dev` 完成晋级后才会统一。
 
-历史 V0.3 仍在 [base-prototype 的 demo/local-life 分支](https://github.com/sanchuang-dev/base-prototype/tree/demo/local-life)，原展示链接为
-https://sanchuang-dev.github.io/base-prototype/local-life/ 。
+详见 [工程基座说明](docs/engineering/monorepo.md) 与 [AGENTS.md](AGENTS.md)。
 
-历史页面与 PRD **只作为产品讨论输入**；本轮减法/加法尚未定稿，不机械复制旧 UI、不擅自改旧链接或统一展厅。以后迁移发布入口须独立决策和验收，消除双重源码维护。
+## 测试与证据
+
+- `pnpm check` 覆盖 Oxlint、TypeScript、API 契约/错误测试与三个子项目构建。
+- UI 回归使用真实浏览器在 375 × 812 与 320 宽度验证，证据见 `docs/engineering/evidence/`。
+- CI 通过只证明静态检查与构建；设备/浏览器交互与真实部署仍需维护者实测。
+
+## 仓库与环境
+
+- `main`：默认分支与工作流入口，**不是生产环境**。
+- `feat/*` → `dev` → `test` → `prod`：依三创组织环境约定；本阶段只向 `dev` 提 Draft PR。
+- `dev`：集成分支；GitHub Pages 开发预览 https://sanchuang-dev.github.io/local-life/ 。
+- `prod`：演示版本源码；GitHub Pages 展示 https://sanchuang-dev.github.io/local-life/prod/ 。
+- Pages 发布：`.github/workflows/preview.yml` 将 `dev` 构建到根目录、`prod` 以 `--base /local-life/prod/` 构建到 `prod/`，合并为一次原子发布。`prod` 更新通过 `workflow_dispatch` 触发允许部署的 `dev` 工作流。
+- 校验：`.github/workflows/ci.yml` 使用 pnpm 执行 `pnpm check`。
+
+## 历史与产品决策
+
+历史 V0.3 仍在 [base-prototype 的 demo/local-life 分支](https://github.com/sanchuang-dev/base-prototype/tree/demo/local-life)，原展示链接为 https://sanchuang-dev.github.io/base-prototype/local-life/ 。历史页面、PRD 与 `docs/migration/` 只作为讨论与迁移记录，不代表当前实现约定。
 
 ## 自动化与牛马
 
-CI 对环境分支与 PR 执行真实构建校验。免费 Worker 已通过 [PR #1](https://github.com/sanchuang-dev/local-life/pull/1) 接入当前 [三创组织标准](https://github.com/sanchuang-dev/.github/blob/main/docs/engineering/free-worker-onboarding.md)，但本仓库 Issue → Draft PR 真实 E2E **尚未验证**。牛马只负责实现和交付 Draft PR，不具备验收、合并或发布权限。
+CI 对环境分支与 PR 执行真实安装/检查/构建。三创 Worker 只负责实现和交付 Draft PR，不具备验收、合并、关闭 Issue 或发布权限。
