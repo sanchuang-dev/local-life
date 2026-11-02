@@ -141,7 +141,7 @@ jobs:
         git diff --cached --check
         # Keep lint, TypeScript build and the composite quality gate meaningful.
         node -e 'const s=require("./package.json").scripts; for(const k of ["lint","build","check"]) if(typeof s?.[k]!=="string" || !s[k].trim() || /^(true|echo|:|exit 0)/.test(s[k].trim())) throw Error("Missing meaningful quality check: "+k)'
-        npm ci --no-audit --no-fund
-        npm run check
+        # The immutable verifier runs on a fresh runner; bootstrap the workspace's exact Node/pnpm toolchain.
+        npm exec --yes --package=node@22 --package=pnpm@10.19.0 --call 'node --version && pnpm --version && pnpm install --frozen-lockfile && pnpm check'
     secrets:
       opencode_go_api_key: ${{ secrets.SANCHUANG_OPENCODE_GO_API_KEY }}
