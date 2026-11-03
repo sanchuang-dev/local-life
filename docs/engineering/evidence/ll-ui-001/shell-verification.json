@@ -1,0 +1,86 @@
+{
+  "checks": [
+    {
+      "name": "1440 dashboard renders shell + real health",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "menu search narrows to order page",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "menu search shows empty state",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "tabs follow route changes",
+      "pass": true,
+      "detail": "[\"经营工作台\",\"活动管理\",\"系统信息\"]"
+    },
+    {
+      "name": "closing a non-current tab keeps the current route",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "close other tabs keeps workbench + current",
+      "pass": true,
+      "detail": "[\"经营工作台\",\"订单管理\"]"
+    },
+    {
+      "name": "browser back keeps tab + page in sync",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "browser forward restores the order tab",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "reload keeps current deep link and tab strip",
+      "pass": true,
+      "detail": "http://localhost:5174/#/orders"
+    },
+    {
+      "name": "sidebar collapses without losing tabs",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "1024 keeps the desktop sidebar",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "768 keeps sidebar + tabs without horizontal overflow",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "767 switches to drawer navigation",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "drawer navigation closes and returns focus to the trigger",
+      "pass": true,
+      "detail": "打开导航菜单"
+    },
+    {
+      "name": "drawer navigation opens the route tab",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "no console errors / page exceptions",
+      "pass": true,
+      "detail": ""
+    }
+  ],
+  "consoleErrors": [],
+  "url": "http://localhost:5174/#/communities"
+}

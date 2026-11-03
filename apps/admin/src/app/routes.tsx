@@ -1,0 +1,33 @@
+import type { RouteObject } from 'react-router'
+import { AdminLayout } from '../layouts/AdminLayout'
+import { DashboardPage } from '../pages/DashboardPage'
+import { NotFoundPage } from '../pages/NotFoundPage'
+import { PlaceholderPage } from '../pages/PlaceholderPage'
+import { NAV_PAGES } from './shell/navigation'
+
+const PLANNED_PAGES = NAV_PAGES.filter((page) => page.status === 'planned')
+
+/**
+ * Route table and navigation model describe the same destinations; planned
+ * pages render the shared 待建设 state instead of invented business UI.
+ */
+export const routes: RouteObject[] = [
+  {
+    path: '/',
+    element: <AdminLayout />,
+    children: [
+      { index: true, element: <DashboardPage /> },
+      ...PLANNED_PAGES.map((page) => ({
+        path: page.key.replace(/^\//, ''),
+        element: (
+          <PlaceholderPage
+            title={page.label}
+            description={page.description}
+            planned={page.planned}
+          />
+        ),
+      })),
+      { path: '*', element: <NotFoundPage /> },
+    ],
+  },
+]

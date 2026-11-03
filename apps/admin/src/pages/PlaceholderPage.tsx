@@ -1,52 +1,52 @@
-import { Button, Card, Result, Space, Tag, Typography } from 'antd'
+import { Button, Card, Result, Tag } from 'antd'
 import { useNavigate } from 'react-router'
+import { PageHeader } from '../components/PageHeader'
 
 export interface PlaceholderPageProps {
   title: string
   description: string
-  planned: string[]
+  planned: readonly string[]
 }
 
 /**
- * Every module outside the engineering slice renders this explicit state.
- * There is deliberately no sample table, fake count or mock success path.
+ * Every module without real code renders this explicit state. There is
+ * deliberately no sample table, fake count or mock success path.
  */
 export function PlaceholderPage({ title, description, planned }: PlaceholderPageProps) {
   const navigate = useNavigate()
 
   return (
-    <Card>
-      <Space orientation="vertical" size={12} style={{ width: '100%' }}>
-        <Space wrap>
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            {title}
-          </Typography.Title>
-          <Tag>未实现</Tag>
-        </Space>
-        <Typography.Text type="secondary">{description}</Typography.Text>
+    <div className="page">
+      <PageHeader
+        title={title}
+        description={description}
+        status={<Tag>待建设</Tag>}
+      />
+      <div className="page-stack">
+        <Card>
+          <Result
+            status="info"
+            title="该模块尚未实现"
+            subTitle="本卡只交付可复用的管理台基础框架；业务功能由对应 MVP 任务卡实现并单独验收。"
+          />
 
-        <Result
-          status="info"
-          title="该模块尚未实现"
-          subTitle="本卡只交付可运行的工程基座；登录、权限和业务功能需后续独立 Issue 与验收。"
-        />
+          {planned.length > 0 ? (
+            <div className="pending-scope">
+              <h3 className="pending-scope-title">后续范围（尚未实现）</h3>
+              <ul className="pending-scope-list">
+                {planned.map((item) => (
+                  <li key={item}>
+                    <Tag>待办</Tag>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
-        {planned.length > 0 && (
-          <div>
-            <Typography.Title level={5}>后续范围（尚未实现）</Typography.Title>
-            <ul style={{ margin: 0, paddingInlineStart: 20 }}>
-              {planned.map((item) => (
-                <li key={item} style={{ marginBottom: 6 }}>
-                  <Tag>待办</Tag>
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <Button onClick={() => navigate('/')}>返回总览</Button>
-      </Space>
-    </Card>
+          <Button onClick={() => navigate('/')}>返回经营工作台</Button>
+        </Card>
+      </div>
+    </div>
   )
 }

@@ -4,7 +4,24 @@ body,
   min-height: 100%;
 }
 
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei",
+    "Segoe UI", system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
 body {
   margin: 0;
-  background: #f4f7f5;
+  /* Same light gray-green base as the H5 content area (design.md §2). */
+  background: #f5f7f7;
+}
+
+/* Shared loading surface while a route resolves its session. */
+.page-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
 }

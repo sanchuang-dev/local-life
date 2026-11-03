@@ -1,0 +1,301 @@
+/*
+ * Local Life admin shell.
+ * Hierarchy: white sidebar -> light utility header -> route tabs -> page title
+ * -> light gray-green work area. The palette comes from the resident H5
+ * (design.md §2); Benefit Hub's blue console tokens are not reused.
+ */
+.app-shell {
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
+  background: #f5f7f7;
+}
+
+.app-main {
+  min-width: 0;
+  min-height: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-header {
+  flex: 0 0 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  line-height: normal;
+  border-bottom: 1px solid #e8f0ec;
+}
+
+.app-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.app-header-separator {
+  color: #b6c2bc;
+}
+
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: auto;
+}
+
+.app-identity-tag {
+  margin-inline-end: 0;
+  color: #64748b;
+  border-color: #dfe7e3;
+  background: #f8faf9;
+}
+
+.app-mobile-nav-trigger {
+  margin-inline-start: -4px;
+  padding-inline: 8px;
+}
+
+.app-mobile-nav-bars,
+.app-mobile-nav-bars::before,
+.app-mobile-nav-bars::after {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 1px;
+  background: #334155;
+}
+
+.app-mobile-nav-bars {
+  position: relative;
+}
+
+.app-mobile-nav-bars::before,
+.app-mobile-nav-bars::after {
+  content: '';
+  position: absolute;
+  left: 0;
+}
+
+.app-mobile-nav-bars::before {
+  top: -6px;
+}
+
+.app-mobile-nav-bars::after {
+  top: 6px;
+}
+
+.app-tabs-bar {
+  position: relative;
+  flex: 0 0 39px;
+  height: 39px;
+  display: flex;
+  align-items: stretch;
+  padding: 0 8px 0 12px;
+  overflow: hidden;
+  background: #fff;
+  border-bottom: 1px solid #e8f0ec;
+}
+
+.app-tabs {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 38px;
+}
+
+.app-tabs .ant-tabs-nav {
+  height: 38px;
+  margin: 0;
+}
+
+.app-tabs .ant-tabs-nav::before {
+  border-bottom: 0;
+}
+
+.app-tabs.ant-tabs-card > .ant-tabs-nav .ant-tabs-tab {
+  min-width: 88px;
+  height: 34px;
+  margin: 4px 3px 0;
+  padding: 0 14px;
+  justify-content: center;
+  border: 0;
+  border-radius: 7px 7px 0 0;
+  background: transparent;
+  font-size: 13px;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.app-tabs.ant-tabs-card > .ant-tabs-nav .ant-tabs-tab:hover {
+  background: #f3f8f6;
+}
+
+.app-tabs.ant-tabs-card > .ant-tabs-nav .ant-tabs-tab-active {
+  background: #e8f6f0;
+}
+
+.app-tabs.ant-tabs-card > .ant-tabs-nav .ant-tabs-tab + .ant-tabs-tab::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: -3px;
+  width: 1px;
+  height: 14px;
+  background: #e3ebe7;
+  pointer-events: none;
+}
+
+.app-tabs.ant-tabs-card > .ant-tabs-nav .ant-tabs-tab-active::before,
+.app-tabs.ant-tabs-card
+  > .ant-tabs-nav
+  .ant-tabs-tab-active
+  + .ant-tabs-tab::before {
+  display: none;
+}
+
+.app-tabs .ant-tabs-tab-remove {
+  margin-inline-start: 7px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 4px;
+  border-radius: 50%;
+  color: #7b8491;
+}
+
+.app-tabs .ant-tabs-tab-remove:hover {
+  background: rgba(31, 41, 55, 0.08);
+  color: #374151;
+}
+
+.app-tabs-menu {
+  flex: 0 0 auto;
+  align-self: center;
+  color: #64748b;
+}
+
+.app-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 0;
+  background: #f5f7f7;
+}
+
+.page {
+  width: 100%;
+  padding: 0 16px 16px;
+}
+
+.page-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+/*
+ * The page header is shell chrome, not scrolling content: it stays pinned while
+ * the page body scrolls underneath. The ::after strip fills the gap between the
+ * header and the content so rows cannot show through during scroll.
+ */
+.page-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  min-height: 66px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 -16px 16px;
+  padding: 13px 16px 11px;
+  background: #fff;
+  border-bottom: 1px solid #e8f0ec;
+}
+
+.page-header::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -17px;
+  left: 0;
+  height: 16px;
+  background: #f5f7f7;
+  pointer-events: none;
+}
+
+.page-header-main {
+  min-width: 0;
+}
+
+.page-header-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.page-header-title h2 {
+  margin: 0 !important;
+  font-size: 18px !important;
+  line-height: 1.4 !important;
+}
+
+.page-header-description {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+}
+
+.page-header-extra {
+  flex: 0 0 auto;
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .app-header {
+    padding-inline: 12px !important;
+  }
+
+  .app-tabs-bar {
+    padding-inline: 8px;
+  }
+
+  .page {
+    padding: 0 12px 12px;
+  }
+
+  .page-header {
+    margin-inline: -12px;
+    padding-inline: 12px;
+  }
+}
+
+/* Explicit 待建设 scope lists used by placeholder pages and the dashboard. */
+.pending-scope-title {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.pending-scope-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pending-scope-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
+}

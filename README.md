@@ -6,7 +6,7 @@
 
 ```text
 apps/web/            居民移动端 H5（React + Vite + Tailwind，原已评审页面）
-apps/admin/          管理台（React + Vite + Ant Design 6，空布局 + 未实现入口）
+apps/admin/          管理台（React + Vite + Ant Design 6，统一 AppShell + 待建设业务入口）
 apps/api/            API（Node 22 + Hono + zod，GET /healthz）
 packages/contracts/  共享 DTO/校验 schema（zod）
 docs/engineering/    工程边界与验证证据
@@ -17,7 +17,7 @@ docs/engineering/    工程边界与验证证据
 ```bash
 pnpm install --frozen-lockfile
 pnpm dev            # 并行启动 web(5173) + admin(5174) + api(127.0.0.1:4080)
-pnpm check          # oxlint + typecheck + API 测试 + 全部构建
+pnpm check          # oxlint + typecheck + Admin/API 测试 + 全部构建
 ```
 
 单独启动：`pnpm dev:web` / `pnpm dev:admin` / `pnpm dev:api`。API 健康检查：
@@ -29,10 +29,12 @@ curl -s http://127.0.0.1:4080/healthz
 
 管理台通过 Vite 代理请求 `/api/healthz`，接口不可达时会显示真实错误，不会伪造成功状态。
 
+管理台已具备统一外壳（左侧分组导航、菜单搜索、可折叠侧栏、路由同步工作页签、顶部工具区、页面标题区与响应式布局），详见 [管理台基础框架](docs/engineering/admin-foundation.md)。真实登录与鉴权仍由 #58 提供，本分支不伪造登录态。
+
 ## 当前边界（重要）
 
-- **已实现**：H5 现有页面与路由原样保留；workspace 脚本与单锁文件；Hono API 的配置校验、结构化错误、`/healthz`；管理台可打开的空布局；共享契约包；dev/prod 双 Pages 构建。
-- **未实现**：管理员登录/权限、任何业务 CRUD、SQLite/Drizzle 数据库、微信 OAuth、真实支付/订单/设备。管理台对应入口均显式标注「未实现」。
+- **已实现**：H5 现有页面与路由原样保留；workspace 脚本与单锁文件；Hono API 的配置校验、结构化错误、`/healthz`；管理台统一 AppShell（分组导航/搜索/页签/主题/响应式）；共享契约包；dev/prod 双 Pages 构建。
+- **未实现**：管理员登录/权限、任何业务 CRUD、SQLite/Drizzle 数据库、微信 OAuth、真实支付/订单/设备。管理台对应入口均显式标注「待建设」；统一身份与路由守卫依赖 #58，尚未合并。
 - **不发布**：管理台与 API 不进 GitHub Pages；Pages 只有静态 H5，不冒充在线 API。
 - **prod 分支**在晋级前仍是旧单包布局，Pages 工作流保留有注释的兼容构建路径；`dev` 完成晋级后才会统一。
 
