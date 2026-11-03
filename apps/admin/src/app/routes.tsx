@@ -1,6 +1,7 @@
 import { Navigate, type RouteObject } from 'react-router'
 import { useAdminAuth } from './auth-context'
 import { AdminLayout } from '../layouts/AdminLayout'
+import { ActivitiesPage } from '../pages/ActivitiesPage'
 import { ComponentPreviewPage } from '../pages/ComponentPreviewPage'
 import { DashboardPage } from '../pages/DashboardPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
@@ -26,6 +27,7 @@ export const routes: RouteObject[] = [
     element: <AdminLayout />,
     children: [
       { index: true, element: <DashboardPage /> },
+      { path: 'activities', element: <ActivitiesPage /> },
       { path: 'communities', element: <CommunityAccountsRoute /> },
       { path: 'system/runtime', element: <SystemInfoPage /> },
       { path: 'users', element: <Navigate to='/communities' replace /> },

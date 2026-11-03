@@ -5,6 +5,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router'
 import {
   activeMenuKey,
   groupForPage,
+  isPageVisible,
   NAV_KEYS,
   pageForMenuKey,
 } from './navigation'
@@ -59,13 +60,20 @@ export function AppShell() {
   }, [activeKey])
 
   // The strip always keeps 经营工作台, drops tabs for routes that no longer
-  // exist and shows the current route even when the stored list was pruned.
-  const knownTabs = persistedTabs.filter((key) => NAV_KEYS.has(key))
+  // exist or that this staff role may not open, and shows the current route
+  // even when the stored list was pruned.
+  const knownTabs = persistedTabs.filter((key) => {
+    if (!NAV_KEYS.has(key)) return false
+    const page = pageForMenuKey(key)
+    return page ? isPageVisible(page, session.staff.role) : false
+  })
   const withHome = knownTabs.includes('/') ? knownTabs : ['/', ...knownTabs]
+  const activeNavPage = activeKey ? pageForMenuKey(activeKey) : undefined
+  const activeVisible = Boolean(
+    activeKey && NAV_KEYS.has(activeKey) && activeNavPage && isPageVisible(activeNavPage, session.staff.role),
+  )
   const tabKeys =
-    activeKey && NAV_KEYS.has(activeKey) && !withHome.includes(activeKey)
-      ? [...withHome, activeKey]
-      : withHome
+    activeVisible && activeKey && !withHome.includes(activeKey) ? [...withHome, activeKey] : withHome
 
   const tabItems = tabKeys.flatMap((key) => {
     const page = pageForMenuKey(key)
