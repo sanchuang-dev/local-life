@@ -260,6 +260,13 @@ test('WeChat OAuth binds one stable resident identity, validates state/nonce and
     assert.ok(state)
     assert.equal(authorizeUrl.searchParams.get('scope'), 'snsapi_base')
     const nonceCookie = cookiePair(start, 'll_oauth_nonce')
+    // The browser visits /api/auth/wechat/callback (proxy strips /api only on
+    // the server). A cookie scoped to /auth/wechat would be silently omitted.
+    const nonceSetCookie = start.headers.get('set-cookie') ?? ''
+    assert.match(nonceSetCookie, /ll_oauth_nonce=[^;]+;/i)
+    assert.match(nonceSetCookie, /;\s*Path=\/;/i)
+    assert.match(nonceSetCookie, /HttpOnly/i)
+    assert.match(nonceSetCookie, /SameSite=Lax/i)
 
     const wrongNonce = await context.app.request(
       `/auth/wechat/callback?state=${state}&code=oauth-code`,
@@ -274,6 +281,7 @@ test('WeChat OAuth binds one stable resident identity, validates state/nonce and
     )
     assert.equal(callback.status, 302)
     assert.equal(new URL(callback.headers.get('location')!).hash, '#/me?auth=success')
+    assert.match(callback.headers.get('set-cookie') ?? '', /ll_oauth_nonce=;/i)
     assert.equal(providerCalls, 1)
 
     const sessionCookies = cookieHeader(

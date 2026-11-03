@@ -72,6 +72,10 @@ type HttpErrorStatus = 400 | 401 | 403 | 404 | 409 | 429 | 500 | 503
 const SESSION_COOKIE = 'll_session'
 const CSRF_COOKIE = 'll_csrf'
 const OAUTH_NONCE_COOKIE = 'll_oauth_nonce'
+// The browser uses /api/auth/wechat/*; Vite and the production reverse proxy
+// strip /api only AFTER the browser has selected which cookies to send.
+// Root scope lets both /auth/* (direct API) and /api/auth/* receive the nonce.
+const OAUTH_NONCE_COOKIE_PATH = '/'
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000
 const RATE_LIMIT_MAX_ATTEMPTS = 8
 
@@ -547,7 +551,7 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
 
     setCookie(c, OAUTH_NONCE_COOKIE, nonce, {
       ...cookieOptions(config, 10 * 60),
-      path: '/auth/wechat',
+      path: OAUTH_NONCE_COOKIE_PATH,
     })
     const authorizeUrl = new URL('https://open.weixin.qq.com/connect/oauth2/authorize')
     authorizeUrl.search = new URLSearchParams({
@@ -662,7 +666,7 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
       const created = createSession(db, config, userId, null)
       setSessionCookies(c, config, created.token, created.csrfToken)
       deleteCookie(c, OAUTH_NONCE_COOKIE, {
-        path: '/auth/wechat',
+        path: OAUTH_NONCE_COOKIE_PATH,
         secure: config.cookieSecure,
         sameSite: 'Lax',
         ...(config.cookieDomain ? { domain: config.cookieDomain } : {}),
