@@ -52,7 +52,8 @@ pnpm --filter @sanchuang-dev/local-life-api bootstrap-admin  # 初始化首个�
 - 设计依据按优先级：**当前用户确认 > 新版已确认原型/截图 > 已验收页面 > 旧版 V0.3 参考 > 实现者推断**。视觉基线在 [design.md](design.md)。
 - 保留 H5 现有页面与交互；新增页面放 `apps/web/src/pages/`，复用组件放 `components/`，样例数据放 `mocks/`。图片引用继续通过 `import.meta.env.BASE_URL`，不得写死会绕过 Pages base 的绝对路径。
 - H5 账户状态通过 `hooks/useResidentAuth.ts` 访问 API；真实 API 调用不得散落复制 DTO，加载、空、错误、禁用状态必须如实展示。
-- 管理台必须以服务端会话为准，前端路由/菜单隐藏不能替代 API 鉴权。管理员可管理社区与后台账户；运营员/网格员只能访问服务器分配的社区范围。
+- 管理台由 `App.tsx` 先校验真实后台会话，成功后才渲染 `app/shell/AppShell.tsx`；由 `app/auth-context.tsx` 统一传递会话到顶部身份/退出与真实功能路由。前端菜单隐藏不能替代 API 鉴权。管理员可管理社区与后台账户；运营员/网格员只能访问服务器分配的社区范围。
+- AppShell（导航/页签/主题）与 DataPanel（受控数据面板）沿用 Benefit Hub 已验证设计思路，但保持 Local Life 自身的 Token 与 URL 单一真相源。业务查询状态由页面管理，不在 DataPanel 自造 API 缓存；详见 `docs/engineering/admin-foundation.md`。
 - 内容、活动、跟进、成交、订单、奖励与对账模块未完成前，必须明确标注未实现，不显示虚构业务数据。
 
 ## 5. API、身份与持久化

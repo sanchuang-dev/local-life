@@ -76,6 +76,12 @@ pnpm --filter @sanchuang-dev/local-life-api bootstrap-admin
 
 生产环境还需设置 `TRUSTED_ORIGINS`、HTTPS Cookie 与同源 `/api` 反向代理。开发居民测试登录默认关闭，只能在非生产环境显式设置 `AUTH_DEV_ENABLED=true`；配置校验会拒绝生产开启。
 
+## 后台 UI 基建与登录
+
+管理台使用 Local Life 绿色主题的 AppShell（分组导航、菜单搜索、工作页签与响应式抽屉），以及复用的 DataPanel（行内筛选、高级检索弹窗、排序/分页意图、列设置与双视图）。**登录未通过时不渲染受保护工作区**；登录后顶部显示真实用户、角色和退出入口。当前可用的社区/账户管理在 `/#/communities`；旧 `/#/users` 自动转到该入口。API 连接诊断在 `/#/system/runtime`；`/#/system/components` 只作带标识的开发组件预览，不是业务数据。
+
+详情参见 [后台基建与身份集成](docs/engineering/admin-foundation.md)。
+
 ## 当前已实现
 
 - 居民主用户 UUID、微信身份映射（appid + openid 唯一；unionid 可选）、重复授权复用同一用户。
