@@ -20,6 +20,7 @@ import {
   type NavGroup,
   type NavIconKey,
 } from './navigation'
+import { useAdminAuth } from '../auth-context'
 import './sidebar.css'
 
 const { Sider } = Layout
@@ -79,6 +80,8 @@ function buildMenuItems(groups: readonly NavGroup[]): MenuItems {
  * narrows what is visible; routes, work tabs and page data stay untouched.
  */
 export function AppSidebar({ activeKey, onNavigate, variant = 'sider' }: AppSidebarProps) {
+  const { session } = useAdminAuth()
+  const role = session.staff.role
   const [query, setQuery] = useState('')
   const [expandedGroups, setExpandedGroups] = useState<string[]>(() =>
     NAV_GROUPS.map((group) => group.key),
@@ -90,8 +93,8 @@ export function AppSidebar({ activeKey, onNavigate, variant = 'sider' }: AppSide
   const trimmedQuery = query.trim()
   const searching = trimmedQuery.length > 0
   const { showHome, groups: visibleGroups } = useMemo(
-    () => filterNavigation(trimmedQuery),
-    [trimmedQuery],
+    () => filterNavigation(trimmedQuery, role),
+    [trimmedQuery, role],
   )
 
   const items = useMemo<MenuItems>(() => {

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { and, eq, gt, inArray, isNull, lt } from 'drizzle-orm'
-import { Hono, type Context } from 'hono'
+import { Hono } from 'hono'
 import { z } from 'zod'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import {
@@ -17,7 +17,6 @@ import {
   type ApiErrorCode,
   type AuthSessionResponse,
   type HealthResponse,
-  type StaffRole,
 } from '@sanchuang-dev/local-life-contracts'
 import type { ApiConfig } from './config.js'
 import { createDatabase, type AppDatabase } from './db/client.js'
@@ -35,28 +34,8 @@ import {
 } from './db/schema.js'
 import { constantTimeTextEqual, hashPassword, hashToken, randomToken, verifyPassword } from './auth/security.js'
 import { logEvent } from './log.js'
-
-interface AuthSession {
-  sessionId: string
-  userId: string
-  displayName: string | null
-  csrfHash: string
-  expiresAt: Date
-  staff: {
-    id: string
-    username: string
-    role: StaffRole
-    status: 'active' | 'disabled'
-  } | null
-}
-
-type AppBindings = {
-  Variables: {
-    requestId: string
-    authSession: AuthSession | null
-  }
-}
-type AppContext = Context<AppBindings>
+import { registerActivityRoutes } from './activities/routes.js'
+import type { AppBindings, AppContext, AuthSession, HttpErrorStatus } from './http.js'
 
 export interface AppOptions {
   version?: string
@@ -66,8 +45,6 @@ export interface AppOptions {
   config?: ApiConfig
   fetcher?: typeof fetch
 }
-
-type HttpErrorStatus = 400 | 401 | 403 | 404 | 409 | 429 | 500 | 503
 
 const SESSION_COOKIE = 'll_session'
 const CSRF_COOKIE = 'll_csrf'
@@ -871,6 +848,14 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
         createdAt: resident.createdAt.toISOString(),
       }))
     return c.json({ items })
+  })
+
+  registerActivityRoutes(app, {
+    db,
+    config,
+    fail,
+    validCsrf,
+    bodySchemaError,
   })
 
   app.notFound((c) =>

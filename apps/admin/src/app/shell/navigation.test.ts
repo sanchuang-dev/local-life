@@ -5,6 +5,7 @@ import {
   findNavPage,
   groupForPage,
   HOME_PAGE,
+  isPageVisible,
   NAV_GROUPS,
 } from './navigation'
 
@@ -59,8 +60,39 @@ describe('filterNavigation', () => {
   })
 })
 
-describe('activeMenuKey', () => {
-  it('resolves the workbench only for the root path', () => {
+describe('activity console navigation', () => {
+  it('marks /activities as a ready page with no planned leftovers', () => {
+    const page = findNavPage('/activities')
+    expect(page?.status).toBe('ready')
+    expect(page?.planned).toEqual([])
+    expect(page?.roles).toEqual(['admin', 'operator'])
+    // The registration/check-in page stays explicitly planned.
+    expect(findNavPage('/activities/checkin')?.status).toBe('planned')
+  })
+
+  it('hides the activity console from grid workers but keeps it for staff who can operate', () => {
+    const activities = findNavPage('/activities')
+    expect(activities).toBeTruthy()
+    expect(isPageVisible(activities!, 'grid_worker')).toBe(false)
+    expect(isPageVisible(activities!, 'admin')).toBe(true)
+    expect(isPageVisible(activities!, 'operator')).toBe(true)
+    // No role means "not yet known"; the sidebar must not hide the entry early.
+    expect(isPageVisible(activities!)).toBe(true)
+
+    const gridNavigation = filterNavigation('', 'grid_worker')
+    expect(
+      gridNavigation.groups.flatMap((group) => group.pages.map((page) => page.key)),
+    ).not.toContain('/activities')
+    expect(gridNavigation.groups.map((group) => group.key)).not.toContain('campaign')
+
+    const adminNavigation = filterNavigation('', 'admin')
+    expect(
+      adminNavigation.groups.flatMap((group) => group.pages.map((page) => page.key)),
+    ).toContain('/activities')
+  })
+})
+
+describe('activeMenuKey', () => {  it('resolves the workbench only for the root path', () => {
     expect(activeMenuKey('/')).toBe(HOME_PAGE.key)
     expect(activeMenuKey('/orders')).toBe('/orders')
   })

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  AlertTriangle,
   CheckCircle2,
   Check,
   LockKeyhole,
@@ -7,16 +8,20 @@ import {
   CircleHelp,
   ImageDown,
   Gift,
+  Info,
   MapPin,
   Medal,
+  RefreshCw,
   Share2,
   Sparkles,
   Store,
   Tv2,
 } from 'lucide-react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { QRCodeSVG } from 'qrcode.react'
+import type { PublicActivityDetail } from '@sanchuang-dev/local-life-contracts'
 import { CampaignSheet } from '../components/CampaignSheet'
+import { usePublicActivity, type PublicActivityLoadState } from '../hooks/usePublicActivity'
 import { luckyPrizes, luckyGridSlots, type LuckyPrize } from '../mocks/silverLuckyPrizes'
 
 type TaskMode = 'checkin' | 'purchase'
@@ -36,7 +41,7 @@ type ShareStatus = 'idle' | 'shared' | 'copied' | 'cancelled' | 'error'
 
 const communityRanks = [
   { rank: 1, name: '悦和社区', teams: 52, score: '326人参与' },
-  { rank: 2, name: '幸福里社区', teams: 36, score: '228人参与', current: true },
+  { rank: 2, name: '示例社区', teams: 36, score: '228人参与', current: true },
   { rank: 3, name: '榕树湾社区', teams: 31, score: '196人参与' },
   { rank: 4, name: '文艺社区', teams: 24, score: '158人参与' },
   { rank: 5, name: '滨江社区', teams: 20, score: '132人参与' },
@@ -112,12 +117,71 @@ const taskPrizePreviews = {
   ],
 } as const
 
-// The campaign's existing sample schedule is 10/26–10/31, with awards ending
-// at 20:00 China Standard Time on 10/31 (see the rules on this page).
-const activityStartsAt = Date.parse('2026-10-26T00:00:00+08:00')
-const activityEndsAt = Date.parse('2026-10-31T20:00:00+08:00')
+/**
+ * Activity timestamps come from the API in UTC; every rendered value is
+ * converted to Asia/Shanghai so the schedule reads the same for every resident
+ * regardless of the device time zone.
+ */
+function shanghaiDateParts(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
 
-function ActivityCountdown() {
+  const parts = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date)
+  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? ''
+
+  return {
+    year: part('year'),
+    month: part('month'),
+    day: part('day'),
+    hour: part('hour'),
+    minute: part('minute'),
+  }
+}
+
+function formatShanghaiDateTime(value: string): string {
+  const parts = shanghaiDateParts(value)
+  if (!parts) return value
+  return `${parts.year}.${parts.month}.${parts.day} ${parts.hour}:${parts.minute}`
+}
+
+type CampaignPhase = 'upcoming' | 'active' | 'paused' | 'ended'
+
+/**
+ * Resident-facing phase. The API status is authoritative for pause/end; a
+ * published activity whose end time has passed is also shown as ended instead
+ * of pretending it is still running.
+ */
+function campaignPhase(activity: PublicActivityDetail, now: number): CampaignPhase {
+  if (activity.status === 'paused') return 'paused'
+  if (activity.status === 'ended') return 'ended'
+  if (now >= Date.parse(activity.endsAt)) return 'ended'
+  if (now < Date.parse(activity.startsAt)) return 'upcoming'
+  return 'active'
+}
+
+const phaseLabels: Record<CampaignPhase, string> = {
+  upcoming: '活动即将开始',
+  active: '活动进行中',
+  paused: '活动已暂停',
+  ended: '活动已结束',
+}
+
+const phaseTones: Record<CampaignPhase, string> = {
+  upcoming: 'font-bold text-[#b45f1c]',
+  active: 'font-bold text-[#126c38]',
+  paused: 'font-bold text-[#8a6132]',
+  ended: 'font-semibold text-[#687c6c]',
+}
+
+function ActivityCountdown({ activity }: { activity: PublicActivityDetail }) {
   const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
@@ -125,9 +189,12 @@ function ActivityCountdown() {
     return () => window.clearInterval(timer)
   }, [])
 
-  const beforeStart = now < activityStartsAt
-  const finished = now >= activityEndsAt
-  const remainder = Math.max(0, (beforeStart ? activityStartsAt : activityEndsAt) - now)
+  const phase = campaignPhase(activity, now)
+  const startsAt = Date.parse(activity.startsAt)
+  const endsAt = Date.parse(activity.endsAt)
+  const showCountdown = phase === 'upcoming' || phase === 'active'
+  const target = phase === 'upcoming' ? startsAt : endsAt
+  const remainder = Math.max(0, target - now)
   const totalSeconds = Math.ceil(remainder / 1000)
   const days = Math.floor(totalSeconds / 86400)
   const hours = Math.floor((totalSeconds % 86400) / 3600)
@@ -145,32 +212,95 @@ function ActivityCountdown() {
   )
 
   return (
-    <div className="relative z-[1] mx-3 -mt-2">
-      <div
-        className="relative rounded-t-[12px] bg-gradient-to-b from-[#d8f0cc] via-[#e1f3d8]/85 to-transparent px-2.5 pb-5 pt-2.5 text-[#275942]"
-        role="timer"
-        aria-label={finished ? '本期活动已结束' : '活动倒计时'}
-      >
-      <div className="flex items-center justify-center gap-2 text-[11px] leading-4">
-        <span className={finished ? 'font-semibold text-[#687c6c]' : 'font-bold text-[#126c38]'}>
-          {finished ? '活动已结束' : beforeStart ? '活动即将开始' : '活动进行中'}
-        </span>
-        <span className="font-medium text-[#375e40]">2026.10.26 - 10.31</span>
-      </div>
-      {finished ? (
-        <p className="mt-2 text-center text-[13px] font-semibold leading-6">本期活动已结束</p>
-      ) : (
-        <div className="mt-1.5 flex items-center justify-center gap-1 text-[12px] font-semibold text-[#285039]">
-          <span className="mr-0.5">还剩</span>
-          {numberBlock(days, '天数')}
-          <span className="mx-0.5">天</span>
-          {numberBlock(hours, '小时')}
-          <span>:</span>
-          {numberBlock(minutes, '分钟')}
-          <span>:</span>
-          {numberBlock(seconds, '秒')}
+    <div className="relative z-[1] mx-3 -mt-2" role="timer" aria-label={phaseLabels[phase]}>
+      <div className="relative rounded-t-[12px] bg-gradient-to-b from-[#d8f0cc] via-[#e1f3d8]/85 to-transparent px-2.5 pb-5 pt-2.5 text-[#275942]">
+        <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11px] leading-4">
+          <span className={phaseTones[phase]}>{phaseLabels[phase]}</span>
+          <span className="font-medium text-[#375e40]">
+            {formatShanghaiDateTime(activity.startsAt)} - {formatShanghaiDateTime(activity.endsAt)}
+          </span>
+          <span className="text-[10px] font-medium text-[#52786c]">北京时间</span>
         </div>
-      )}
+        {showCountdown ? (
+          <div className="mt-1.5 flex items-center justify-center gap-1 text-[12px] font-semibold text-[#285039]">
+            <span className="mr-0.5">{phase === 'upcoming' ? '距开始' : '还剩'}</span>
+            {numberBlock(days, '天数')}
+            <span className="mx-0.5">天</span>
+            {numberBlock(hours, '小时')}
+            <span>:</span>
+            {numberBlock(minutes, '分钟')}
+            <span>:</span>
+            {numberBlock(seconds, '秒')}
+          </div>
+        ) : (
+          <p className="mt-2 text-center text-[13px] font-semibold leading-6">
+            {phase === 'paused' ? '活动已暂停，等待恢复通知' : '本期活动已结束'}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Real loading / empty / error states for the activity header. None of them
+ * substitutes demo data, and the error branch keeps the real message visible
+ * with an explicit retry action.
+ */
+function ActivityLoadNotice({
+  state,
+  onRetry,
+}: {
+  state: Exclude<PublicActivityLoadState, { status: 'ready' }>
+  onRetry: () => void
+}) {
+  const wrapper = 'relative z-[1] mx-3 -mt-2'
+
+  if (state.status === 'loading') {
+    return (
+      <div className={wrapper} role="status" aria-live="polite">
+        <div className="rounded-t-[12px] bg-gradient-to-b from-[#d8f0cc] via-[#e1f3d8]/85 to-transparent px-3 pb-5 pt-3 text-[#275942]">
+          <div className="flex items-center justify-center gap-2 text-[12px] font-semibold">
+            <span
+              className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#126c38]/25 border-t-[#126c38]"
+              aria-hidden="true"
+            />
+            正在加载活动信息…
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (state.status === 'empty') {
+    return (
+      <div className={wrapper} role="status">
+        <div className="rounded-t-[12px] bg-gradient-to-b from-[#d8f0cc] via-[#e1f3d8]/85 to-transparent px-3 pb-5 pt-3 text-center text-[#275942]">
+          <p className="text-[14px] font-bold">当前没有已发布活动</p>
+          <p className="mt-1 text-[11px] leading-4 text-[#52786c]">
+            活动发布后，这里会显示真实的活动标题、社区、地点与时间。
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={wrapper} role="alert">
+      <div className="rounded-t-[12px] border border-[#efd0b8] bg-[#fff7f0] px-3 pb-4 pt-3 text-[#7a4a2c]">
+        <p className="flex items-center gap-1.5 text-[13px] font-bold">
+          <AlertTriangle size={15} aria-hidden="true" />
+          活动信息加载失败
+        </p>
+        <p className="mt-1 break-words text-[11px] leading-4">{state.message}</p>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-[#7a4a2c] px-4 text-[12px] font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+        >
+          <RefreshCw size={14} aria-hidden="true" />
+          重试
+        </button>
       </div>
     </div>
   )
@@ -202,6 +332,13 @@ const fallbackCopy = (value: string) => {
 }
 
 export function SilverNeighborhoodCampaignPage() {
+  const [searchParams] = useSearchParams()
+  // A deep link may target a specific published activity; everything else reads
+  // the first item of the public activity list.
+  const requestedActivityId = searchParams.get('activityId')?.trim() || null
+  const { state: activityState, retry: retryActivity } = usePublicActivity(requestedActivityId)
+  const activity = activityState.status === 'ready' ? activityState.activity : null
+
   const [taskMode, setTaskMode] = useState<TaskMode>('checkin')
   const [activeSheet, setActiveSheet] = useState<SheetKind>(null)
   const [shareStatus, setShareStatus] = useState<ShareStatus>('idle')
@@ -261,8 +398,8 @@ export function SilverNeighborhoodCampaignPage() {
 
     try {
       await navigator.share({
-        title: '银发社区欢乐季',
-        text: '还差 1 位街坊，来一起组成三人团。',
+        title: '银发社区欢乐季（演示）',
+        text: '【演示页面】还差 1 位街坊，来一起组成三人团。',
         url: getActivityUrl(),
       })
       setShareStatus('shared')
@@ -297,7 +434,7 @@ export function SilverNeighborhoodCampaignPage() {
 
   return (
     <div className="pb-7">
-      <section className="relative overflow-hidden bg-[#eaf5e9]">
+      <section className="relative overflow-hidden bg-[#eaf5e9]" aria-label="活动信息">
         <div className="relative">
           <img
             src={import.meta.env.BASE_URL + 'images/silver-neighborhood-hero.webp'}
@@ -306,25 +443,46 @@ export function SilverNeighborhoodCampaignPage() {
             fetchPriority="high"
           />
         </div>
-        <ActivityCountdown />
+        {activityState.status === 'ready' ? (
+          <ActivityCountdown activity={activityState.activity} />
+        ) : (
+          <ActivityLoadNotice state={activityState} onRetry={retryActivity} />
+        )}
         <div className="relative -mt-px bg-gradient-to-b from-[#edf8e9] via-[#e8f5ec] to-[#d8eee5] px-4 pb-16 pt-0">
-          <div className="flex min-h-[48px] items-center gap-2">
-            <p
-              className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] font-medium text-[#386857]"
-              title="幸福里社区活动广场 · 示例场地"
-            >
-              <MapPin size={16} className="shrink-0" aria-hidden="true" />
-              <span className="min-w-0 truncate">幸福里社区活动广场 · 示例场地</span>
-            </p>
-            <button
-              type="button"
-              onClick={() => openSheet('rules')}
-              className="inline-flex min-h-[44px] shrink-0 items-center gap-1 px-1 text-[13px] font-medium text-[#27725b] hover:underline focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
-            >
-              <CircleHelp size={16} aria-hidden="true" />
-              活动规则
-            </button>
-          </div>
+          {activity ? (
+            <>
+              <div className="pt-3">
+                <h1 className="break-words text-[19px] font-bold leading-[1.35] tracking-tight text-[#1f4d3c]">
+                  {activity.title}
+                </h1>
+                <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] leading-5 text-[#4a6f61]">
+                  <span className="break-words">{activity.community.name}</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="inline-flex min-w-0 items-center gap-1">
+                    <MapPin size={14} className="shrink-0" aria-hidden="true" />
+                    <span className="min-w-0 break-words">{activity.location}</span>
+                  </span>
+                </p>
+              </div>
+              <div className="mt-1 flex min-h-[48px] items-center justify-between gap-2">
+                <p className="text-[11px] leading-4 text-[#52786c]">
+                  {activity.ruleVersion === null
+                    ? '已发布公开规则'
+                    : `已发布 · 规则第 ${activity.ruleVersion} 版`}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => openSheet('rules')}
+                  className="inline-flex min-h-[44px] shrink-0 items-center gap-1 px-1 text-[13px] font-medium text-[#27725b] hover:underline focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+                >
+                  <CircleHelp size={16} aria-hidden="true" />
+                  活动规则
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="min-h-[96px]" aria-hidden="true" />
+          )}
         </div>
       </section>
 
@@ -334,9 +492,12 @@ export function SilverNeighborhoodCampaignPage() {
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-[#e8f6f0] px-2.5 py-1 text-[12px] font-bold text-teal-700">
                 我的三人团
+              </span>
+              <span className="rounded-full bg-[#fff3e6] px-2 py-0.5 text-[10px] font-bold text-[#a96b2f]">
+                演示
               </span>
               <span className="text-[12px] font-semibold text-orange-600">2 / 3</span>
             </div>
@@ -388,6 +549,19 @@ export function SilverNeighborhoodCampaignPage() {
         </button>
       </section>
 
+      <section
+        className="mx-4 mt-5 rounded-[18px] border border-dashed border-[#e7c9a3] bg-[#fffaf1] px-3.5 py-3"
+        aria-label="演示内容说明"
+      >
+        <p className="flex items-center gap-1.5 text-[12px] font-bold text-[#8a6132]">
+          <Info size={15} className="shrink-0" aria-hidden="true" />
+          以下为演示内容 · 未接入真实玩法
+        </p>
+        <p className="mt-1 text-[11px] leading-[1.7] text-[#8a6132]">
+          三人团、签到、消费、抽奖、排行榜、大奖、支付与核销均为前端交互演示，与上方真实活动数据无关，不会写入真实记录。
+        </p>
+      </section>
+
       <section className="mx-4 mt-4" aria-labelledby="team-gifts-heading">
         <div className="mb-2 flex items-center justify-between gap-2">
           <h2 id="team-gifts-heading" className="text-[16px] font-bold text-[#225c4c]">
@@ -432,7 +606,7 @@ export function SilverNeighborhoodCampaignPage() {
             <p className="text-[11px] font-bold tracking-[0.16em] text-teal-700">TEAM QUEST</p>
             <h2 className="mt-1 text-[19px] font-bold tracking-tight text-slate-900">成团任务</h2>
           </div>
-          <span className="text-[12px] text-slate-400">两条任务独立计算</span>
+          <span className="text-[12px] text-slate-400">演示 · 两条任务独立计算</span>
         </div>
 
         <div className="rounded-[20px] border border-slate-100 bg-white p-3 shadow-sm">
@@ -736,7 +910,7 @@ export function SilverNeighborhoodCampaignPage() {
               活动压轴大奖
             </h2>
           </div>
-          <p className="pb-0.5 text-[11px] font-semibold text-[#9d7849]">10月31日 20:00 截止</p>
+          <p className="pb-0.5 text-[11px] font-semibold text-[#9d7849]">示例：10月31日 20:00 截止</p>
         </div>
 
         <div className="relative mt-2 overflow-hidden rounded-[18px] bg-gradient-to-b from-[#fff8e9] via-[#fffbf5] to-transparent pt-1">
@@ -828,10 +1002,10 @@ export function SilverNeighborhoodCampaignPage() {
         <div className="flex items-start gap-3">
           <CheckCircle2 size={19} className="mt-0.5 shrink-0 text-teal-700" aria-hidden="true" />
           <div>
-            <p className="text-[13px] font-bold text-slate-700">当前是可交互原型，不是真实活动</p>
+            <p className="text-[13px] font-bold text-slate-700">上方活动信息来自真实数据，其余玩法仍是交互演示</p>
             <p className="mt-1 text-[12px] leading-[1.7] text-slate-500">
-              人数、金额、社区、奖品和抽奖结果均为样例；分享和复制是真实浏览器操作，但不会写入邀请关系、
-              签到、订单、库存或兑奖记录。
+              标题、社区、地点、时间与活动规则读取自已发布活动；三人团、签到、消费、抽奖、排行榜、大奖与社区数据均为样例，
+              分享和复制是真实浏览器操作，但不会写入邀请关系、签到、订单、库存或兑奖记录。
             </p>
           </div>
         </div>
@@ -845,27 +1019,54 @@ export function SilverNeighborhoodCampaignPage() {
       <CampaignSheet
         open={activeSheet === 'rules'}
         title="活动规则"
-        eyebrow="SILVER NEIGHBORHOOD"
+        eyebrow={activity ? 'SILVER NEIGHBORHOOD · 已发布规则' : 'SILVER NEIGHBORHOOD'}
         onClose={() => setActiveSheet(null)}
       >
-        <ol className="grid gap-3">
-          {[
-            '本原型按“团长占一席，再邀请两位街坊”展示三人团。',
-            '签到任务与消费任务独立计算；同一成员的两个行为分别计入对应进度。',
-            '社区榜当前按有效成团数展示；正式活动上线前需冻结统计与并列规则。',
-            '活动大奖采用“前 20 名取得抽奖资格”的单一演示口径，并非前 20 名直接获得大奖。',
-          ].map((rule, index) => (
-            <li key={rule} className="flex gap-3 rounded-[14px] bg-slate-50 p-3">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-teal-700 text-[12px] font-bold text-white">
-                {index + 1}
+        {activity ? (
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-[14px] bg-[#eef7f2] p-3">
+              <p className="text-[13px] font-bold text-[#225b44]">已发布规则快照</p>
+              <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-teal-700">
+                {activity.ruleVersion === null ? '未记录版本号' : `第 ${activity.ruleVersion} 版`}
               </span>
-              <span>{rule}</span>
-            </li>
-          ))}
-        </ol>
-        <p className="mt-4 rounded-[14px] bg-[#fff7ec] p-3 text-[12px] leading-5 text-[#8a6132]">
-          当前页面用于确认玩法和交互。真实活动的身份去重、签到核验、支付/成交、库存、中奖概率与兑奖规则仍需由正式业务系统承载。
-        </p>
+            </div>
+            <ol className="mt-3 grid gap-3">
+              {[
+                { label: '参与资格', text: activity.publicRules.eligibility },
+                { label: '签到规则', text: activity.publicRules.checkin },
+                { label: '消费规则', text: activity.publicRules.purchase },
+                { label: '奖品领取', text: activity.publicRules.prizeClaim },
+              ].map((rule, index) => (
+                <li key={rule.label} className="flex gap-3 rounded-[14px] bg-slate-50 p-3">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-teal-700 text-[12px] font-bold text-white">
+                    {index + 1}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[12px] font-bold text-slate-700">{rule.label}</span>
+                    <span className="mt-1 block break-words leading-6">{rule.text}</span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+            {activity.publicRules.notes ? (
+              <div className="mt-3 rounded-[14px] bg-[#fff7ec] p-3 text-[12px] leading-6 text-[#8a6132]">
+                <p className="font-bold">补充说明</p>
+                <p className="mt-1 break-words">{activity.publicRules.notes}</p>
+              </div>
+            ) : null}
+            <p className="mt-3 text-[12px] leading-5 text-slate-400">
+              以上为活动发布时固化的公开规则快照
+              {activity.publishedAt
+                ? `，发布时间 ${formatShanghaiDateTime(activity.publishedAt)}（北京时间）`
+                : ''}
+              。页面中的三人团、抽奖、榜单与大奖玩法仍为演示，未接入真实业务。
+            </p>
+          </>
+        ) : (
+          <p className="rounded-[14px] bg-slate-50 p-3 text-[13px] leading-6 text-slate-500">
+            尚未读取到已发布活动，暂无可展示的活动规则。请等待活动发布后重新打开页面。
+          </p>
+        )}
       </CampaignSheet>
 
       <CampaignSheet
@@ -916,7 +1117,7 @@ export function SilverNeighborhoodCampaignPage() {
           <div className="px-3 pb-3 pt-3">
             <div className="text-center">
               <p className="text-[17px] font-bold leading-6 text-[#176149]">还差你，三人成团领好礼</p>
-              <p className="mt-1 text-[12px] text-[#547c6c]">幸福里社区 · 已有 2 / 3 位街坊</p>
+              <p className="mt-1 text-[12px] text-[#547c6c]">示例社区 · 已有 2 / 3 位街坊</p>
             </div>
             <div className="mt-3 rounded-[14px] border border-[#deece1] bg-white px-3 py-3 text-center">
               <div className="relative mx-auto w-fit rounded-lg bg-white">
@@ -1135,7 +1336,7 @@ export function SilverNeighborhoodCampaignPage() {
         onClose={() => setActiveSheet(null)}
       >
         <p className="mb-3 text-[13px] leading-6 text-slate-600">
-          每个小团仍为 3 人，里程碑按照整个幸福里社区的成功成团数累计计算，不是把不同团队合并为大团。
+          每个小团仍为 3 人，里程碑按照整个演示社区的成功成团数累计计算，不是把不同团队合并为大团。
         </p>
         <div className="space-y-3">
           {communityMilestones.map(({ target, reward, prize }) => (
@@ -1170,7 +1371,7 @@ export function SilverNeighborhoodCampaignPage() {
         <dl className="mt-3 divide-y divide-slate-100 rounded-[16px] border border-slate-100 bg-white px-4">
           <div className="flex justify-between gap-4 py-3">
             <dt>示例结束时间</dt>
-            <dd className="text-right font-semibold text-slate-800">10月31日 20:00</dd>
+            <dd className="text-right font-semibold text-slate-800">10月31日 20:00（演示）</dd>
           </div>
           <div className="flex justify-between gap-4 py-3">
             <dt>资格名额</dt>

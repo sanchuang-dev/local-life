@@ -24,7 +24,10 @@ function withWorkspace(fn) {
 test('fresh setup creates a gitignored-style local env and durable in-project db path', () => {
   withWorkspace((root) => {
     const prepared = prepareLocalFiles(root)
-    assert.ok(prepared.dbPath.endsWith('/.data/local-life-dev.sqlite'))
+    // `join()` yields native separators (backslashes on Windows), so normalise the
+    // path before comparing against the POSIX-style suffix. The assertion strength
+    // is unchanged: the db must still live in `<workspace>/.data/`.
+    assert.ok(prepared.dbPath.replaceAll('\\', '/').endsWith('/.data/local-life-dev.sqlite'))
     assert.equal(readFileSync(prepared.envPath, 'utf8'), localEnvTemplate)
     assert.doesNotThrow(() => assertLocalConfig(localEnvTemplate))
   })

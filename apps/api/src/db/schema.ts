@@ -7,6 +7,7 @@ import {
   text,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core'
+import type { ActivityStatus } from '@sanchuang-dev/local-life-contracts'
 
 export type StaffRole = 'admin' | 'operator' | 'grid_worker'
 export type StaffStatus = 'active' | 'disabled'
@@ -138,7 +139,81 @@ export const auditLogs = sqliteTable(
     metadata: text('metadata'),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   },
-  (table) => [index('audit_logs_created_idx').on(table.createdAt)],
+  (table) => [
+    index('audit_logs_created_idx').on(table.createdAt),
+    index('audit_logs_target_idx').on(table.targetId),
+  ],
+)
+
+/**
+ * Activity operations domain (#59). Key rules are stored twice on purpose:
+ * the mutable current values live on the activity row (so drafts can be edited
+ * without a version), and every publish/rule change freezes an immutable
+ * snapshot in `activity_rule_versions`.
+ */
+export const activities = sqliteTable(
+  'activities',
+  {
+    id: text('id').primaryKey(),
+    communityId: text('community_id')
+      .notNull()
+      .references(() => communities.id, { onDelete: 'restrict' }),
+    title: text('title').notNull(),
+    summary: text('summary'),
+    description: text('description'),
+    status: text('status').$type<ActivityStatus>().notNull(),
+    startsAt: integer('starts_at', { mode: 'timestamp_ms' }).notNull(),
+    endsAt: integer('ends_at', { mode: 'timestamp_ms' }).notNull(),
+    location: text('location').notNull(),
+    budgetCapCents: integer('budget_cap_cents').notNull(),
+    prizeQuantityCap: integer('prize_quantity_cap').notNull(),
+    publicRulesJson: text('public_rules_json').notNull(),
+    currentRuleVersionId: text('current_rule_version_id').references(
+      () => activityRuleVersions.id,
+      { onDelete: 'set null' },
+    ),
+    createdByUserId: text('created_by_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+    publishedAt: integer('published_at', { mode: 'timestamp_ms' }),
+    pausedAt: integer('paused_at', { mode: 'timestamp_ms' }),
+    endedAt: integer('ended_at', { mode: 'timestamp_ms' }),
+  },
+  (table) => [
+    index('activities_community_idx').on(table.communityId),
+    index('activities_status_idx').on(table.status),
+    index('activities_starts_at_idx').on(table.startsAt),
+  ],
+)
+
+/**
+ * Immutable rule snapshots. Rows are INSERT-only; a SQLite trigger raises
+ * ABORT on UPDATE/DELETE so even a buggy query cannot rewrite published rules.
+ */
+export const activityRuleVersions = sqliteTable(
+  'activity_rule_versions',
+  {
+    id: text('id').primaryKey(),
+    // Kept as a plain column to avoid a circular Drizzle/TypeScript reference with
+    // `activities.current_rule_version_id` (which owns the FK). The API only inserts
+    // versions for an activity it just read in the same transaction.
+    activityId: text('activity_id').notNull(),
+    version: integer('version').notNull(),
+    snapshotJson: text('snapshot_json').notNull(),
+    createdByUserId: text('created_by_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('activity_rule_versions_activity_version_uq').on(
+      table.activityId,
+      table.version,
+    ),
+    index('activity_rule_versions_activity_idx').on(table.activityId),
+  ],
 )
 
 export const userRelations = relations(users, ({ many }) => ({
@@ -163,4 +238,6 @@ export const schema = {
   oauthStates,
   rateLimits,
   auditLogs,
+  activities,
+  activityRuleVersions,
 }

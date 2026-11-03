@@ -1,3 +1,5 @@
+import type { StaffRole } from '@sanchuang-dev/local-life-contracts'
+
 export interface NavPage {
   readonly key: string
   readonly label: string
@@ -5,6 +7,12 @@ export interface NavPage {
   /** `planned` pages render an explicit 待建设 state instead of business UI. */
   readonly status: 'ready' | 'planned'
   readonly planned: readonly string[]
+  /**
+   * Staff roles allowed to see this destination. Omitted means every staff role.
+   * Hiding a menu item is presentation only: the API still authorises every
+   * request, so a grid worker receives a real 403 even from a direct URL.
+   */
+  readonly roles?: readonly StaffRole[]
 }
 
 export type NavIconKey = 'workbench' | 'campaign' | 'customer' | 'commerce' | 'performance' | 'system'
@@ -39,8 +47,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         key: '/activities',
         label: '活动管理',
         description: '创建、配置、发布活动，并让居民 H5 读取真实活动数据。',
-        status: 'planned',
-        planned: ['活动配置与草稿', '发布、下线与回滚', '报名名单与活动效果'],
+        status: 'ready',
+        planned: [],
+        roles: ['admin', 'operator'],
       },
       {
         key: '/activities/checkin',
@@ -48,6 +57,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         description: '签到、福利核销凭据、库存与预算控制。',
         status: 'planned',
         planned: ['核销凭据与库存', '预算与重复兑现校验', '核销记录查询'],
+        roles: ['admin', 'operator'],
       },
     ],
   },
@@ -188,18 +198,31 @@ export interface NavigationFilter {
 
 /**
  * Narrows the navigation to matching page labels. A group-label hit keeps all
- * of its pages; an empty query returns the untouched model.
+ * of its pages; an empty query returns the untouched model. When a staff role is
+ * supplied, destinations that role may not use are removed — the API still
+ * enforces the same boundary.
  */
-export function filterNavigation(query: string): NavigationFilter {
+export function filterNavigation(query: string, role?: StaffRole): NavigationFilter {
   const normalized = query.trim().toLowerCase()
-  if (!normalized) return { showHome: true, groups: NAV_GROUPS }
+  if (!normalized && !role) return { showHome: true, groups: NAV_GROUPS }
+
+  const visible = (page: NavPage) => isPageVisible(page, role)
 
   return {
-    showHome: HOME_PAGE.label.toLowerCase().includes(normalized),
+    showHome: visible(HOME_PAGE) && (!normalized || HOME_PAGE.label.toLowerCase().includes(normalized)),
     groups: NAV_GROUPS.flatMap((group) => {
-      if (group.label.toLowerCase().includes(normalized)) return [group]
-      const pages = group.pages.filter((page) => page.label.toLowerCase().includes(normalized))
-      return pages.length > 0 ? [{ ...group, pages }] : []
+      const pages = group.pages.filter(visible)
+      if (pages.length === 0) return []
+      if (!normalized || group.label.toLowerCase().includes(normalized)) {
+        return [{ ...group, pages }]
+      }
+      const matched = pages.filter((page) => page.label.toLowerCase().includes(normalized))
+      return matched.length > 0 ? [{ ...group, pages: matched }] : []
     }),
   }
+}
+
+/** Role gate shared by the sidebar, the work-tab strip and route-level notices. */
+export function isPageVisible(page: NavPage, role?: StaffRole): boolean {
+  return !role || !page.roles || page.roles.includes(role)
 }
