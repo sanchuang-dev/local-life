@@ -1,5 +1,5 @@
-import { MoreOutlined } from '@ant-design/icons'
-import { Button, Drawer, Dropdown, Layout, Tabs, Tag, Tooltip, Typography } from 'antd'
+import { LogoutOutlined, MoreOutlined } from '@ant-design/icons'
+import { Alert, Button, Drawer, Dropdown, Layout, Tabs, Tag, Typography } from 'antd'
 import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import {
@@ -8,6 +8,7 @@ import {
   NAV_KEYS,
   pageForMenuKey,
 } from './navigation'
+import { useAdminAuth } from '../auth-context'
 import { AppSidebar } from './AppSidebar'
 import {
   addWorkTab,
@@ -29,6 +30,7 @@ const COMPACT_NAV_MAX_WIDTH = 768
  * is no parallel navigation state to drift out of sync with browser back/forward.
  */
 export function AppShell() {
+  const { session, busy, error, onLogout } = useAdminAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const activeKey = activeMenuKey(location.pathname)
@@ -128,9 +130,22 @@ export function AppShell() {
           </div>
 
           <div className="app-header-actions">
-            <Tooltip title="真实登录、角色与路由保护由 #58 提供，尚未合并到本分支；此处不伪造登录态。">
-              <Tag className="app-identity-tag">身份未接入</Tag>
-            </Tooltip>
+            <Typography.Text className="app-identity-name" strong>
+              {session.user.displayName || session.staff.username}
+            </Typography.Text>
+            <Tag color="green" className="app-identity-tag">
+              {{ admin: '管理员', operator: '运营员', grid_worker: '网格员' }[session.staff.role]}
+            </Tag>
+            <Button
+              type="text"
+              size="small"
+              icon={<LogoutOutlined />}
+              aria-label="退出登录"
+              loading={busy}
+              onClick={() => void onLogout()}
+            >
+              退出登录
+            </Button>
           </div>
         </Header>
 
@@ -168,6 +183,7 @@ export function AppShell() {
         </nav>
 
         <Content className="app-content">
+          {error ? <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} /> : null}
           <Outlet />
         </Content>
       </Layout>

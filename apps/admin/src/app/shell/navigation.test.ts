@@ -51,7 +51,7 @@ describe('filterNavigation', () => {
     const { groups } = filterNavigation('  社区  ')
 
     expect(groups.map((group) => group.key)).toEqual(['customer'])
-    expect(groups[0]?.pages.map((page) => page.label)).toEqual(['网格与社区'])
+    expect(groups[0]?.pages.map((page) => page.label)).toEqual(['账户与社区'])
   })
 
   it('returns no items when nothing matches', () => {

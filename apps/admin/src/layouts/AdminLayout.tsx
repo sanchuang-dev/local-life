@@ -1,9 +1,6 @@
 import { AppShell } from '../app/shell/AppShell'
 
-/**
- * Route-table layout entry. Session resolution and the authenticated route
- * guard belong to #58; this branch deliberately does not invent a login state.
- */
+/** The outer App resolves the API session before rendering this route. */
 export function AdminLayout() {
   return <AppShell />
 }

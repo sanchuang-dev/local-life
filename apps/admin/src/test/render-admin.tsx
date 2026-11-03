@@ -4,15 +4,25 @@ import zhCN from 'antd/locale/zh_CN'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { vi } from 'vitest'
 import { routes } from '../app/routes'
+import { AdminAuthProvider } from '../app/auth-context'
+import type { AuthenticatedSession } from '../services/auth'
 import { adminTheme } from '../app/theme'
 
 /** Renders the real route tree with the same providers used by main.tsx. */
 export function renderAdmin(initialPath = '/') {
   const router = createMemoryRouter(routes, { initialEntries: [initialPath] })
+  const staff: AuthenticatedSession = {
+    authenticated: true,
+    user: { id: '123e4567-e89b-42d3-a456-426614174000', displayName: '测试管理员' },
+    staff: { id: '123e4567-e89b-42d3-a456-426614174001', username: 'testadmin', role: 'admin', communities: [] },
+    csrfToken: 'test-only-csrf',
+  }
   const result = render(
     <ConfigProvider locale={zhCN} theme={adminTheme}>
       <AntdApp>
-        <RouterProvider router={router} />
+        <AdminAuthProvider value={{ session: staff, busy: false, error: null, onLogout: async () => {} }}>
+          <RouterProvider router={router} />
+        </AdminAuthProvider>
       </AntdApp>
     </ConfigProvider>,
   )

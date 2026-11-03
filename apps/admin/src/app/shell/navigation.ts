@@ -65,10 +65,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       },
       {
         key: '/communities',
-        label: '网格与社区',
-        description: '社区网格划分，以及运营员/网格员的辖区范围。',
-        status: 'planned',
-        planned: ['社区与网格维护', '网格员分配', '辖区权限核对'],
+        label: '账户与社区',
+        description: '真实社区、后台账户与当前账号可访问的居民列表。',
+        status: 'ready',
+        planned: [],
       },
     ],
   },
@@ -129,9 +129,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       {
         key: '/system/runtime',
         label: '系统信息',
-        description: '前端构建、API 地址与发布配置的只读说明。',
-        status: 'planned',
-        planned: ['环境信息', '发布记录', '健康检查说明'],
+        description: '当前 API 健康检查与连接状态。',
+        status: 'ready',
+        planned: [],
       },
       {
         key: '/system/components',

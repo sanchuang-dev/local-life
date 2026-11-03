@@ -25,7 +25,7 @@ import {
 } from 'antd'
 import type { ColumnType, TableProps } from 'antd/es/table'
 import dayjs, { type Dayjs } from 'dayjs'
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   moveColumn,
   resolvePanelPreference,
@@ -221,19 +221,24 @@ export function DataPanel<
   const visibleKeys = [...new Set([...prefs.visibleKeys, ...requiredKeys])]
   const { rows, total, loading, error } = data
 
+  // Form edits are local drafts. Only an actual applied-query/schema change
+  // should resynchronize them, never a presentation-state rerender.
+  const lastAppliedQuick = useRef<string | null>(null)
   useEffect(() => {
-    // Browser back/forward and page resets synchronize submitted quick filters.
-    // An unsent advanced draft must never leak into page-owned query state.
+    const signature = JSON.stringify([
+      query.filters,
+      regularFilters.map((filter) => String(filter.key)),
+    ])
+    if (lastAppliedQuick.current === signature) return
+    lastAppliedQuick.current = signature
     for (const filter of regularFilters) {
       quickForm.setFieldValue(String(filter.key), query.filters[filter.key])
     }
-  }, [quickForm, query.filters, regularFilters])
+  })
 
-  useEffect(() => {
-    if (!advancedOpen) return
-    // Begin with the applied query, while respecting unsent quick-search edits.
-    // Read ONLY regular fields: the quick form also knows advanced keys, which
-    // may be stale after browser back/forward navigation.
+  const openAdvanced = () => {
+    // Initialize only on opening, not on every rerender or failed submit:
+    // otherwise validation feedback would discard the user's unsubmitted draft.
     const draft = { ...query.filters } as Record<string, unknown>
     for (const filter of regularFilters) {
       draft[String(filter.key)] = quickForm.getFieldValue(String(filter.key))
@@ -241,7 +246,9 @@ export function DataPanel<
     for (const filter of filters) {
       advancedForm.setFieldValue(String(filter.key), draft[String(filter.key)])
     }
-  }, [advancedOpen, advancedForm, quickForm, query.filters, regularFilters, filters])
+    setAdvancedError(false)
+    setAdvancedOpen(true)
+  }
 
   const submitQuick = (values: Partial<Filters>) => {
     const accepted = onQueryChange({
@@ -526,10 +533,7 @@ export function DataPanel<
                 {hasAdvanced ? (
                   <Button
                     type="link"
-                    onClick={() => {
-                      setAdvancedError(false)
-                      setAdvancedOpen(true)
-                    }}
+                    onClick={openAdvanced}
                   >
                     高级检索
                   </Button>

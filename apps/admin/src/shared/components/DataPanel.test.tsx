@@ -157,6 +157,9 @@ describe('DataPanel controlled query contract', () => {
     await waitFor(() => expect(changes).toHaveBeenCalled())
     expect(screen.getByRole('dialog')).toBeTruthy()
     expect(screen.getByText('筛选条件未被接受')).toBeTruthy()
+    // Rejected submission triggers a panel rerender. The unsent advanced
+    // draft must not be overwritten by the applied query (which is still empty).
+    expect((within(dialog).getByLabelText('金额最小值') as HTMLInputElement).value).toBe('100')
 
     fireEvent.click(within(dialog).getByRole('button', { name: /取\s*消/ }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())

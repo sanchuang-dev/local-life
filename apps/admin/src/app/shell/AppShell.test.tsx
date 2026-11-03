@@ -37,7 +37,7 @@ describe('admin AppShell', () => {
     expect(screen.getByRole('menuitem', { name: '活动管理' })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: '系统信息' })).toBeTruthy()
     expect(screen.getByRole('tab', { name: '经营工作台' })).toBeTruthy()
-    expect(screen.getByText('API 健康检查')).toBeTruthy()
+    expect(screen.getByText('已验证身份')).toBeTruthy()
   })
 
   it('narrows the menu by search and shows an honest empty state', async () => {
