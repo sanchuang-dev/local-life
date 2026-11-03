@@ -1,12 +1,14 @@
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Route, Routes } from 'react-router'
+import { Spin } from 'antd'
 import { AdminLayout } from './layouts/AdminLayout'
-import { DashboardPage } from './pages/DashboardPage'
-import { PlaceholderPage } from './pages/PlaceholderPage'
+import { fetchSession, loginStaff, logoutStaff, type AuthenticatedSession } from './services/auth'
 
-/**
- * Navigation entries exist so the information architecture is reviewable, but
- * every one of them is explicitly unimplemented in this engineering slice.
- */
+const DashboardPage = lazy(() => import('./pages/DashboardPage').then((module) => ({ default: module.DashboardPage })))
+const LoginPage = lazy(() => import('./pages/LoginPage').then((module) => ({ default: module.LoginPage })))
+const PlaceholderPage = lazy(() => import('./pages/PlaceholderPage').then((module) => ({ default: module.PlaceholderPage })))
+const UsersPage = lazy(() => import('./pages/UsersPage').then((module) => ({ default: module.UsersPage })))
+
 const PENDING_MODULES = [
   {
     path: '/content',
@@ -17,28 +19,95 @@ const PENDING_MODULES = [
   {
     path: '/activities',
     title: '活动管理',
-    description: '银发社区欢乐季等活动的配置、报名与效果数据。',
-    planned: ['活动配置', '报名名单', '活动数据看板'],
-  },
-  {
-    path: '/users',
-    title: '用户与权限',
-    description: '管理员账号、角色与操作审计。',
-    planned: ['登录与账号', '角色权限', '操作审计'],
+    description: '三人成团活动的配置、发布、报名与效果数据。',
+    planned: ['活动配置', '参与名单', '成团与奖励规则'],
   },
   {
     path: '/settings',
     title: '系统设置',
-    description: 'API 地址、运行环境与发布配置的只读说明。',
-    planned: ['环境信息', '发布记录'],
+    description: '运行环境、账号安全与集成配置。',
+    planned: ['微信公众平台配置', '运行环境', '审计记录查询'],
   },
 ]
 
 export default function App() {
+  const [session, setSession] = useState<AuthenticatedSession | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+    fetchSession()
+      .then((result) => {
+        if (active) {
+          if (result.authenticated && result.staff) setSession({ ...result, staff: result.staff })
+          else setSession(null)
+        }
+      })
+      .catch((cause: unknown) => {
+        if (active) setError(cause instanceof Error ? cause.message : '无法连接账户服务')
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  async function handleLogin(values: { username: string; password: string }) {
+    setBusy(true)
+    setError(null)
+    try {
+      setSession(await loginStaff(values.username, values.password))
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '登录失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleLogout() {
+    if (!session) return
+    setBusy(true)
+    setError(null)
+    try {
+      await logoutStaff(session.csrfToken)
+      setSession(null)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : '退出登录失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
+        <Spin tip="正在读取登录状态…" />
+      </div>
+    )
+  }
+
+  if (!session) {
+    return (
+      <Suspense fallback={<div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}><Spin /></div>}>
+        <LoginPage busy={busy} error={error} onLogin={handleLogin} />
+      </Suspense>
+    )
+  }
+
   return (
+    <Suspense fallback={<div style={{ minHeight: '50vh', display: 'grid', placeItems: 'center' }}><Spin /></div>}>
     <Routes>
-      <Route element={<AdminLayout />}>
-        <Route index element={<DashboardPage />} />
+      <Route
+        element={
+          <AdminLayout session={session} busy={busy} error={error} onLogout={handleLogout} />
+        }
+      >
+        <Route index element={<DashboardPage session={session} />} />
+        <Route path="/users" element={<UsersPage session={session} />} />
         {PENDING_MODULES.map((pendingModule) => (
           <Route
             key={pendingModule.path}
@@ -58,5 +127,6 @@ export default function App() {
         />
       </Route>
     </Routes>
+    </Suspense>
   )
 }

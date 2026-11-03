@@ -39,12 +39,32 @@ test('unknown route returns the shared structured error envelope', async () => {
 test('loadConfig fails loudly on invalid input', () => {
   assert.throws(() => loadConfig({ PORT: 'not-a-port' }), ConfigError)
   assert.throws(() => loadConfig({ NODE_ENV: 'staging' }), ConfigError)
+  assert.throws(
+    () => loadConfig({ NODE_ENV: 'production', AUTH_DEV_ENABLED: 'true' }),
+    ConfigError,
+  )
+  assert.throws(
+    () => loadConfig({ WECHAT_APP_ID: 'wx-app-id' }),
+    ConfigError,
+  )
+  assert.throws(() => loadConfig({ TRUSTED_ORIGINS: 'not-a-url' }), ConfigError)
 })
 
-test('loadConfig applies documented local defaults', () => {
+test('loadConfig applies explicit local defaults and keeps dev login disabled', () => {
   assert.deepEqual(loadConfig({}), {
     nodeEnv: 'development',
     host: '127.0.0.1',
     port: 4080,
+    databasePath: '../../.data/local-life.sqlite',
+    sessionTtlSeconds: 7 * 24 * 60 * 60,
+    cookieSecure: false,
+    trustedOrigins: [
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+      'http://localhost:5174',
+      'http://127.0.0.1:5174',
+    ],
+    webBaseUrl: 'http://localhost:5173/local-life/',
+    authDevEnabled: false,
   })
 })

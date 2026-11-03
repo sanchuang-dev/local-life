@@ -11,6 +11,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import type { AuthenticatedSession } from '../services/auth'
 import { fetchHealth, type HealthResponse } from '../services/api'
 
 type HealthState =
@@ -19,10 +20,10 @@ type HealthState =
   | { kind: 'error'; message: string }
 
 const NOT_IMPLEMENTED = [
-  '管理员登录、角色与权限',
-  '内容 / 活动 / 用户 CRUD',
-  'SQLite + Drizzle 业务数据库',
-  '微信 OAuth、真实支付与订单',
+  '活动发布、三人成团和活动履约',
+  '网格员客户跟进与业务受理',
+  '商城商品、订单和交易关联',
+  '奖励发放、业绩确认与对账',
 ]
 
 function formatUptime(seconds: number): string {
@@ -33,7 +34,7 @@ function formatUptime(seconds: number): string {
   return `${hours} 小时 ${minutes % 60} 分`
 }
 
-export function DashboardPage() {
+export function DashboardPage({ session }: { session: AuthenticatedSession }) {
   const [attempt, setAttempt] = useState(0)
   const [health, setHealth] = useState<HealthState>({ kind: 'loading' })
 
@@ -44,7 +45,6 @@ export function DashboardPage() {
 
   useEffect(() => {
     const controller = new AbortController()
-
     fetchHealth(controller.signal)
       .then((data) => setHealth({ kind: 'ok', data }))
       .catch((error: unknown) => {
@@ -54,20 +54,38 @@ export function DashboardPage() {
           message: error instanceof Error ? error.message : String(error),
         })
       })
-
     return () => controller.abort()
   }, [attempt])
 
   return (
-    <Space orientation="vertical" size={16} style={{ width: '100%' }}>
-      <Row gutter={16}>
+    <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      <Row gutter={[16, 16]}>
         <Col xs={24} md={8}>
-          <Card size="small" title="居民 H5（已评审演示）">
+          <Card size="small" title="当前账户">
+            <Typography.Title level={4} style={{ marginTop: 0 }}>
+              {session.user.displayName || session.staff.username}
+            </Typography.Title>
+            <Space wrap>
+              <Tag color="green">
+                {session.staff.role === 'admin'
+                  ? '管理员'
+                  : session.staff.role === 'operator'
+                    ? '运营员'
+                    : '网格员'}
+              </Tag>
+              <Typography.Text type="secondary">
+                {session.staff.communities.length} 个负责社区
+              </Typography.Text>
+            </Space>
+          </Card>
+        </Col>
+        <Col xs={24} md={8}>
+          <Card size="small" title="居民 H5">
             <Typography.Paragraph style={{ marginBottom: 8 }}>
-              现有移动端页面原样迁入 <Typography.Text code>apps/web</Typography.Text>，视觉与路由未重画。
+              已接入居民账户状态和微信网页授权入口；现有活动、积分和商品页面继续明确标注演示数据。
             </Typography.Paragraph>
             <Space wrap>
-              <Tag color="green">保留</Tag>
+              <Tag color="green">身份已接入</Tag>
               <Typography.Link
                 href="https://sanchuang-dev.github.io/local-life/"
                 target="_blank"
@@ -75,28 +93,15 @@ export function DashboardPage() {
               >
                 开发预览
               </Typography.Link>
-              <Typography.Text type="secondary">本地：pnpm dev:web</Typography.Text>
             </Space>
           </Card>
         </Col>
         <Col xs={24} md={8}>
-          <Card size="small" title="共享契约">
+          <Card size="small" title="身份与权限">
             <Typography.Paragraph style={{ marginBottom: 8 }}>
-              <Typography.Text code>packages/contracts</Typography.Text> 提供 zod schema 与类型，
-              API 与管理台共用，不复制 DTO。
+              用户主键、后台账号、会话、角色和社区范围由 API 与 SQLite 持久化。
             </Typography.Paragraph>
-            <Tag color="blue">已接入健康检查契约</Tag>
-          </Card>
-        </Col>
-        <Col xs={24} md={8}>
-          <Card size="small" title="管理台">
-            <Typography.Paragraph style={{ marginBottom: 8 }}>
-              当前页面仅为可运行的空布局，没有任何已实现的业务模块。
-            </Typography.Paragraph>
-            <Space>
-              <Tag color="gold">未接入登录</Tag>
-              <Tag>无业务数据</Tag>
-            </Space>
+            <Tag color="green">已接入服务端鉴权</Tag>
           </Card>
         </Col>
       </Row>
@@ -129,7 +134,7 @@ export function DashboardPage() {
             showIcon
             title="无法连接本地 API"
             description={
-              <Space orientation="vertical" size={4}>
+              <Space direction="vertical" size={4}>
                 <Typography.Text>{health.message}</Typography.Text>
                 <Typography.Text type="secondary">
                   请先运行 pnpm dev:api（默认 127.0.0.1:4080），再重新检查。
@@ -140,7 +145,7 @@ export function DashboardPage() {
         )}
 
         {health.kind === 'ok' && (
-          <Space orientation="vertical" size={8} style={{ width: '100%' }}>
+          <Space direction="vertical" size={8} style={{ width: '100%' }}>
             <Tag color="green">已连通 · {health.data.status}</Tag>
             <Descriptions
               size="small"
@@ -148,11 +153,7 @@ export function DashboardPage() {
               items={[
                 { key: 'service', label: '服务', children: health.data.service },
                 { key: 'version', label: '版本', children: health.data.version },
-                {
-                  key: 'uptime',
-                  label: '已运行',
-                  children: formatUptime(health.data.uptimeSeconds),
-                },
+                { key: 'uptime', label: '已运行', children: formatUptime(health.data.uptimeSeconds) },
                 {
                   key: 'timestamp',
                   label: '响应时间',
@@ -164,11 +165,14 @@ export function DashboardPage() {
         )}
       </Card>
 
-      <Card size="small" title="本阶段明确未实现">
+      <Card size="small" title="后续业务施工">
+        <Typography.Paragraph type="secondary">
+          本卡只建立可用身份与权限底座，不把未实现的活动、成交、奖励或分账显示成真实业务。
+        </Typography.Paragraph>
         <ul style={{ margin: 0, paddingInlineStart: 20 }}>
           {NOT_IMPLEMENTED.map((item) => (
             <li key={item} style={{ marginBottom: 6 }}>
-              <Tag>未实现</Tag>
+              <Tag>后续</Tag>
               {item}
             </li>
           ))}

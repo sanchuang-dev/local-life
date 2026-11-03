@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@sanchuang-dev/local-life-contracts": "workspace:*",
     "@tailwindcss/vite": "4.3.3",
     "lucide-react": "1.59.0",
     "qrcode.react": "4.2.0",

@@ -1,9 +1,10 @@
-import { ChevronRight, UserRound } from 'lucide-react'
+import { ChevronRight, LogOut, UserRound } from 'lucide-react'
 import { Link } from 'react-router'
 import { DemoNote } from '../components/DemoNote'
 import { PendingNotice } from '../components/PendingNotice'
 import { SectionHeading } from '../components/home/SectionHeading'
 import { usePendingNotice } from '../hooks/usePendingNotice'
+import { useResidentAuth } from '../hooks/useResidentAuth'
 import {
   meDemoNote,
   meProfile,
@@ -75,6 +76,7 @@ function ServiceRow({
 
 export function MePage() {
   const { message, show, dismiss } = usePendingNotice()
+  const auth = useResidentAuth()
 
   return (
     <div className="px-4 pb-7 pt-4">
@@ -88,14 +90,77 @@ export function MePage() {
           </span>
           <div className="min-w-0 flex-1">
             <h1 className="text-[19px] font-semibold tracking-tight text-slate-900">
-              {meProfile.name}
+              {auth.session?.user.displayName || meProfile.name}
             </h1>
-            <p className="mt-0.5 text-[11px] leading-4 text-slate-400">{meProfile.community}</p>
+            <p className="mt-0.5 text-[11px] leading-4 text-slate-400">
+              {auth.session ? '微信居民账户 · 已登录' : meProfile.community}
+            </p>
           </div>
           <span className="shrink-0 rounded-full bg-[#fff3e6] px-2 py-1 text-[10px] font-medium text-[#a96b2f]">
-            {meProfile.tag}
+            {auth.session ? '已登录' : meProfile.tag}
           </span>
         </div>
+
+        {!auth.session && (
+          <div className="mt-4 rounded-[16px] bg-[#f4f8f6] p-3.5">
+            <p className="text-[13px] font-semibold text-slate-700">登录本地生活</p>
+            <p className="mt-1 text-[11px] leading-5 text-slate-500">
+              登录后可使用与你的居民账户关联的活动和社区服务。
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {auth.methods?.wechat && (
+                <button
+                  type="button"
+                  onClick={auth.startWechatLogin}
+                  className="min-h-10 rounded-full bg-[#138b79] px-4 text-[12px] font-semibold text-white transition-colors hover:bg-[#116d63]"
+                >
+                  微信授权登录
+                </button>
+              )}
+              {auth.methods?.developmentResidentLogin && (
+                <button
+                  type="button"
+                  disabled={auth.busy}
+                  onClick={() => void auth.developmentLogin()}
+                  className="min-h-10 rounded-full border border-teal-200 bg-white px-4 text-[12px] font-semibold text-teal-700 disabled:opacity-50"
+                >
+                  {auth.busy ? '登录中…' : '开发测试登录'}
+                </button>
+              )}
+              {auth.methods && !auth.methods.wechat && !auth.methods.developmentResidentLogin && (
+                <span className="text-[11px] text-slate-500">微信网页授权尚未配置，当前无法登录。</span>
+              )}
+              {!auth.methods && !auth.loading && (
+                <span className="text-[11px] text-slate-500">账户服务暂不可用，请稍后重试。</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {auth.session && (
+          <div className="mt-3 flex items-center justify-between">
+            <span className="text-[11px] text-slate-400">平台居民 ID：{auth.session.user.id.slice(0, 8)}…</span>
+            <button
+              type="button"
+              disabled={auth.busy}
+              onClick={() => void auth.logout()}
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <LogOut size={14} />
+              退出登录
+            </button>
+          </div>
+        )}
+
+        {auth.error && (
+          <p role="alert" className="mt-3 text-[11px] leading-5 text-rose-600">
+            {auth.error}
+          </p>
+        )}
+
+        {auth.loading && (
+          <p className="mt-3 text-[11px] text-slate-400">正在读取账户状态…</p>
+        )}
 
         <div className="mt-4 grid grid-cols-3 gap-2">
           {meStats.map((stat) => {
@@ -153,7 +218,7 @@ export function MePage() {
 
       <div className="mt-6">
         <DemoNote tone="warn">
-          所有账户、身份、积分、活动、优惠券、订单、收藏与客服能力均为演示占位，不产生真实身份认证、交易或个人数据存储。
+          当前仅居民身份接入真实账户系统；积分、活动、优惠券、订单、收藏与客服仍是演示占位，不产生真实交易或履约记录。
         </DemoNote>
       </div>
 
