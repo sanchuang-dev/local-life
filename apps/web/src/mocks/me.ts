@@ -17,10 +17,9 @@ import { lifePoints } from './life'
 /**
  * "Me" fixtures ported from the V0.3 `me` screen.
  *
- * The profile, activity/coupon counts, services and settings are demonstration
- * content only. No account, order, coupon, family or customer-service backend is
- * connected, and the points value comes from the shared life fixture so there is
- * only one demo balance in the project.
+ * The activity/coupon counts, services and settings are demonstration content only.
+ * Resident identity is read from the account API when authenticated; the points
+ * value comes from the shared life fixture so there is only one demo balance.
  */
 
 export const meProfile = {
@@ -149,4 +148,4 @@ export const meSettings: MeServiceItem[] = [
 ]
 
 export const meDemoNote =
-  '本页依据 V0.3 我的页迁移，用户、积分、活动、优惠券、设备与设置均为示例；未接入账号、订单、优惠券、家庭成员或客服服务。'
+  '本页依据 V0.3 我的页迁移；居民身份已接入账户系统，其余积分、活动、优惠券、设备与设置仍为示例数据。'

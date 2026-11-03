@@ -1,68 +1,69 @@
-# Pre-MVP 工程基座（LL-MVP-001）
+# Pre-MVP 工程基座与身份域
 
-> 对应 Issue [#57](https://github.com/sanchuang-dev/local-life/issues/57)。本文记录**已经落地**的目录、命令和边界，不写未来架构规划。
+> 本文延续 LL-MVP-001（Issue #57）的工程迁移记录，并补充 LL-MVP-002（Issue #58）已经落地的身份与权限底座。本文只记录当前代码事实。
 
-## 1. 结构
+## 1. Workspace 结构
 
 | 路径 | 角色 | 是否发布 |
 | --- | --- | --- |
-| `apps/web` | 居民移动端 H5，原根目录 `src/`、`public/`、Vite 配置原样迁入 | 是，GitHub Pages 根路径 `/local-life/` |
-| `apps/admin` | 管理台工程壳：Ant Design 6 布局 + 明确未实现模块 | 否 |
-| `apps/api` | Hono API：配置校验、结构化错误、`GET /healthz` | 否 |
-| `packages/contracts` | 共享 zod schema/类型（健康检查、错误信封、路由常量） | 作为 workspace 依赖 |
+| `apps/web` | 居民移动端 H5，保留已评审页面与 HashRouter | 是，GitHub Pages 静态预览 |
+| `apps/admin` | 管理台：后台登录、社区/后台账户管理、社区居民只读列表 | 否 |
+| `apps/api` | Hono API、Drizzle/SQLite、认证与社区范围鉴权 | 否 |
+| `packages/contracts` | API 与客户端共享 zod schema、DTO 和路由常量 | workspace 依赖 |
 
-根目录保留 `package.json`、`pnpm-workspace.yaml`、`pnpm-lock.yaml`、`AGENTS.md`、`README.md`、`docs/`、`.github/`。`package-lock.json` 已移除，单锁文件为 `pnpm-lock.yaml`。
+根目录保留 workspace 配置、单一 `pnpm-lock.yaml`、规约和文档。没有 Nx/Turborepo，也不把 PHP CRMEB 商城源码迁入此 monorepo。
 
-## 2. 为什么这样切
-
-- **H5 不重画**：迁移只改路径，不改页面实现、路由表、Tailwind 样式和图片引用；`import.meta.env.BASE_URL` 继续保证 `/local-life/` 与 `/local-life/prod/` 的资源解析。
-- **管理台/API 是骨架而非假系统**：所有未实现模块渲染「未实现」页；API 只有健康检查和错误处理，没有业务表、假账号或 Mock 成功。
-- **契约唯一**：`packages/contracts` 是 API 与客户端的 DTO 事实源。API 用 `healthResponseSchema.parse()` 校验自己的响应，管理台用同一 schema 校验响应；任何一侧漂移都会显式失败。
-- **不引入多余工具**：没有 Nx/Turborepo、没有状态管理、没有业务数据库；workspace 用 pnpm 原生能力 + 根脚本排序。
-
-## 3. 启动与端口
+## 2. 本地启动与同源 API
 
 | 服务 | 命令 | 地址 |
 | --- | --- | --- |
-| 全部 | `pnpm dev` | web 5173 / admin 5174 / api 4080 |
-| H5 | `pnpm dev:web` | http://127.0.0.1:5173/local-life/ |
-| 管理台 | `pnpm dev:admin` | http://127.0.0.1:5174/ |
+| 一键本地启动（推荐） | `pnpm dev:local` | 自动安装依赖、初始化/迁移 `.data/local-life-dev.sqlite`，启动三端 |
+| 全部（自定义环境） | `pnpm dev` | web 5173 / admin 5174 / api 4080 |
+| H5 | `pnpm dev:web` | http://localhost:5173/local-life/ |
+| 管理台 | `pnpm dev:admin` | http://localhost:5174/ |
 | API | `pnpm dev:api` | http://127.0.0.1:4080/healthz |
 
-`pnpm dev` 先构建 `packages/contracts`（admin/API 依赖其 `dist`），再并行启动三个服务。管理台 `/api/*` 由 Vite 代理去掉 `/api` 前缀转发到 4080，因此浏览器侧是同源请求。
+H5 与管理台开发服务器均把 `/api/*` 去掉前缀后代理到 API 实际端口，浏览器侧保持各自同源。`pnpm dev:local` 从 `apps/api/.env.local` 的 `PORT`、`WEB_PORT`、`ADMIN_PORT` 唯一读取端口并推导受信任 Origin、Vite 监听与代理目标；裸 `pnpm dev` 则使用 `scripts/local-ports.mjs` 中的默认值。生产部署必须用反向代理提供同样的 `/api` 路径；`TRUSTED_ORIGINS` 是 CSRF Origin allowlist，不会自动启用 CORS。
 
-## 4. API 边界
+## 3. API 与持久化
 
-已实现：
+- `GET /healthz` 返回共享 `healthResponseSchema` 校验后的 payload。
+- 每个请求生成 `x-request-id`；404/500 返回共享结构化错误信封。
+- SQLite + Drizzle 仅在 `apps/api` 内：schema 位于 `src/db/schema.ts`，迁移位于 `db/migrations/`，服务启动时自动应用迁移。
+- 默认数据库路径为仓库根目录 `.data/local-life.sqlite`，由 `.gitignore` 忽略；生产环境必须显式配置持久卷/备份策略。
+- `packages/contracts` 是 API、H5、管理台共享 DTO 的唯一来源；客户端不得另造相同接口的数据结构。
 
-- `GET /healthz` → `{ status, service, version, uptimeSeconds, timestamp }`，响应先过共享 schema。
-- 每个请求生成 `x-request-id`，访问日志为单行 JSON。
-- 404/500 返回 `{ error: { code, message, requestId } }`；500 不向客户端泄露堆栈。
-- 启动配置 `NODE_ENV` / `HOST` / `PORT` 用 zod 校验，非法值直接失败退出。
+## 4. 身份与权限（LL-MVP-002）
 
-明确未实现：登录/鉴权、业务路由、SQLite/Drizzle、迁移、CORS 策略、限流、部署。后续数据库只允许在 `apps/api` 内引入，先评审 schema 与敏感数据边界，不预建空 repository/domain 层。
+- `users.id` 是稳定平台 UUID；微信身份以 `(appid, openid)` 唯一映射，unionid 可选。
+- 后台账号 `staff_accounts.user_id` 关联平台用户；管理员可将已完成微信授权的居民账户关联为运营员/网格员，冲突拒绝，不静默合并。
+- 角色：`admin`、`operator`、`grid_worker`。管理员可访问全部社区；运营员/网格员仅能访问分配的社区。
+- Cookie session 数据库存 token hash；写请求要求 CSRF token 和可信 Origin；后台密码使用 scrypt；登录失败限流；关键账户/社区操作有审计记录。
+- 微信 OAuth 具备 start/callback、state、浏览器 nonce、过期和重放拒绝。真实公众号凭证和线上回调仍待配置/实测。
+- 开发居民测试登录默认关闭；仅非生产环境显式 `AUTH_DEV_ENABLED=true` 才启用，生产配置禁止开启。
+- 管理台可登录、创建社区、创建运营员/网格员、分配社区并查看授权范围内的居民列表。居民列表不暴露 openid、手机号或微信凭证。
 
-## 5. GitHub Pages 双预览
+完整配置、接口和安全说明见 [identity-auth.md](identity-auth.md)。
 
-`.github/workflows/preview.yml` 保持单站点原子发布：
+## 5. 当前未实现的业务边界
 
-1. 同时 checkout `dev`（`dev-source`）与 `prod`（`prod-source`）。
-2. `dev-source`：`pnpm install --frozen-lockfile` + `pnpm check`，产物在 `apps/web/dist`。
-3. `prod-source`：若已是 workspace（`pnpm-lock.yaml` + `apps/web/package.json`），用 `pnpm --filter @sanchuang-dev/local-life-web build:prod-preview`；否则回退旧单包 `npm ci` + `npx vite build --base /local-life/prod/`。**兼容路径只为 prod 晋级前服务，晋级后应删除**。
-4. 合并 `apps/web/dist` 到根、prod 产物到 `/prod/`，断言两份 `index.html` 的 `/local-life/assets/`、`/local-life/prod/assets/` 引用后上传。
+本阶段没有实现活动配置/发布、三人成团、客户线索跟进、广电业务受理、CRMEB 商品/订单映射、支付、奖励核销、业绩确认、空中分账与对账。这些能力不得以 Mock 成功或静态演示数据宣称已可运营。
 
-管理台与 API 不进入 Pages 产物；静态站点不会把 API 伪装成可用。
+CRMEB 继续作为独立仓库/系统，通过后续明确的 adapter 与订单契约接入；不将 PHP 商城源码复制进 workspace。
 
-## 6. 验证基线
+## 6. GitHub Pages 双预览
+
+GitHub Pages 只发布静态 H5：
+
+1. `dev` 构建到站点根目录，base 为 `/local-life/`。
+2. `prod` 构建到 `/prod/`，base 为 `/local-life/prod/`。
+3. 管理台与 API 不进入 Pages 产物；Pages 上没有真实账户 API，因此账户区域应如实显示服务不可用。
+
+`prod` 晋级 workspace 前，Pages workflow 仍保留旧单包兼容构建路径；该路径的删除条件是 prod 分支完成 monorepo 晋级并通过 Pages 验收。
+
+## 7. 验证
 
 - `pnpm install --frozen-lockfile`
-- `pnpm check`：Oxlint → contracts 构建 + 各包 typecheck → API 测试（node:test）→ 拓扑构建
-- 真实 HTTP：`curl http://127.0.0.1:4080/healthz` 与 404 错误信封
-- 浏览器：375 × 812 与 320 宽度检查首页、五 Tab、银发活动页深链接；Pages 双构建按 `/local-life/` 前缀本地静态服务校验
-- 证据：`docs/engineering/evidence/ll-mvp-001/`
-
-## 7. 已知边界与风险
-
-- `prod` 分支在晋级前仍是旧单包布局，Pages 工作流保留兼容分支；需在 prod 晋级评审时删除。
-- 管理台与 API 只在本地运行，没有部署、鉴权或生产配置；CI 无法证明真实浏览器交互。
-- 迁移提交会保留旧 `docs/migration/` 历史文档与脚本，其中根 `src/` 路径描述的是迁移当时状态，不代表当前目录。
+- `pnpm check`：Oxlint → contracts 构建 + 各包 typecheck → API 测试 → workspace 构建。
+- API 测试覆盖后台登录、账户创建、社区越权拒绝、CSRF、登出、开发登录隔离、WeChat OAuth state/nonce/重放与重复授权。
+- 浏览器仍需验证 H5 375 × 812 / 320 宽度和管理台登录/账户管理交互；真实微信授权、生产 HTTPS Cookie、部署、备份恢复及真机验收必须在真实环境完成。

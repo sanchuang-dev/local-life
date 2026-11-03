@@ -15,8 +15,11 @@
     "build": "pnpm -r --if-present build",
     "lint": "oxlint apps packages --ignore-pattern '**/dist/**'",
     "typecheck": "pnpm --filter @sanchuang-dev/local-life-contracts build && pnpm -r --if-present typecheck",
-    "test": "pnpm --filter @sanchuang-dev/local-life-contracts build && pnpm -r --workspace-concurrency=1 --if-present test",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+    "test": "pnpm --filter @sanchuang-dev/local-life-contracts build && pnpm -r --workspace-concurrency=1 --if-present test && node --test scripts/local-dev.test.mjs",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "dev:local": "node scripts/local-dev.mjs start",
+    "db:local:setup": "node scripts/local-dev.mjs setup",
+    "admin:local": "node scripts/local-dev.mjs admin"
   },
   "devDependencies": {
     "oxlint": "1.88.0",
