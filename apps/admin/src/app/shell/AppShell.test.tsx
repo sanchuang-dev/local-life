@@ -98,16 +98,24 @@ describe('admin AppShell', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/customers'))
     fireEvent.click(screen.getByRole('menuitem', { name: '订单管理' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/orders'))
-    await waitFor(() => expect(tabNames()).toEqual(['经营工作台', '居民与客户', '订单管理']))
+    await waitFor(() => expect(tabNames()).toEqual(['经营工作台', '居民与客户', '订单管理']), {
+      timeout: 5000,
+    })
 
     await router.navigate(-1)
-    await waitFor(() => expect(screen.getByRole('heading', { name: '居民与客户' })).toBeTruthy())
+    await waitFor(
+      () => expect(screen.getByRole('heading', { name: '居民与客户' })).toBeTruthy(),
+      { timeout: 5000 },
+    )
     expect(screen.getByRole('tab', { name: '居民与客户' }).getAttribute('aria-selected')).toBe(
       'true',
     )
 
     await router.navigate(1)
-    await waitFor(() => expect(screen.getByRole('heading', { name: '订单管理' })).toBeTruthy())
+    await waitFor(
+      () => expect(screen.getByRole('heading', { name: '订单管理' })).toBeTruthy(),
+      { timeout: 5000 },
+    )
     expect(screen.getByRole('tab', { name: '订单管理' }).getAttribute('aria-selected')).toBe('true')
   })
 

@@ -1,5 +1,6 @@
 import type { RouteObject } from 'react-router'
 import { AdminLayout } from '../layouts/AdminLayout'
+import { ComponentPreviewPage } from '../pages/ComponentPreviewPage'
 import { DashboardPage } from '../pages/DashboardPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
@@ -17,6 +18,7 @@ export const routes: RouteObject[] = [
     element: <AdminLayout />,
     children: [
       { index: true, element: <DashboardPage /> },
+      { path: 'system/components', element: <ComponentPreviewPage /> },
       ...PLANNED_PAGES.map((page) => ({
         path: page.key.replace(/^\//, ''),
         element: (

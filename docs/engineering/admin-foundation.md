@@ -14,7 +14,7 @@ apps/admin/src/
     shell/
       AppShell.tsx        # 布局、顶部工具区、路由同步工作页签、响应式抽屉
       AppSidebar.tsx      # 品牌、菜单搜索、分组导航、折叠/抽屉
-      navigation.tsx      # 业务导航模型（页面、分组、待建设状态）
+      navigation.ts       # 业务导航模型（页面、分组、待建设状态，纯数据）
       shell.css           # 外壳与页面版心样式
       sidebar.css         # 侧栏样式
   components/
@@ -53,7 +53,19 @@ apps/admin/src/
 - 菜单搜索只收窄可见菜单，不改变路由/页签；无结果时显示「未找到匹配的菜单」。
 - 折叠/展开、抽屉、页签操作均为真实按钮，具备 `aria-label` / `aria-expanded`，不存在可点击但无行为的假交互。
 
-## 5. 与 #58 身份/权限的接入点
+## 5. DataPanel 数据面板
+
+- 入口：`shared/components/DataPanel.tsx`；显示偏好：`shared/lib/data-panel-state.ts` + `shared/lib/data-panel-prefs.ts`。
+- **查询状态归页面所有**。`DataPanel` 接收受控 `query`（filters / page / pageSize / sort），只回传变更意图；页面决定是否请求、如何处理服务端分页与错误。面板自身不发请求，也不缓存业务数据。
+- 筛选：`text` / `select` / `status` / `numberRange` / `dateRange` 五种；前 `inlineFilterLimit` 个常规条件固定在行内，其余常规条件折叠到「更多条件」，标记 `advanced` 的条件只出现在「高级检索」弹窗。弹窗提交被页面拒绝（`onQueryChange` 返回 `false`）时保持打开并给出提示；取消不应用草稿。
+- 日期区间只传 `YYYY-MM-DD` 字符串（`{ start?, end? }`），由页面/API 定义时区与开闭区间语义；组件不自行猜测。
+- 排序与分页：点击表头只发出 `sort` 意图并回到第 1 页，不在本地重排当前页；分页大小变化回到第 1 页。`pagination=false` 用于完整的小数据集。
+- 表格/卡片：同一 `rows` 两种视图；卡片视图需要页面提供 `renderCard`。所有行操作由页面注入，组件不写业务实体。
+- 列设置：显示/隐藏、上下移动、表格密度（紧凑/标准/宽松）、视图模式按 `id` 隔离保存在 `localStorage` 的 `ll:data-panel-prefs`（版本化、白名单、上限 30 面板/60 列）。新增列默认显示；至少保留一列；`hideable=false` 的列不可隐藏。
+- 状态：加载中不显示「暂无数据」；失败态提供 `errorTitle`/`message` 与「重试」；空态区分「无匹配筛选」与页码过期，后者提供「回到第一页」。筛选摘要不写入 URL（LL-UI-003）。
+- 组件验收页：`/#/system/components`（`pages/ComponentPreviewPage.tsx`）使用 14 条本地样例数据，明确标注为开发预览，不代表居民/订单/业绩等真实业务；样例数据与状态切换仅用于验收组件状态，不写库、不调 API。
+
+## 6. 与 #58 身份/权限的接入点
 
 当前分支基于 `origin/dev`，**没有真实登录与路由守卫**（#58 仍在施工且未合并）。本卡不做以下事情：
 
@@ -63,7 +75,7 @@ apps/admin/src/
 
 #58 合并时的接入方式：`layouts/AdminLayout.tsx` 是路由布局入口，认证守卫包裹 `AppShell`，把服务端会话中的管理员身份传入顶部工具区；页签/导航逻辑无需改动。
 
-## 6. 验证
+## 7. 验证
 
 - `pnpm install --frozen-lockfile`、`pnpm check`（Oxlint + typecheck + Admin/API 测试 + 全部构建）。
 - Admin 组件/交互测试：`vitest run`（jsdom + Testing Library），覆盖导航模型、页签状态、折叠/抽屉与 DataPanel 契约。

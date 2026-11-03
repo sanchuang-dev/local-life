@@ -1,19 +1,39 @@
-import { MenuFoldOutlined, MenuUnfoldOutlined, SearchOutlined } from '@ant-design/icons'
+import {
+  BarChartOutlined,
+  DashboardOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
+  NotificationOutlined,
+  SearchOutlined,
+  SettingOutlined,
+  ShoppingOutlined,
+  TeamOutlined,
+} from '@ant-design/icons'
 import { Empty, Input, Layout, Menu } from 'antd'
 import type { MenuProps } from 'antd'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import {
   filterNavigation,
   HOME_ICON,
   HOME_PAGE,
   NAV_GROUPS,
   type NavGroup,
+  type NavIconKey,
 } from './navigation'
 import './sidebar.css'
 
 const { Sider } = Layout
 
 type MenuItems = NonNullable<MenuProps['items']>
+
+const NAV_ICONS: Record<NavIconKey, ReactNode> = {
+  workbench: <DashboardOutlined aria-hidden="true" />,
+  campaign: <NotificationOutlined aria-hidden="true" />,
+  customer: <TeamOutlined aria-hidden="true" />,
+  commerce: <ShoppingOutlined aria-hidden="true" />,
+  performance: <BarChartOutlined aria-hidden="true" />,
+  system: <SettingOutlined aria-hidden="true" />,
+}
 
 interface AppSidebarProps {
   /** Menu key of the current route, resolved by `activeMenuKey()`. */
@@ -44,7 +64,7 @@ function pageLabel(label: string, pageKey: string) {
 function buildMenuItems(groups: readonly NavGroup[]): MenuItems {
   return groups.map((group) => ({
     key: group.key,
-    icon: group.icon,
+    icon: NAV_ICONS[group.icon],
     label: group.label,
     children: group.pages.map((page) => ({
       key: page.key,
@@ -77,7 +97,7 @@ export function AppSidebar({ activeKey, onNavigate, variant = 'sider' }: AppSide
   const items = useMemo<MenuItems>(() => {
     const homeItem = {
       key: HOME_PAGE.key,
-      icon: HOME_ICON,
+      icon: NAV_ICONS[HOME_ICON],
       label: HOME_PAGE.label,
     }
     return showHome
@@ -86,15 +106,15 @@ export function AppSidebar({ activeKey, onNavigate, variant = 'sider' }: AppSide
   }, [showHome, visibleGroups])
 
   // Deep links and browser history must reveal the selected group even if the
-  // operator had collapsed it earlier.
-  useEffect(() => {
-    if (!activeKey) return
-    const parent = NAV_GROUPS.find((group) => group.pages.some((page) => page.key === activeKey))
-    if (!parent) return
-    setExpandedGroups((current) =>
-      current.includes(parent.key) ? current : [...current, parent.key],
-    )
-  }, [activeKey])
+  // operator had collapsed it earlier. Deriving this during render avoids a
+  // second render pass and keeps the persisted expansion state untouched.
+  const activeParentKey = activeKey
+    ? NAV_GROUPS.find((group) => group.pages.some((page) => page.key === activeKey))?.key
+    : undefined
+  const baseExpandedGroups =
+    activeParentKey && !expandedGroups.includes(activeParentKey)
+      ? [...expandedGroups, activeParentKey]
+      : expandedGroups
 
   // While searching, every group that still has a hit is expanded; clearing the
   // query restores the operator's own expansion state.
@@ -102,7 +122,7 @@ export function AppSidebar({ activeKey, onNavigate, variant = 'sider' }: AppSide
     ? visibleGroups.map((group) => group.key)
     : isCollapsed
       ? undefined
-      : expandedGroups
+      : baseExpandedGroups
 
   const navigation = (
     <>

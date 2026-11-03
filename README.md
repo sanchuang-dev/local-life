@@ -6,7 +6,7 @@
 
 ```text
 apps/web/            居民移动端 H5（React + Vite + Tailwind，原已评审页面）
-apps/admin/          管理台（React + Vite + Ant Design 6，统一 AppShell + 待建设业务入口）
+apps/admin/          管理台（React + Vite + Ant Design 6，统一 AppShell + DataPanel + 待建设业务入口）
 apps/api/            API（Node 22 + Hono + zod，GET /healthz）
 packages/contracts/  共享 DTO/校验 schema（zod）
 docs/engineering/    工程边界与验证证据
@@ -29,7 +29,7 @@ curl -s http://127.0.0.1:4080/healthz
 
 管理台通过 Vite 代理请求 `/api/healthz`，接口不可达时会显示真实错误，不会伪造成功状态。
 
-管理台已具备统一外壳（左侧分组导航、菜单搜索、可折叠侧栏、路由同步工作页签、顶部工具区、页面标题区与响应式布局），详见 [管理台基础框架](docs/engineering/admin-foundation.md)。真实登录与鉴权仍由 #58 提供，本分支不伪造登录态。
+管理台已具备统一外壳（左侧分组导航、菜单搜索、可折叠侧栏、路由同步工作页签、顶部工具区、页面标题区与响应式布局）与通用数据面板 `DataPanel`（行内/折叠/高级筛选、服务端排序与分页契约、列设置、密度、表格/卡片视图、加载/失败/空态）。`/#/system/components` 是明确标注的开发预览页，使用本地样例数据验收组件，不代表真实业务记录；详见 [管理台基础框架](docs/engineering/admin-foundation.md)。真实登录与鉴权仍由 #58 提供，本分支不伪造登录态。
 
 ## 当前边界（重要）
 

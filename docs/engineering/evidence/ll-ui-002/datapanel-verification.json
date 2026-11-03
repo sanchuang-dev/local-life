@@ -1,0 +1,120 @@
+{
+  "checks": [
+    {
+      "name": "preview page loads DataPanel with 14 local sample rows",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "inline keyword filter queries page-owned data",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "reset clears keyword and restores the full list",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "collapsed filter row expands",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "advanced number range applies to page query",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "advanced date range applies with documented string boundaries",
+      "pass": true,
+      "detail": "rows=3"
+    },
+    {
+      "name": "cancel discards the advanced draft",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "reopening the dialog starts from the applied query",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "rejected filter keeps the dialog open with explicit feedback",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "status filter returns only matching rows",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "card view renders the same filtered rows",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "row action gives real feedback (no dead button)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "column visibility and density apply immediately",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "column prefs persist across reload for this panel only",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "loading state shows a spinner, not an empty claim",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "error state renders failure + retry",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "retry returns to the ready state",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "no-match filter shows a distinct empty state and clear action",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "1024 has no horizontal overflow",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "768 keeps the advanced dialog inside the viewport",
+      "pass": true,
+      "detail": "{\"x\":44,\"y\":100,\"width\":680,\"height\":394}"
+    },
+    {
+      "name": "768 DataPanel has no horizontal overflow",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "767 drawer navigation reaches the preview page",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "no console errors / page exceptions",
+      "pass": true,
+      "detail": ""
+    }
+  ],
+  "consoleErrors": []
+}

@@ -1,13 +1,3 @@
-import {
-  BarChartOutlined,
-  DashboardOutlined,
-  NotificationOutlined,
-  SettingOutlined,
-  ShoppingOutlined,
-  TeamOutlined,
-} from '@ant-design/icons'
-import type { ReactNode } from 'react'
-
 export interface NavPage {
   readonly key: string
   readonly label: string
@@ -17,10 +7,12 @@ export interface NavPage {
   readonly planned: readonly string[]
 }
 
+export type NavIconKey = 'workbench' | 'campaign' | 'customer' | 'commerce' | 'performance' | 'system'
+
 export interface NavGroup {
   readonly key: string
   readonly label: string
-  readonly icon: ReactNode
+  readonly icon: NavIconKey
   readonly pages: readonly NavPage[]
 }
 
@@ -41,7 +33,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     key: 'campaign',
     label: '活动运营',
-    icon: <NotificationOutlined aria-hidden="true" />,
+    icon: 'campaign',
     pages: [
       {
         key: '/activities',
@@ -62,7 +54,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     key: 'customer',
     label: '客户与网格',
-    icon: <TeamOutlined aria-hidden="true" />,
+    icon: 'customer',
     pages: [
       {
         key: '/customers',
@@ -83,7 +75,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     key: 'commerce',
     label: '商品与订单',
-    icon: <ShoppingOutlined aria-hidden="true" />,
+    icon: 'commerce',
     pages: [
       {
         key: '/products',
@@ -104,7 +96,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     key: 'performance',
     label: '业绩与对账',
-    icon: <BarChartOutlined aria-hidden="true" />,
+    icon: 'performance',
     pages: [
       {
         key: '/performance',
@@ -125,7 +117,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
   {
     key: 'system',
     label: '系统管理',
-    icon: <SettingOutlined aria-hidden="true" />,
+    icon: 'system',
     pages: [
       {
         key: '/system/access',
@@ -141,11 +133,18 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         status: 'planned',
         planned: ['环境信息', '发布记录', '健康检查说明'],
       },
+      {
+        key: '/system/components',
+        label: '界面组件',
+        description: 'DataPanel 数据面板的开发预览与组件验收场景。',
+        status: 'ready',
+        planned: [],
+      },
     ],
   },
 ]
 
-export const HOME_ICON = <DashboardOutlined aria-hidden="true" />
+export const HOME_ICON: NavIconKey = 'workbench'
 
 export const NAV_PAGES: readonly NavPage[] = [
   HOME_PAGE,

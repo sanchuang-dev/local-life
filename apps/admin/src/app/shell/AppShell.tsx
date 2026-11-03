@@ -41,15 +41,16 @@ export function AppShell() {
   const [navOpen, setNavOpen] = useState(false)
 
   useEffect(() => {
-    const update = () => setCompactNav(window.innerWidth < COMPACT_NAV_MAX_WIDTH)
+    const update = () => {
+      const nextCompact = window.innerWidth < COMPACT_NAV_MAX_WIDTH
+      setCompactNav(nextCompact)
+      // Crossing back to the desktop layout must not leave a stale drawer open.
+      if (!nextCompact) setNavOpen(false)
+    }
     window.addEventListener('resize', update)
     update()
     return () => window.removeEventListener('resize', update)
   }, [])
-
-  useEffect(() => {
-    if (!compactNav) setNavOpen(false)
-  }, [compactNav])
 
   useEffect(() => {
     if (activeKey && NAV_KEYS.has(activeKey)) addWorkTab(activeKey)

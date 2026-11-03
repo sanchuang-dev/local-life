@@ -33,7 +33,11 @@ describe('filterNavigation', () => {
     const { groups } = filterNavigation('系统管理')
 
     expect(groups.map((group) => group.key)).toEqual(['system'])
-    expect(groups[0]?.pages.map((page) => page.label)).toEqual(['管理员与权限', '系统信息'])
+    expect(groups[0]?.pages.map((page) => page.label)).toEqual([
+      '管理员与权限',
+      '系统信息',
+      '界面组件',
+    ])
   })
 
   it('matches the top-level workbench item separately', () => {
