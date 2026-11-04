@@ -1,0 +1,583 @@
+{
+  "api": "http://127.0.0.1:4094",
+  "origin": "http://localhost:5274",
+  "run": "1793765150732",
+  "generatedAt": "2026-11-04T04:05:51.401Z",
+  "passed": 68,
+  "failed": 0,
+  "results": [
+    {
+      "id": "admin creates community R2一社区-1793765150732",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "admin creates community R2二社区-1793765150732",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "admin creates community R2三社区-1793765150732",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "admin creates operator op",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "admin creates grid_worker a",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "admin creates grid_worker b",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "admin creates grid_worker 3a",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "admin creates grid_worker 3b",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "admin lists staff",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "create lead",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "create order R2-A-1793765150732-1",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "read submitted order",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "order -> processing",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "order -> pending_verification",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "F1 new lead: review confirm succeeds",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "F1 new lead: read converted lead",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "F1 new lead: read audit timeline",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "F1 new lead status hops",
+      "ok": true,
+      "detail": {
+        "hops": [
+          [
+            "new",
+            "contacting"
+          ],
+          [
+            "contacting",
+            "converted"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "create lead",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "create order R2-I-1793765150732-1",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "read submitted order",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "order -> processing",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "order -> pending_verification",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "F1 invalid: read lead",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "F1 invalid: mark lead invalid",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "F1 invalid lead confirm rejected with 409",
+      "ok": true,
+      "detail": {
+        "status": 409,
+        "body": {
+          "error": {
+            "code": "conflict",
+            "message": "线索已被标记无效，请先由负责人恢复为跟进中再核验",
+            "requestId": "f288e7dd-2c20-4894-8f1c-d9cfbb82a857"
+          }
+        }
+      }
+    },
+    {
+      "id": "F1 invalid: read order after rejected review",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "F1 invalid: read order timeline",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "F1 invalid: restore to contacting",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "F1 invalid: confirm after restore",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "create order R2-A-1793765150732-2",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "read submitted order",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "order -> processing",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "order -> pending_verification",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "F1 idempotent: second confirm succeeds",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "F1 idempotent: timeline after second confirm",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "F1 idempotent: no extra lead hop",
+      "ok": true,
+      "detail": {
+        "hops": [
+          [
+            "new",
+            "contacting"
+          ],
+          [
+            "contacting",
+            "converted"
+          ]
+        ]
+      }
+    },
+    {
+      "id": "create lead",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "create lead",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "create lead",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "create lead",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "F2 page 1",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "F2 page 2",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "F2 page ordering",
+      "ok": true,
+      "detail": {
+        "page1Ids": [
+          "c3bd499e-2016-46db-8afe-c3bdec768276",
+          "35b5363a-ef6a-42ee-8832-fbf2471af016"
+        ],
+        "page2Ids": [
+          "d9cb9454-e3ee-4a8b-818e-41b815f255cc",
+          "5c4d9aa1-eab3-463f-bf68-3af791fc7acf"
+        ],
+        "page2": 2
+      }
+    },
+    {
+      "id": "create lead",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "create order R2-C-1793765150732-1",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "read submitted order",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "order -> processing",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "order -> pending_verification",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "F3 operator review without CSRF -> 403 CSRF",
+      "ok": true,
+      "detail": {
+        "status": 403,
+        "message": "CSRF 校验失败"
+      }
+    },
+    {
+      "id": "F3 operator review with CSRF succeeds",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "create lead",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "create order R2-B-1793765150732-1",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "read submitted order",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "order -> processing",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "order -> pending_verification",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "F4 operator cross-community /crm/orders/988fe670-9f6b-4817-ac81-055fabc48a79",
+      "ok": true,
+      "detail": {
+        "status": 403
+      }
+    },
+    {
+      "id": "F4 grid cross-community /crm/orders/988fe670-9f6b-4817-ac81-055fabc48a79",
+      "ok": true,
+      "detail": {
+        "status": 403
+      }
+    },
+    {
+      "id": "F4 operator cross-community /crm/orders/988fe670-9f6b-4817-ac81-055fabc48a79/audit",
+      "ok": true,
+      "detail": {
+        "status": 403
+      }
+    },
+    {
+      "id": "F4 grid cross-community /crm/orders/988fe670-9f6b-4817-ac81-055fabc48a79/audit",
+      "ok": true,
+      "detail": {
+        "status": 403
+      }
+    },
+    {
+      "id": "create lead",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "F5 read lead before transfer",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "F5 transfer to admin -> 400",
+      "ok": true,
+      "detail": {
+        "status": 400,
+        "body": {
+          "error": {
+            "code": "invalid_request",
+            "message": "目标员工必须是该社区的运营员或网格员",
+            "requestId": "3d402b62-a0ba-45fa-8231-7fccadca1cca"
+          }
+        }
+      }
+    },
+    {
+      "id": "privacy: grid lead list",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "privacy: list phone masked, no full phone",
+      "ok": true,
+      "detail": {
+        "masked": "138****2222"
+      }
+    },
+    {
+      "id": "privacy: lead detail",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "privacy: lead audit has no phone/credentials",
+      "ok": true,
+      "detail": {
+        "items": 3
+      }
+    },
+    {
+      "id": "privacy: order audit",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    }
+  ]
+}

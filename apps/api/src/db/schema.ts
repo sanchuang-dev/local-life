@@ -10,6 +10,10 @@ import {
 } from 'drizzle-orm/sqlite-core'
 import type {
   ActivityStatus,
+  CrmBusinessType,
+  CrmLeadSourceType,
+  CrmLeadStatus,
+  CrmServiceOrderStatus,
   ParticipationInviteSource,
   ParticipationRole,
   ParticipationTeamStatus,
@@ -223,6 +227,191 @@ export const activityRuleVersions = sqliteTable(
 )
 
 /**
+ * Community CRM (#61 LL-MVP-005). A lead belongs to exactly one community and has
+ * exactly one current owner; history lives in `crm_lead_events` (append-only).
+ * `contact_phone` is the minimum necessary contact field and must never be copied
+ * into audit metadata or payment/commission records.
+ */
+export const crmLeads = sqliteTable(
+  'crm_leads',
+  {
+    id: text('id').primaryKey(),
+    communityId: text('community_id')
+      .notNull()
+      .references(() => communities.id, { onDelete: 'restrict' }),
+    ownerStaffId: text('owner_staff_id')
+      .notNull()
+      .references(() => staffAccounts.id, { onDelete: 'restrict' }),
+    residentUserId: text('resident_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    contactName: text('contact_name').notNull(),
+    contactPhone: text('contact_phone').notNull(),
+    sourceType: text('source_type').$type<CrmLeadSourceType>().notNull(),
+    sourceActivityId: text('source_activity_id').references(() => activities.id, {
+      onDelete: 'restrict',
+    }),
+    promotionStaffId: text('promotion_staff_id').references(() => staffAccounts.id, {
+      onDelete: 'set null',
+    }),
+    createdByStaffId: text('created_by_staff_id')
+      .notNull()
+      .references(() => staffAccounts.id, { onDelete: 'restrict' }),
+    status: text('status').$type<CrmLeadStatus>().notNull(),
+    nextContactAt: integer('next_contact_at', { mode: 'timestamp_ms' }),
+    lastContactedAt: integer('last_contacted_at', { mode: 'timestamp_ms' }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    index('crm_leads_community_owner_status_idx').on(
+      table.communityId,
+      table.ownerStaffId,
+      table.status,
+    ),
+    index('crm_leads_next_contact_idx').on(table.nextContactAt),
+    index('crm_leads_source_activity_idx').on(table.sourceActivityId),
+    index('crm_leads_promotion_staff_idx').on(table.promotionStaffId),
+  ],
+)
+
+/**
+ * Append-only lead timeline (created / status changes / transfers / follow-ups).
+ * The migration adds SQLite triggers that ABORT UPDATE and DELETE, following the
+ * `activity_rule_versions` precedent, so even a buggy query cannot rewrite history.
+ */
+export const crmLeadEvents = sqliteTable(
+  'crm_lead_events',
+  {
+    id: text('id').primaryKey(),
+    leadId: text('lead_id')
+      .notNull()
+      .references(() => crmLeads.id, { onDelete: 'restrict' }),
+    actorUserId: text('actor_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    event: text('event').notNull(),
+    fromStatus: text('from_status').$type<CrmLeadStatus>(),
+    toStatus: text('to_status').$type<CrmLeadStatus>(),
+    fromOwnerStaffId: text('from_owner_staff_id').references(() => staffAccounts.id, {
+      onDelete: 'set null',
+    }),
+    toOwnerStaffId: text('to_owner_staff_id').references(() => staffAccounts.id, {
+      onDelete: 'set null',
+    }),
+    note: text('note'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    index('crm_lead_events_lead_created_idx').on(table.leadId, table.createdAt),
+  ],
+)
+
+/**
+ * Follow-up records are append-only. `next_contact_at` is copied onto the lead as
+ * the current reminder when the follow-up is written.
+ */
+export const crmFollowUps = sqliteTable(
+  'crm_follow_ups',
+  {
+    id: text('id').primaryKey(),
+    leadId: text('lead_id')
+      .notNull()
+      .references(() => crmLeads.id, { onDelete: 'restrict' }),
+    staffId: text('staff_id')
+      .notNull()
+      .references(() => staffAccounts.id, { onDelete: 'restrict' }),
+    content: text('content').notNull(),
+    nextContactAt: integer('next_contact_at', { mode: 'timestamp_ms' }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    index('crm_follow_ups_lead_created_idx').on(table.leadId, table.createdAt),
+    index('crm_follow_ups_staff_created_idx').on(table.staffId, table.createdAt),
+  ],
+)
+
+/**
+ * Carrier acceptance orders for 广电手机卡/电视. Attribution and source are frozen
+ * at creation (`attributed_staff_id`, `source_activity_id`, `promotion_staff_id`);
+ * transferring the lead later must not move this order.
+ *
+ * `status = confirmed` means an operator manually verified a real deal; it is not
+ * carrier activation. No activation API/commission automation exists in this MVP.
+ */
+export const crmServiceOrders = sqliteTable(
+  'crm_service_orders',
+  {
+    id: text('id').primaryKey(),
+    communityId: text('community_id')
+      .notNull()
+      .references(() => communities.id, { onDelete: 'restrict' }),
+    leadId: text('lead_id')
+      .notNull()
+      .references(() => crmLeads.id, { onDelete: 'restrict' }),
+    orderNo: text('order_no').notNull(),
+    businessType: text('business_type').$type<CrmBusinessType>().notNull(),
+    status: text('status').$type<CrmServiceOrderStatus>().notNull(),
+    customerName: text('customer_name').notNull(),
+    contactPhone: text('contact_phone').notNull(),
+    evidenceRef: text('evidence_ref'),
+    notes: text('notes'),
+    createdByStaffId: text('created_by_staff_id')
+      .notNull()
+      .references(() => staffAccounts.id, { onDelete: 'restrict' }),
+    attributedStaffId: text('attributed_staff_id')
+      .notNull()
+      .references(() => staffAccounts.id, { onDelete: 'restrict' }),
+    sourceActivityId: text('source_activity_id').references(() => activities.id, {
+      onDelete: 'restrict',
+    }),
+    promotionStaffId: text('promotion_staff_id').references(() => staffAccounts.id, {
+      onDelete: 'set null',
+    }),
+    confirmedByUserId: text('confirmed_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    confirmedAt: integer('confirmed_at', { mode: 'timestamp_ms' }),
+    confirmationNote: text('confirmation_note'),
+    failureReason: text('failure_reason'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('crm_service_orders_community_order_no_uq').on(
+      table.communityId,
+      table.orderNo,
+    ),
+    index('crm_service_orders_community_status_idx').on(table.communityId, table.status),
+    index('crm_service_orders_lead_idx').on(table.leadId),
+    index('crm_service_orders_attributed_staff_idx').on(table.attributedStaffId),
+    index('crm_service_orders_business_type_idx').on(table.businessType),
+  ],
+)
+
+/** Append-only order timeline; same UPDATE/DELETE ABORT triggers as lead events. */
+export const crmOrderEvents = sqliteTable(
+  'crm_order_events',
+  {
+    id: text('id').primaryKey(),
+    orderId: text('order_id')
+      .notNull()
+      .references(() => crmServiceOrders.id, { onDelete: 'restrict' }),
+    actorUserId: text('actor_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    event: text('event').notNull(),
+    fromStatus: text('from_status').$type<CrmServiceOrderStatus>(),
+    toStatus: text('to_status').$type<CrmServiceOrderStatus>(),
+    note: text('note'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    index('crm_order_events_order_created_idx').on(table.orderId, table.createdAt),
+  ],
+)
+
+/**
  * Three-person team for one activity (#60). A team is created by the resident
  * who confirms first (the leader owns seat 1) and is shared by at most three
  * residents. `unique(activity_id, leader_user_id)` keeps a resident from
@@ -362,6 +551,11 @@ export const schema = {
   auditLogs,
   activities,
   activityRuleVersions,
+  crmLeads,
+  crmLeadEvents,
+  crmFollowUps,
+  crmServiceOrders,
+  crmOrderEvents,
   activityTeams,
   activityInvitations,
   activityParticipations,

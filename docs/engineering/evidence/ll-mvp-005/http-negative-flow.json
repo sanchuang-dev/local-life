@@ -1,0 +1,406 @@
+{
+  "api": "http://127.0.0.1:4094",
+  "origin": "http://localhost:5274",
+  "run": "1793765142606",
+  "generatedAt": "2026-11-04T04:05:43.259Z",
+  "passed": 49,
+  "failed": 0,
+  "results": [
+    {
+      "id": "admin creates community QA一社区-1793765142606",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "admin creates community QA二社区-1793765142606",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "admin creates operator op",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "admin creates grid_worker a1",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "admin creates grid_worker a2",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "admin creates grid_worker b",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "anon GET /crm/leads -> 401",
+      "ok": true,
+      "detail": {
+        "status": 401,
+        "expected": 401
+      }
+    },
+    {
+      "id": "anon GET /crm/orders -> 401",
+      "ok": true,
+      "detail": {
+        "status": 401,
+        "expected": 401
+      }
+    },
+    {
+      "id": "anon GET /admin/crm/leads -> 401",
+      "ok": true,
+      "detail": {
+        "status": 401,
+        "expected": 401
+      }
+    },
+    {
+      "id": "anon POST /crm/leads {} -> 401",
+      "ok": true,
+      "detail": {
+        "status": 401,
+        "expected": 401
+      }
+    },
+    {
+      "id": "grid GET /admin/crm/leads -> 403",
+      "ok": true,
+      "detail": {
+        "status": 403,
+        "expected": 403
+      }
+    },
+    {
+      "id": "grid GET /admin/crm/filter-options -> 403",
+      "ok": true,
+      "detail": {
+        "status": 403,
+        "expected": 403
+      }
+    },
+    {
+      "id": "grid POST /crm/leads without CSRF -> 403",
+      "ok": true,
+      "detail": {
+        "status": 403,
+        "expected": 403
+      }
+    },
+    {
+      "id": "grid POST /crm/leads untrusted Origin -> 403",
+      "ok": true,
+      "detail": {
+        "status": 403,
+        "expected": 403
+      }
+    },
+    {
+      "id": "resident GET /crm/leads -> 401",
+      "ok": true,
+      "detail": {
+        "status": 401,
+        "expected": 401
+      }
+    },
+    {
+      "id": "grid A1 creates lead in own community",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "lead detail hides internal ids / keeps masked list phone",
+      "ok": true,
+      "detail": {
+        "ownerStaffId": "2ecf05dd-e059-4cc5-a5b0-4035253ea305",
+        "hasFullPhoneInCreateResponse": true
+      }
+    },
+    {
+      "id": "grid A2 GET /crm/leads/:id -> 403",
+      "ok": true,
+      "detail": {
+        "status": 403,
+        "expected": 403
+      }
+    },
+    {
+      "id": "grid B GET /crm/leads/:id -> 403",
+      "ok": true,
+      "detail": {
+        "status": 403,
+        "expected": 403
+      }
+    },
+    {
+      "id": "grid B POST /crm/leads into A -> 403",
+      "ok": true,
+      "detail": {
+        "status": 403,
+        "expected": 403
+      }
+    },
+    {
+      "id": "operator adminLeadList communityId=c2",
+      "ok": true,
+      "detail": {
+        "status": 403
+      }
+    },
+    {
+      "id": "grid A1 lead detail",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "create follow-up",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "follow-up persisted + lastContactedAt set + nextContactAt updated",
+      "ok": true,
+      "detail": {
+        "followUpCount": 1,
+        "lastContactedAt": "2026-11-04T04:05:43.157Z",
+        "nextContactAt": "2026-11-06T04:05:43.154Z"
+      }
+    },
+    {
+      "id": "stale follow-up -> 409",
+      "ok": true,
+      "detail": {
+        "status": 409,
+        "expected": 409
+      }
+    },
+    {
+      "id": "grid lead list 200",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "grid lead list has masked phone only",
+      "ok": true,
+      "detail": {
+        "items": 1
+      }
+    },
+    {
+      "id": "grid A1 creates order",
+      "ok": true,
+      "detail": {
+        "status": 201,
+        "expected": 201
+      }
+    },
+    {
+      "id": "order attributedStaff frozen to creator",
+      "ok": true,
+      "detail": {
+        "attributedStaffId": "2ecf05dd-e059-4cc5-a5b0-4035253ea305",
+        "attributionMatches": true
+      }
+    },
+    {
+      "id": "duplicate orderNo -> 409",
+      "ok": true,
+      "detail": {
+        "status": 409,
+        "expected": 409
+      }
+    },
+    {
+      "id": "grid A2 GET /crm/orders/:id -> 403",
+      "ok": true,
+      "detail": {
+        "status": 403,
+        "expected": 403
+      }
+    },
+    {
+      "id": "operator reads A1 lead in assigned community",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "operator transfers lead",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "new lead owner cannot read frozen-attribution order (403)",
+      "ok": true,
+      "detail": {
+        "status": 403
+      }
+    },
+    {
+      "id": "operator reads order after transfer",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "order attributedStaff unchanged after lead transfer",
+      "ok": true,
+      "detail": {
+        "attributedStaff": "2ecf05dd-e059-4cc5-a5b0-4035253ea305",
+        "original": "2ecf05dd-e059-4cc5-a5b0-4035253ea305"
+      }
+    },
+    {
+      "id": "order detail",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "skip transition -> 409",
+      "ok": true,
+      "detail": {
+        "status": 409,
+        "expected": 409
+      }
+    },
+    {
+      "id": "grid worker status=confirmed rejected",
+      "ok": true,
+      "detail": {
+        "status": 400
+      }
+    },
+    {
+      "id": "submitted -> processing",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "processing -> pending_verification",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "operator reads pending order",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "concurrent confirm exactly one success",
+      "ok": true,
+      "detail": {
+        "statuses": [
+          200,
+          409
+        ]
+      }
+    },
+    {
+      "id": "operator reads confirmed order",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "confirmed carries manual_verification + confirmation + no activation claims",
+      "ok": true,
+      "detail": {
+        "status": "confirmed",
+        "activationSource": "manual_verification",
+        "confirmation": {
+          "confirmedBy": {
+            "id": "7fb5cee2-be7d-4aba-99a1-2e81d17417df",
+            "displayName": "QA operator op"
+          },
+          "confirmedAt": "2026-11-04T04:05:43.239Z",
+          "note": "电话人工核验：客户确认已办理广电手机卡"
+        }
+      }
+    },
+    {
+      "id": "confirmed -> cancelled rejected",
+      "ok": true,
+      "detail": {
+        "status": 409
+      }
+    },
+    {
+      "id": "re-review of confirmed order rejected",
+      "ok": true,
+      "detail": {
+        "status": 409
+      }
+    },
+    {
+      "id": "order audit 200",
+      "ok": true,
+      "detail": {
+        "status": 200,
+        "expected": 200
+      }
+    },
+    {
+      "id": "order audit metadata free of sensitive values",
+      "ok": true,
+      "detail": {
+        "items": 4
+      }
+    }
+  ]
+}

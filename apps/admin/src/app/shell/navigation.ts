@@ -68,10 +68,12 @@ export const NAV_GROUPS: readonly NavGroup[] = [
     pages: [
       {
         key: '/customers',
-        label: '居民与客户',
-        description: '社区居民与客户线索视图，按当前账号的辖区范围读取。',
-        status: 'planned',
-        planned: ['居民列表与筛选', '客户线索与归属', '跟进记录'],
+        label: '客户与业务单',
+        description:
+          '按授权社区与网格员查询客户线索、跟进与广电业务受理单，并对人工核验的成交做审核。',
+        status: 'ready',
+        planned: [],
+        roles: ['admin', 'operator'],
       },
       {
         key: '/communities',

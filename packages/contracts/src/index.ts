@@ -339,6 +339,520 @@ export type ActivityAuditEntryListResponse = z.infer<
 >
 
 /* -------------------------------------------------------------------------- */
+/* CRM domain (#61 LL-MVP-005)                                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Route identifiers for the community CRM. Grid-worker (mobile H5) endpoints live
+ * under `/crm/*`; back-office review endpoints live under `/admin/crm/*`. Every
+ * client must build URLs from these constants.
+ *
+ * GET + POST share the list paths (`leadList`, `orderList`) for query and creation.
+ * Creation is guarded by the unique lead/order constraints rather than an
+ * optimistic-concurrency token; every update, status transition, transfer, review
+ * and follow-up write carries `expectedUpdatedAt`.
+ */
+export const CRM_ROUTES = {
+  // Grid worker / H5
+  leadList: '/crm/leads',
+  leadDetail: '/crm/leads/:leadId',
+  leadStatus: '/crm/leads/:leadId/status',
+  leadTransfer: '/crm/leads/:leadId/transfer',
+  leadFollowUps: '/crm/leads/:leadId/follow-ups',
+  leadAudit: '/crm/leads/:leadId/audit',
+  orderList: '/crm/orders',
+  orderDetail: '/crm/orders/:orderId',
+  orderStatus: '/crm/orders/:orderId/status',
+  orderAudit: '/crm/orders/:orderId/audit',
+  // Back office
+  adminLeadList: '/admin/crm/leads',
+  adminLeadDetail: '/admin/crm/leads/:leadId',
+  adminLeadAudit: '/admin/crm/leads/:leadId/audit',
+  adminOrderList: '/admin/crm/orders',
+  adminOrderDetail: '/admin/crm/orders/:orderId',
+  adminOrderAudit: '/admin/crm/orders/:orderId/audit',
+  adminOrderReview: '/admin/crm/orders/:orderId/review',
+  adminFilterOptions: '/admin/crm/filter-options',
+} as const
+
+/**
+ * Lead provenance. The three lead origins are deliberately separate columns
+ * (`sourceActivityId` / `promotionStaffId`) instead of one free-text field so
+ * attribution stays queryable and auditable.
+ */
+export const crmLeadSourceTypeSchema = z.enum([
+  'activity',
+  'grid_promotion',
+  'walk_in',
+  'resident_referral',
+])
+export type CrmLeadSourceType = z.infer<typeof crmLeadSourceTypeSchema>
+
+/**
+ * `converted` is system-only: it may be set only when a service order of this
+ * lead reaches `confirmed` through manual back-office verification. Humans can
+ * move a lead to `contacting` / `invalid` only (see `CRM_LEAD_STATUS_TRANSITIONS`).
+ */
+export const crmLeadStatusSchema = z.enum(['new', 'contacting', 'converted', 'invalid'])
+export type CrmLeadStatus = z.infer<typeof crmLeadStatusSchema>
+
+export const crmLeadManualStatusSchema = z.enum(['contacting', 'invalid'])
+export type CrmLeadManualStatus = z.infer<typeof crmLeadManualStatusSchema>
+
+export const crmBusinessTypeSchema = z.enum(['gd_mobile', 'gd_tv'])
+export type CrmBusinessType = z.infer<typeof crmBusinessTypeSchema>
+
+/**
+ * Service-order lifecycle. `confirmed` means "有效成交 verified by a human
+ * operator", never "开通/激活". There is intentionally no activation status or
+ * activation timestamp in this contract.
+ */
+export const crmServiceOrderStatusSchema = z.enum([
+  'submitted',
+  'processing',
+  'pending_verification',
+  'confirmed',
+  'failed',
+  'cancelled',
+])
+export type CrmServiceOrderStatus = z.infer<typeof crmServiceOrderStatusSchema>
+
+/** Grid workers may submit these targets; only an operator review may `confirm`. */
+export const crmOrderTransitionStatusSchema = z.enum([
+  'processing',
+  'pending_verification',
+  'failed',
+  'cancelled',
+])
+export type CrmOrderTransitionStatus = z.infer<typeof crmOrderTransitionStatusSchema>
+
+export const crmOrderReviewDecisionSchema = z.enum(['confirm', 'reject'])
+export type CrmOrderReviewDecision = z.infer<typeof crmOrderReviewDecisionSchema>
+
+/**
+ * The only source of a `confirmed` order. There is no carrier activation API, so
+ * the API must always write this literal when an operator confirms after manual
+ * verification (phone call / carrier portal screenshot reference).
+ */
+export const CRM_ACTIVATION_SOURCE = 'manual_verification' as const
+export const crmActivationSourceSchema = z.literal(CRM_ACTIVATION_SOURCE)
+export type CrmActivationSource = z.infer<typeof crmActivationSourceSchema>
+
+/**
+ * Frozen state machines. The API enforces these server-side; clients may use the
+ * tables for UI affordances but must never be the authority.
+ */
+export const CRM_LEAD_STATUS_TRANSITIONS: Record<CrmLeadStatus, readonly CrmLeadStatus[]> = {
+  new: ['contacting', 'invalid'],
+  contacting: ['invalid', 'converted'],
+  invalid: ['contacting'],
+  converted: [],
+}
+
+export const CRM_ORDER_STATUS_TRANSITIONS: Record<
+  CrmServiceOrderStatus,
+  readonly CrmServiceOrderStatus[]
+> = {
+  submitted: ['processing', 'cancelled'],
+  processing: ['pending_verification', 'failed', 'cancelled'],
+  pending_verification: ['confirmed', 'failed', 'cancelled'],
+  confirmed: [],
+  failed: [],
+  cancelled: [],
+}
+
+/** Optional free-text event names; clients should display unknown events verbatim. */
+export const crmLeadEventTypeSchema = z.enum([
+  'lead.created',
+  'lead.status_changed',
+  'lead.transferred',
+  'lead.follow_up_added',
+])
+export type CrmLeadEventType = z.infer<typeof crmLeadEventTypeSchema>
+
+export const crmOrderEventTypeSchema = z.enum([
+  'order.created',
+  'order.status_changed',
+  'order.reviewed',
+])
+export type CrmOrderEventType = z.infer<typeof crmOrderEventTypeSchema>
+
+/** Minimum-necessary contact phone. Full numbers are only returned in detail payloads. */
+export const crmContactPhoneSchema = z
+  .string()
+  .trim()
+  .regex(/^[0-9+\-() ]{5,20}$/, 'must be a contact phone number')
+
+export const crmStaffRefSchema = z.object({
+  id: z.string().uuid(),
+  displayName: z.string().nullable(),
+})
+export type CrmStaffRef = z.infer<typeof crmStaffRefSchema>
+
+export const crmActivityRefSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string().min(1),
+})
+export type CrmActivityRef = z.infer<typeof crmActivityRefSchema>
+
+export const crmUserRefSchema = z.object({
+  id: z.string().uuid(),
+  displayName: z.string().nullable(),
+})
+export type CrmUserRef = z.infer<typeof crmUserRefSchema>
+
+/* ---------------------------------- Leads --------------------------------- */
+
+export const crmLeadSummarySchema = z.object({
+  id: z.string().uuid(),
+  community: authCommunitySchema,
+  ownerStaff: crmStaffRefSchema,
+  contactName: z.string().min(1),
+  /** List payloads never expose the full phone; open the detail to call the resident. */
+  contactPhoneMasked: z.string().min(1),
+  sourceType: crmLeadSourceTypeSchema,
+  sourceActivity: crmActivityRefSchema.nullable(),
+  promotionStaff: crmStaffRefSchema.nullable(),
+  status: crmLeadStatusSchema,
+  followUpCount: z.number().int().nonnegative(),
+  nextContactAt: isoTimestamp.nullable(),
+  lastContactedAt: isoTimestamp.nullable(),
+  createdAt: isoTimestamp,
+  updatedAt: isoTimestamp,
+})
+export type CrmLeadSummary = z.infer<typeof crmLeadSummarySchema>
+
+export const crmLeadDetailSchema = crmLeadSummarySchema.extend({
+  contactPhone: crmContactPhoneSchema,
+  residentUserId: z.string().uuid().nullable(),
+  createdByStaff: crmStaffRefSchema,
+})
+export type CrmLeadDetail = z.infer<typeof crmLeadDetailSchema>
+
+/**
+ * Lead creation. Cross-field source rules are enforced here and again server-side:
+ * `activity` requires `sourceActivityId`; only `grid_promotion` may carry
+ * `promotionStaffId` (the API defaults it to the current owner when omitted).
+ */
+export const createCrmLeadRequestSchema = z
+  .object({
+    communityId: z.string().uuid(),
+    /** Admin/operator only; grid workers always own what they create. */
+    ownerStaffId: z.string().uuid().optional(),
+    contactName: z.string().trim().min(1).max(40),
+    contactPhone: crmContactPhoneSchema,
+    sourceType: crmLeadSourceTypeSchema,
+    sourceActivityId: z.string().uuid().optional(),
+    promotionStaffId: z.string().uuid().optional(),
+    residentUserId: z.string().uuid().optional(),
+    nextContactAt: isoTimestamp.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.sourceType === 'activity' && !value.sourceActivityId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'activity leads require sourceActivityId',
+        path: ['sourceActivityId'],
+      })
+    }
+    if (value.sourceType !== 'activity' && value.sourceActivityId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'sourceActivityId is only allowed for activity leads',
+        path: ['sourceActivityId'],
+      })
+    }
+    if (value.sourceType !== 'grid_promotion' && value.promotionStaffId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'promotionStaffId is only allowed for grid_promotion leads',
+        path: ['promotionStaffId'],
+      })
+    }
+  })
+export type CreateCrmLeadRequest = z.infer<typeof createCrmLeadRequestSchema>
+
+export const updateCrmLeadStatusRequestSchema = z.object({
+  expectedUpdatedAt: isoTimestamp,
+  status: crmLeadManualStatusSchema,
+  note: z.string().trim().max(500).optional(),
+})
+export type UpdateCrmLeadStatusRequest = z.infer<typeof updateCrmLeadStatusRequestSchema>
+
+/**
+ * Transfer keeps history: the old owner stays on the previous event and on every
+ * service order it already created. Only `ownerStaffId` on the lead changes.
+ */
+export const transferCrmLeadRequestSchema = z.object({
+  expectedUpdatedAt: isoTimestamp,
+  toOwnerStaffId: z.string().uuid(),
+  reason: z.string().trim().min(2).max(200),
+})
+export type TransferCrmLeadRequest = z.infer<typeof transferCrmLeadRequestSchema>
+
+export const crmFollowUpSchema = z.object({
+  id: z.string().uuid(),
+  leadId: z.string().uuid(),
+  staff: crmStaffRefSchema,
+  content: z.string().min(1),
+  nextContactAt: isoTimestamp.nullable(),
+  createdAt: isoTimestamp,
+})
+export type CrmFollowUp = z.infer<typeof crmFollowUpSchema>
+
+/** Follow-ups also bump the lead's `updatedAt`, so the concurrency token applies. */
+export const createCrmFollowUpRequestSchema = z.object({
+  expectedUpdatedAt: isoTimestamp,
+  content: z.string().trim().min(1).max(1000),
+  /** Omit to keep the current reminder; send null to clear it. */
+  nextContactAt: isoTimestamp.nullable().optional(),
+})
+export type CreateCrmFollowUpRequest = z.infer<typeof createCrmFollowUpRequestSchema>
+
+export const crmFollowUpListResponseSchema = z.object({
+  items: z.array(crmFollowUpSchema),
+})
+export type CrmFollowUpListResponse = z.infer<typeof crmFollowUpListResponseSchema>
+
+/**
+ * Creating a follow-up returns the new record plus the refreshed lead detail so
+ * the client can render the new `updatedAt` concurrency token without a refetch.
+ */
+export const createCrmFollowUpResponseSchema = z.object({
+  followUp: crmFollowUpSchema,
+  lead: crmLeadDetailSchema,
+})
+export type CreateCrmFollowUpResponse = z.infer<typeof createCrmFollowUpResponseSchema>
+
+export const crmLeadEventSchema = z.object({
+  id: z.string().uuid(),
+  leadId: z.string().uuid(),
+  event: crmLeadEventTypeSchema,
+  fromStatus: crmLeadStatusSchema.nullable(),
+  toStatus: crmLeadStatusSchema.nullable(),
+  fromOwnerStaff: crmStaffRefSchema.nullable(),
+  toOwnerStaff: crmStaffRefSchema.nullable(),
+  actor: crmUserRefSchema.nullable(),
+  note: z.string().nullable(),
+  createdAt: isoTimestamp,
+})
+export type CrmLeadEvent = z.infer<typeof crmLeadEventSchema>
+
+export const crmLeadEventListResponseSchema = z.object({
+  items: z.array(crmLeadEventSchema),
+})
+export type CrmLeadEventListResponse = z.infer<typeof crmLeadEventListResponseSchema>
+
+/**
+ * Server-side pagination and filtering. The API must always scope results to the
+ * caller's communities; `communityId`/`staffId` only narrow that scope.
+ */
+export const crmLeadListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  communityId: z.string().uuid().optional(),
+  staffId: z.string().uuid().optional(),
+  status: crmLeadStatusSchema.optional(),
+  sourceType: crmLeadSourceTypeSchema.optional(),
+  keyword: z.string().trim().min(1).max(80).optional(),
+})
+export type CrmLeadListQuery = z.infer<typeof crmLeadListQuerySchema>
+
+export const crmLeadListResponseSchema = z.object({
+  items: z.array(crmLeadSummarySchema),
+  total: z.number().int().nonnegative(),
+  page: z.number().int().min(1),
+  pageSize: z.number().int().min(1),
+})
+export type CrmLeadListResponse = z.infer<typeof crmLeadListResponseSchema>
+
+/* ------------------------------ Service orders ----------------------------- */
+
+export const crmOrderSummarySchema = z.object({
+  id: z.string().uuid(),
+  community: authCommunitySchema,
+  leadId: z.string().uuid(),
+  orderNo: z.string().min(1),
+  businessType: crmBusinessTypeSchema,
+  status: crmServiceOrderStatusSchema,
+  customerName: z.string().min(1),
+  contactPhoneMasked: z.string().min(1),
+  /** Frozen at creation: later lead transfers must not re-attribute this order. */
+  attributedStaff: crmStaffRefSchema,
+  sourceActivity: crmActivityRefSchema.nullable(),
+  promotionStaff: crmStaffRefSchema.nullable(),
+  /** Reviewer shown in the back-office list; null until a manual confirmation. */
+  confirmedBy: crmUserRefSchema.nullable(),
+  confirmedAt: isoTimestamp.nullable(),
+  createdAt: isoTimestamp,
+  updatedAt: isoTimestamp,
+})
+export type CrmOrderSummary = z.infer<typeof crmOrderSummarySchema>
+
+export const crmOrderEventSchema = z.object({
+  id: z.string().uuid(),
+  orderId: z.string().uuid(),
+  event: crmOrderEventTypeSchema,
+  fromStatus: crmServiceOrderStatusSchema.nullable(),
+  toStatus: crmServiceOrderStatusSchema.nullable(),
+  actor: crmUserRefSchema.nullable(),
+  note: z.string().nullable(),
+  createdAt: isoTimestamp,
+})
+export type CrmOrderEvent = z.infer<typeof crmOrderEventSchema>
+
+/**
+ * Order detail. `confirmation` exists only after an operator review; a `confirmed`
+ * order must carry `activationSource = manual_verification`. The contract refuses
+ * any other combination so "已提交受理" can never be rendered as "已开通".
+ */
+export const crmOrderDetailSchema = crmOrderSummarySchema
+  .extend({
+    contactPhone: crmContactPhoneSchema,
+    evidenceRef: z.string().nullable(),
+    notes: z.string().nullable(),
+    createdByStaff: crmStaffRefSchema,
+    confirmation: z
+      .object({
+        confirmedBy: crmUserRefSchema.nullable(),
+        confirmedAt: isoTimestamp,
+        note: z.string().nullable(),
+      })
+      .nullable(),
+    failureReason: z.string().nullable(),
+    activationSource: crmActivationSourceSchema.nullable(),
+    events: z.array(crmOrderEventSchema),
+  })
+  .superRefine((value, ctx) => {
+    if (value.status === 'confirmed') {
+      if (value.activationSource !== CRM_ACTIVATION_SOURCE) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'confirmed orders require activationSource=manual_verification',
+          path: ['activationSource'],
+        })
+      }
+      if (!value.confirmation) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'confirmed orders require confirmation details',
+          path: ['confirmation'],
+        })
+      }
+    } else if (value.activationSource !== null) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'activationSource is only allowed on confirmed orders',
+        path: ['activationSource'],
+      })
+    }
+  })
+export type CrmOrderDetail = z.infer<typeof crmOrderDetailSchema>
+
+/**
+ * Create an acceptance order for an existing lead. `orderNo` is the carrier's
+ * acceptance number, unique per community. Customer name/phone default to the
+ * lead snapshot when omitted. `evidenceRef` is a redacted reference (e.g.
+ * "工单截图 2026-11-04 #3"), never a full ID card or carrier password.
+ */
+export const createCrmServiceOrderRequestSchema = z.object({
+  leadId: z.string().uuid(),
+  orderNo: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9_-]{4,64}$/, 'orderNo must be 4-64 letters, digits, _ or -'),
+  businessType: crmBusinessTypeSchema,
+  customerName: z.string().trim().min(1).max(40).optional(),
+  contactPhone: crmContactPhoneSchema.optional(),
+  evidenceRef: z.string().trim().max(200).optional(),
+  notes: z.string().trim().max(500).optional(),
+})
+export type CreateCrmServiceOrderRequest = z.infer<typeof createCrmServiceOrderRequestSchema>
+
+export const updateCrmOrderStatusRequestSchema = z
+  .object({
+    expectedUpdatedAt: isoTimestamp,
+    status: crmOrderTransitionStatusSchema,
+    note: z.string().trim().max(500).optional(),
+    failureReason: z.string().trim().max(500).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.status === 'failed' && !value.failureReason) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'failureReason is required when marking an order failed',
+        path: ['failureReason'],
+      })
+    }
+  })
+export type UpdateCrmOrderStatusRequest = z.infer<typeof updateCrmOrderStatusRequestSchema>
+
+/**
+ * Operator review. `confirm` is the only path to `confirmed`; it always sets
+ * activationSource=manual_verification. `reject` moves the order to `failed` and
+ * stores the note as `failureReason`. A note is mandatory for both decisions.
+ */
+export const crmOrderReviewRequestSchema = z.object({
+  expectedUpdatedAt: isoTimestamp,
+  decision: crmOrderReviewDecisionSchema,
+  note: z.string().trim().min(2).max(500),
+})
+export type CrmOrderReviewRequest = z.infer<typeof crmOrderReviewRequestSchema>
+
+export const crmOrderListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  communityId: z.string().uuid().optional(),
+  staffId: z.string().uuid().optional(),
+  businessType: crmBusinessTypeSchema.optional(),
+  status: crmServiceOrderStatusSchema.optional(),
+  keyword: z.string().trim().min(1).max(80).optional(),
+})
+export type CrmOrderListQuery = z.infer<typeof crmOrderListQuerySchema>
+
+export const crmOrderListResponseSchema = z.object({
+  items: z.array(crmOrderSummarySchema),
+  total: z.number().int().nonnegative(),
+  page: z.number().int().min(1),
+  pageSize: z.number().int().min(1),
+})
+export type CrmOrderListResponse = z.infer<typeof crmOrderListResponseSchema>
+
+export const crmOrderEventListResponseSchema = z.object({
+  items: z.array(crmOrderEventSchema),
+})
+export type CrmOrderEventListResponse = z.infer<typeof crmOrderEventListResponseSchema>
+
+/* -------------------------------- Back office ------------------------------ */
+
+export const adminCrmLeadListResponseSchema = crmLeadListResponseSchema
+export type AdminCrmLeadListResponse = CrmLeadListResponse
+
+export const adminCrmOrderListResponseSchema = crmOrderListResponseSchema
+export type AdminCrmOrderListResponse = CrmOrderListResponse
+
+export const crmStaffOptionSchema = z.object({
+  id: z.string().uuid(),
+  displayName: z.string().nullable(),
+  role: staffRoleSchema,
+  communities: z.array(authCommunitySchema),
+})
+export type CrmStaffOption = z.infer<typeof crmStaffOptionSchema>
+
+/** Filter options are scoped server-side to the caller's communities. */
+export const adminCrmFilterOptionsResponseSchema = z.object({
+  communities: z.array(authCommunitySchema),
+  staff: z.array(crmStaffOptionSchema),
+  leadStatuses: z.array(crmLeadStatusSchema),
+  leadSourceTypes: z.array(crmLeadSourceTypeSchema),
+  businessTypes: z.array(crmBusinessTypeSchema),
+  orderStatuses: z.array(crmServiceOrderStatusSchema),
+})
+export type AdminCrmFilterOptionsResponse = z.infer<
+  typeof adminCrmFilterOptionsResponseSchema
+>
+
+/* -------------------------------------------------------------------------- */
 /* Resident participation & three-person team domain (#60 LL-MVP-004)         */
 /* -------------------------------------------------------------------------- */
 

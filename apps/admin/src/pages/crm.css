@@ -1,0 +1,52 @@
+/* Back-office CRM (#61): page-local composition on top of shell + DataPanel. */
+
+.crm-drawer .crm-drawer-loading {
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+}
+
+.crm-drawer .crm-timeline-section,
+.crm-drawer .crm-attribution,
+.crm-drawer .crm-confirmation,
+.crm-drawer .crm-review-box {
+  border: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.crm-drawer .crm-timeline-section .ant-timeline,
+.crm-drawer .crm-attribution .ant-descriptions,
+.crm-drawer .crm-confirmation .ant-descriptions {
+  margin-top: 12px;
+}
+
+.crm-drawer .crm-timeline-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.crm-drawer .crm-timeline-note {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.crm-drawer .crm-review-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.crm-drawer .crm-review-actions {
+  margin-top: 4px;
+}
+
+.crm-drawer .crm-review-error {
+  margin-top: 4px;
+}
+
+.crm-review-confirm p {
+  margin: 4px 0;
+}

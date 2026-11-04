@@ -707,12 +707,13 @@ test('migration 0002 applies to an empty database with its indexes, foreign keys
       }
     }
 
-    // New installs see all three migrations; earlier ones are untouched.
+    // The three migrations through #60 must remain the exact journal prefix.
+    // Later independent features (e.g. CRM 0003) may append new migrations.
     const journal = JSON.parse(
       readFileSync(join(migrationsFolder, 'meta', '_journal.json'), 'utf8'),
     ) as { entries: Array<{ tag: string }> }
     assert.deepEqual(
-      journal.entries.map((entry) => entry.tag),
+      journal.entries.slice(0, 3).map((entry) => entry.tag),
       ['0000_freezing_micromax', '0001_oval_mulholland_black', '0002_nosy_white_queen'],
     )
 

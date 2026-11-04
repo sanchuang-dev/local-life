@@ -92,6 +92,36 @@ describe('activity console navigation', () => {
   })
 })
 
+describe('customer CRM navigation', () => {
+  it('marks /customers as a ready CRM page for admins and operators', () => {
+    const customers = findNavPage('/customers')
+    expect(customers?.status).toBe('ready')
+    expect(customers?.planned).toEqual([])
+    expect(customers?.roles).toEqual(['admin', 'operator'])
+    expect(customers?.label).toContain('客户')
+    expect(customers?.description).toContain('受理单')
+    // The neighbouring account/community registry stays a separate real page.
+    expect(findNavPage('/communities')?.status).toBe('ready')
+  })
+
+  it('hides the CRM console from grid workers while keeping it for staff who can audit', () => {
+    const customers = findNavPage('/customers')
+    expect(customers).toBeTruthy()
+    expect(isPageVisible(customers!, 'grid_worker')).toBe(false)
+    expect(isPageVisible(customers!, 'admin')).toBe(true)
+    expect(isPageVisible(customers!, 'operator')).toBe(true)
+
+    const gridNavigation = filterNavigation('', 'grid_worker')
+    expect(
+      gridNavigation.groups.flatMap((group) => group.pages.map((page) => page.key)),
+    ).not.toContain('/customers')
+    expect(
+      filterNavigation('', 'operator')
+        .groups.flatMap((group) => group.pages.map((page) => page.key)),
+    ).toContain('/customers')
+  })
+})
+
 describe('activeMenuKey', () => {  it('resolves the workbench only for the root path', () => {
     expect(activeMenuKey('/')).toBe(HOME_PAGE.key)
     expect(activeMenuKey('/orders')).toBe('/orders')

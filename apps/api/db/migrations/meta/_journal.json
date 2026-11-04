@@ -22,6 +22,13 @@
       "when": 1793762182581,
       "tag": "0002_nosy_white_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793767961760,
+      "tag": "0003_crm_core",
+      "breakpoints": true
     }
   ]
 }
