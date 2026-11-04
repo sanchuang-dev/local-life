@@ -1,8 +1,10 @@
-import { ChevronRight, Gift, ShoppingBag } from 'lucide-react'
-import { type KeyboardEvent, useState } from 'react'
+import { ChevronRight, Gift } from 'lucide-react'
+import { type KeyboardEvent } from 'react'
+import { useSearchParams } from 'react-router'
 import { DemoNote } from '../components/DemoNote'
 import { LifeProductCard } from '../components/life/LifeProductCard'
 import { PointsSummaryCard } from '../components/life/PointsSummaryCard'
+import { ShopDealsSection } from '../components/life/ShopDealsSection'
 import { PageHeader } from '../components/PageHeader'
 import { PendingNotice } from '../components/PendingNotice'
 import { SectionHeading } from '../components/home/SectionHeading'
@@ -22,6 +24,10 @@ const lifeSections = [
 
 type LifeSection = (typeof lifeSections)[number]['id']
 
+function isLifeSection(value: string | null): value is LifeSection {
+  return value === 'points' || value === 'deals' || value === 'local'
+}
+
 const toneStyles = {
   mint: 'bg-[#e8f6f0] text-[#388b77]',
   peach: 'bg-[#fff3e6] text-[#c6925c]',
@@ -29,10 +35,21 @@ const toneStyles = {
 
 export function LifePage() {
   const { message, show, dismiss } = usePendingNotice()
-  const [activeSection, setActiveSection] = useState<LifeSection>('points')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const activityId = searchParams.get('activityId')?.trim() || null
+  // A shared activity deep link opens the real shop by default; otherwise the
+  // page keeps its original points-first demo order.
+  const activeSection: LifeSection = isLifeSection(tabParam)
+    ? tabParam
+    : activityId
+      ? 'deals'
+      : 'points'
 
   const selectSection = (section: LifeSection) => {
-    setActiveSection(section)
+    const next = new URLSearchParams(searchParams)
+    next.set('tab', section)
+    setSearchParams(next, { replace: true })
     dismiss()
   }
 
@@ -72,7 +89,8 @@ export function LifePage() {
       />
 
       <DemoNote>
-        本页按积分兑换、优惠购、本地生活三个演示分类展示；商品、库存、积分与门店均为示例数据，不接入支付、订单或发券后台。
+        优惠购接入真实 CRMEB 商品（只读展示与购买跳转，平台不代下单、不代支付）；
+        积分兑换与本地生活仍为示例数据，不会真实扣积分或产生订单。加载失败或未配置时如实提示，不展示模拟商品。
       </DemoNote>
 
       <div
@@ -149,42 +167,7 @@ export function LifePage() {
         hidden={activeSection !== 'deals'}
         className="mt-4"
       >
-        <section className="rounded-[20px] border border-dashed border-slate-200 bg-white px-5 py-8 text-center shadow-sm">
-          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-[#fff3e6] text-[#c6925c]">
-            <ShoppingBag size={26} strokeWidth={1.6} aria-hidden="true" />
-          </span>
-          <span className="mt-3 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-medium text-slate-500">
-            功能待接入
-          </span>
-          <h2 className="mt-2.5 text-[16px] font-semibold text-slate-800">
-            暂无可演示的优惠商品
-          </h2>
-          <p className="mx-auto mt-2 max-w-[280px] text-[12px] leading-6 text-slate-500">
-            原型尚未接入真实商品、价格、折扣与支付数据。为避免误导，这里不展示虚构优惠，也不会模拟下单成功。
-          </p>
-          <div className="mt-5 flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => selectSection('points')}
-              className="flex min-h-[44px] w-full items-center justify-center rounded-xl bg-teal-700 text-[13px] font-semibold text-white transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
-            >
-              去看看积分兑换
-            </button>
-            <button
-              type="button"
-              onClick={() => selectSection('local')}
-              className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-slate-200 bg-white text-[13px] font-semibold text-slate-600 transition-colors hover:border-teal-200 hover:text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
-            >
-              浏览本地生活
-            </button>
-          </div>
-        </section>
-
-        <div className="mt-4">
-          <DemoNote tone="warn">
-            优惠购需要真实商品、价格与支付能力，当前原型没有可证明的数据，因此保持空态。
-          </DemoNote>
-        </div>
+        {activeSection === 'deals' ? <ShopDealsSection activityId={activityId} /> : null}
       </div>
 
       <div

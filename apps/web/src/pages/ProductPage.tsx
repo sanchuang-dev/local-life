@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router'
 import { DemoNote } from '../components/DemoNote'
 import { PageHeader } from '../components/PageHeader'
 import { PendingNotice } from '../components/PendingNotice'
+import { ShopProductDetail } from '../components/life/ShopProductDetail'
 import { useBackTarget } from '../hooks/useBackTarget'
 import { usePendingNotice } from '../hooks/usePendingNotice'
 import {
@@ -16,8 +17,13 @@ const toneStyles = {
   peach: 'bg-gradient-to-br from-[#fff3e6] to-[#f9e1c9] text-[#c6925c]',
 } as const
 
-export function ProductPage() {
-  const { productId } = useParams()
+/**
+ * Demo points-product detail, kept unchanged for `/life/product/<slug>` routes.
+ *
+ * The "优惠购" section no longer uses these fixtures: real CRMEB products are
+ * addressed by numeric id and render `ShopProductDetail` instead.
+ */
+function PointsProductDetail({ productId }: { productId: string }) {
   const { message, show, dismiss } = usePendingNotice()
   const { backTo, backLabel } = useBackTarget('/life', '返回惠生活')
   const product = lifeProducts.find((item) => item.id === productId)
@@ -35,7 +41,7 @@ export function ProductPage() {
         <div className="mt-6 rounded-[18px] border border-dashed border-slate-200 bg-white px-4 py-12 text-center">
           <p className="text-[14px] font-semibold text-slate-500">商品不存在</p>
           <p className="mt-2 text-[11px] leading-5 text-slate-400">
-            该示例商品可能已下线，或链接有误。
+            该示例商品可能已下线，或链接有误。真实优惠购商品使用数字 id。
           </p>
           <Link
             to={backTo}
@@ -140,4 +146,21 @@ export function ProductPage() {
       <PendingNotice message={message} onDismiss={dismiss} />
     </div>
   )
+}
+
+/**
+ * `/life/product/:productId`.
+ *
+ * Numeric ids belong to the real CRMEB catalogue and are rendered by the shop
+ * detail. Non-numeric ids are the pre-existing demo points goods so their deep
+ * links keep working and stay clearly labelled as examples.
+ */
+export function ProductPage() {
+  const { productId } = useParams()
+
+  if (productId && /^\d+$/.test(productId)) {
+    return <ShopProductDetail rawProductId={productId} />
+  }
+
+  return <PointsProductDetail productId={productId ?? ''} />
 }

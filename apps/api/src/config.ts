@@ -14,8 +14,64 @@ const environmentSchema = z
     WEB_BASE_URL: z.string().url().optional(),
     TRUSTED_ORIGINS: z.string().default(''),
     AUTH_DEV_ENABLED: z.enum(['true', 'false']).default('false'),
+    // CRMEB integration (Issue #63). The three credentials are optional as a
+    // group: when they are absent the adapter reports `not_configured` instead
+    // of faking a working shop. A partially supplied group is a deployment
+    // mistake and must fail startup. CRMEB_H5_BASE_URL is an optional override.
+    CRMEB_BASE_URL: z.string().url().optional(),
+    CRMEB_OUTAPI_APPID: z
+      .string()
+      .trim()
+      .regex(/^[A-Za-z0-9]{4,30}$/, 'must be 4-30 letters or digits')
+      .optional(),
+    CRMEB_OUTAPI_APPSECRET: z.string().min(1).optional(),
+    CRMEB_H5_BASE_URL: z.string().url().optional(),
+    CRMEB_TIMEOUT_MS: z.coerce.number().int().min(100).max(30_000).default(10_000),
   })
   .superRefine((value, context) => {
+    const crmebCredentials = [
+      value.CRMEB_BASE_URL,
+      value.CRMEB_OUTAPI_APPID,
+      value.CRMEB_OUTAPI_APPSECRET,
+    ]
+    const suppliedCredentials = crmebCredentials.filter(Boolean).length
+    if (suppliedCredentials > 0 && suppliedCredentials < 3) {
+      for (const [path, field] of [
+        ['CRMEB_BASE_URL', value.CRMEB_BASE_URL],
+        ['CRMEB_OUTAPI_APPID', value.CRMEB_OUTAPI_APPID],
+        ['CRMEB_OUTAPI_APPSECRET', value.CRMEB_OUTAPI_APPSECRET],
+      ] as const) {
+        if (!field) {
+          context.addIssue({
+            code: 'custom',
+            path: [path],
+            message: `${path} is required when any CRMEB credential is supplied`,
+          })
+        }
+      }
+    }
+    // An H5 override alone is meaningless: it may only accompany credentials.
+    if (value.CRMEB_H5_BASE_URL && suppliedCredentials < 3) {
+      context.addIssue({
+        code: 'custom',
+        path: ['CRMEB_BASE_URL'],
+        message: 'CRMEB credentials are required when CRMEB_H5_BASE_URL is supplied',
+      })
+    }
+    for (const [path, raw] of [
+      ['CRMEB_BASE_URL', value.CRMEB_BASE_URL],
+      ['CRMEB_H5_BASE_URL', value.CRMEB_H5_BASE_URL],
+    ] as const) {
+      if (!raw) continue
+      try {
+        const parsed = new URL(raw)
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+          context.addIssue({ code: 'custom', path: [path], message: 'must use http or https' })
+        }
+      } catch {
+        context.addIssue({ code: 'custom', path: [path], message: 'must be a valid URL' })
+      }
+    }
     if (Boolean(value.WECHAT_APP_ID) !== Boolean(value.WECHAT_APP_SECRET)) {
       context.addIssue({
         code: 'custom',
@@ -69,6 +125,14 @@ export interface ApiConfig {
   trustedOrigins: string[]
   webBaseUrl: string
   authDevEnabled: boolean
+  crmeb?: {
+    baseUrl: string
+    appId: string
+    appSecret: string
+    /** H5 entry origin; defaults to the CRMEB site root. */
+    h5BaseUrl: string
+    timeoutMs: number
+  }
 }
 
 export class ConfigError extends Error {
@@ -125,5 +189,16 @@ export function loadConfig(env: NodeJS.ProcessEnv): ApiConfig {
     trustedOrigins,
     webBaseUrl,
     authDevEnabled: value.AUTH_DEV_ENABLED === 'true',
+    ...(value.CRMEB_BASE_URL && value.CRMEB_OUTAPI_APPID && value.CRMEB_OUTAPI_APPSECRET
+      ? {
+          crmeb: {
+            baseUrl: value.CRMEB_BASE_URL.replace(/\/+$/, ''),
+            appId: value.CRMEB_OUTAPI_APPID,
+            appSecret: value.CRMEB_OUTAPI_APPSECRET,
+            h5BaseUrl: (value.CRMEB_H5_BASE_URL ?? value.CRMEB_BASE_URL).replace(/\/+$/, ''),
+            timeoutMs: value.CRMEB_TIMEOUT_MS,
+          },
+        }
+      : {}),
   }
 }

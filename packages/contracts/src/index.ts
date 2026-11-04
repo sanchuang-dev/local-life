@@ -25,6 +25,10 @@ export const API_ERROR_CODES = {
   activityUnavailable: 'activity_unavailable',
   teamFull: 'team_full',
   inviteInvalid: 'invite_invalid',
+  crmebUpstreamError: 'crmeb_upstream_error',
+  crmebTimeout: 'crmeb_timeout',
+  crmebContractMismatch: 'crmeb_contract_mismatch',
+  crmebSyncInProgress: 'crmeb_sync_in_progress',
 } as const
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES]
@@ -1043,3 +1047,5 @@ export const activityParticipationConfirmResponseSchema = z.object({
 export type ActivityParticipationConfirmResponse = z.infer<
   typeof activityParticipationConfirmResponseSchema
 >
+
+export * from './crmeb.js'
