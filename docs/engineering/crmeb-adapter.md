@@ -28,7 +28,7 @@ apps/api/src/crmeb/attribution.ts      # 购买跳转与 claim 记录
 apps/api/src/crmeb/orders.ts           # 订单/售后拉取同步、状态映射、幂等与审计
 apps/api/src/crmeb/routes.ts           # 公开/管理路由与权限
 apps/api/src/crmeb/{audit,money,errors}.ts
-apps/api/db/migrations/0002_opposite_echo.sql
+apps/api/db/migrations/0004_polite_black_bird.sql  # rebase 到 dev 后顺延为 0004（上游已有 0002/0003）
 apps/api/test/crmeb-*.test.ts          # node:test + 本机 HTTP SIMULATED CRMEB
 ```
 

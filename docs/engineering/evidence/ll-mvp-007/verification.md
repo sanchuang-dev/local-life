@@ -616,3 +616,12 @@ pnpm check -> exit 0
 - 退款分页只造了 150 条模拟数据；未验证 >10000 条/周期的跨 run 合并（文档已声明不承诺全量历史）。
 - 并发只验证单进程 `syncRunning` 互斥；未做多实例/多进程并发压测。
 - 本节所有结论均为“**修复后隔离复验通过**”，**不是真实商城联调通过**。
+
+
+---
+
+## 12. rebase 到最新 dev 后的迁移编号说明（追加，不改动上文证据）
+
+上文（§0–§11）的证据是在 `feat/ll-mvp-007-crmeb-adapter` 基于 `origin/dev@1d4f000` 的工作树上采集的，当时 CRMEB 迁移编号为 `0002_opposite_echo.sql`。
+
+集成阶段分支 rebase 到 `origin/dev`（含 #60 `0002_nosy_white_queen`、#61 `0003_crm_core`）后，CRMEB 迁移按 Drizzle 顺序重新生成为 **`0004_polite_black_bird.sql`**（DDL 与 append-only 触发器等价），因此上文出现的“0002”仅指迁移编号，不是当前文件名。功能、HTTP 契约、H5 行为与负例结论不受编号变化影响；rebase 后已重新执行 `pnpm install --frozen-lockfile` 与 `pnpm check`（API 77/77、web 61/61、scripts 7/7、全量构建通过），并在全新 SQLite 上验证迁移可应用。真实 CRMEB 实例/凭证/微信/支付仍未具备，阻塞结论不变。
