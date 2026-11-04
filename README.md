@@ -94,8 +94,8 @@ pnpm --filter @sanchuang-dev/local-life-api bootstrap-admin
 
 ## 尚未实现 / 不得误称已上线
 
-- 活动创建发布、三人成团、邀请归属与有效成交确认。
-- 网格员客户跟进、线索、广电手机卡/电视服务受理。
+- **活动发布与 H5 公开读取**（LL-MVP-003）、**三人团与邀请归属**（LL-MVP-004）、**网格员 CRM/业务单人工核验**（LL-MVP-005）已有代码合入 `dev`，但尚未部署到在线 MVP；外部真实业务成交与履约不能因此宣称可用。
+- 网格员 CRM 已有跟进、线索和业务单人工核验代码，但不代表广电运营商正式受理/开通能力已经接通。
 - CRMEB 商品/订单接入、支付、奖励履约、空中分账。
 - 真实微信公众平台授权验收（取决于账号资质、授权域名、AppID/AppSecret 和线上回调配置）。
 - 完整客户 CRM、手机号实名验证、短信、密码找回、后台账号停用/重置等管理能力。
@@ -106,7 +106,8 @@ pnpm --filter @sanchuang-dev/local-life-api bootstrap-admin
 GitHub Pages 只发布静态居民 H5，不包含管理台与 API。Pages 演示站点没有真实账户后端；真实身份流程需连接部署后的 API。不要把静态预览地址当作业务环境。
 
 - `main`：默认分支与工作流入口，不是生产环境。
-- `feat/*` → `dev` → `test` → `prod`：依三创组织环境约定。
+- 业务卡：`feat/*` → `dev`；受控真实服务的**在线 MVP 验收例外**：`dev` → `mvp`（独立晋级 PR、维护者验收），居民域名 `https://local.proto.3cgroup.cn/`、后台域名 `https://local-admin.proto.3cgroup.cn/`，两个站点的 `/api/*` 均代理至同一 Hono/SQLite，`mvp` 合并后自动部署（首次主机接入须独立授权），**目前尚未部署成功**，详见 [在线 MVP 环境决策](docs/engineering/mvp-online-preview.md)。
+- `test` / `prod`：继续承担原有 GitHub Pages 静态展示路线；不能与在线 MVP 或正式商用生产环境混称。
 - `dev`：集成分支；GitHub Pages 开发预览 https://sanchuang-dev.github.io/local-life/。
 - `prod`：演示版本源码；GitHub Pages 展示 https://sanchuang-dev.github.io/local-life/prod/。
 

@@ -2034,7 +2034,7 @@ test('a pre-CRM database upgrades in place, keeps existing rows and becomes usab
     const now = new Date()
     try {
       const crmTables = legacy.sqlite
-        .prepare("SELECT count(*) AS value FROM sqlite_master WHERE type = 'table' AND name LIKE 'crm_%'")
+        .prepare("SELECT count(*) AS value FROM sqlite_master WHERE type = 'table' AND name GLOB 'crm_*'")
         .get() as { value: number }
       assert.equal(crmTables.value, 0, 'the pre-CRM database has no CRM tables')
       legacy.db
@@ -2058,7 +2058,7 @@ test('a pre-CRM database upgrades in place, keeps existing rows and becomes usab
         .get()
       assert.equal(preservedCommunity?.name, '升级前 CRM 社区')
       const crmTableCount = upgraded.sqlite
-        .prepare("SELECT count(*) AS value FROM sqlite_master WHERE type = 'table' AND name LIKE 'crm_%'")
+        .prepare("SELECT count(*) AS value FROM sqlite_master WHERE type = 'table' AND name GLOB 'crm_*'")
         .get() as { value: number }
       assert.equal(crmTableCount.value, 5)
 

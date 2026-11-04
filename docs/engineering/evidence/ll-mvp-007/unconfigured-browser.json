@@ -1,0 +1,161 @@
+{
+  "note": "Chrome headless via CDP against the real API running WITHOUT CRMEB configuration (isolated SQLite).",
+  "scenarios": {
+    "unconfigured-list-375": {
+      "url": "http://localhost:5173/local-life/#/life?tab=deals",
+      "width": 375,
+      "scrollWidth": 375,
+      "noHorizontalOverflow": true,
+      "text": "9:41\n惠生活\n惠生活\n\n居民权益 · 积分好礼 · 本地服务\n\n优惠购接入真实 CRMEB 商品（只读展示与购买跳转，平台不代下单、不代支付）； 积分兑换与本地生活仍为示例数据，不会真实扣积分或产生订单。加载失败或未配置时如实提示，不展示模拟商品。\n\n积分兑换\n优惠购\n本地生活\n优惠购\n真实商城商品\n优惠购尚未接入商城\n\n未配置 CRMEB_BASE_URL、CRMEB_OUTAPI_APPID、CRMEB_OUTAPI_APPSECRET；不会返回任何模拟商品或订单 配置完成前，这里不会展示模拟商品，也不提供模拟购买。\n\n检查配置后重试\n先去看看积分兑换（示例数据）\n首页\n社区\n健康\n惠生活\n（当前）\n我的",
+      "productTiles": 0,
+      "images": [],
+      "buttons": [
+        "积分兑换",
+        "优惠购",
+        "本地生活",
+        "检查配置后重试",
+        "地图",
+        "幸福里便利店积分兑换点 · 商品核销点 · 步行 4 分钟",
+        "广电社区服务点（演示）套餐咨询 · 装维协助 · 筹备中筹备中",
+        "社区健康体验点设备体验 · 首批试点试点"
+      ],
+      "apiRequests": [
+        {
+          "method": "GET",
+          "url": "/api/integrations/crmeb/status",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "/api/integrations/crmeb/status",
+          "postData": null
+        }
+      ],
+      "screenshot": "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-007/docs/engineering/evidence/ll-mvp-007/01-unconfigured-life-375.png"
+    },
+    "unconfigured-list-320": {
+      "url": "http://localhost:5173/local-life/#/life?tab=deals",
+      "width": 320,
+      "scrollWidth": 320,
+      "noHorizontalOverflow": true,
+      "text": "9:41\n惠生活\n惠生活\n\n居民权益 · 积分好礼 · 本地服务\n\n优惠购接入真实 CRMEB 商品（只读展示与购买跳转，平台不代下单、不代支付）； 积分兑换与本地生活仍为示例数据，不会真实扣积分或产生订单。加载失败或未配置时如实提示，不展示模拟商品。\n\n积分兑换\n优惠购\n本地生活\n优惠购\n真实商城商品\n优惠购尚未接入商城\n\n未配置 CRMEB_BASE_URL、CRMEB_OUTAPI_APPID、CRMEB_OUTAPI_APPSECRET；不会返回任何模拟商品或订单 配置完成前，这里不会展示模拟商品，也不提供模拟购买。\n\n检查配置后重试\n先去看看积分兑换（示例数据）\n首页\n社区\n健康\n惠生活\n（当前）\n我的",
+      "productTiles": 0,
+      "images": [],
+      "buttons": [
+        "积分兑换",
+        "优惠购",
+        "本地生活",
+        "检查配置后重试",
+        "地图",
+        "幸福里便利店积分兑换点 · 商品核销点 · 步行 4 分钟",
+        "广电社区服务点（演示）套餐咨询 · 装维协助 · 筹备中筹备中",
+        "社区健康体验点设备体验 · 首批试点试点"
+      ],
+      "apiRequests": [
+        {
+          "method": "GET",
+          "url": "/api/integrations/crmeb/status",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "/api/integrations/crmeb/status",
+          "postData": null
+        }
+      ],
+      "screenshot": "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-007/docs/engineering/evidence/ll-mvp-007/02-unconfigured-life-320.png"
+    },
+    "unconfigured-detail-375": {
+      "url": "http://localhost:5173/local-life/#/life/product/101",
+      "width": 375,
+      "scrollWidth": 375,
+      "noHorizontalOverflow": true,
+      "text": "9:41\n商品详情\n返回惠生活\n商品详情\n\n真实 CRMEB 商城 · 价格与库存以商城为准\n\n商城未配置\n\n未配置 CRMEB_BASE_URL、CRMEB_OUTAPI_APPID、CRMEB_OUTAPI_APPSECRET；不会返回任何模拟商品或订单 配置完成前，这里不会展示模拟商品，也不提供模拟购买。\n\n检查配置后重试\n首页\n社区\n健康\n惠生活\n（当前）\n我的",
+      "productTiles": 0,
+      "images": [],
+      "buttons": [
+        "",
+        "检查配置后重试"
+      ],
+      "apiRequests": [
+        {
+          "method": "GET",
+          "url": "/api/integrations/crmeb/status",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "/api/auth/session",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "/api/auth/methods",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "/api/integrations/crmeb/status",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "/api/auth/session",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "/api/auth/methods",
+          "postData": null
+        }
+      ],
+      "screenshot": "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-007/docs/engineering/evidence/ll-mvp-007/03-unconfigured-detail-375.png"
+    },
+    "unconfigured-detail-320": {
+      "url": "http://localhost:5173/local-life/#/life/product/101",
+      "width": 320,
+      "scrollWidth": 320,
+      "noHorizontalOverflow": true,
+      "text": "9:41\n商品详情\n返回惠生活\n商品详情\n\n真实 CRMEB 商城 · 价格与库存以商城为准\n\n商城未配置\n\n未配置 CRMEB_BASE_URL、CRMEB_OUTAPI_APPID、CRMEB_OUTAPI_APPSECRET；不会返回任何模拟商品或订单 配置完成前，这里不会展示模拟商品，也不提供模拟购买。\n\n检查配置后重试\n首页\n社区\n健康\n惠生活\n（当前）\n我的",
+      "productTiles": 0,
+      "images": [],
+      "buttons": [
+        "",
+        "检查配置后重试"
+      ],
+      "apiRequests": [
+        {
+          "method": "GET",
+          "url": "/api/integrations/crmeb/status",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "/api/auth/session",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "/api/auth/methods",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "/api/integrations/crmeb/status",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "/api/auth/session",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "/api/auth/methods",
+          "postData": null
+        }
+      ],
+      "screenshot": "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-007/docs/engineering/evidence/ll-mvp-007/04-unconfigured-detail-320.png"
+    }
+  }
+}

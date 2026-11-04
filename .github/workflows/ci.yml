@@ -1,12 +1,12 @@
-# Workspace CI: install once, then lint, typecheck, API tests and all builds.
-# Branch deployments stay in preview.yml; this workflow never deploys.
+# Workspace CI and isolated online-MVP package verification.
+# GitHub Pages remains owned by preview.yml; no server deployment here.
 name: Workspace CI
 
 on:
   push:
-    branches: [dev, test, prod]
+    branches: [dev, test, prod, mvp]
   pull_request:
-    branches: [dev, test, prod, main]
+    branches: [dev, test, prod, main, mvp]
   workflow_dispatch:
 
 permissions:
@@ -17,16 +17,66 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: pnpm/action-setup@v4
         with:
           version: 10.19.0
-
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
-
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
+
+  mvp-build:
+    # Package the current code for MVP as part of PR review and on mvp promotion.
+    # No live credentials or remote host writes are possible in this job.
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/mvp'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @sanchuang-dev/local-life-contracts build
+      - run: pnpm --filter @sanchuang-dev/local-life-web build:mvp
+      - run: pnpm --filter @sanchuang-dev/local-life-admin build:mvp
+      - run: node scripts/mvp/verify-build.mjs
+      - name: Build real Node 22 / SQLite Linux container
+        run: docker build -f apps/api/Dockerfile -t local-life-mvp-api:ci .
+      - name: Exercise real Hono/SQLite through HTTP with production security settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --rm --name local-life-mvp-ci --read-only \
+            --tmpfs /tmp:rw,nosuid,size=64m \
+            -p 127.0.0.1:18081:4080 \
+            -e NODE_ENV=production -e HOST=0.0.0.0 -e PORT=4080 \
+            -e DATABASE_PATH=/tmp/ci.sqlite \
+            -e WEB_BASE_URL=https://local.proto.3cgroup.cn/ \
+            -e TRUSTED_ORIGINS=https://local.proto.3cgroup.cn,https://local-admin.proto.3cgroup.cn \
+            -e AUTH_DEV_ENABLED=false local-life-mvp-api:ci
+          trap 'docker logs local-life-mvp-ci || true; docker stop local-life-mvp-ci || true' EXIT
+          ready=0
+          for i in $(seq 1 25); do
+            if curl --fail --silent http://127.0.0.1:18081/healthz > /tmp/health.json; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          test "$ready" = 1
+          grep -Fq '"status":"ok"' /tmp/health.json
+          grep -Fq '"service":"local-life-api"' /tmp/health.json
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:18081/admin/communities)" = 401
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:18081/auth/login \
+            -H 'Origin: https://attacker.invalid' -H 'Content-Type: application/json' --data '{}')" = 403
+          curl -fsS http://127.0.0.1:18081/auth/methods | grep -Fq '"developmentResidentLogin":false'
+          echo MVP_API_REAL_HTTP_AND_AUTH_NEGATIVES=PASS

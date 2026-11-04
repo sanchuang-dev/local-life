@@ -6,7 +6,7 @@
 
 - 自 [Issue #57](https://github.com/sanchuang-dev/local-life/issues/57) 起，本仓库进入 **Pre-MVP 真实工程基座**：pnpm workspace + 居民 H5 + 管理台 + Node API。
 - **居民 H5** 保留已评审页面、视觉和路由；居民主身份现已接入账户 API。微信网页授权只有在公众号 AppID、AppSecret、授权回调域名等真实配置齐备后才可使用。
-- **管理台** 已具备管理员/运营员/网格员登录、退出、会话、社区分配和居民列表的服务端权限校验；活动、内容、跟进、成交、订单、奖励与对账仍由后续业务卡实现。
+- **管理台** 已具备管理员/运营员/网格员登录、退出、会话、社区分配和居民列表的服务端权限校验；**活动创建/发布/暂停和居民 H5 公开读取已由 LL-MVP-003 落地**。参与/三人团与网格员 CRM 已分别由 LL-MVP-004/005 合入 `dev`，但不是已部署的线上能力；奖励履约、商城、分账等仍由后续业务卡处理。
 - **API** 使用 SQLite + Drizzle 持久化用户、微信身份、后台账户、社区范围、会话、OAuth state、限流与审计记录。数据库只允许落在 `apps/api` 内。
 - 所有未实现业务必须显式标注，不得用 Mock 成功、写死数据或假鉴权伪装。
 - 产品仍按 MVP 任务卡逐步收敛；旧 [V0.3](https://github.com/sanchuang-dev/base-prototype/blob/demo/local-life/docs/PRD-V0.3.md) 只是历史参考。
@@ -54,7 +54,7 @@ pnpm --filter @sanchuang-dev/local-life-api bootstrap-admin  # 初始化首个�
 - H5 账户状态通过 `hooks/useResidentAuth.ts` 访问 API；真实 API 调用不得散落复制 DTO，加载、空、错误、禁用状态必须如实展示。
 - 管理台由 `App.tsx` 先校验真实后台会话，成功后才渲染 `app/shell/AppShell.tsx`；由 `app/auth-context.tsx` 统一传递会话到顶部身份/退出与真实功能路由。前端菜单隐藏不能替代 API 鉴权。管理员可管理社区与后台账户；运营员/网格员只能访问服务器分配的社区范围。
 - AppShell（导航/页签/主题）与 DataPanel（受控数据面板）沿用 Benefit Hub 已验证设计思路，但保持 Local Life 自身的 Token 与 URL 单一真相源。业务查询状态由页面管理，不在 DataPanel 自造 API 缓存；详见 `docs/engineering/admin-foundation.md`。
-- 内容、活动、跟进、成交、订单、奖励与对账模块未完成前，必须明确标注未实现，不显示虚构业务数据。
+- 内容、奖励履约、商城及对账等未完成/未验收模块必须标注真实状态，不显示虚构业务数据；已合入代码的活动发布、三人团和 CRM 不得误写为完全未实现，更不得误称已经线上部署。
 
 ## 5. API、身份与持久化
 
@@ -72,7 +72,7 @@ pnpm --filter @sanchuang-dev/local-life-api bootstrap-admin  # 初始化首个�
 
 ## 6. 分支、验证与牛马
 
-- `main` 是默认分支和工作流入口，**不是生产分支**；业务工作 `feat/* → dev → test → prod`。本阶段只允许从最新 `dev` 开分支并向 `dev` 提交 Draft PR。
+- `main` 是默认分支和工作流入口，**不是生产分支**；业务施工仍从最新 `dev` 开 `feat/*` 并向 `dev` 提交 Draft PR。**本仓库在线 MVP 验收环境的已批准例外为 `dev → mvp`**：仅经维护者验收的增量以独立晋级 PR 进入 `mvp`，合并后自动部署；居民 H5 使用 `https://local.proto.3cgroup.cn/`、管理后台使用 `https://local-admin.proto.3cgroup.cn/`，两域名各自同源 `/api/*` 代理到同一 Hono/SQLite；`mvp` 不是商用生产分支。现有 `test/prod` 继续承担 GitHub Pages 静态展示兼容，部署设计与授权边界详见 [在线 MVP 环境决策](docs/engineering/mvp-online-preview.md)。
 - 小步施工，只修改任务范围；不顺手迁移旧页面、重构无关模块或删除历史证据。
 - 提交前至少运行 `pnpm install --frozen-lockfile` 与 `pnpm check`。改 UI/路由还必须用真实浏览器验证 375 与 320 宽度下的入口、返回、图片和深链接；改 API 必须发真实 HTTP 请求；改 Pages 必须验证 dev 与 `/prod/` 两份构建的 base 路径。身份、权限、持久化和 OAuth 必须覆盖成功路径、未认证/越权/重放/过期/缺配置负例。
 - CI 绿不等于验收通过，未验证不得宣称通过。外部微信/商城/支付依赖未具备真实凭证时，记录阻塞项，不以 mock 冒称真实环境验收。
