@@ -6,8 +6,7 @@ import {
   LockKeyhole,
   ChevronRight,
   CircleHelp,
-  ImageDown,
-  Gift,
+  Copy,
   Info,
   MapPin,
   Medal,
@@ -21,7 +20,11 @@ import { Link, useSearchParams } from 'react-router'
 import { QRCodeSVG } from 'qrcode.react'
 import type { PublicActivityDetail } from '@sanchuang-dev/local-life-contracts'
 import { CampaignSheet } from '../components/CampaignSheet'
+import { ParticipationTeamCard } from '../components/activity/ParticipationTeamCard'
+import { buildActivityShareUrl, parseInviteParam } from '../components/activity/share'
+import { useActivityParticipation } from '../hooks/useActivityParticipation'
 import { usePublicActivity, type PublicActivityLoadState } from '../hooks/usePublicActivity'
+import { useResidentAuth } from '../hooks/useResidentAuth'
 import { luckyPrizes, luckyGridSlots, type LuckyPrize } from '../mocks/silverLuckyPrizes'
 
 type TaskMode = 'checkin' | 'purchase'
@@ -308,16 +311,6 @@ function ActivityLoadNotice({
 
 const activityPath = '/community/activity/silver-neighborhood'
 
-const publicActivityUrl = 'https://sanchuang-dev.github.io/local-life/#' + activityPath
-
-const getActivityUrl = () => {
-  // A QR code shown on localhost must not direct other phones to a loopback address.
-  if (['localhost', '127.0.0.1'].includes(window.location.hostname)) {
-    return publicActivityUrl
-  }
-  return window.location.origin + window.location.pathname + '#' + activityPath
-}
-
 const fallbackCopy = (value: string) => {
   const textarea = document.createElement('textarea')
   textarea.value = value
@@ -336,8 +329,35 @@ export function SilverNeighborhoodCampaignPage() {
   // A deep link may target a specific published activity; everything else reads
   // the first item of the public activity list.
   const requestedActivityId = searchParams.get('activityId')?.trim() || null
+  // The invite code is attribution from the URL, not a user id: the resident is
+  // always identified by the session cookie on the server side.
+  const inviteParam = parseInviteParam(searchParams.get('invite'))
   const { state: activityState, retry: retryActivity } = usePublicActivity(requestedActivityId)
   const activity = activityState.status === 'ready' ? activityState.activity : null
+  const auth = useResidentAuth()
+  const participation = useActivityParticipation({
+    activityId: activity?.id ?? null,
+    sessionKey: auth.session?.user.id ?? null,
+    authLoading: auth.loading,
+  })
+
+  const participationState =
+    participation.state.status === 'ready' ? participation.state.data : null
+  const team = participationState?.team ?? null
+  const selfParticipation = participationState?.participation ?? null
+  const remainingSeats = team ? Math.max(0, team.seatsTotal - team.seatsFilled) : 0
+  // The single share URL used by QR, native share and copy-link. It only exists
+  // when the resident is a member of an open team that still has a real invite
+  // code; a locked 3/3 team gets no invite entry at all.
+  const shareUrl =
+    activity &&
+    team &&
+    selfParticipation &&
+    team.status === 'open' &&
+    team.seatsFilled < team.seatsTotal &&
+    team.inviteCode
+      ? buildActivityShareUrl(activity.id, team.inviteCode)
+      : null
 
   const [taskMode, setTaskMode] = useState<TaskMode>('checkin')
   const [activeSheet, setActiveSheet] = useState<SheetKind>(null)
@@ -375,13 +395,22 @@ export function SilverNeighborhoodCampaignPage() {
     setActiveSheet(sheet)
   }
 
+  const openShareSheet = () => {
+    if (!shareUrl) return
+    setShareStatus('idle')
+    setActiveSheet('share')
+  }
+
   const handleCopyLink = async () => {
-    const value = getActivityUrl()
+    if (!shareUrl) {
+      setShareStatus('error')
+      return
+    }
 
     try {
       if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(value)
-      } else if (!fallbackCopy(value)) {
+        await navigator.clipboard.writeText(shareUrl)
+      } else if (!fallbackCopy(shareUrl)) {
         throw new Error('copy failed')
       }
       setShareStatus('copied')
@@ -391,6 +420,10 @@ export function SilverNeighborhoodCampaignPage() {
   }
 
   const handleSystemShare = async () => {
+    if (!shareUrl) {
+      setShareStatus('error')
+      return
+    }
     if (!canNativeShare) {
       await handleCopyLink()
       return
@@ -398,9 +431,9 @@ export function SilverNeighborhoodCampaignPage() {
 
     try {
       await navigator.share({
-        title: '银发社区欢乐季（演示）',
-        text: '【演示页面】还差 1 位街坊，来一起组成三人团。',
-        url: getActivityUrl(),
+        title: activity?.title ?? '银发社区欢乐季',
+        text: `还差 ${remainingSeats} 位街坊，来一起组成三人团。`,
+        url: shareUrl,
       })
       setShareStatus('shared')
     } catch (error) {
@@ -486,68 +519,22 @@ export function SilverNeighborhoodCampaignPage() {
         </div>
       </section>
 
-      <section
-        id="my-team"
-        className="relative z-[2] mx-4 -mt-14 scroll-mt-4 rounded-[22px] border border-slate-100 bg-white p-4 shadow-[0_16px_40px_rgba(15,52,44,0.12)]"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-[#e8f6f0] px-2.5 py-1 text-[12px] font-bold text-teal-700">
-                我的三人团
-              </span>
-              <span className="rounded-full bg-[#fff3e6] px-2 py-0.5 text-[10px] font-bold text-[#a96b2f]">
-                演示
-              </span>
-              <span className="text-[12px] font-semibold text-orange-600">2 / 3</span>
-            </div>
-            <h2 className="mt-2 text-[20px] font-bold tracking-tight text-slate-900">还差 1 位街坊</h2>
-            <p className="mt-1 text-[13px] leading-5 text-slate-500">
-              三人完成签到后，解锁一份团队生活礼。
-            </p>
-          </div>
-          <div className="rounded-[16px] bg-[#fff3e6] p-2.5 text-[#b97836]" aria-hidden="true">
-            <Gift size={24} />
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-3 gap-2.5">
-          <div className="rounded-[16px] border border-teal-100 bg-[#f4fbf8] p-3 text-center">
-            <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-teal-700 text-[14px] font-bold text-white">
-              我
-            </div>
-            <p className="mt-2 text-[12px] font-semibold text-slate-700">团长</p>
-            <p className="mt-0.5 text-[11px] text-teal-700">已加入</p>
-          </div>
-          <div className="rounded-[16px] border border-teal-100 bg-[#f4fbf8] p-3 text-center">
-            <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#d8efe7] text-[14px] font-bold text-teal-800">
-              王
-            </div>
-            <p className="mt-2 text-[12px] font-semibold text-slate-700">王阿姨</p>
-            <p className="mt-0.5 text-[11px] text-teal-700">已加入</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => openSheet('share')}
-            className="min-h-[96px] rounded-[16px] border border-dashed border-orange-200 bg-[#fffaf3] p-3 text-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
-          >
-            <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#fff0d7] text-[22px] font-light text-orange-600">
-              +
-            </div>
-            <p className="mt-2 text-[12px] font-semibold text-slate-700">邀请街坊</p>
-            <p className="mt-0.5 text-[11px] text-orange-600">还差 1 人</p>
-          </button>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => openSheet('share')}
-          className="mt-3 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-[14px] bg-teal-700 px-4 text-[14px] font-bold text-white transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
-        >
-          <Share2 size={17} aria-hidden="true" />
-          邀请 1 位街坊来成团
-        </button>
-      </section>
+      <ParticipationTeamCard
+        activity={activity}
+        activityError={
+          activityState.status === 'empty'
+            ? '当前没有已发布的活动，暂不能读取参与状态。'
+            : activityState.status === 'error'
+              ? activityState.message
+              : null
+        }
+        onRetryActivity={retryActivity}
+        auth={auth}
+        participation={participation}
+        inviteCode={inviteParam.code}
+        inviteInvalid={inviteParam.invalid}
+        onShare={openShareSheet}
+      />
 
       <section
         className="mx-4 mt-5 rounded-[18px] border border-dashed border-[#e7c9a3] bg-[#fffaf1] px-3.5 py-3"
@@ -555,10 +542,10 @@ export function SilverNeighborhoodCampaignPage() {
       >
         <p className="flex items-center gap-1.5 text-[12px] font-bold text-[#8a6132]">
           <Info size={15} className="shrink-0" aria-hidden="true" />
-          以下为演示内容 · 未接入真实玩法
+          以下为演示玩法 · 未接入真实记录
         </p>
         <p className="mt-1 text-[11px] leading-[1.7] text-[#8a6132]">
-          三人团、签到、消费、抽奖、排行榜、大奖、支付与核销均为前端交互演示，与上方真实活动数据无关，不会写入真实记录。
+          签到、消费、抽奖、排行榜、大奖、奖品发放与社区统计仍为前端交互演示，不会写入真实签到、订单、库存或兑奖记录。参与、三人团与邀请已接入真实业务，状态来自服务端。
         </p>
       </section>
 
@@ -606,7 +593,7 @@ export function SilverNeighborhoodCampaignPage() {
             <p className="text-[11px] font-bold tracking-[0.16em] text-teal-700">TEAM QUEST</p>
             <h2 className="mt-1 text-[19px] font-bold tracking-tight text-slate-900">成团任务</h2>
           </div>
-          <span className="text-[12px] text-slate-400">演示 · 两条任务独立计算</span>
+          <span className="text-[12px] text-slate-400">演示 · 未接入真实签到与订单</span>
         </div>
 
         <div className="rounded-[20px] border border-slate-100 bg-white p-3 shadow-sm">
@@ -635,17 +622,17 @@ export function SilverNeighborhoodCampaignPage() {
 
           {taskMode === 'checkin' ? (
             <div className="mt-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[14px] font-bold text-slate-800">三人有效签到</p>
-                  <p className="mt-1 text-[12px] text-slate-500">当前 2 / 3 人 · 还差 1 人完成签到</p>
+                  <p className="mt-1 text-[12px] text-slate-500">签到模块仍为演示，尚未读取真实签到记录。</p>
                 </div>
-                <span className="rounded-full bg-[#fff3e6] px-2.5 py-1 text-[11px] font-bold text-orange-600">
-                  小礼必得
+                <span className="shrink-0 rounded-full bg-[#fff3e6] px-2.5 py-1 text-[11px] font-bold text-orange-600">
+                  演示玩法
                 </span>
               </div>
-              <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-teal-600 to-[#55b99b]" />
+              <div className="mt-3 rounded-[12px] border border-dashed border-slate-200 bg-slate-50 px-3 py-2.5 text-[12px] text-slate-500">
+                真实签到进度将在签到功能接入后显示，当前不虚构人数。
               </div>
             </div>
           ) : (
@@ -653,14 +640,14 @@ export function SilverNeighborhoodCampaignPage() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[14px] font-bold text-slate-800">三人有效购买 + 团队达标</p>
-                  <p className="mt-1 text-[12px] text-slate-500">2 / 3 人已购 · ¥228 / ¥300（示例）</p>
+                  <p className="mt-1 text-[12px] text-slate-500">消费模块仍为演示，尚未接入真实订单与金额。</p>
                 </div>
                 <span className="shrink-0 rounded-full bg-[#f1edff] px-2.5 py-1 text-[11px] font-bold text-[#725aa9]">
-                  高价值礼
+                  演示玩法
                 </span>
               </div>
-              <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
-                <div className="h-full w-[76%] rounded-full bg-gradient-to-r from-[#6e5ab0] to-[#a68bd5]" />
+              <div className="mt-3 rounded-[12px] border border-dashed border-slate-200 bg-slate-50 px-3 py-2.5 text-[12px] text-slate-500">
+                真实消费进度将在订单接入后显示，当前不虚构人数与金额。
               </div>
               <Link
                 to="/community/activity/silver-neighborhood/products"
@@ -1002,10 +989,10 @@ export function SilverNeighborhoodCampaignPage() {
         <div className="flex items-start gap-3">
           <CheckCircle2 size={19} className="mt-0.5 shrink-0 text-teal-700" aria-hidden="true" />
           <div>
-            <p className="text-[13px] font-bold text-slate-700">上方活动信息来自真实数据，其余玩法仍是交互演示</p>
+            <p className="text-[13px] font-bold text-slate-700">活动信息与参与状态来自真实服务，其余玩法仍是交互演示</p>
             <p className="mt-1 text-[12px] leading-[1.7] text-slate-500">
-              标题、社区、地点、时间与活动规则读取自已发布活动；三人团、签到、消费、抽奖、排行榜、大奖与社区数据均为样例，
-              分享和复制是真实浏览器操作，但不会写入邀请关系、签到、订单、库存或兑奖记录。
+              标题、社区、地点、时间、活动规则与你的参与/三人团状态读取自真实服务；登录、确认参与与邀请分享会调用真实 API。
+              签到、消费、抽奖、排行榜、大奖与社区统计仍为样例，不会写入签到、订单、库存或兑奖记录。
             </p>
           </div>
         </div>
@@ -1059,7 +1046,7 @@ export function SilverNeighborhoodCampaignPage() {
               {activity.publishedAt
                 ? `，发布时间 ${formatShanghaiDateTime(activity.publishedAt)}（北京时间）`
                 : ''}
-              。页面中的三人团、抽奖、榜单与大奖玩法仍为演示，未接入真实业务。
+              。参与、三人团与邀请记录来自真实服务；抽奖、榜单与大奖玩法仍为演示，未接入真实业务。
             </p>
           </>
         ) : (
@@ -1071,89 +1058,103 @@ export function SilverNeighborhoodCampaignPage() {
 
       <CampaignSheet
         open={activeSheet === 'share'}
-        title="邀请最后 1 位街坊"
-        eyebrow="TEAM 2 / 3"
+        title="邀请街坊加入三人团"
+        eyebrow={team ? `TEAM ${team.seatsFilled} / ${team.seatsTotal}` : 'TEAM'}
         variant="poster"
         onClose={() => setActiveSheet(null)}
         footer={
-          <>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={handleSystemShare}
-                className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-[13px] bg-teal-700 px-2 text-[13px] font-semibold text-white transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
-              >
-                <Share2 size={17} aria-hidden="true" />
-                转发给好友
-              </button>
-              <button
-                type="button"
-                disabled
-                aria-describedby="screenshot-unavailable"
-                className="flex min-h-[48px] cursor-not-allowed items-center justify-center gap-1.5 rounded-[13px] border border-slate-200 bg-slate-50 px-2 text-[13px] font-semibold text-slate-400"
-              >
-                <ImageDown size={17} aria-hidden="true" />
-                截图保存
-              </button>
-            </div>
-            <p id="screenshot-unavailable" className="mt-2 text-center text-[11px] leading-4 text-slate-400">
-              截图保存暂未开放
-            </p>
-            <div className="text-center text-[12px] font-medium" aria-live="polite">
-              {shareStatus === 'shared' ? <p className="mt-1 text-teal-700">已调起系统分享，是否加入还需好友确认。</p> : null}
-              {shareStatus === 'copied' ? <p className="mt-1 text-teal-700">活动链接已复制，可粘贴发送给好友。</p> : null}
-              {shareStatus === 'cancelled' ? <p className="mt-1 text-slate-500">已取消分享，可再次点击转发。</p> : null}
-              {shareStatus === 'error' ? <p className="mt-1 text-orange-700">分享或复制未成功，请稍后重试。</p> : null}
-            </div>
-          </>
+          shareUrl ? (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={handleSystemShare}
+                  className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-[13px] bg-teal-700 px-2 text-[13px] font-semibold text-white transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+                >
+                  <Share2 size={17} aria-hidden="true" />
+                  转发给好友
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleCopyLink()}
+                  className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-[13px] border border-teal-200 bg-white px-2 text-[13px] font-semibold text-teal-700 transition-colors hover:bg-[#f2faf6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+                >
+                  <Copy size={17} aria-hidden="true" />
+                  复制链接
+                </button>
+              </div>
+              <p className="mt-2 text-center text-[11px] leading-4 text-slate-400">
+                二维码、转发与复制使用同一条链接；截图保存暂未开放。
+              </p>
+              <div className="text-center text-[12px] font-medium" aria-live="polite">
+                {shareStatus === 'shared' ? <p className="mt-1 text-teal-700">已调起系统分享，好友需登录并主动确认才会加入。</p> : null}
+                {shareStatus === 'copied' ? <p className="mt-1 text-teal-700">邀请链接已复制，包含当前活动与邀请参数。</p> : null}
+                {shareStatus === 'cancelled' ? <p className="mt-1 text-slate-500">已取消分享，可再次点击转发。</p> : null}
+                {shareStatus === 'error' ? <p className="mt-1 text-orange-700">分享或复制未成功，请稍后重试。</p> : null}
+              </div>
+            </>
+          ) : undefined
         }
       >
-        <div className="mx-auto w-full max-w-[300px] overflow-hidden rounded-[20px] border border-[#deebdf] bg-[#f4faf3] shadow-[0_9px_25px_rgba(26,88,62,0.08)]">
-          <img
-            src={import.meta.env.BASE_URL + 'images/silver-neighborhood-hero.webp'}
-            alt="银发社区欢乐季活动海报"
-            className="block aspect-[4/3] w-full object-cover"
-          />
-          <div className="px-3 pb-3 pt-3">
-            <div className="text-center">
-              <p className="text-[17px] font-bold leading-6 text-[#176149]">还差你，三人成团领好礼</p>
-              <p className="mt-1 text-[12px] text-[#547c6c]">示例社区 · 已有 2 / 3 位街坊</p>
-            </div>
-            <div className="mt-3 rounded-[14px] border border-[#deece1] bg-white px-3 py-3 text-center">
-              <div className="relative mx-auto w-fit rounded-lg bg-white">
-                <QRCodeSVG
-                  value={getActivityUrl()}
-                  size={148}
-                  level="H"
-                  marginSize={3}
-                  fgColor="#195B4C"
-                  bgColor="#FFFFFF"
-                  title="银发社区欢乐季活动直达二维码"
-                />
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                  <span
-                    aria-label="演示团长头像"
-                    className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#247D67] text-[13px] font-bold text-white shadow-sm"
-                  >
-                    我
-                  </span>
-                </div>
+        {shareUrl ? (
+          <div className="mx-auto w-full max-w-[300px] overflow-hidden rounded-[20px] border border-[#deebdf] bg-[#f4faf3] shadow-[0_9px_25px_rgba(26,88,62,0.08)]">
+            <img
+              src={import.meta.env.BASE_URL + 'images/silver-neighborhood-hero.webp'}
+              alt="银发社区欢乐季活动海报"
+              className="block aspect-[4/3] w-full object-cover"
+            />
+            <div className="px-3 pb-3 pt-3">
+              <div className="text-center">
+                <p className="text-[17px] font-bold leading-6 text-[#176149]">还差你，三人成团领好礼</p>
+                <p className="mt-1 text-[12px] text-[#547c6c]">
+                  {activity?.community.name ?? '本社区'} · 已有 {team?.seatsFilled ?? 0} / {team?.seatsTotal ?? 3} 位街坊
+                </p>
               </div>
-              <p className="mt-2 text-[12px] font-semibold text-[#2f765f]">
-                扫码查看活动 · 邻里一起领好礼
+              <div className="mt-3 rounded-[14px] border border-[#deece1] bg-white px-3 py-3 text-center">
+                <div className="relative mx-auto w-fit rounded-lg bg-white">
+                  <QRCodeSVG
+                    value={shareUrl}
+                    size={148}
+                    level="H"
+                    marginSize={3}
+                    fgColor="#195B4C"
+                    bgColor="#FFFFFF"
+                    title="银发社区欢乐季活动直达二维码"
+                  />
+                  {selfParticipation ? (
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                      <span
+                        aria-label="我的团席位"
+                        className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#247D67] text-[13px] font-bold text-white shadow-sm"
+                      >
+                        我
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+                <p className="mt-2 text-[12px] font-semibold text-[#2f765f]">
+                  扫码打开本活动 · 邻里一起领好礼
+                </p>
+              </div>
+              <p className="mt-2 text-center text-[11px] leading-4 text-slate-500">
+                二维码、转发与复制使用同一条链接，包含真实活动与邀请参数；浏览不会自动加入，需登录后确认参与。
+              </p>
+              <p className="mt-1 text-center text-[11px] leading-4 text-slate-400">
+                线上正式域名待配置；本地开发时该链接仅本机可访问。
               </p>
             </div>
-            <p className="mt-2 text-center text-[11px] leading-4 text-slate-500">
-              演示海报 · 扫码仅打开活动页，不自动加入队伍
-            </p>
           </div>
-        </div>
+        ) : (
+          <p className="rounded-[14px] bg-slate-50 p-3 text-[13px] leading-6 text-slate-500">
+            当前没有可用的邀请码（团队可能已满员、已锁定或你尚未参与）。邀请入口已关闭，请刷新参与状态。
+          </p>
+        )}
       </CampaignSheet>
 
       <CampaignSheet
         open={activeSheet === 'checkin-reward'}
         title="团队生活礼"
-        eyebrow="签到任务 · 2 / 3"
+        eyebrow="签到任务 · 演示"
         onClose={() => setActiveSheet(null)}
       >
         <div className="rounded-[16px] bg-[#f2faf6] p-4">
@@ -1163,7 +1164,7 @@ export function SilverNeighborhoodCampaignPage() {
         <dl className="mt-3 divide-y divide-slate-100 rounded-[16px] border border-slate-100 bg-white px-4">
           <div className="flex justify-between gap-4 py-3">
             <dt>当前进度</dt>
-            <dd className="font-semibold text-slate-800">2 / 3 人</dd>
+            <dd className="text-right font-semibold text-slate-800">签到数据未接入</dd>
           </div>
           <div className="flex justify-between gap-4 py-3">
             <dt>奖励示例</dt>
@@ -1182,7 +1183,7 @@ export function SilverNeighborhoodCampaignPage() {
       <CampaignSheet
         open={activeSheet === 'purchase-reward'}
         title="团队惊喜权益"
-        eyebrow="消费任务 · 2 / 3"
+        eyebrow="消费任务 · 演示"
         onClose={() => setActiveSheet(null)}
       >
         <div className="rounded-[16px] bg-[#faf8ff] p-4">
@@ -1194,11 +1195,11 @@ export function SilverNeighborhoodCampaignPage() {
         <dl className="mt-3 divide-y divide-slate-100 rounded-[16px] border border-slate-100 bg-white px-4">
           <div className="flex justify-between gap-4 py-3">
             <dt>成员完成</dt>
-            <dd className="font-semibold text-slate-800">2 / 3 人</dd>
+            <dd className="text-right font-semibold text-slate-800">消费数据未接入</dd>
           </div>
           <div className="flex justify-between gap-4 py-3">
             <dt>金额进度</dt>
-            <dd className="font-semibold text-slate-800">¥228 / ¥300</dd>
+            <dd className="text-right font-semibold text-slate-800">消费数据未接入</dd>
           </div>
           <div className="flex justify-between gap-4 py-3">
             <dt>奖励形式</dt>
@@ -1299,14 +1300,14 @@ export function SilverNeighborhoodCampaignPage() {
               <p className="font-bold text-slate-800">团队生活礼</p>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500">待达成</span>
             </div>
-            <p className="mt-1 text-[12px] text-slate-500">签到 2 / 3 人，还差 1 位团员。</p>
+            <p className="mt-1 text-[12px] text-slate-500">签到数据尚未接入，当前仅展示奖励结构。</p>
           </div>
           <div className="rounded-[16px] border border-slate-100 bg-white p-4">
             <div className="flex items-center justify-between gap-3">
               <p className="font-bold text-slate-800">团队惊喜权益</p>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500">待达成</span>
             </div>
-            <p className="mt-1 text-[12px] text-slate-500">购买成员 2 / 3，金额 ¥228 / ¥300。</p>
+            <p className="mt-1 text-[12px] text-slate-500">消费数据尚未接入，当前仅展示权益结构。</p>
           </div>
           <div className="rounded-[16px] border border-slate-100 bg-white p-4">
             <div className="flex items-center justify-between gap-3">

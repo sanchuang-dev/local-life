@@ -1,0 +1,103 @@
+{
+  "workingDirectory": "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-004",
+  "branch": "feat/ll-mvp-004-real-teams",
+  "baseCommit": "1d4f000",
+  "commands": [
+    {
+      "step": 1,
+      "command": "curl -sS https://raw.githubusercontent.com/sanchuang-dev/.github/main/AGENTS.md",
+      "exitCode": 0,
+      "evidence": "组织 AGENTS.md 已实际读取（policy revision 2026-10-16.1）；本仓库 AGENTS.md 也已读取。"
+    },
+    {
+      "step": 2,
+      "command": "gh issue view 60 --repo sanchuang-dev/local-life --json number,title,body,state,labels",
+      "exitCode": 0,
+      "evidence": "Issue #60 标题、正文与 2026-11-04 首场试点规则已读取。"
+    },
+    {
+      "step": 3,
+      "command": "pnpm install --frozen-lockfile",
+      "exitCode": 0,
+      "evidence": "Done in 958ms using pnpm v10.19.0；lockfile 未变化。输出中的 approve-builds 提示为 pnpm 既有警告，不影响安装。"
+    },
+    {
+      "step": 4,
+      "command": "env NODE_ENV=development DATABASE_PATH=/tmp/ll-mvp-004-verify/verify.sqlite pnpm --filter @sanchuang-dev/local-life-api db:prepare",
+      "exitCode": 0,
+      "evidence": "SQLite 已迁移：/tmp/ll-mvp-004-verify/verify.sqlite（16 个表）。"
+    },
+    {
+      "step": 5,
+      "command": "expect -f /tmp/ll-mvp-004-verify/scripts/bootstrap-admin.expect",
+      "exitCode": 0,
+      "evidence": "真实 bootstrap-admin 在 pty 中创建 verify.admin（admin/active）；输出“管理员账户创建成功”，未使用直接写库或默认密码。"
+    },
+    {
+      "step": 6,
+      "command": "env NODE_ENV=development HOST=127.0.0.1 PORT=4080 DATABASE_PATH=/tmp/ll-mvp-004-verify/verify.sqlite AUTH_DEV_ENABLED=true TRUSTED_ORIGINS='http://localhost:5173,http://127.0.0.1:5173' WEB_BASE_URL='http://localhost:5173/local-life/' SESSION_TTL_HOURS=168 pnpm --filter @sanchuang-dev/local-life-api exec tsx src/index.ts",
+      "exitCode": null,
+      "evidence": "真实 API 进程（tsx src/index.ts）。GET http://127.0.0.1:4080/healthz → 200，service=local-life-api。"
+    },
+    {
+      "step": 7,
+      "command": "env LOCAL_LIFE_API_PORT=4080 LOCAL_LIFE_WEB_PORT=5173 pnpm --filter @sanchuang-dev/local-life-web dev",
+      "exitCode": null,
+      "evidence": "真实 Vite H5。GET http://localhost:5173/local-life/ → 200；GET http://localhost:5173/api/healthz → 200（同源 /api 代理到真实 API）。"
+    },
+    {
+      "step": 8,
+      "command": "node /tmp/ll-mvp-004-verify/scripts/http-verify.mjs",
+      "exitCode": 0,
+      "evidence": "40/40 真实 HTTP 断言通过，写入 http-checks.json。"
+    },
+    {
+      "step": 9,
+      "command": "pnpm --filter @sanchuang-dev/local-life-api test",
+      "exitCode": 0,
+      "evidence": "# tests 33 / # pass 33 / # fail 0。"
+    },
+    {
+      "step": 10,
+      "command": "node /tmp/ll-mvp-004-verify/scripts/db-inspect.mjs",
+      "exitCode": 0,
+      "evidence": "只读检查真实 SQLite：16 张表、11 个团（无 >3 席）、所有 locked 团均 3 席、审计 metadata 无邀请码；pass=true。"
+    },
+    {
+      "step": 11,
+      "command": "停止 API 进程后用同一 DATABASE_PATH 重新启动，再执行 node /tmp/ll-mvp-004-verify/scripts/restart-recheck.mjs",
+      "exitCode": 0,
+      "evidence": "4/4 通过：重启后 200、A 的数据库会话仍有效、同团 teamId、locked 3/3。"
+    },
+    {
+      "step": 12,
+      "command": "node /tmp/ll-mvp-004-verify/scripts/browser-setup.mjs",
+      "exitCode": 0,
+      "evidence": "通过真实 admin HTTP API 创建并发布浏览器验收活动；paused/ended 走真实 pause/end（均 200）。"
+    },
+    {
+      "step": 13,
+      "command": "node /tmp/ll-mvp-004-verify/scripts/browser-verify.cjs",
+      "exitCode": 0,
+      "evidence": "Chrome 156.0.8078.80（本机 Google Chrome，headless）40/40 断言通过，104 条 /api 响应（103×200、1×409），19 张截图，写入 browser-run.json。"
+    },
+    {
+      "step": 14,
+      "command": "node /tmp/ll-mvp-004-verify/scripts/paused-text.cjs",
+      "exitCode": 0,
+      "evidence": "暂停活动页面文本取证：页头“活动已暂停，等待恢复通知”，参与卡“活动尚未发布，暂不可参与。”（缺陷 VERIFY-01）。"
+    },
+    {
+      "step": 15,
+      "command": "sips -g pixelWidth -g pixelHeight docs/engineering/evidence/ll-mvp-004/browser/*.png",
+      "exitCode": 0,
+      "evidence": "375×812@2x 截图 750×1624；320×568@2x 截图 640×1136；二维码截图 296×296。"
+    },
+    {
+      "step": 16,
+      "command": "git status --porcelain=v1",
+      "exitCode": 0,
+      "evidence": "相对开工前状态，仅新增 docs/engineering/evidence/ll-mvp-004/；T1–T4 的既有未提交实现改动未被验收人修改。"
+    }
+  ]
+}

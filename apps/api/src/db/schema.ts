@@ -1,5 +1,6 @@
-import { relations } from 'drizzle-orm'
+import { relations, sql } from 'drizzle-orm'
 import {
+  check,
   index,
   integer,
   primaryKey,
@@ -7,7 +8,12 @@ import {
   text,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core'
-import type { ActivityStatus } from '@sanchuang-dev/local-life-contracts'
+import type {
+  ActivityStatus,
+  ParticipationInviteSource,
+  ParticipationRole,
+  ParticipationTeamStatus,
+} from '@sanchuang-dev/local-life-contracts'
 
 export type StaffRole = 'admin' | 'operator' | 'grid_worker'
 export type StaffStatus = 'active' | 'disabled'
@@ -216,6 +222,122 @@ export const activityRuleVersions = sqliteTable(
   ],
 )
 
+/**
+ * Three-person team for one activity (#60). A team is created by the resident
+ * who confirms first (the leader owns seat 1) and is shared by at most three
+ * residents. `unique(activity_id, leader_user_id)` keeps a resident from
+ * leading two teams in the same activity even if a bug bypasses the service.
+ *
+ * A team is INSERT-only apart from the one-way `open -> locked` transition when
+ * the third seat is taken; triggers in migration 0002 enforce that on disk.
+ */
+export const activityTeams = sqliteTable(
+  'activity_teams',
+  {
+    id: text('id').primaryKey(),
+    activityId: text('activity_id')
+      .notNull()
+      .references(() => activities.id, { onDelete: 'restrict' }),
+    leaderUserId: text('leader_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    status: text('status').$type<ParticipationTeamStatus>().notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    lockedAt: integer('locked_at', { mode: 'timestamp_ms' }),
+  },
+  (table) => [
+    uniqueIndex('activity_teams_activity_leader_uq').on(table.activityId, table.leaderUserId),
+    index('activity_teams_activity_idx').on(table.activityId),
+    index('activity_teams_leader_idx').on(table.leaderUserId),
+    check('activity_teams_status_check', sql`${table.status} IN ('open', 'locked')`),
+    // A locked team is exactly the team whose third seat was taken in the same
+    // transaction, so the lock flag and its timestamp can never disagree.
+    check(
+      'activity_teams_locked_at_check',
+      sql`(${table.status} = 'locked' AND ${table.lockedAt} IS NOT NULL)
+        OR (${table.status} = 'open' AND ${table.lockedAt} IS NULL)`,
+    ),
+  ],
+)
+
+/**
+ * One invite code per open team. The code is opaque, minted by the API, and
+ * belongs to the *team*, never to a single invitee: invitation attribution is
+ * frozen on the participation row when an invitee confirms. This table carries
+ * no grid-worker / sales attribution columns on purpose (see
+ * docs/engineering/participation-teams.md).
+ */
+export const activityInvitations = sqliteTable(
+  'activity_invitations',
+  {
+    id: text('id').primaryKey(),
+    code: text('code').notNull(),
+    activityId: text('activity_id')
+      .notNull()
+      .references(() => activities.id, { onDelete: 'restrict' }),
+    teamId: text('team_id')
+      .notNull()
+      .references(() => activityTeams.id, { onDelete: 'restrict' }),
+    inviterUserId: text('inviter_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('activity_invitations_code_uq').on(table.code),
+    uniqueIndex('activity_invitations_team_uq').on(table.teamId),
+    index('activity_invitations_activity_idx').on(table.activityId),
+    check(
+      'activity_invitations_code_check',
+      sql`length(${table.code}) = 32 AND ${table.code} NOT GLOB '*[^0-9a-f]*'`,
+    ),
+  ],
+)
+
+/**
+ * A resident's participation in one activity. `unique(activity_id, user_id)` is
+ * the durable "one valid team per resident per activity" rule; `unique(team_id,
+ * seat_no)` makes a duplicated seat impossible. Attribution columns
+ * (`invite_source`, `invitation_id`) are frozen at insert time and immutable
+ * afterwards via triggers, so opening another share link can never rewrite the
+ * first effective attribution.
+ */
+export const activityParticipations = sqliteTable(
+  'activity_participations',
+  {
+    id: text('id').primaryKey(),
+    activityId: text('activity_id')
+      .notNull()
+      .references(() => activities.id, { onDelete: 'restrict' }),
+    teamId: text('team_id')
+      .notNull()
+      .references(() => activityTeams.id, { onDelete: 'restrict' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    seatNo: integer('seat_no').notNull(),
+    role: text('role').$type<ParticipationRole>().notNull(),
+    inviteSource: text('invite_source').$type<ParticipationInviteSource>().notNull(),
+    invitationId: text('invitation_id').references(() => activityInvitations.id, {
+      onDelete: 'restrict',
+    }),
+    joinedAt: integer('joined_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('activity_participations_activity_user_uq').on(table.activityId, table.userId),
+    uniqueIndex('activity_participations_team_seat_uq').on(table.teamId, table.seatNo),
+    index('activity_participations_user_idx').on(table.userId),
+    check('activity_participations_seat_no_check', sql`${table.seatNo} BETWEEN 1 AND 3`),
+    // Seat 1 is always the self-confirmed leader and seats 2/3 are always
+    // invitation-sourced members: the roster shape is data, not a convention.
+    check(
+      'activity_participations_role_source_check',
+      sql`(${table.role} = 'leader' AND ${table.seatNo} = 1 AND ${table.inviteSource} = 'self' AND ${table.invitationId} IS NULL)
+        OR (${table.role} = 'member' AND ${table.seatNo} BETWEEN 2 AND 3 AND ${table.inviteSource} = 'invite' AND ${table.invitationId} IS NOT NULL)`,
+    ),
+  ],
+)
+
 export const userRelations = relations(users, ({ many }) => ({
   wechatIdentities: many(wechatIdentities),
   residentCommunities: many(residentCommunityAssignments),
@@ -240,4 +362,7 @@ export const schema = {
   auditLogs,
   activities,
   activityRuleVersions,
+  activityTeams,
+  activityInvitations,
+  activityParticipations,
 }
