@@ -14,6 +14,9 @@ import type {
   CrmLeadSourceType,
   CrmLeadStatus,
   CrmServiceOrderStatus,
+  CrmebAttributionClaimState,
+  CrmebIdentityVerificationMethod,
+  CrmebOrderStatus,
   ParticipationInviteSource,
   ParticipationRole,
   ParticipationTeamStatus,
@@ -527,6 +530,220 @@ export const activityParticipations = sqliteTable(
   ],
 )
 
+/* -------------------------------------------------------------------------- */
+/* CRMEB adapter domain (LL-MVP-007, Issue #63)                               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Platform UUID -> CRMEB uid mapping. CRMEB exposes no signed identity
+ * assertion, so the only accepted verification is a staff member manually
+ * checking the link. Browsers can never write this table directly; only the
+ * audited admin endpoint inserts rows.
+ */
+export const crmebIdentities = sqliteTable(
+  'crmeb_identities',
+  {
+    id: text('id').primaryKey(),
+    platformUserId: text('platform_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    crmebUid: integer('crmeb_uid').notNull(),
+    status: text('status').$type<'active' | 'revoked'>().notNull(),
+    verificationMethod: text('verification_method')
+      .$type<CrmebIdentityVerificationMethod>()
+      .notNull(),
+    verificationNote: text('verification_note'),
+    createdByUserId: text('created_by_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    verifiedAt: integer('verified_at', { mode: 'timestamp_ms' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('crmeb_identities_platform_user_uq').on(table.platformUserId),
+    uniqueIndex('crmeb_identities_crmeb_uid_uq').on(table.crmebUid),
+    index('crmeb_identities_created_by_idx').on(table.createdByUserId),
+  ],
+)
+
+/**
+ * Pull-based order mirror. CRMEB's numeric `id` is the stable identity
+ * (`channel, external_order_id` unique). `order_id` is the human-facing business
+ * number: it is indexed for lookup/collision detection but NOT the key, so a
+ * reused `order_id` can never silently overwrite the row owned by another id.
+ */
+export const crmebOrders = sqliteTable(
+  'crmeb_orders',
+  {
+    id: text('id').primaryKey(),
+    channel: text('channel').$type<'crmeb'>().notNull(),
+    externalOrderId: integer('external_order_id').notNull(),
+    externalOrderNo: text('external_order_no').notNull(),
+    crmebUid: integer('crmeb_uid'),
+    platformUserId: text('platform_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    payType: text('pay_type'),
+    payAmountCents: integer('pay_amount_cents').notNull(),
+    paid: integer('paid', { mode: 'boolean' }).notNull(),
+    status: text('status').$type<CrmebOrderStatus>().notNull(),
+    /** Raw CRMEB `status` integer; kept for audit, never used as an enum. */
+    rawStatus: integer('raw_status').notNull(),
+    refundStatus: integer('refund_status'),
+    validTransaction: integer('valid_transaction', { mode: 'boolean' }).notNull(),
+    rawHash: text('raw_hash').notNull(),
+    itemsJson: text('items_json'),
+    orderedAt: integer('ordered_at', { mode: 'timestamp_ms' }),
+    paidAt: integer('paid_at', { mode: 'timestamp_ms' }),
+    syncedAt: integer('synced_at', { mode: 'timestamp_ms' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    index('crmeb_orders_channel_order_no_idx').on(table.channel, table.externalOrderNo),
+    uniqueIndex('crmeb_orders_channel_order_id_uq').on(table.channel, table.externalOrderId),
+    index('crmeb_orders_crmeb_uid_idx').on(table.crmebUid),
+    index('crmeb_orders_platform_user_idx').on(table.platformUserId),
+    index('crmeb_orders_valid_transaction_idx').on(table.validTransaction),
+  ],
+)
+
+/**
+ * Append-only order state events. The unique `(order_id, event_key)` pair is the
+ * dedupe key; SQLite triggers make UPDATE/DELETE impossible even for buggy code.
+ */
+export const crmebOrderEvents = sqliteTable(
+  'crmeb_order_events',
+  {
+    id: text('id').primaryKey(),
+    orderId: text('order_id')
+      .notNull()
+      .references(() => crmebOrders.id, { onDelete: 'cascade' }),
+    eventKey: text('event_key').notNull(),
+    payloadHash: text('payload_hash').notNull(),
+    payloadJson: text('payload_json'),
+    occurredAt: integer('occurred_at', { mode: 'timestamp_ms' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('crmeb_order_events_order_event_uq').on(table.orderId, table.eventKey),
+    index('crmeb_order_events_order_idx').on(table.orderId),
+    index('crmeb_order_events_occurred_idx').on(table.occurredAt),
+  ],
+)
+
+/**
+ * Refund/after-sale mirror (`GET /outapi/refund/list`). Refund numbers are
+ * independent from order numbers: `store_order_id` points at `crmeb_orders.id`
+ * while the refund's own `order_id` becomes `external_refund_no`.
+ */
+export const crmebRefunds = sqliteTable(
+  'crmeb_refunds',
+  {
+    id: text('id').primaryKey(),
+    channel: text('channel').$type<'crmeb'>().notNull(),
+    externalRefundId: integer('external_refund_id').notNull(),
+    externalRefundNo: text('external_refund_no').notNull(),
+    externalOrderId: integer('external_order_id').notNull(),
+    refundType: integer('refund_type').notNull(),
+    refundAmountCents: integer('refund_amount_cents').notNull(),
+    refundedAmountCents: integer('refunded_amount_cents').notNull(),
+    refundedAt: integer('refunded_at', { mode: 'timestamp_ms' }),
+    addTime: integer('add_time', { mode: 'timestamp_ms' }),
+    rawHash: text('raw_hash').notNull(),
+    syncedAt: integer('synced_at', { mode: 'timestamp_ms' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('crmeb_refunds_channel_refund_no_uq').on(
+      table.channel,
+      table.externalRefundNo,
+    ),
+    uniqueIndex('crmeb_refunds_channel_refund_id_uq').on(
+      table.channel,
+      table.externalRefundId,
+    ),
+    index('crmeb_refunds_order_idx').on(table.externalOrderId),
+  ],
+)
+
+/**
+ * Click/attribution claim. The browser may only supply an activity id, product
+ * id and an opaque referral code; the server resolves the staff, checks the
+ * community assignment and writes `claimed`/`unconfirmed`. `confirmed` is
+ * reserved for a future audited verification path and is never written here.
+ */
+export const crmebClickAttributions = sqliteTable(
+  'crmeb_click_attributions',
+  {
+    id: text('id').primaryKey(),
+    clickId: text('click_id').notNull(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    // Null for natural purchases that carry no activity context.
+    activityId: text('activity_id').references(() => activities.id, {
+      onDelete: 'restrict',
+    }),
+    crmebProductId: integer('crmeb_product_id').notNull(),
+    claimedStaffId: text('claimed_staff_id').references(() => staffAccounts.id, {
+      onDelete: 'set null',
+    }),
+    claimState: text('claim_state').$type<CrmebAttributionClaimState>().notNull(),
+    referralCodeHash: text('referral_code_hash'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('crmeb_click_attributions_click_uq').on(table.clickId),
+    index('crmeb_click_attributions_user_idx').on(table.userId),
+    index('crmeb_click_attributions_activity_idx').on(table.activityId),
+    index('crmeb_click_attributions_staff_idx').on(table.claimedStaffId),
+    // A staff id must never be attached to an unconfirmed/revoked claim.
+    check(
+      'crmeb_click_attributions_staff_claim_check',
+      sql`${table.claimedStaffId} IS NULL OR ${table.claimState} = 'claimed'`,
+    ),
+  ],
+)
+
+/** Audit trail for each pull-sync run: window, counts, cursor, errors. */
+export const crmebSyncRuns = sqliteTable(
+  'crmeb_sync_runs',
+  {
+    id: text('id').primaryKey(),
+    status: text('status').$type<'running' | 'succeeded' | 'failed'>().notNull(),
+    trigger: text('trigger').$type<'admin_manual'>().notNull(),
+    /** Real role of the triggering staff session, audited next to its user id. */
+    actorRole: text('actor_role').$type<'admin'>().notNull(),
+    actorUserId: text('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
+    scopeJson: text('scope_json').notNull(),
+    cursorJson: text('cursor_json'),
+    ordersScanned: integer('orders_scanned').notNull().default(0),
+    ordersCreated: integer('orders_created').notNull().default(0),
+    ordersUpdated: integer('orders_updated').notNull().default(0),
+    ordersUnchanged: integer('orders_unchanged').notNull().default(0),
+    ordersFailed: integer('orders_failed').notNull().default(0),
+    refundsScanned: integer('refunds_scanned').notNull().default(0),
+    refundsCreated: integer('refunds_created').notNull().default(0),
+    refundsUpdated: integer('refunds_updated').notNull().default(0),
+    refundsUnchanged: integer('refunds_unchanged').notNull().default(0),
+    refundsUnmatched: integer('refunds_unmatched').notNull().default(0),
+    validTransactions: integer('valid_transactions').notNull().default(0),
+    eventsAppended: integer('events_appended').notNull().default(0),
+    errorsJson: text('errors_json'),
+    errorMessage: text('error_message'),
+    startedAt: integer('started_at', { mode: 'timestamp_ms' }).notNull(),
+    finishedAt: integer('finished_at', { mode: 'timestamp_ms' }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    index('crmeb_sync_runs_started_idx').on(table.startedAt),
+    index('crmeb_sync_runs_status_idx').on(table.status),
+  ],
+)
+
 export const userRelations = relations(users, ({ many }) => ({
   wechatIdentities: many(wechatIdentities),
   residentCommunities: many(residentCommunityAssignments),
@@ -559,4 +776,10 @@ export const schema = {
   activityTeams,
   activityInvitations,
   activityParticipations,
+  crmebIdentities,
+  crmebOrders,
+  crmebOrderEvents,
+  crmebRefunds,
+  crmebClickAttributions,
+  crmebSyncRuns,
 }
