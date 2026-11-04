@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router'
-import { ChevronRight, ClipboardList, Phone, Plus, UserRoundCheck } from 'lucide-react'
+import { ChevronRight, ClipboardList, Copy, ExternalLink, Phone, Plus, UserRoundCheck } from 'lucide-react'
 import type { CrmLeadSourceType, CrmLeadStatus, CrmLeadSummary } from '@sanchuang-dev/local-life-contracts'
 import { useCrmApi, type LeadListFilters } from '../../hooks/useCrmApi'
+import { useAsyncResource } from '../../hooks/useAsyncResource'
+import { buildActivityShareUrl } from '../../components/activity/share'
 import { useStaffSession } from '../../hooks/useStaffSession'
 import { StaffGate, StaffIdentityCard } from '../../components/crm/StaffGate'
 import { FilterChipRow } from '../../components/crm/FilterChips'
@@ -125,7 +127,30 @@ function LeadsView() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null)
   const [reloadToken, setReloadToken] = useState(0)
+  const [copiedActivityId, setCopiedActivityId] = useState<string | null>(null)
+  const [copyError, setCopyError] = useState<string | null>(null)
   const requestVersion = useRef(0)
+  const publicActivities = useAsyncResource('grid-community-activity-entries', (signal) =>
+    api.listPublicActivities(signal),
+  )
+  const visibleActivities = publicActivities.state.status === 'ready'
+    ? publicActivities.state.data.items.filter((activity) =>
+        activity.status === 'published' &&
+        communities.some((community) => community.id === activity.community.id) &&
+        (!communityId || activity.community.id === communityId),
+      )
+    : []
+
+  const copyActivityLink = async (activityId: string) => {
+    setCopyError(null)
+    try {
+      await navigator.clipboard.writeText(buildActivityShareUrl(activityId, null))
+      setCopiedActivityId(activityId)
+    } catch {
+      setCopiedActivityId(null)
+      setCopyError('无法复制链接，请使用“打开活动”后从浏览器分享。')
+    }
+  }
 
   const filters: LeadListFilters = { status, sourceType, communityId }
   const filterKey = `${status ?? ''}|${sourceType ?? ''}|${communityId ?? ''}|${reloadToken}`
@@ -205,6 +230,42 @@ function LeadsView() {
           受理单
         </Link>
       </div>
+
+      <section className="mt-4 rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm" aria-label="社区活动入口">
+        <h2 className="text-[14px] font-semibold text-slate-800">社区活动入口</h2>
+        {publicActivities.state.status === 'loading' ? (
+          <p className="mt-2 text-[12px] text-slate-500">正在读取已发布活动…</p>
+        ) : publicActivities.state.status === 'error' ? (
+          <div className="mt-2">
+            <ErrorBlock message={publicActivities.state.message} onRetry={publicActivities.reload} />
+          </div>
+        ) : visibleActivities.length === 0 ? (
+          <p className="mt-2 text-[12px] text-slate-500">当前授权社区暂无可分享的已发布活动。</p>
+        ) : (
+          <div className="mt-3 space-y-3">
+            {visibleActivities.map((activity) => (
+              <div key={activity.id} className="rounded-[14px] bg-slate-50 p-3">
+                <p className="text-[13px] font-semibold text-slate-800">{activity.title}</p>
+                <p className="mt-1 text-[11px] text-slate-500">{activity.community.name}</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <a href={buildActivityShareUrl(activity.id, null)} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-teal-200 bg-white px-3 text-[12px] font-medium text-teal-700">
+                    <ExternalLink size={14} aria-hidden="true" />打开居民活动
+                  </a>
+                  <button type="button" onClick={() => void copyActivityLink(activity.id)}
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-[12px] font-medium text-slate-700">
+                    <Copy size={14} aria-hidden="true" />{copiedActivityId === activity.id ? '已复制' : '复制活动链接'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {copyError ? <p className="mt-2 text-[11px] text-rose-600" role="alert">{copyError}</p> : null}
+        <p className="mt-3 text-[11px] leading-5 text-slate-400">
+          这是公开活动入口，不自动绑定网格员成交归属；业务来源和有效成交以登记、核验记录为准。
+        </p>
+      </section>
 
       <div className="mt-4 flex items-center justify-between gap-2">
         <div>
