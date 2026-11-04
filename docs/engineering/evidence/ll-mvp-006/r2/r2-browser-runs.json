@@ -1,0 +1,307 @@
+{
+  "generatedAt": "2026-11-04T18:58:41.026Z",
+  "api": "http://127.0.0.1:4091",
+  "web": "http://localhost:5241/local-life/",
+  "admin": "http://localhost:5242/",
+  "cdp": "http://127.0.0.1:9333",
+  "scenario": {
+    "communityId": "923579c6-4db1-4472-b2c3-6653b36ec146",
+    "mainActivityId": "273c8df8-1474-47b7-9b2d-1531027008e3",
+    "noPlanActivityId": "cde782f2-0c9e-4f76-a2f1-af6083590802",
+    "teamId": "9afdc940-0b74-4c6d-9ff4-2db81d36a1b6"
+  },
+  "viewportMetrics": {
+    "375-campaign": {
+      "scrollWidth": 375,
+      "clientWidth": 375,
+      "bodyScrollWidth": 375,
+      "innerWidth": 375,
+      "overflow": false,
+      "overflowingCount": 0,
+      "overflowingInsideScroller": 0,
+      "overflowingClipped": 0,
+      "overflowingUnreachable": 0,
+      "overflowingElements": []
+    },
+    "375-wallet": {
+      "scrollWidth": 375,
+      "clientWidth": 375,
+      "bodyScrollWidth": 375,
+      "innerWidth": 375,
+      "overflow": false,
+      "overflowingCount": 2,
+      "overflowingInsideScroller": 2,
+      "overflowingClipped": 0,
+      "overflowingUnreachable": 0,
+      "overflowingElements": [
+        {
+          "el": "min-h-11 shrink-0 whitespace-nowrap rounded-full b",
+          "horizontalScroller": "-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scroll",
+          "clippedBy": null
+        },
+        {
+          "el": "min-h-11 shrink-0 whitespace-nowrap rounded-full b",
+          "horizontalScroller": "-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scroll",
+          "clippedBy": null
+        }
+      ]
+    },
+    "375-workbench": {
+      "scrollWidth": 375,
+      "clientWidth": 375,
+      "bodyScrollWidth": 375,
+      "innerWidth": 375,
+      "overflow": false,
+      "overflowingCount": 0,
+      "overflowingInsideScroller": 0,
+      "overflowingClipped": 0,
+      "overflowingUnreachable": 0,
+      "overflowingElements": []
+    },
+    "320-campaign": {
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "bodyScrollWidth": 320,
+      "innerWidth": 320,
+      "overflow": false,
+      "overflowingCount": 0,
+      "overflowingInsideScroller": 0,
+      "overflowingClipped": 0,
+      "overflowingUnreachable": 0,
+      "overflowingElements": []
+    },
+    "320-wallet": {
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "bodyScrollWidth": 320,
+      "innerWidth": 320,
+      "overflow": false,
+      "overflowingCount": 3,
+      "overflowingInsideScroller": 3,
+      "overflowingClipped": 0,
+      "overflowingUnreachable": 0,
+      "overflowingElements": [
+        {
+          "el": "min-h-11 shrink-0 whitespace-nowrap rounded-full b",
+          "horizontalScroller": "-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scroll",
+          "clippedBy": null
+        },
+        {
+          "el": "min-h-11 shrink-0 whitespace-nowrap rounded-full b",
+          "horizontalScroller": "-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scroll",
+          "clippedBy": null
+        },
+        {
+          "el": "min-h-11 shrink-0 whitespace-nowrap rounded-full b",
+          "horizontalScroller": "-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scroll",
+          "clippedBy": null
+        }
+      ]
+    },
+    "320-workbench": {
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "bodyScrollWidth": 320,
+      "innerWidth": 320,
+      "overflow": false,
+      "overflowingCount": 0,
+      "overflowingInsideScroller": 0,
+      "overflowingClipped": 0,
+      "overflowingUnreachable": 0,
+      "overflowingElements": []
+    },
+    "320-admin": {
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "bodyScrollWidth": 320,
+      "innerWidth": 320,
+      "overflow": false,
+      "overflowingCount": 55,
+      "overflowingInsideScroller": 52,
+      "overflowingClipped": 3,
+      "overflowingUnreachable": 0,
+      "overflowingElements": [
+        {
+          "el": "ant-tabs-nav-list",
+          "horizontalScroller": null,
+          "clippedBy": "ant-tabs-nav-wrap ant-tabs-nav-wrap-ping-left ant-"
+        },
+        {
+          "el": "ant-tabs-tab",
+          "horizontalScroller": null,
+          "clippedBy": "ant-tabs-nav-wrap ant-tabs-nav-wrap-ping-left ant-"
+        },
+        {
+          "el": "ant-tabs-tab-btn",
+          "horizontalScroller": null,
+          "clippedBy": "ant-tabs-nav-wrap ant-tabs-nav-wrap-ping-left ant-"
+        },
+        {
+          "el": "ant-space css-dev-only-do-not-override-1y106cm ant",
+          "horizontalScroller": "ant-layout-content app-content css-dev-only-do-not",
+          "clippedBy": null
+        },
+        {
+          "el": "ant-space-item",
+          "horizontalScroller": "ant-layout-content app-content css-dev-only-do-not",
+          "clippedBy": null
+        },
+        {
+          "el": "ant-select ant-select-outlined css-var-_r_0_ ant-s",
+          "horizontalScroller": "ant-layout-content app-content css-dev-only-do-not",
+          "clippedBy": null
+        },
+        {
+          "el": "ant-select-content ant-select-content-has-value",
+          "horizontalScroller": "ant-layout-content app-content css-dev-only-do-not",
+          "clippedBy": null
+        },
+        {
+          "el": "ant-select-input",
+          "horizontalScroller": "ant-layout-content app-content css-dev-only-do-not",
+          "clippedBy": "ant-select-content ant-select-content-has-value"
+        }
+      ]
+    }
+  },
+  "screenshots": {
+    "campaignShot": "browser/375-campaign-claimable.png",
+    "redeemedCodeRedacted": "CQBN**FCQH",
+    "claimShot": "browser/375-claim-plaintext.png",
+    "reloadShot": "browser/375-after-reload-masked.png",
+    "walletShot": "browser/375-my-rewards.png",
+    "redeemShot": "browser/375-workbench-redeemed.png",
+    "duplicateShot": "browser/375-workbench-duplicate.png",
+    "reloginShot": "browser/375-workbench-relogin.png",
+    "drawerWithPlanShot": "browser/admin-desktop-drawer-with-plan.png",
+    "drawerNoPlanShot": "browser/admin-desktop-drawer-no-plan.png",
+    "tabShots": [
+      "browser/admin-desktop-checkin-tab-1.png",
+      "browser/admin-desktop-checkin-tab-2.png",
+      "browser/admin-desktop-checkin-tab-3.png",
+      "browser/admin-desktop-checkin-tab-4.png"
+    ]
+  },
+  "totals": {
+    "checks": 19,
+    "passed": 19,
+    "failed": 0
+  },
+  "failedIds": [],
+  "runs": [
+    {
+      "id": "seed.scenario",
+      "label": "用真实 API 造场景：1 个有奖励计划的活动（三人团 3/3、3 条已核验签到）+ 1 个无计划活动",
+      "pass": true,
+      "evidence": "main=273c8df8 noPlan=cde782f2 team=9afdc940 eligible=true"
+    },
+    {
+      "id": "ui375.campaign",
+      "label": "H5 活动页 375px 打开真实活动：团队进度来自服务端，横向不溢出",
+      "pass": true,
+      "evidence": "scrollWidth=375 clientWidth=375 overflow=false hasProgress=true"
+    },
+    {
+      "id": "ui375.claim",
+      "label": "H5 点击「领取奖励凭据」真的调用 API：页面出现 10 位核销码 + 一次性提示",
+      "pass": true,
+      "evidence": "click={\"ok\":true,\"tag\":\"BUTTON\",\"text\":\"领取奖励凭据\"} codeLen=10 promptShown=true"
+    },
+    {
+      "id": "ui375.codeMatchesServer",
+      "label": "页面上的明文码与后台投影的掩码尾号一致（同一份真实凭据）",
+      "pass": true,
+      "evidence": "pageCodeTail=FCQH adminMasked=******FCQH sha256=76e6fb400c0f…"
+    },
+    {
+      "id": "ui375.reloadMasked",
+      "label": "刷新后明文码不再出现，页面只显示 ******XXXX 掩码（服务端只存哈希）",
+      "pass": true,
+      "evidence": "leftoverCodes=0 masked=true pattern=******FCQH"
+    },
+    {
+      "id": "ui375.wallet",
+      "label": "我的奖励页 375px：显示同一条凭据掩码与奖励状态，横向不溢出",
+      "pass": true,
+      "evidence": "masked=true bucket=true scrollWidth=375 clientWidth=375"
+    },
+    {
+      "id": "ui375.gridRedeem",
+      "label": "网格员页面输入真实码后核销成功：UI 反映的是服务端核销结果",
+      "pass": true,
+      "evidence": "tab=true input={\"ok\":true} submit={\"ok\":true,\"tag\":\"BUTTON\",\"text\":\"确认核销\"} success=true scrollWidth=375/375"
+    },
+    {
+      "id": "ui375.gridDuplicate",
+      "label": "同一码第二次核销在 UI 上得到真实失败文案（不是假成功）",
+      "pass": true,
+      "evidence": "retype=true click=true duplicateMessage=true successCleared=true"
+    },
+    {
+      "id": "ui375.serverTruth",
+      "label": "UI 操作在服务端留下且仅留下一次核销（grant=redeemed、库存 redeemed=1）",
+      "pass": true,
+      "evidence": "grantsRedeemed=1 redeemedQty=1 redeemedBudget=2500"
+    },
+    {
+      "id": "ui375.relogin",
+      "label": "网格员清空会话后用真实账号密码重新登录：页面恢复，同源 /api 会话在服务端真的生效",
+      "pass": true,
+      "evidence": "loginPage=true click=true sessionRestored=true probe={\"authenticated\":true,\"username\":\"r2ui.4cb15d\",\"role\":\"grid_worker\"} scopedRead={\"status\":200,\"items\":3,\"raw\":null} activityManage={\"status\":403,\"code\":\"forbidden\",\"raw\":\"{\\\"error\\\":{\\\"code\\\":\\\"forbidden\\\",\\\"message\\\":\\\"网格员无权管理活动\\\",\\\"requestId\\\":\\\"97dbc033-a564-4ff8-82a6-86584c2a8e2b\\\"}}\"}"
+    },
+    {
+      "id": "ui375.reloginConsistency",
+      "label": "重新登录后管理台/H5 与库内状态一致：同一 grant 仍为 redeemed，库存未被二次占用",
+      "pass": true,
+      "evidence": "grantsRedeemed=1 redeemedQty=1"
+    },
+    {
+      "id": "admin.drawerWithPlan",
+      "label": "管理台编辑抽屉（有 rewardPlan）读回冻结的计划：开关已配置且奖品名称/成本/库存与计划一致",
+      "pass": true,
+      "evidence": "list=true open=true switch=true prize=\"社区小礼品\" unitYuan=\"25.00\" total=\"10\""
+    },
+    {
+      "id": "admin.drawerNoPlan",
+      "label": "管理台编辑抽屉（无 rewardPlan）开关为未配置、计划字段不渲染，不伪造默认值",
+      "pass": true,
+      "evidence": "open={\"ok\":true} switch=false prize=null total=null hint=true"
+    },
+    {
+      "id": "admin.checkinTabs",
+      "label": "报名与核销页四个页签齐全，且读取到真实奖励计划与库存",
+      "pass": true,
+      "evidence": "tabs=true realPlanShown=true"
+    },
+    {
+      "id": "admin.checkinTabsContent",
+      "label": "四个页签逐一渲染真实数据（核验计数、奖励授予、核销记录、异常）",
+      "pass": true,
+      "evidence": "hasVerifyCounts=true hasRedeemed=true"
+    },
+    {
+      "id": "ui320.320-campaign",
+      "label": "居民活动页 320px 无横向溢出、内容真实渲染",
+      "pass": true,
+      "evidence": "scrollWidth=320 clientWidth=320 overflowEls=0 textLen=1718"
+    },
+    {
+      "id": "ui320.320-wallet",
+      "label": "我的奖励 320px 无横向溢出、内容真实渲染",
+      "pass": true,
+      "evidence": "scrollWidth=320 clientWidth=320 overflowEls=3 textLen=419"
+    },
+    {
+      "id": "ui320.320-workbench",
+      "label": "网格员核销页 320px 无横向溢出、内容真实渲染",
+      "pass": true,
+      "evidence": "scrollWidth=320 clientWidth=320 overflowEls=0 textLen=341"
+    },
+    {
+      "id": "ui320.adminCheckin",
+      "label": "管理台「报名与核销」320px：文档不横向溢出，页签 4 个仍在可达范围内",
+      "pass": true,
+      "evidence": "scrollWidth=320 clientWidth=320 overflowEls=55 insideScroller=52 rewardTabs=4 allInViewport=false moreButton=\"more\" tabs=[\"签到核验（0 待核验）@166\",\"奖励列表（1）@290\",\"核销记录@379\",\"异常处理@468\"]"
+    }
+  ]
+}

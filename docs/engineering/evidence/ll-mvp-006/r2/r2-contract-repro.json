@@ -1,0 +1,44 @@
+{
+  "generatedAt": "2026-11-04T18:57:21.503Z",
+  "contractModule": "packages/contracts/dist/index.js",
+  "schema": "teamRewardStateSchema",
+  "totals": {
+    "checks": 4,
+    "passed": 4,
+    "failed": 0
+  },
+  "runs": [
+    {
+      "id": "baseline.ok",
+      "label": "对照：eligible=true 且 unavailableReason=null —— 契约应当接受",
+      "expect": "ok",
+      "observed": "ok",
+      "pass": true,
+      "firstIssue": null
+    },
+    {
+      "id": "bug.stockExhausted",
+      "label": "修复前的自我矛盾态：eligible=true 同时 unavailableReason=stock_exhausted",
+      "expect": "reject",
+      "observed": "reject",
+      "pass": true,
+      "firstIssue": "unavailableReason: unavailableReason must be null when the team is eligible"
+    },
+    {
+      "id": "bug.budgetExhausted",
+      "label": "修复前的自我矛盾态：eligible=true 同时 unavailableReason=budget_exhausted",
+      "expect": "reject",
+      "observed": "reject",
+      "pass": true,
+      "firstIssue": "unavailableReason: unavailableReason must be null when the team is eligible"
+    },
+    {
+      "id": "fixed.stockExhausted",
+      "label": "修复后的正确形态：eligible=false + unavailableReason=stock_exhausted —— 契约接受",
+      "expect": "ok",
+      "observed": "ok",
+      "pass": true,
+      "firstIssue": null
+    }
+  ]
+}

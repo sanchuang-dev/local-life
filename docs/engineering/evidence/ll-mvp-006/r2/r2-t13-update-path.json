@@ -1,0 +1,75 @@
+{
+  "generatedAt": "2026-11-04T18:57:21.600Z",
+  "api": "http://127.0.0.1:4091",
+  "db": "/tmp/ll-mvp-006-r2/verify.sqlite",
+  "totals": {
+    "checks": 10,
+    "passed": 9,
+    "failed": 1
+  },
+  "failedIds": [
+    "t13u.createPathMessageActionable"
+  ],
+  "runs": [
+    {
+      "id": "setup.activity",
+      "label": "创建带合法奖励计划的活动（用于走「继承计划」的编辑路径）",
+      "pass": true,
+      "evidence": "status=201 plan.checkinWindow=2026-11-04T18:27:21.541Z..2026-11-04T21:57:21.541Z"
+    },
+    {
+      "id": "t13u.inheritedPathFailsClosed",
+      "label": "继承计划的编辑被拒绝，且数据库原值完全未变（不半途写入、不产生越界数据）",
+      "pass": true,
+      "evidence": "status=400 unchanged=true"
+    },
+    {
+      "id": "t13u.inheritedPathReportable",
+      "label": "被拒绝时必须返回 400 + {error:{code,message,requestId}}，而不是空体 500",
+      "pass": true,
+      "evidence": "status=400 contentType=application/json bodyLen=155 code=invalid_request requestId=d3988890-8615-4d33-a4e2-a1aca56f7ce9"
+    },
+    {
+      "id": "t13u.inheritedPathMessageActionable",
+      "label": "拒绝信息点名 checkinWindow.opensAt，运营据此知道该改哪个字段",
+      "pass": true,
+      "evidence": "message=\"checkinWindow.opensAt must not be earlier than startsAt\""
+    },
+    {
+      "id": "t13u.inheritedPathLogged",
+      "label": "失败请求留下日志（request.completed 或 request.failed），便于运维定位",
+      "pass": true,
+      "evidence": "apiLogLines 273->274"
+    },
+    {
+      "id": "t13u.explicitPathReportable",
+      "label": "显式携带越界 rewardPlan 的编辑：400 + 错误信封，且原值不变",
+      "pass": true,
+      "evidence": "status=400 code=invalid_request unchanged=true"
+    },
+    {
+      "id": "t13u.closesAtBoundEnforced",
+      "label": "窗口结束晚于活动结束：创建路径拒绝（400 + 信封），且数据库不留活动行",
+      "pass": true,
+      "evidence": "status=400 code=invalid_request activities 12->12"
+    },
+    {
+      "id": "t13u.createPathMessageActionable",
+      "label": "创建路径的拒绝信息应点名 checkinWindow.closesAt（Finding E，low，既有行为）",
+      "pass": false,
+      "evidence": "message=\"活动信息不正确\""
+    },
+    {
+      "id": "t13u.clearPlanStillAllowed",
+      "label": "显式清空奖励计划（rewardPlan:null）仍被允许：约束只作用于计划本身，不误伤清空操作",
+      "pass": true,
+      "evidence": "status=200 rewardPlan=null"
+    },
+    {
+      "id": "t13u.legacyRowReadableAndRepairable",
+      "label": "修复前写入的越界计划仍可读取（管理台详情 200），且运营能把它改回合法值",
+      "pass": true,
+      "evidence": "read=200 storedOpensAt=2026-11-04T14:57:21.541Z repair=200"
+    }
+  ]
+}

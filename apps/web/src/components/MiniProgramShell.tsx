@@ -48,10 +48,12 @@ const subPageTitles: Record<string, string> = {
   '/life/exchange': '积分兑换',
   '/points': '我的积分',
   '/me/devices': '我的设备',
+  '/me/rewards': '我的奖励',
   '/workbench': '网格员工作台',
   '/workbench/leads': '我的线索',
   '/workbench/leads/new': '登记新线索',
   '/workbench/orders': '我的受理单',
+  '/workbench/verify': '现场核验核销',
 }
 
 /**
@@ -63,6 +65,8 @@ const sharedSubPageTabs: Record<string, TabPath> = {
   '/gd': '/',
   '/points': '/life',
   '/me/devices': '/me',
+  '/me/rewards': '/me',
+  '/workbench/verify': '/me',
 }
 
 /** Resolve a pathname to the module that owns it, or undefined for 404. */

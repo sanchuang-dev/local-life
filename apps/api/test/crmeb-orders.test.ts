@@ -979,11 +979,14 @@ test('migration 0005 upgrades a legacy event table in place and backfills determ
     entries: Array<{ idx: number; tag: string; when: number }>
   }
   assert.ok(journal.entries.some((entry) => entry.tag.startsWith('0005_')))
+  // Stage "everything before 0005" by index, not by excluding one tag: a later
+  // migration (0006+) must not be applied to the pre-0005 database, otherwise
+  // drizzle records a newer `when` and then skips 0005 during the upgrade.
   writeFileSync(
     journalPath,
     JSON.stringify({
       ...journal,
-      entries: journal.entries.filter((entry) => !entry.tag.startsWith('0005_')),
+      entries: journal.entries.filter((entry) => entry.idx <= 4),
     }),
   )
 

@@ -1,0 +1,24 @@
+{
+  "note": "修复前那次运行的留存摘录。原始 r2-api-runs.json 在 t11 修复落地后已被同一脚本在新库上重跑覆盖；本文件只保留修复前运行的统计行与两条 FAIL 原文（含服务端 requestId），供维护者核对『R2 独立验收确实抓到了这条 500』这一事实。",
+  "runId": "before-fix",
+  "generatedAt": "2026-11-04T16:07:53.943Z",
+  "script": "docs/engineering/evidence/ll-mvp-006/r2/api-e2e.cjs",
+  "scriptDrift": "修复后对同一脚本做过三处非语义改动：(a) item4.stockState / item4.budgetState 的 evidence 字符串改为打印 eligible/reason（断言表达式未改）；(b) 新增 item6.disputeReversed；(c) 新增 item5.anyMember。总项数因此由 41 变为 43。三处都是**新增证据或换打印内容**，没有为了转绿而放宽任何既有断言——修复前的 41 项与修复后的前 41 项可逐条对照。",
+  "sourceStateAtRun": "apps/api/src/rewards/service.ts 的 buildTeamRewardState 仍分别计算 eligible 与 unavailableReason（t11 修复前）",
+  "totals": { "checks": 41, "passed": 39, "failed": 2 },
+  "failedIds": ["item4.stockState", "item4.budgetState"],
+  "failedRuns": [
+    {
+      "id": "item4.stockState",
+      "label": "（契约要求）第二团的奖励状态读取应 200 且 eligible=false / unavailableReason=stock_exhausted",
+      "pass": false,
+      "evidence": "GET /activities/:id/rewards => 500 {\"error\":{\"code\":\"internal_error\",\"message\":\"Internal server error\",\"requestId\":\"2de41e20-960f-4ca7-bae1-796bef52c3f1\"}}"
+    },
+    {
+      "id": "item4.budgetState",
+      "label": "（契约要求）第二团的奖励状态读取应 200 且 unavailableReason=budget_exhausted",
+      "pass": false,
+      "evidence": "GET /activities/:id/rewards => 500 {\"error\":{\"code\":\"internal_error\",\"message\":\"Internal server error\",\"requestId\":\"f6526bc8-e01a-444d-944e-601c2c40c157\"}}"
+    }
+  ]
+}

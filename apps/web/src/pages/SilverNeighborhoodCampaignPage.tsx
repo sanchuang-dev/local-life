@@ -21,10 +21,21 @@ import { QRCodeSVG } from 'qrcode.react'
 import type { PublicActivityDetail } from '@sanchuang-dev/local-life-contracts'
 import { CampaignSheet } from '../components/CampaignSheet'
 import { ParticipationTeamCard } from '../components/activity/ParticipationTeamCard'
+import { RewardProgressCard } from '../components/activity/RewardProgressCard'
+import {
+  credentialExpiryText,
+  formatRewardDateTime,
+  grantStatusLabels,
+  rewardBucketClasses,
+  rewardBucketDetail,
+  rewardBucketLabels,
+  rewardBucketOf,
+} from '../components/activity/rewardLabels'
 import { buildActivityShareUrl, parseInviteParam } from '../components/activity/share'
 import { useActivityParticipation } from '../hooks/useActivityParticipation'
 import { usePublicActivity, type PublicActivityLoadState } from '../hooks/usePublicActivity'
 import { useResidentAuth } from '../hooks/useResidentAuth'
+import { useRewardProgress } from '../hooks/useRewardProgress'
 import { luckyPrizes, luckyGridSlots, type LuckyPrize } from '../mocks/silverLuckyPrizes'
 
 type TaskMode = 'checkin' | 'purchase'
@@ -340,6 +351,16 @@ export function SilverNeighborhoodCampaignPage() {
     sessionKey: auth.session?.user.id ?? null,
     authLoading: auth.loading,
   })
+  // Real check-in progress and team reward qualification for this activity.
+  // `csrfToken` comes from the authenticated session; a logged-out visitor can
+  // still read the page but cannot write a check-in or a claim.
+  const rewardProgress = useRewardProgress({
+    activityId: activity?.id ?? null,
+    csrfToken: auth.session?.csrfToken ?? null,
+    sessionKey: auth.session?.user.id ?? null,
+    authLoading: auth.loading,
+  })
+  const rewardReady = rewardProgress.state.status === 'ready' ? rewardProgress.state.data : null
 
   const participationState =
     participation.state.status === 'ready' ? participation.state.data : null
@@ -542,10 +563,12 @@ export function SilverNeighborhoodCampaignPage() {
       >
         <p className="flex items-center gap-1.5 text-[12px] font-bold text-[#8a6132]">
           <Info size={15} className="shrink-0" aria-hidden="true" />
-          以下为演示玩法 · 未接入真实记录
+          演示与真实内容说明
         </p>
         <p className="mt-1 text-[11px] leading-[1.7] text-[#8a6132]">
-          签到、消费、抽奖、排行榜、大奖、奖品发放与社区统计仍为前端交互演示，不会写入真实签到、订单、库存或兑奖记录。参与、三人团与邀请已接入真实业务，状态来自服务端。
+          参与、三人团、邀请、<span className="font-bold">真实签到</span>与
+          <span className="font-bold">团队奖励领取/核销凭据</span>
+          已接入真实业务，状态来自服务端。以下内容仍为前端演示、不产生真实记录：今日抽奖、活动压轴大奖、社区里程碑与热力榜、消费组队。
         </p>
       </section>
 
@@ -554,7 +577,7 @@ export function SilverNeighborhoodCampaignPage() {
           <h2 id="team-gifts-heading" className="text-[16px] font-bold text-[#225c4c]">
             成团好礼
           </h2>
-          <span className="text-[11px] text-slate-400">示例奖品</span>
+          <span className="text-[11px] text-slate-400">示例奖品 · 非真实库存</span>
         </div>
         <div className="grid grid-cols-3 gap-2">
           {[
@@ -593,7 +616,7 @@ export function SilverNeighborhoodCampaignPage() {
             <p className="text-[11px] font-bold tracking-[0.16em] text-teal-700">TEAM QUEST</p>
             <h2 className="mt-1 text-[19px] font-bold tracking-tight text-slate-900">成团任务</h2>
           </div>
-          <span className="text-[12px] text-slate-400">演示 · 未接入真实签到与订单</span>
+          <span className="text-[12px] text-slate-400">签到为真实数据 · 消费仍为演示</span>
         </div>
 
         <div className="rounded-[20px] border border-slate-100 bg-white p-3 shadow-sm">
@@ -602,7 +625,7 @@ export function SilverNeighborhoodCampaignPage() {
               type="button"
               onClick={() => setTaskMode('checkin')}
               aria-pressed={taskMode === 'checkin'}
-              className={`min-h-[42px] rounded-[11px] px-3 text-[13px] font-bold transition ${
+              className={`min-h-[44px] rounded-[11px] px-3 text-[13px] font-bold transition ${
                 taskMode === 'checkin' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500'
               }`}
             >
@@ -612,7 +635,7 @@ export function SilverNeighborhoodCampaignPage() {
               type="button"
               onClick={() => setTaskMode('purchase')}
               aria-pressed={taskMode === 'purchase'}
-              className={`min-h-[42px] rounded-[11px] px-3 text-[13px] font-bold transition ${
+              className={`min-h-[44px] rounded-[11px] px-3 text-[13px] font-bold transition ${
                 taskMode === 'purchase' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500'
               }`}
             >
@@ -623,30 +646,32 @@ export function SilverNeighborhoodCampaignPage() {
           {taskMode === 'checkin' ? (
             <div className="mt-4">
               <div className="flex items-center justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <p className="text-[14px] font-bold text-slate-800">三人有效签到</p>
-                  <p className="mt-1 text-[12px] text-slate-500">签到模块仍为演示，尚未读取真实签到记录。</p>
+                  <p className="mt-1 text-[12px] leading-5 text-slate-500">
+                    签到与奖励资格为真实数据；只有现场核验通过的签到计入进度。
+                  </p>
                 </div>
-                <span className="shrink-0 rounded-full bg-[#fff3e6] px-2.5 py-1 text-[11px] font-bold text-orange-600">
-                  演示玩法
+                <span className="shrink-0 rounded-full bg-[#e8f6f0] px-2.5 py-1 text-[11px] font-bold text-teal-700">
+                  真实接入
                 </span>
               </div>
-              <div className="mt-3 rounded-[12px] border border-dashed border-slate-200 bg-slate-50 px-3 py-2.5 text-[12px] text-slate-500">
-                真实签到进度将在签到功能接入后显示，当前不虚构人数。
-              </div>
+              <RewardProgressCard auth={auth} progress={rewardProgress} />
             </div>
           ) : (
             <div className="mt-4">
               <div className="flex items-center justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <p className="text-[14px] font-bold text-slate-800">三人有效购买 + 团队达标</p>
-                  <p className="mt-1 text-[12px] text-slate-500">消费模块仍为演示，尚未接入真实订单与金额。</p>
+                  <p className="mt-1 text-[12px] leading-5 text-slate-500">
+                    消费模块仍为演示，尚未接入真实订单与金额。
+                  </p>
                 </div>
                 <span className="shrink-0 rounded-full bg-[#f1edff] px-2.5 py-1 text-[11px] font-bold text-[#725aa9]">
                   演示玩法
                 </span>
               </div>
-              <div className="mt-3 rounded-[12px] border border-dashed border-slate-200 bg-slate-50 px-3 py-2.5 text-[12px] text-slate-500">
+              <div className="mt-3 rounded-[12px] border border-dashed border-slate-200 bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-500">
                 真实消费进度将在订单接入后显示，当前不虚构人数与金额。
               </div>
               <Link
@@ -1153,30 +1178,81 @@ export function SilverNeighborhoodCampaignPage() {
 
       <CampaignSheet
         open={activeSheet === 'checkin-reward'}
-        title="团队生活礼"
-        eyebrow="签到任务 · 演示"
+        title={rewardReady?.reward?.reward?.prizeName ?? '团队生活礼'}
+        eyebrow="签到任务 · 真实奖励"
         onClose={() => setActiveSheet(null)}
       >
         <div className="rounded-[16px] bg-[#f2faf6] p-4">
           <p className="text-[15px] font-bold text-slate-800">解锁条件</p>
-          <p className="mt-1">三位团员都完成一次有效到场签到后，团队解锁一份生活礼。</p>
+          <p className="mt-1">
+            三人团坐满 3 人，且三位团员各有一次经现场核验的有效签到后，团队解锁一份奖励。
+          </p>
         </div>
         <dl className="mt-3 divide-y divide-slate-100 rounded-[16px] border border-slate-100 bg-white px-4">
-          <div className="flex justify-between gap-4 py-3">
-            <dt>当前进度</dt>
-            <dd className="text-right font-semibold text-slate-800">签到数据未接入</dd>
-          </div>
-          <div className="flex justify-between gap-4 py-3">
-            <dt>奖励示例</dt>
-            <dd className="text-right font-semibold text-slate-800">鸡蛋 / 纸巾</dd>
-          </div>
+          {rewardReady?.reward?.reward ? (
+            <>
+              <div className="flex justify-between gap-4 py-3">
+                <dt>奖品</dt>
+                <dd className="min-w-0 break-words text-right font-semibold text-slate-800">
+                  {rewardReady.reward.reward.prizeName} · 每团{' '}
+                  {rewardReady.reward.reward.prizeQuantityPerTeam} 份
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4 py-3">
+                <dt>签到窗口</dt>
+                <dd className="min-w-0 text-right font-semibold text-slate-800">
+                  {formatRewardDateTime(rewardReady.reward.reward.checkinWindow.opensAt)} 至{' '}
+                  {formatRewardDateTime(rewardReady.reward.reward.checkinWindow.closesAt)}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4 py-3">
+                <dt>团队人数</dt>
+                <dd className="text-right font-semibold text-slate-800">
+                  {rewardReady.reward.requirement.seatsFilled}/3
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4 py-3">
+                <dt>有效签到</dt>
+                <dd className="text-right font-semibold text-slate-800">
+                  {rewardReady.reward.requirement.checkinsValid}/3
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4 py-3">
+                <dt>领取人</dt>
+                <dd className="text-right font-semibold text-slate-800">
+                  {rewardReady.reward.reward.claimRecipient === 'leader' ? '队长' : '任一团员'}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-4 py-3">
+                <dt>凭据有效期</dt>
+                <dd className="text-right font-semibold text-slate-800">
+                  {rewardReady.reward.reward.redemptionValidHours} 小时
+                </dd>
+              </div>
+            </>
+          ) : (
+            <div className="flex justify-between gap-4 py-3">
+              <dt>当前进度</dt>
+              <dd className="min-w-0 break-words text-right font-semibold text-slate-800">
+                {rewardProgress.state.status === 'ready'
+                  ? rewardProgress.state.data.gate?.kind === 'no_team'
+                    ? '尚未加入三人团'
+                    : '本活动未配置正式奖励计划'
+                  : rewardProgress.state.status === 'unauthenticated'
+                    ? '登录后查看真实进度'
+                    : rewardProgress.state.status === 'error'
+                      ? '进度读取失败'
+                      : '正在读取…'}
+              </dd>
+            </div>
+          )}
           <div className="flex justify-between gap-4 py-3">
             <dt>领取方式</dt>
-            <dd className="text-right font-semibold text-slate-800">活动现场核验领取</dd>
+            <dd className="text-right font-semibold text-slate-800">达标后领取凭据码，现场核销一次</dd>
           </div>
         </dl>
         <p className="mt-3 text-[12px] leading-5 text-slate-400">
-          当前只展示状态结构，不生成真实签到记录、领取码或库存占用。
+          以上奖品、窗口与进度均来自服务端冻结的奖励规则；凭据码仅在领取时显示一次，核销后不可重复使用。
         </p>
       </CampaignSheet>
 
@@ -1293,41 +1369,94 @@ export function SilverNeighborhoodCampaignPage() {
         title="我的奖励"
         eyebrow="ACTIVITY WALLET"
         onClose={() => setActiveSheet(null)}
+        footer={
+          <Link
+            to="/me/rewards"
+            className="flex min-h-[48px] w-full items-center justify-center rounded-[14px] bg-teal-700 px-4 text-[14px] font-bold text-white"
+          >
+            查看全部活动奖励
+          </Link>
+        }
       >
-        <div className="grid gap-3">
-          <div className="rounded-[16px] border border-slate-100 bg-white p-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="font-bold text-slate-800">团队生活礼</p>
-              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500">待达成</span>
+        {rewardReady?.reward ? (
+          <div className="grid gap-3">
+            <div className="rounded-[16px] border border-slate-100 bg-white p-4">
+              <div className="flex items-start justify-between gap-3">
+                <p className="min-w-0 break-words font-bold text-slate-800">
+                  {rewardReady.reward.reward?.prizeName ?? '本活动团队奖励'}
+                </p>
+                <span
+                  className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                    rewardBucketClasses[rewardBucketOf(rewardReady.reward)]
+                  }`}
+                >
+                  {rewardBucketLabels[rewardBucketOf(rewardReady.reward)]}
+                </span>
+              </div>
+              <p className="mt-1 text-[12px] leading-5 text-slate-500">
+                {rewardBucketDetail(rewardReady.reward)}
+              </p>
+              {rewardReady.reward.credential ? (
+                <p className="mt-2 rounded-[12px] bg-[#f4f9f6] px-3 py-2 font-mono text-[13px] font-semibold text-[#225c4c]">
+                  凭据 {rewardReady.reward.credential.maskedCode}
+                </p>
+              ) : null}
+              {rewardReady.reward.credential ? (
+                <p className="mt-1 text-[11px] leading-[18px] text-slate-400">
+                  {credentialExpiryText(rewardReady.reward.credential)}
+                </p>
+              ) : null}
+              {rewardReady.reward.grant ? (
+                <p className="mt-1 text-[11px] leading-[18px] text-slate-400">
+                  {grantStatusLabels[rewardReady.reward.grant.status]} · 发放于{' '}
+                  {formatRewardDateTime(rewardReady.reward.grant.grantedAt)}
+                </p>
+              ) : null}
             </div>
-            <p className="mt-1 text-[12px] text-slate-500">签到数据尚未接入，当前仅展示奖励结构。</p>
+            <div className="rounded-[16px] border border-slate-100 bg-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-bold text-slate-800">团队进度</p>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500">
+                  {rewardReady.reward.requirement.seatsFilled}/3 人 ·{' '}
+                  {rewardReady.reward.requirement.checkinsValid}/3 签到
+                </span>
+              </div>
+              <p className="mt-1 text-[12px] leading-5 text-slate-500">
+                有效签到指经工作人员现场核验的签到；自行签到未核验前不计入。
+              </p>
+            </div>
           </div>
+        ) : (
           <div className="rounded-[16px] border border-slate-100 bg-white p-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="font-bold text-slate-800">团队惊喜权益</p>
-              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500">待达成</span>
-            </div>
-            <p className="mt-1 text-[12px] text-slate-500">消费数据尚未接入，当前仅展示权益结构。</p>
-          </div>
-          <div className="rounded-[16px] border border-slate-100 bg-white p-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="font-bold text-slate-800">今日抽奖</p>
-              <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                drawResult ? 'bg-[#fff3e6] text-orange-700' : 'bg-[#e8f6f0] text-teal-700'
-              }`}>
-                {drawResult ? '待领取 · 演示' : '可抽取'}
-              </span>
-            </div>
-            <p className="mt-1 text-[12px] text-slate-500">
-              {drawResult
-                ? `本次演示中奖：${drawResult.level} · ${drawResult.name}。`
-                : '今天还有 1 次演示抽奖机会。'}
+            <p className="font-bold text-slate-800">本活动暂无真实奖励记录</p>
+            <p className="mt-1 text-[12px] leading-5 text-slate-500">
+              {rewardProgress.state.status === 'ready'
+                ? rewardProgress.state.data.gate?.kind === 'no_team'
+                  ? '你还没有加入三人团，暂不满足奖励条件。'
+                  : '本活动尚未配置正式奖励计划，未生成任何奖励或凭据。'
+                : rewardProgress.state.status === 'unauthenticated'
+                  ? '登录后可查看本活动的真实奖励与核销凭据。'
+                  : rewardProgress.state.status === 'error'
+                    ? '奖励状态读取失败，请稍后重试。'
+                    : '正在读取奖励状态…'}
             </p>
           </div>
+        )}
+        <div className="mt-3 rounded-[16px] border border-dashed border-slate-200 bg-slate-50 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="font-bold text-slate-700">今日抽奖</p>
+            <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+              drawResult ? 'bg-[#fff3e6] text-orange-700' : 'bg-slate-100 text-slate-500'
+            }`}>
+              {drawResult ? '演示中奖' : '演示玩法'}
+            </span>
+          </div>
+          <p className="mt-1 text-[12px] leading-5 text-slate-500">
+            {drawResult
+              ? `本次演示中奖：${drawResult.level} · ${drawResult.name}。`
+              : '抽奖为前端演示，不生成真实券码或兑奖凭证。'}
+          </p>
         </div>
-        <p className="mt-3 text-[12px] leading-5 text-slate-400">
-          “待领取”仅用于验证奖励状态设计，不生成真实券码或兑奖凭证。
-        </p>
       </CampaignSheet>
 
       <CampaignSheet

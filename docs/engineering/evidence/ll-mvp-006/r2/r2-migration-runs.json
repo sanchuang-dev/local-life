@@ -1,0 +1,80 @@
+{
+  "generatedAt": "2026-11-04T18:57:21.414Z",
+  "db": "/tmp/ll-mvp-006-r2/migration.sqlite",
+  "oldMigrations": [
+    "0000_freezing_micromax",
+    "0001_oval_mulholland_black",
+    "0002_nosy_white_queen",
+    "0003_crm_core",
+    "0004_polite_black_bird",
+    "0005_opposite_gunslinger"
+  ],
+  "totals": {
+    "checks": 10,
+    "passed": 10,
+    "failed": 0
+  },
+  "failedIds": [],
+  "runs": [
+    {
+      "id": "mig.oldFolder",
+      "label": "构造\"上一张卡\"的迁移目录（journal 截断到 0005）",
+      "pass": true,
+      "evidence": "tags=0000_freezing_micromax,0001_oval_mulholland_black,0002_nosy_white_queen,0003_crm_core,0004_polite_black_bird,0005_opposite_gunslinger"
+    },
+    {
+      "id": "mig.at0005",
+      "label": "老库真实停在 0005：无奖励相关表，activities 无 reward_plan_json 列",
+      "pass": true,
+      "evidence": "tables=27 triggers=21 hasGrantsTable=false hasRewardPlanColumn=false"
+    },
+    {
+      "id": "mig.seed",
+      "label": "在 0005 库中写入真实老数据（社区/居民/管理员/已发布活动/规则版本）",
+      "pass": true,
+      "evidence": "{\"communities\":1,\"users\":2,\"staff\":1,\"activities\":1,\"ruleVersions\":1}"
+    },
+    {
+      "id": "mig.startup",
+      "label": "真实 API 进程启动时对老库执行增量迁移（0006 apply）",
+      "pass": true,
+      "evidence": "GET /healthz => 200 on :4093"
+    },
+    {
+      "id": "mig.objects",
+      "label": "0006 新增 6 张表 / 32 个触发器 / 相关索引全部到位",
+      "pass": true,
+      "evidence": "missingTables=none newTables=6 newTriggers=32 newIndexes=20"
+    },
+    {
+      "id": "mig.column",
+      "label": "activities.reward_plan_json 列已由 ALTER TABLE 添加，且是 nullable",
+      "pass": true,
+      "evidence": "hasColumn=true"
+    },
+    {
+      "id": "mig.preserved",
+      "label": "老数据零丢失：各表行数与升级前完全一致，活动标题/状态未变",
+      "pass": true,
+      "evidence": "{\"communities\":1,\"users\":2,\"staff\":1,\"activities\":1,\"ruleVersions\":1} -> {\"communities\":1,\"users\":2,\"staff\":1,\"activities\":1,\"ruleVersions\":1}"
+    },
+    {
+      "id": "mig.noBackfill",
+      "label": "0006 不回填任何奖励数据（老活动保持\"未配置奖励计划\"）",
+      "pass": true,
+      "evidence": "grants+stocks+checkins=0 reward_plan_json=null"
+    },
+    {
+      "id": "mig.triggersLive",
+      "label": "新约束在升级后的库上真实生效（无奖励计划的签到被拒、无快照的库存行被拒，且未落库）",
+      "pass": true,
+      "evidence": "checkin=\"check-in is outside the frozen check-in window\" stock=\"stock row must copy the frozen reward plan of its activity\" leakedRows=0"
+    },
+    {
+      "id": "mig.integrity",
+      "label": "升级后完整性检查通过（integrity_check=ok、无外键违规）",
+      "pass": true,
+      "evidence": "integrity_check=ok foreignKeyViolations=0"
+    }
+  ]
+}

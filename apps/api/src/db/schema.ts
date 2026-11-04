@@ -17,9 +17,15 @@ import type {
   CrmebAttributionClaimState,
   CrmebIdentityVerificationMethod,
   CrmebOrderStatus,
+  CheckinStatus,
   ParticipationInviteSource,
   ParticipationRole,
   ParticipationTeamStatus,
+  RewardCredentialStatus,
+  RewardDisputeDecision,
+  RewardEventKind,
+  RewardGrantStatus,
+  RewardRecipientRole,
 } from '@sanchuang-dev/local-life-contracts'
 
 export type StaffRole = 'admin' | 'operator' | 'grid_worker'
@@ -181,6 +187,13 @@ export const activities = sqliteTable(
     budgetCapCents: integer('budget_cap_cents').notNull(),
     prizeQuantityCap: integer('prize_quantity_cap').notNull(),
     publicRulesJson: text('public_rules_json').notNull(),
+    /**
+     * Mutable current copy of the prize fulfilment plan (LL-MVP-006). Only the
+     * frozen copy inside a rule-version snapshot may drive fulfilment; this
+     * column exists so a draft can be edited without a version, and is NULL for
+     * every activity that has no plan.
+     */
+    rewardPlanJson: text('reward_plan_json'),
     currentRuleVersionId: text('current_rule_version_id').references(
       () => activityRuleVersions.id,
       { onDelete: 'set null' },
@@ -753,6 +766,402 @@ export const crmebSyncRuns = sqliteTable(
   ],
 )
 
+
+/* -------------------------------------------------------------------------- */
+/* Check-in, team reward and prize fulfilment (LL-MVP-006, Issue #62)         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A real, on-site check-in. Only `status = 'valid'` with `verified_at` set counts
+ * towards the three-check-in requirement; a revoked row stays behind as history
+ * and stops counting. `(activity_id, user_id)` is unique among valid rows, so a
+ * resident can never bank two live check-ins in one activity, while revoking one
+ * still allows a later re-check-in.
+ */
+export const activityCheckins = sqliteTable(
+  'activity_checkins',
+  {
+    id: text('id').primaryKey(),
+    activityId: text('activity_id')
+      .notNull()
+      .references(() => activities.id, { onDelete: 'restrict' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    /** Frozen at insert: the team the resident belonged to when checking in. */
+    teamId: text('team_id').references(() => activityTeams.id, { onDelete: 'restrict' }),
+    seatNo: integer('seat_no'),
+    status: text('status').$type<CheckinStatus>().notNull(),
+    note: text('note'),
+    checkedInAt: integer('checked_in_at', { mode: 'timestamp_ms' }).notNull(),
+    verifiedAt: integer('verified_at', { mode: 'timestamp_ms' }),
+    verifiedByStaffId: text('verified_by_staff_id').references(() => staffAccounts.id, {
+      onDelete: 'restrict',
+    }),
+    revokedAt: integer('revoked_at', { mode: 'timestamp_ms' }),
+    revokedByStaffId: text('revoked_by_staff_id').references(() => staffAccounts.id, {
+      onDelete: 'restrict',
+    }),
+    revokeReason: text('revoke_reason'),
+  },
+  (table) => [
+    // At most one *valid* check-in per resident per activity (partial index).
+    uniqueIndex('activity_checkins_activity_user_valid_uq')
+      .on(table.activityId, table.userId)
+      .where(sql`${table.status} = 'valid'`),
+    index('activity_checkins_activity_status_idx').on(table.activityId, table.status),
+    index('activity_checkins_user_idx').on(table.userId),
+    index('activity_checkins_team_idx').on(table.teamId),
+    check('activity_checkins_status_check', sql`${table.status} IN ('valid', 'revoked')`),
+    check(
+      'activity_checkins_seat_no_check',
+      sql`(${table.teamId} IS NULL AND ${table.seatNo} IS NULL)
+        OR (${table.teamId} IS NOT NULL AND ${table.seatNo} BETWEEN 1 AND 3)`,
+    ),
+    // A revoked check-in must carry the full revocation stamp, a valid one none.
+    check(
+      'activity_checkins_revocation_check',
+      sql`(${table.status} = 'revoked'
+          AND ${table.revokedAt} IS NOT NULL
+          AND ${table.revokedByStaffId} IS NOT NULL
+          AND ${table.revokeReason} IS NOT NULL
+          AND length(trim(${table.revokeReason})) >= 2)
+        OR (${table.status} = 'valid'
+          AND ${table.revokedAt} IS NULL
+          AND ${table.revokedByStaffId} IS NULL
+          AND ${table.revokeReason} IS NULL)`,
+    ),
+    // Verification stamp is all-or-nothing.
+    check(
+      'activity_checkins_verification_check',
+      sql`(${table.verifiedAt} IS NULL AND ${table.verifiedByStaffId} IS NULL)
+        OR (${table.verifiedAt} IS NOT NULL AND ${table.verifiedByStaffId} IS NOT NULL)`,
+    ),
+  ],
+)
+
+/**
+ * Exactly one grant per (activity, frozen rule version, team). The unique key is
+ * what makes "3 seats + 3 check-ins arrive concurrently" safe: the second claim
+ * loses at the index, not in application code.
+ *
+ * `unit_cost_cents`, `quantity` and `prize_name` are copied from the frozen rule
+ * version snapshot at grant time, so a later edit of the activity row can never
+ * re-price an issued prize.
+ */
+export const activityRewardGrants = sqliteTable(
+  'activity_reward_grants',
+  {
+    id: text('id').primaryKey(),
+    activityId: text('activity_id')
+      .notNull()
+      .references(() => activities.id, { onDelete: 'restrict' }),
+    ruleVersionId: text('rule_version_id')
+      .notNull()
+      .references(() => activityRuleVersions.id, { onDelete: 'restrict' }),
+    teamId: text('team_id')
+      .notNull()
+      .references(() => activityTeams.id, { onDelete: 'restrict' }),
+    prizeName: text('prize_name').notNull(),
+    quantity: integer('quantity').notNull(),
+    unitCostCents: integer('unit_cost_cents').notNull(),
+    totalCostCents: integer('total_cost_cents').notNull(),
+    status: text('status').$type<RewardGrantStatus>().notNull(),
+    /** Who may present the credential: the leader or any team member. */
+    recipientRole: text('recipient_role').$type<RewardRecipientRole>().notNull(),
+    recipientUserId: text('recipient_user_id').references(() => users.id, {
+      onDelete: 'restrict',
+    }),
+    grantedAt: integer('granted_at', { mode: 'timestamp_ms' }).notNull(),
+    redeemedAt: integer('redeemed_at', { mode: 'timestamp_ms' }),
+    redeemedByStaffId: text('redeemed_by_staff_id').references(() => staffAccounts.id, {
+      onDelete: 'restrict',
+    }),
+    revokedAt: integer('revoked_at', { mode: 'timestamp_ms' }),
+    revokedByStaffId: text('revoked_by_staff_id').references(() => staffAccounts.id, {
+      onDelete: 'restrict',
+    }),
+    revokeReason: text('revoke_reason'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    // "One team, one activity, one prize" — deliberately NOT scoped to the rule
+    // version: an edit bumps the version, and a version-scoped key let the same
+    // team be granted a second physical prize after any rule change.
+    // Partial on `status <> 'revoked'` so withdrawing an unredeemed grant frees
+    // the slot for a corrected re-grant; every other status keeps it occupied.
+    uniqueIndex('activity_reward_grants_activity_team_uq')
+      .on(table.activityId, table.teamId)
+      .where(sql`${table.status} <> 'revoked'`),
+    index('activity_reward_grants_activity_status_idx').on(table.activityId, table.status),
+    index('activity_reward_grants_team_idx').on(table.teamId),
+    index('activity_reward_grants_recipient_idx').on(table.recipientUserId),
+    check(
+      'activity_reward_grants_status_check',
+      sql`${table.status} IN ('granted', 'redeemed', 'revoked', 'expired', 'disputed', 'reversed')`,
+    ),
+    check('activity_reward_grants_quantity_check', sql`${table.quantity} > 0`),
+    check('activity_reward_grants_unit_cost_check', sql`${table.unitCostCents} > 0`),
+    check(
+      'activity_reward_grants_total_cost_check',
+      sql`${table.totalCostCents} = ${table.quantity} * ${table.unitCostCents}`,
+    ),
+    check(
+      'activity_reward_grants_recipient_role_check',
+      sql`${table.recipientRole} IN ('leader', 'member')`,
+    ),
+    check(
+      'activity_reward_grants_revocation_check',
+      sql`(${table.status} = 'revoked'
+          AND ${table.revokedAt} IS NOT NULL
+          AND ${table.revokedByStaffId} IS NOT NULL
+          AND ${table.revokeReason} IS NOT NULL)
+        OR (${table.status} <> 'revoked'
+          AND ${table.revokedAt} IS NULL
+          AND ${table.revokedByStaffId} IS NULL
+          AND ${table.revokeReason} IS NULL)`,
+    ),
+    // A redeemed prize keeps its redemption stamp even when it is later disputed
+    // or reversed: reversal is expressed by dispute/event rows, not by erasing
+    // the redemption.
+    check(
+      'activity_reward_grants_redemption_check',
+      sql`(${table.status} IN ('redeemed', 'disputed', 'reversed')
+          AND ${table.redeemedAt} IS NOT NULL
+          AND ${table.redeemedByStaffId} IS NOT NULL)
+        OR (${table.status} IN ('granted', 'revoked', 'expired')
+          AND ${table.redeemedAt} IS NULL
+          AND ${table.redeemedByStaffId} IS NULL)`,
+    ),
+  ],
+)
+
+/**
+ * One-time redemption credential. Only the sha256 hash is stored; the plaintext
+ * code exists in exactly one API response. At most one credential per grant may
+ * be `active` (partial unique index), and re-issuing supersedes the old row
+ * instead of deleting or overwriting it.
+ */
+export const activityRewardCodes = sqliteTable(
+  'activity_reward_codes',
+  {
+    id: text('id').primaryKey(),
+    grantId: text('grant_id')
+      .notNull()
+      .references(() => activityRewardGrants.id, { onDelete: 'restrict' }),
+    activityId: text('activity_id')
+      .notNull()
+      .references(() => activities.id, { onDelete: 'restrict' }),
+    teamId: text('team_id')
+      .notNull()
+      .references(() => activityTeams.id, { onDelete: 'restrict' }),
+    codeHash: text('code_hash').notNull(),
+    /** Last four characters, so staff can confirm the paper slip. */
+    codeSuffix: text('code_suffix').notNull(),
+    prizeName: text('prize_name').notNull(),
+    status: text('status').$type<RewardCredentialStatus>().notNull(),
+    issuedAt: integer('issued_at', { mode: 'timestamp_ms' }).notNull(),
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+    redeemedAt: integer('redeemed_at', { mode: 'timestamp_ms' }),
+    redeemedByStaffId: text('redeemed_by_staff_id').references(() => staffAccounts.id, {
+      onDelete: 'restrict',
+    }),
+    supersededAt: integer('superseded_at', { mode: 'timestamp_ms' }),
+    revokedAt: integer('revoked_at', { mode: 'timestamp_ms' }),
+  },
+  (table) => [
+    uniqueIndex('activity_reward_codes_hash_uq').on(table.codeHash),
+    // At most one live credential per grant.
+    uniqueIndex('activity_reward_codes_grant_active_uq')
+      .on(table.grantId)
+      .where(sql`${table.status} = 'active'`),
+    index('activity_reward_codes_activity_status_idx').on(table.activityId, table.status),
+    index('activity_reward_codes_grant_idx').on(table.grantId),
+    check(
+      'activity_reward_codes_status_check',
+      sql`${table.status} IN ('active', 'redeemed', 'superseded', 'expired', 'revoked')`,
+    ),
+    check(
+      'activity_reward_codes_hash_check',
+      sql`length(${table.codeHash}) = 64 AND ${table.codeHash} NOT GLOB '*[^0-9a-f]*'`,
+    ),
+    check(
+      'activity_reward_codes_suffix_check',
+      sql`length(${table.codeSuffix}) = 4 AND ${table.codeSuffix} NOT GLOB '*[^0-9A-HJKMNP-TV-Z]*'`,
+    ),
+    check(
+      'activity_reward_codes_expiry_check',
+      sql`${table.expiresAt} > ${table.issuedAt}`,
+    ),
+    check(
+      'activity_reward_codes_redemption_check',
+      sql`(${table.status} = 'redeemed'
+          AND ${table.redeemedAt} IS NOT NULL
+          AND ${table.redeemedByStaffId} IS NOT NULL)
+        OR (${table.status} <> 'redeemed'
+          AND ${table.redeemedAt} IS NULL
+          AND ${table.redeemedByStaffId} IS NULL)`,
+    ),
+    check(
+      'activity_reward_codes_superseded_check',
+      sql`(${table.status} = 'superseded' AND ${table.supersededAt} IS NOT NULL)
+        OR (${table.status} <> 'superseded' AND ${table.supersededAt} IS NULL)`,
+    ),
+    check(
+      'activity_reward_codes_revoked_check',
+      sql`(${table.status} = 'revoked' AND ${table.revokedAt} IS NOT NULL)
+        OR (${table.status} <> 'revoked' AND ${table.revokedAt} IS NULL)`,
+    ),
+  ],
+)
+
+/**
+ * Stock and budget occupancy of one frozen rule version. `unit_cost_cents`,
+ * `budget_cap_cents` and `total_quantity` are copied from the rule-version
+ * snapshot, never read from the mutable activity row.
+ *
+ * `claimed_quantity` is the committed occupancy and `redeemed_quantity` the
+ * handed-out count, so `claimed >= redeemed` always holds. Revoking an
+ * unredeemed grant releases `claimed`; a reversed *redeemed* grant must NOT
+ * lower `redeemed` (the reversal is expressed by the append-only dispute/event
+ * rows), which keeps the ledger and the audit trail reconcilable.
+ */
+export const activityPrizeStocks = sqliteTable(
+  'activity_prize_stocks',
+  {
+    id: text('id').primaryKey(),
+    activityId: text('activity_id')
+      .notNull()
+      .references(() => activities.id, { onDelete: 'restrict' }),
+    ruleVersionId: text('rule_version_id')
+      .notNull()
+      .references(() => activityRuleVersions.id, { onDelete: 'restrict' }),
+    prizeName: text('prize_name').notNull(),
+    unitCostCents: integer('unit_cost_cents').notNull(),
+    totalQuantity: integer('total_quantity').notNull(),
+    claimedQuantity: integer('claimed_quantity').notNull().default(0),
+    redeemedQuantity: integer('redeemed_quantity').notNull().default(0),
+    budgetCapCents: integer('budget_cap_cents').notNull(),
+    committedBudgetCents: integer('committed_budget_cents').notNull().default(0),
+    redeemedBudgetCents: integer('redeemed_budget_cents').notNull().default(0),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    // One ledger per activity and prize, NOT per rule version: a version-scoped
+    // ledger let every new version start at `claimed_quantity = 0`, silently
+    // multiplying total quantity and budget cap by the number of edits.
+    // `rule_version_id` stays on the row as the price provenance only.
+    uniqueIndex('activity_prize_stocks_activity_prize_uq').on(
+      table.activityId,
+      table.prizeName,
+    ),
+    index('activity_prize_stocks_activity_idx').on(table.activityId),
+    check(
+      'activity_prize_stocks_unit_cost_check',
+      sql`${table.unitCostCents} > 0 AND ${table.totalQuantity} > 0 AND ${table.budgetCapCents} > 0`,
+    ),
+    check(
+      'activity_prize_stocks_quantity_check',
+      sql`${table.claimedQuantity} >= 0
+        AND ${table.redeemedQuantity} >= 0
+        AND ${table.claimedQuantity} <= ${table.totalQuantity}
+        AND ${table.redeemedQuantity} <= ${table.claimedQuantity}`,
+    ),
+    check(
+      'activity_prize_stocks_budget_check',
+      sql`${table.committedBudgetCents} = ${table.claimedQuantity} * ${table.unitCostCents}
+        AND ${table.redeemedBudgetCents} = ${table.redeemedQuantity} * ${table.unitCostCents}
+        AND ${table.committedBudgetCents} <= ${table.budgetCapCents}`,
+    ),
+  ],
+)
+
+/**
+ * Append-only fulfilment timeline per activity. `sequence` is monotonic inside
+ * one activity, so two events written in the same millisecond still have a
+ * deterministic order. UPDATE and DELETE are rejected by triggers in 0006.
+ */
+export const activityRewardEvents = sqliteTable(
+  'activity_reward_events',
+  {
+    id: text('id').primaryKey(),
+    activityId: text('activity_id')
+      .notNull()
+      .references(() => activities.id, { onDelete: 'restrict' }),
+    sequence: integer('sequence').notNull(),
+    kind: text('kind').$type<RewardEventKind>().notNull(),
+    grantId: text('grant_id').references(() => activityRewardGrants.id, {
+      onDelete: 'restrict',
+    }),
+    checkinId: text('checkin_id').references(() => activityCheckins.id, {
+      onDelete: 'restrict',
+    }),
+    credentialId: text('credential_id').references(() => activityRewardCodes.id, {
+      onDelete: 'restrict',
+    }),
+    actorUserId: text('actor_user_id').references(() => users.id, { onDelete: 'restrict' }),
+    actorStaffId: text('actor_staff_id').references(() => staffAccounts.id, {
+      onDelete: 'restrict',
+    }),
+    detailJson: text('detail_json'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('activity_reward_events_activity_sequence_uq').on(
+      table.activityId,
+      table.sequence,
+    ),
+    index('activity_reward_events_activity_created_idx').on(table.activityId, table.createdAt),
+    index('activity_reward_events_grant_idx').on(table.grantId),
+    index('activity_reward_events_kind_idx').on(table.kind),
+    check('activity_reward_events_sequence_check', sql`${table.sequence} > 0`),
+    check(
+      'activity_reward_events_kind_check',
+      sql`${table.kind} IN ('checkin.verified', 'checkin.revoked', 'grant.created', 'grant.redeemed', 'grant.revoked', 'grant.expired', 'credential.issued', 'credential.superseded', 'dispute.opened', 'dispute.reversed', 'dispute.dismissed')`,
+    ),
+  ],
+)
+
+/**
+ * Dispute / manual-reversal thread of one grant, expressed purely as appended
+ * rows: `opened` first, then at most one terminal `reversed` or `dismissed`
+ * entry. Nothing is ever updated or deleted, so the original decision stays
+ * auditable even after a reversal.
+ */
+export const activityRewardDisputes = sqliteTable(
+  'activity_reward_disputes',
+  {
+    id: text('id').primaryKey(),
+    activityId: text('activity_id')
+      .notNull()
+      .references(() => activities.id, { onDelete: 'restrict' }),
+    grantId: text('grant_id')
+      .notNull()
+      .references(() => activityRewardGrants.id, { onDelete: 'restrict' }),
+    decision: text('decision').$type<RewardDisputeDecision>().notNull(),
+    reason: text('reason').notNull(),
+    note: text('note'),
+    actorStaffId: text('actor_staff_id').references(() => staffAccounts.id, {
+      onDelete: 'restrict',
+    }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    index('activity_reward_disputes_grant_created_idx').on(table.grantId, table.createdAt),
+    index('activity_reward_disputes_activity_idx').on(table.activityId),
+    check(
+      'activity_reward_disputes_decision_check',
+      sql`${table.decision} IN ('opened', 'reversed', 'dismissed')`,
+    ),
+    check(
+      'activity_reward_disputes_reason_check',
+      sql`length(trim(${table.reason})) >= 2`,
+    ),
+  ],
+)
+
 export const userRelations = relations(users, ({ many }) => ({
   wechatIdentities: many(wechatIdentities),
   residentCommunities: many(residentCommunityAssignments),
@@ -791,4 +1200,10 @@ export const schema = {
   crmebRefunds,
   crmebClickAttributions,
   crmebSyncRuns,
+  activityCheckins,
+  activityRewardGrants,
+  activityRewardCodes,
+  activityPrizeStocks,
+  activityRewardEvents,
+  activityRewardDisputes,
 }
