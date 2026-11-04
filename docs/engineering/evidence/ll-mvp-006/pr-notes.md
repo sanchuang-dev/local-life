@@ -93,9 +93,12 @@ Issues: [#62](https://github.com/sanchuang-dev/local-life/issues/62)
 pnpm check   → EXIT=0
   oxlint            17 warnings / 0 errors
   typecheck         contracts / api / admin / web 全过
-  API tests         189 / 189 pass, 0 fail
-  contracts tests   7 / 7 pass
-  admin tests       91 / 91 pass
+  API tests         189 / 189 pass, 0 fail   (apps/api, node:test)
+  local-dev tests     7 / 7   pass, 0 fail   (scripts/local-dev.test.mjs)
+  admin tests        91 / 91  pass            (apps/admin, vitest)
+  contracts         build + typecheck only — `packages/contracts` has no test
+                    runtime, so the "7" that shows up under `pnpm check` comes
+                    from local-dev, not from contracts
   build             全量通过
 ```
 
