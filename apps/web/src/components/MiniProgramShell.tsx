@@ -48,6 +48,10 @@ const subPageTitles: Record<string, string> = {
   '/life/exchange': '积分兑换',
   '/points': '我的积分',
   '/me/devices': '我的设备',
+  '/workbench': '网格员工作台',
+  '/workbench/leads': '我的线索',
+  '/workbench/leads/new': '登记新线索',
+  '/workbench/orders': '我的受理单',
 }
 
 /**
@@ -68,6 +72,19 @@ const tabForPath = (pathname: string): TabPath | undefined => {
   if (pathname.startsWith('/health')) return '/health'
   if (pathname.startsWith('/life')) return '/life'
   if (pathname === '/me' || pathname.startsWith('/me/')) return '/me'
+  // The staff workbench is entered from "我的"; residents never see the entry.
+  if (pathname === '/workbench' || pathname.startsWith('/workbench/')) return '/me'
+  return undefined
+}
+
+/** Deep-linked workbench sub-pages return to their nearest list, not the tab root. */
+const workbenchBackFallback = (pathname: string): string | undefined => {
+  if (pathname === '/workbench/leads/new') return '/workbench/leads'
+  const orderNew = pathname.match(/^\/workbench\/leads\/([^/]+)\/orders\/new$/)
+  if (orderNew?.[1]) return `/workbench/leads/${orderNew[1]}`
+  if (/^\/workbench\/leads\/[^/]+$/.test(pathname)) return '/workbench/leads'
+  if (/^\/workbench\/orders\/[^/]+$/.test(pathname)) return '/workbench/orders'
+  if (pathname.startsWith('/workbench')) return '/workbench'
   return undefined
 }
 
@@ -100,7 +117,15 @@ function MiniProgramTopBar() {
             ? '活动详情'
             : pathname.startsWith('/life/product/')
               ? '商品详情'
-              : tabs.find((item) => item.path === pathname)?.label)
+              : pathname === '/workbench/leads/new'
+                ? '登记新线索'
+                : /^\/workbench\/leads\/[^/]+\/orders\/new$/.test(pathname)
+                  ? '新建受理单'
+                  : /^\/workbench\/leads\/[^/]+$/.test(pathname)
+                    ? '线索详情'
+                    : /^\/workbench\/(orders|leads)\/[^/]+$/.test(pathname)
+                      ? '受理单详情'
+                      : tabs.find((item) => item.path === pathname)?.label)
 
   const handleBack = () => {
     // HashRouter tracks its own entry index. A direct deep link can have browser
@@ -113,7 +138,7 @@ function MiniProgramTopBar() {
 
     // Without an in-app predecessor, use the owning module as a safe landing
     // page. This is a fallback, never a substitute for real navigation history.
-    navigate(tabForPath(pathname) ?? '/', { replace: true })
+    navigate(workbenchBackFallback(pathname) ?? tabForPath(pathname) ?? '/', { replace: true })
   }
 
   return (

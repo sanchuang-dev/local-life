@@ -15,6 +15,13 @@
       "when": 1793718611176,
       "tag": "0001_oval_mulholland_black",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793762092948,
+      "tag": "0002_crm_core",
+      "breakpoints": true
     }
   ]
 }

@@ -5,7 +5,12 @@ import { mockHealthFetch, renderAdmin, setViewportWidth } from '../../test/rende
 import { resetWorkTabs } from '../../shared/lib/work-tabs'
 
 function tabNames(): string[] {
-  return screen.getAllByRole('tab').map((tab) => tab.textContent?.trim() ?? '')
+  // Scope to the shell's work-tab strip: pages may render their own Tabs too.
+  const bar = document.querySelector('.app-tabs-bar')
+  if (!bar) return []
+  return within(bar as HTMLElement)
+    .getAllByRole('tab')
+    .map((tab) => tab.textContent?.trim() ?? '')
 }
 
 /** Ant Design keeps the remove control next to (not inside) the tab button. */
@@ -62,17 +67,17 @@ describe('admin AppShell', () => {
     expect(await screen.findByRole('heading', { name: '活动管理' })).toBeTruthy()
     expect(tabNames()).toEqual(['经营工作台', '活动管理'])
 
-    fireEvent.click(screen.getByRole('menuitem', { name: '居民与客户' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '客户与业务单' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/customers'))
-    expect(tabNames()).toEqual(['经营工作台', '活动管理', '居民与客户'])
+    expect(tabNames()).toEqual(['经营工作台', '活动管理', '客户与业务单'])
 
     // Closing a non-current tab keeps the current page and strip ordering.
     clickTabRemove('活动管理')
-    expect(tabNames()).toEqual(['经营工作台', '居民与客户'])
+    expect(tabNames()).toEqual(['经营工作台', '客户与业务单'])
     expect(router.state.location.pathname).toBe('/customers')
 
     // Closing the current tab moves to the remaining neighbour.
-    clickTabRemove('居民与客户')
+    clickTabRemove('客户与业务单')
     await waitFor(() => expect(router.state.location.pathname).toBe('/'))
     expect(tabNames()).toEqual(['经营工作台'])
   })
@@ -94,20 +99,20 @@ describe('admin AppShell', () => {
   it('keeps tabs consistent with browser back and forward navigation', async () => {
     const { router } = renderAdmin('/')
 
-    fireEvent.click(await screen.findByRole('menuitem', { name: '居民与客户' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: '客户与业务单' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/customers'))
     fireEvent.click(screen.getByRole('menuitem', { name: '订单管理' }))
     await waitFor(() => expect(router.state.location.pathname).toBe('/orders'))
-    await waitFor(() => expect(tabNames()).toEqual(['经营工作台', '居民与客户', '订单管理']), {
+    await waitFor(() => expect(tabNames()).toEqual(['经营工作台', '客户与业务单', '订单管理']), {
       timeout: 5000,
     })
 
     await router.navigate(-1)
     await waitFor(
-      () => expect(screen.getByRole('heading', { name: '居民与客户' })).toBeTruthy(),
+      () => expect(screen.getByRole('heading', { name: '客户与业务单' })).toBeTruthy(),
       { timeout: 5000 },
     )
-    expect(screen.getByRole('tab', { name: '居民与客户' }).getAttribute('aria-selected')).toBe(
+    expect(screen.getByRole('tab', { name: '客户与业务单' }).getAttribute('aria-selected')).toBe(
       'true',
     )
 

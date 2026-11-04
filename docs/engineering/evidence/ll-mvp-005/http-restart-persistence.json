@@ -1,0 +1,43 @@
+{
+  "leads": 12,
+  "converted": 6,
+  "orders": 8,
+  "confirmed": 7,
+  "details": [
+    {
+      "status": "confirmed",
+      "activationSource": "manual_verification",
+      "confirmation": "afa4d5f4-37f7-44d2-9c4a-7554cbf6309e"
+    },
+    {
+      "status": "confirmed",
+      "activationSource": "manual_verification",
+      "confirmation": "afa4d5f4-37f7-44d2-9c4a-7554cbf6309e"
+    },
+    {
+      "status": "confirmed",
+      "activationSource": "manual_verification",
+      "confirmation": "cd1bf5aa-3897-486b-8fee-12917afb79a8"
+    },
+    {
+      "status": "confirmed",
+      "activationSource": "manual_verification",
+      "confirmation": "cd1bf5aa-3897-486b-8fee-12917afb79a8"
+    },
+    {
+      "status": "confirmed",
+      "activationSource": "manual_verification",
+      "confirmation": "cd1bf5aa-3897-486b-8fee-12917afb79a8"
+    },
+    {
+      "status": "confirmed",
+      "activationSource": "manual_verification",
+      "confirmation": "cd1bf5aa-3897-486b-8fee-12917afb79a8"
+    },
+    {
+      "status": "confirmed",
+      "activationSource": "manual_verification",
+      "confirmation": "7fb5cee2-be7d-4aba-99a1-2e81d17417df"
+    }
+  ]
+}

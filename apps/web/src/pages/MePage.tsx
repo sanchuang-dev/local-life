@@ -1,8 +1,9 @@
-import { ChevronRight, LogOut, UserRound } from 'lucide-react'
+import { ChevronRight, ClipboardList, LogOut, UserRound } from 'lucide-react'
 import { Link } from 'react-router'
 import { DemoNote } from '../components/DemoNote'
 import { PendingNotice } from '../components/PendingNotice'
 import { SectionHeading } from '../components/home/SectionHeading'
+import { staffRoleLabels } from '../components/crm/crmLabels'
 import { usePendingNotice } from '../hooks/usePendingNotice'
 import { useResidentAuth } from '../hooks/useResidentAuth'
 import {
@@ -191,6 +192,29 @@ export function MePage() {
           })}
         </div>
       </article>
+
+      {auth.session?.staff ? (
+        <Link
+          to="/workbench"
+          state={{ from: '/me' }}
+          className="mt-4 flex items-center gap-3 rounded-[18px] border border-teal-200/70 bg-[#eef7f2] px-4 py-3.5 transition-colors hover:bg-[#e5f3ec] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+        >
+          <span
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-white text-[#388b77]"
+            aria-hidden="true"
+          >
+            <ClipboardList size={20} strokeWidth={1.8} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[14px] font-semibold text-slate-800">网格员工作台</span>
+            <span className="mt-0.5 block truncate text-[11px] leading-4 text-[#52786c]">
+              {staffRoleLabels[auth.session.staff.role]} ·{' '}
+              {auth.session.staff.communities.map((item) => item.name).join('、') || '未分配社区'}
+            </span>
+          </span>
+          <ChevronRight size={17} className="shrink-0 text-[#52786c]" aria-hidden="true" />
+        </Link>
+      ) : null}
 
       <DemoNote>{meDemoNote}</DemoNote>
 

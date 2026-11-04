@@ -1,0 +1,1107 @@
+{
+  "generatedAt": "2026-11-04T04:11:49.186Z",
+  "web": "http://localhost:5273",
+  "admin": "http://localhost:5274",
+  "chrome": "Chrome/156.0.8078.80",
+  "runs": [
+    {
+      "width": 375,
+      "steps": [
+        {
+          "step": "grid-login",
+          "hash": "#/workbench/leads"
+        },
+        {
+          "step": "lead-form-filled",
+          "contactName": "QA浏览器客户-mobile-evidence-1793765509186",
+          "phone": "13800004444",
+          "nextContactAt": "2026-11-05T10:30"
+        },
+        {
+          "step": "follow-up-saved",
+          "content": "已电话联系居民，确认需要办理广电业务（375 验收）",
+          "nextContactAt": "2026-11-06T14:15"
+        },
+        {
+          "step": "order-created",
+          "orderId": "2e54a8af-663f-4404-a3b1-f7d81c6cb338",
+          "orderNo": "BROWSER-375-EVIDENCE-1793765509186",
+          "businessType": "gd_mobile"
+        },
+        {
+          "step": "order-processing"
+        },
+        {
+          "step": "order-pending-verification"
+        },
+        {
+          "step": "admin-login",
+          "hash": "#/customers"
+        },
+        {
+          "step": "order-confirmed-by-operator",
+          "orderNo": "BROWSER-375-EVIDENCE-1793765509186",
+          "width": 375
+        },
+        {
+          "step": "admin-refresh-persisted",
+          "orderNo": "BROWSER-375-EVIDENCE-1793765509186"
+        },
+        {
+          "step": "grid-login",
+          "hash": "#/workbench/leads"
+        },
+        {
+          "step": "h5-refresh-persisted",
+          "orderId": "2e54a8af-663f-4404-a3b1-f7d81c6cb338"
+        }
+      ],
+      "api": [
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/auth/session",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/auth/session",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/auth/csrf",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "url": "http://localhost:5273/api/auth/login",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/leads?page=1&pageSize=20",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/activities/public",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "url": "http://localhost:5273/api/crm/leads",
+          "status": 201
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/leads/5264bff7-0517-4295-8546-889f185c6bda",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/leads/5264bff7-0517-4295-8546-889f185c6bda/follow-ups",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/leads/5264bff7-0517-4295-8546-889f185c6bda/audit",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "url": "http://localhost:5273/api/crm/leads/5264bff7-0517-4295-8546-889f185c6bda/follow-ups",
+          "status": 201
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/leads/5264bff7-0517-4295-8546-889f185c6bda",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/leads/5264bff7-0517-4295-8546-889f185c6bda/follow-ups",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/leads/5264bff7-0517-4295-8546-889f185c6bda/audit",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/leads/5264bff7-0517-4295-8546-889f185c6bda",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "url": "http://localhost:5273/api/crm/orders",
+          "status": 201
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/orders/2e54a8af-663f-4404-a3b1-f7d81c6cb338",
+          "status": 200
+        },
+        {
+          "method": "PATCH",
+          "url": "http://localhost:5273/api/crm/orders/2e54a8af-663f-4404-a3b1-f7d81c6cb338/status",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/orders/2e54a8af-663f-4404-a3b1-f7d81c6cb338",
+          "status": 200
+        },
+        {
+          "method": "PATCH",
+          "url": "http://localhost:5273/api/crm/orders/2e54a8af-663f-4404-a3b1-f7d81c6cb338/status",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/orders/2e54a8af-663f-4404-a3b1-f7d81c6cb338",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/auth/session",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/auth/session",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/auth/csrf",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "url": "http://localhost:5274/api/auth/login",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/admin/crm/leads?page=1&pageSize=20",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/admin/crm/filter-options",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/admin/crm/orders?page=1&pageSize=20",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/admin/crm/leads?page=1&pageSize=20",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/admin/crm/orders/2e54a8af-663f-4404-a3b1-f7d81c6cb338",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "url": "http://localhost:5274/api/admin/crm/orders/2e54a8af-663f-4404-a3b1-f7d81c6cb338/review",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/admin/crm/orders?page=1&pageSize=20",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/auth/session",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/auth/session",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/admin/crm/leads?page=1&pageSize=20",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/admin/crm/filter-options",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/admin/crm/orders?page=1&pageSize=20",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/admin/crm/leads?page=1&pageSize=20",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/auth/session",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/auth/session",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/auth/csrf",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "url": "http://localhost:5273/api/auth/login",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/leads?page=1&pageSize=20",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/leads?page=1&pageSize=20",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/orders/2e54a8af-663f-4404-a3b1-f7d81c6cb338",
+          "status": 200
+        }
+      ],
+      "pageErrors": [],
+      "requestFailures": [],
+      "abortedRequests": [
+        {
+          "url": "http://localhost:5273/api/crm/leads?page=1&pageSize=20",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5273/api/activities/public",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5273/api/crm/leads/5264bff7-0517-4295-8546-889f185c6bda",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5273/api/crm/leads/5264bff7-0517-4295-8546-889f185c6bda/follow-ups",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5273/api/crm/leads/5264bff7-0517-4295-8546-889f185c6bda/audit",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5273/api/crm/leads/5264bff7-0517-4295-8546-889f185c6bda",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5273/api/crm/orders/2e54a8af-663f-4404-a3b1-f7d81c6cb338",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5274/api/admin/crm/filter-options",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5274/api/admin/crm/leads?page=1&pageSize=20",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5274/api/admin/crm/orders?page=1&pageSize=20",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5274/api/admin/crm/filter-options",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5274/api/admin/crm/leads?page=1&pageSize=20",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5274/api/admin/crm/orders?page=1&pageSize=20",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5273/api/crm/leads?page=1&pageSize=20",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5273/api/crm/orders/2e54a8af-663f-4404-a3b1-f7d81c6cb338",
+          "error": "net::ERR_ABORTED"
+        }
+      ],
+      "screenshots": [
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-01-workbench-leads.jpg",
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-02-lead-form.jpg",
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-03-lead-detail-followed.jpg",
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-04-order-form.jpg",
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-05-order-submitted.jpg",
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-06-order-pending.jpg",
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-07-admin-review-drawer.jpg",
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-08-admin-review-confirm.jpg",
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-09-admin-confirmed.jpg",
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-10-admin-confirmed-after-refresh.jpg",
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-11-h5-confirmed-after-refresh.jpg"
+      ],
+      "orders": {
+        "leadId": "5264bff7-0517-4295-8546-889f185c6bda",
+        "orderId": "2e54a8af-663f-4404-a3b1-f7d81c6cb338",
+        "orderNo": "BROWSER-375-EVIDENCE-1793765509186",
+        "businessType": "gd_mobile",
+        "contactName": "QA浏览器客户-mobile-evidence-1793765509186"
+      },
+      "assertions": [
+        {
+          "name": "375 leads list: no horizontal overflow",
+          "ok": true,
+          "detail": {
+            "innerWidth": 375,
+            "scrollWidth": 375
+          }
+        },
+        {
+          "name": "375: lead created and detail opened",
+          "ok": true,
+          "detail": {
+            "hash": "#/workbench/leads/5264bff7-0517-4295-8546-889f185c6bda"
+          }
+        },
+        {
+          "name": "375: order created (gd_mobile)",
+          "ok": true,
+          "detail": {
+            "hash": "#/workbench/orders/2e54a8af-663f-4404-a3b1-f7d81c6cb338"
+          }
+        },
+        {
+          "name": "375 order pending: no activation claims",
+          "ok": true,
+          "detail": {
+            "hits": []
+          }
+        },
+        {
+          "name": "375: pending order says 待运营核验",
+          "ok": true
+        },
+        {
+          "name": "375: pending order does not claim 有效成交",
+          "ok": true
+        },
+        {
+          "name": "375 order detail pending: no horizontal overflow",
+          "ok": true,
+          "detail": {
+            "innerWidth": 375,
+            "scrollWidth": 375
+          }
+        },
+        {
+          "name": "375: H5 pending page has no activation claim",
+          "ok": true
+        },
+        {
+          "name": "375: operator sees real CRM console",
+          "ok": true
+        },
+        {
+          "name": "375 admin confirmed: no activation claims",
+          "ok": true,
+          "detail": {
+            "hits": []
+          }
+        },
+        {
+          "name": "375: operator review shows 人工核验 result",
+          "ok": true
+        },
+        {
+          "name": "375: confirmation is manual_verification-like",
+          "ok": true
+        },
+        {
+          "name": "375 H5 confirmed refresh: no activation claims",
+          "ok": true,
+          "detail": {
+            "hits": []
+          }
+        },
+        {
+          "name": "375: H5 shows confirmed after refresh",
+          "ok": true
+        },
+        {
+          "name": "375: H5 says manual verification",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "width": 320,
+      "steps": [
+        {
+          "step": "grid-login",
+          "hash": "#/workbench/leads"
+        },
+        {
+          "step": "lead-form-filled",
+          "contactName": "QA浏览器客户-tv-evidence-1793765509186",
+          "phone": "13900005555",
+          "nextContactAt": "2026-11-05T10:30"
+        },
+        {
+          "step": "follow-up-saved",
+          "content": "已电话联系居民，确认需要办理广电业务（320 验收）",
+          "nextContactAt": "2026-11-06T14:15"
+        },
+        {
+          "step": "order-created",
+          "orderId": "10d30a06-88fe-4783-9866-e30351061a53",
+          "orderNo": "BROWSER-320-EVIDENCE-1793765509186",
+          "businessType": "gd_tv"
+        },
+        {
+          "step": "order-processing"
+        },
+        {
+          "step": "order-pending-verification"
+        },
+        {
+          "step": "admin-login",
+          "hash": "#/customers"
+        },
+        {
+          "step": "order-confirmed-by-operator",
+          "orderNo": "BROWSER-320-EVIDENCE-1793765509186",
+          "width": 320
+        },
+        {
+          "step": "admin-refresh-persisted",
+          "orderNo": "BROWSER-320-EVIDENCE-1793765509186"
+        },
+        {
+          "step": "grid-login",
+          "hash": "#/workbench/leads"
+        },
+        {
+          "step": "h5-refresh-persisted",
+          "orderId": "10d30a06-88fe-4783-9866-e30351061a53"
+        }
+      ],
+      "api": [
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/auth/session",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/auth/session",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/auth/csrf",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "url": "http://localhost:5273/api/auth/login",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/leads?page=1&pageSize=20",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/activities/public",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/activities/public",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "url": "http://localhost:5273/api/crm/leads",
+          "status": 201
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/leads/eb2a032c-f4b1-437f-a7df-4cb1f759054c",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/leads/eb2a032c-f4b1-437f-a7df-4cb1f759054c/follow-ups",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/leads/eb2a032c-f4b1-437f-a7df-4cb1f759054c/audit",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "url": "http://localhost:5273/api/crm/leads/eb2a032c-f4b1-437f-a7df-4cb1f759054c/follow-ups",
+          "status": 201
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/leads/eb2a032c-f4b1-437f-a7df-4cb1f759054c",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/leads/eb2a032c-f4b1-437f-a7df-4cb1f759054c/follow-ups",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/leads/eb2a032c-f4b1-437f-a7df-4cb1f759054c/audit",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/leads/eb2a032c-f4b1-437f-a7df-4cb1f759054c",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "url": "http://localhost:5273/api/crm/orders",
+          "status": 201
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/orders/10d30a06-88fe-4783-9866-e30351061a53",
+          "status": 200
+        },
+        {
+          "method": "PATCH",
+          "url": "http://localhost:5273/api/crm/orders/10d30a06-88fe-4783-9866-e30351061a53/status",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/orders/10d30a06-88fe-4783-9866-e30351061a53",
+          "status": 200
+        },
+        {
+          "method": "PATCH",
+          "url": "http://localhost:5273/api/crm/orders/10d30a06-88fe-4783-9866-e30351061a53/status",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/orders/10d30a06-88fe-4783-9866-e30351061a53",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/auth/session",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/auth/session",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/auth/csrf",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "url": "http://localhost:5274/api/auth/login",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/admin/crm/leads?page=1&pageSize=20",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/admin/crm/filter-options",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/admin/crm/orders?page=1&pageSize=20",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/admin/crm/leads?page=1&pageSize=20",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/admin/crm/orders/10d30a06-88fe-4783-9866-e30351061a53",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "url": "http://localhost:5274/api/admin/crm/orders/10d30a06-88fe-4783-9866-e30351061a53/review",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/admin/crm/orders?page=1&pageSize=20",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/auth/session",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/auth/session",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/admin/crm/leads?page=1&pageSize=20",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/admin/crm/filter-options",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/admin/crm/orders?page=1&pageSize=20",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5274/api/admin/crm/leads?page=1&pageSize=20",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/auth/session",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/auth/session",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/auth/csrf",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "url": "http://localhost:5273/api/auth/login",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/leads?page=1&pageSize=20",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/leads?page=1&pageSize=20",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5273/api/crm/orders/10d30a06-88fe-4783-9866-e30351061a53",
+          "status": 200
+        }
+      ],
+      "pageErrors": [],
+      "requestFailures": [],
+      "abortedRequests": [
+        {
+          "url": "http://localhost:5273/api/crm/leads?page=1&pageSize=20",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5273/api/activities/public",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5273/api/crm/leads/eb2a032c-f4b1-437f-a7df-4cb1f759054c",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5273/api/crm/leads/eb2a032c-f4b1-437f-a7df-4cb1f759054c/follow-ups",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5273/api/crm/leads/eb2a032c-f4b1-437f-a7df-4cb1f759054c/audit",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5273/api/crm/leads/eb2a032c-f4b1-437f-a7df-4cb1f759054c",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5273/api/crm/orders/10d30a06-88fe-4783-9866-e30351061a53",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5274/api/admin/crm/filter-options",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5274/api/admin/crm/leads?page=1&pageSize=20",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5274/api/admin/crm/orders?page=1&pageSize=20",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5274/api/admin/crm/filter-options",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5274/api/admin/crm/leads?page=1&pageSize=20",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5274/api/admin/crm/orders?page=1&pageSize=20",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5273/api/crm/leads?page=1&pageSize=20",
+          "error": "net::ERR_ABORTED"
+        },
+        {
+          "url": "http://localhost:5273/api/crm/orders/10d30a06-88fe-4783-9866-e30351061a53",
+          "error": "net::ERR_ABORTED"
+        }
+      ],
+      "screenshots": [
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-01-workbench-leads.jpg",
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-02-lead-form.jpg",
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-03-lead-detail-followed.jpg",
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-04-order-form.jpg",
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-05-order-submitted.jpg",
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-06-order-pending.jpg",
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-07-admin-review-drawer.jpg",
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-08-admin-review-confirm.jpg",
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-09-admin-confirmed.jpg",
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-10-admin-confirmed-after-refresh.jpg",
+        "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-11-h5-confirmed-after-refresh.jpg"
+      ],
+      "orders": {
+        "leadId": "eb2a032c-f4b1-437f-a7df-4cb1f759054c",
+        "orderId": "10d30a06-88fe-4783-9866-e30351061a53",
+        "orderNo": "BROWSER-320-EVIDENCE-1793765509186",
+        "businessType": "gd_tv",
+        "contactName": "QA浏览器客户-tv-evidence-1793765509186"
+      },
+      "assertions": [
+        {
+          "name": "320 leads list: no horizontal overflow",
+          "ok": true,
+          "detail": {
+            "innerWidth": 320,
+            "scrollWidth": 320
+          }
+        },
+        {
+          "name": "320: lead created and detail opened",
+          "ok": true,
+          "detail": {
+            "hash": "#/workbench/leads/eb2a032c-f4b1-437f-a7df-4cb1f759054c"
+          }
+        },
+        {
+          "name": "320: order created (gd_tv)",
+          "ok": true,
+          "detail": {
+            "hash": "#/workbench/orders/10d30a06-88fe-4783-9866-e30351061a53"
+          }
+        },
+        {
+          "name": "320 order pending: no activation claims",
+          "ok": true,
+          "detail": {
+            "hits": []
+          }
+        },
+        {
+          "name": "320: pending order says 待运营核验",
+          "ok": true
+        },
+        {
+          "name": "320: pending order does not claim 有效成交",
+          "ok": true
+        },
+        {
+          "name": "320 order detail pending: no horizontal overflow",
+          "ok": true,
+          "detail": {
+            "innerWidth": 320,
+            "scrollWidth": 320
+          }
+        },
+        {
+          "name": "320: H5 pending page has no activation claim",
+          "ok": true
+        },
+        {
+          "name": "320: operator sees real CRM console",
+          "ok": true
+        },
+        {
+          "name": "320 admin confirmed: no activation claims",
+          "ok": true,
+          "detail": {
+            "hits": []
+          }
+        },
+        {
+          "name": "320: operator review shows 人工核验 result",
+          "ok": true
+        },
+        {
+          "name": "320: confirmation is manual_verification-like",
+          "ok": true
+        },
+        {
+          "name": "320 H5 confirmed refresh: no activation claims",
+          "ok": true,
+          "detail": {
+            "hits": []
+          }
+        },
+        {
+          "name": "320: H5 shows confirmed after refresh",
+          "ok": true
+        },
+        {
+          "name": "320: H5 says manual verification",
+          "ok": true
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "totalAssertions": 30,
+    "failures": 0,
+    "assertions": [
+      {
+        "name": "375 leads list: no horizontal overflow",
+        "ok": true,
+        "detail": {
+          "innerWidth": 375,
+          "scrollWidth": 375
+        }
+      },
+      {
+        "name": "375: lead created and detail opened",
+        "ok": true,
+        "detail": {
+          "hash": "#/workbench/leads/5264bff7-0517-4295-8546-889f185c6bda"
+        }
+      },
+      {
+        "name": "375: order created (gd_mobile)",
+        "ok": true,
+        "detail": {
+          "hash": "#/workbench/orders/2e54a8af-663f-4404-a3b1-f7d81c6cb338"
+        }
+      },
+      {
+        "name": "375 order pending: no activation claims",
+        "ok": true,
+        "detail": {
+          "hits": []
+        }
+      },
+      {
+        "name": "375: pending order says 待运营核验",
+        "ok": true
+      },
+      {
+        "name": "375: pending order does not claim 有效成交",
+        "ok": true
+      },
+      {
+        "name": "375 order detail pending: no horizontal overflow",
+        "ok": true,
+        "detail": {
+          "innerWidth": 375,
+          "scrollWidth": 375
+        }
+      },
+      {
+        "name": "375: H5 pending page has no activation claim",
+        "ok": true
+      },
+      {
+        "name": "375: operator sees real CRM console",
+        "ok": true
+      },
+      {
+        "name": "375 admin confirmed: no activation claims",
+        "ok": true,
+        "detail": {
+          "hits": []
+        }
+      },
+      {
+        "name": "375: operator review shows 人工核验 result",
+        "ok": true
+      },
+      {
+        "name": "375: confirmation is manual_verification-like",
+        "ok": true
+      },
+      {
+        "name": "375 H5 confirmed refresh: no activation claims",
+        "ok": true,
+        "detail": {
+          "hits": []
+        }
+      },
+      {
+        "name": "375: H5 shows confirmed after refresh",
+        "ok": true
+      },
+      {
+        "name": "375: H5 says manual verification",
+        "ok": true
+      },
+      {
+        "name": "320 leads list: no horizontal overflow",
+        "ok": true,
+        "detail": {
+          "innerWidth": 320,
+          "scrollWidth": 320
+        }
+      },
+      {
+        "name": "320: lead created and detail opened",
+        "ok": true,
+        "detail": {
+          "hash": "#/workbench/leads/eb2a032c-f4b1-437f-a7df-4cb1f759054c"
+        }
+      },
+      {
+        "name": "320: order created (gd_tv)",
+        "ok": true,
+        "detail": {
+          "hash": "#/workbench/orders/10d30a06-88fe-4783-9866-e30351061a53"
+        }
+      },
+      {
+        "name": "320 order pending: no activation claims",
+        "ok": true,
+        "detail": {
+          "hits": []
+        }
+      },
+      {
+        "name": "320: pending order says 待运营核验",
+        "ok": true
+      },
+      {
+        "name": "320: pending order does not claim 有效成交",
+        "ok": true
+      },
+      {
+        "name": "320 order detail pending: no horizontal overflow",
+        "ok": true,
+        "detail": {
+          "innerWidth": 320,
+          "scrollWidth": 320
+        }
+      },
+      {
+        "name": "320: H5 pending page has no activation claim",
+        "ok": true
+      },
+      {
+        "name": "320: operator sees real CRM console",
+        "ok": true
+      },
+      {
+        "name": "320 admin confirmed: no activation claims",
+        "ok": true,
+        "detail": {
+          "hits": []
+        }
+      },
+      {
+        "name": "320: operator review shows 人工核验 result",
+        "ok": true
+      },
+      {
+        "name": "320: confirmation is manual_verification-like",
+        "ok": true
+      },
+      {
+        "name": "320 H5 confirmed refresh: no activation claims",
+        "ok": true,
+        "detail": {
+          "hits": []
+        }
+      },
+      {
+        "name": "320: H5 shows confirmed after refresh",
+        "ok": true
+      },
+      {
+        "name": "320: H5 says manual verification",
+        "ok": true
+      }
+    ],
+    "screenshots": [
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-01-workbench-leads.jpg",
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-02-lead-form.jpg",
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-03-lead-detail-followed.jpg",
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-04-order-form.jpg",
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-05-order-submitted.jpg",
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-06-order-pending.jpg",
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-07-admin-review-drawer.jpg",
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-08-admin-review-confirm.jpg",
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-09-admin-confirmed.jpg",
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-10-admin-confirmed-after-refresh.jpg",
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/375-11-h5-confirmed-after-refresh.jpg",
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-01-workbench-leads.jpg",
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-02-lead-form.jpg",
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-03-lead-detail-followed.jpg",
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-04-order-form.jpg",
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-05-order-submitted.jpg",
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-06-order-pending.jpg",
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-07-admin-review-drawer.jpg",
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-08-admin-review-confirm.jpg",
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-09-admin-confirmed.jpg",
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-10-admin-confirmed-after-refresh.jpg",
+      "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-005/docs/engineering/evidence/ll-mvp-005/screenshots/320-11-h5-confirmed-after-refresh.jpg"
+    ]
+  }
+}

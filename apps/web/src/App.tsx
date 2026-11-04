@@ -20,6 +20,14 @@ import { PointsPage } from './pages/PointsPage'
 import { ProductPage } from './pages/ProductPage'
 import { SilverActivityProductsPage } from './pages/SilverActivityProductsPage'
 import { SilverNeighborhoodCampaignPage } from './pages/SilverNeighborhoodCampaignPage'
+import { WorkbenchLayout } from './pages/workbench/WorkbenchLayout'
+import { WorkbenchLeadDetailPage } from './pages/workbench/WorkbenchLeadDetailPage'
+import { WorkbenchLeadNewPage } from './pages/workbench/WorkbenchLeadNewPage'
+import { WorkbenchLeadsPage } from './pages/workbench/WorkbenchLeadsPage'
+import { WorkbenchLoginPage } from './pages/workbench/WorkbenchLoginPage'
+import { WorkbenchOrderDetailPage } from './pages/workbench/WorkbenchOrderDetailPage'
+import { WorkbenchOrderNewPage } from './pages/workbench/WorkbenchOrderNewPage'
+import { WorkbenchOrdersPage } from './pages/workbench/WorkbenchOrdersPage'
 
 export default function App() {
   return (
@@ -49,6 +57,15 @@ export default function App() {
         <Route path="/points" element={<PointsPage />} />
         <Route path="/me/devices" element={<HealthDevicesPage />} />
         <Route path="/me" element={<MePage />} />
+        <Route path="/workbench" element={<WorkbenchLayout />}>
+          <Route index element={<WorkbenchLoginPage />} />
+          <Route path="leads" element={<WorkbenchLeadsPage />} />
+          <Route path="leads/new" element={<WorkbenchLeadNewPage />} />
+          <Route path="leads/:leadId" element={<WorkbenchLeadDetailPage />} />
+          <Route path="leads/:leadId/orders/new" element={<WorkbenchOrderNewPage />} />
+          <Route path="orders" element={<WorkbenchOrdersPage />} />
+          <Route path="orders/:orderId" element={<WorkbenchOrderDetailPage />} />
+        </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </MiniProgramShell>

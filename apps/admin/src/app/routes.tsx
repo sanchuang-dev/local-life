@@ -3,6 +3,7 @@ import { useAdminAuth } from './auth-context'
 import { AdminLayout } from '../layouts/AdminLayout'
 import { ActivitiesPage } from '../pages/ActivitiesPage'
 import { ComponentPreviewPage } from '../pages/ComponentPreviewPage'
+import { CrmPage } from '../pages/CrmPage'
 import { DashboardPage } from '../pages/DashboardPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
@@ -28,6 +29,7 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <DashboardPage /> },
       { path: 'activities', element: <ActivitiesPage /> },
+      { path: 'customers', element: <CrmPage /> },
       { path: 'communities', element: <CommunityAccountsRoute /> },
       { path: 'system/runtime', element: <SystemInfoPage /> },
       { path: 'users', element: <Navigate to='/communities' replace /> },
