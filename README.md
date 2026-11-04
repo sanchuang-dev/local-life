@@ -106,7 +106,7 @@ pnpm --filter @sanchuang-dev/local-life-api bootstrap-admin
 GitHub Pages 只发布静态居民 H5，不包含管理台与 API。Pages 演示站点没有真实账户后端；真实身份流程需连接部署后的 API。不要把静态预览地址当作业务环境。
 
 - `main`：默认分支与工作流入口，不是生产环境。
-- 业务卡：`feat/*` → `dev`；受控真实服务的**在线 MVP 验收例外**：`dev` → `mvp`（独立晋级 PR、维护者验收），目标域名 `https://local.proto.3cgroup.cn`，**目前尚未部署成功**，详见 [在线 MVP 环境决策](docs/engineering/mvp-online-preview.md)。
+- 业务卡：`feat/*` → `dev`；受控真实服务的**在线 MVP 验收例外**：`dev` → `mvp`（独立晋级 PR、维护者验收），居民域名 `https://local.proto.3cgroup.cn/`、后台域名 `https://local-admin.proto.3cgroup.cn/`，两个站点的 `/api/*` 均代理至同一 Hono/SQLite，`mvp` 合并后自动部署（首次主机接入须独立授权），**目前尚未部署成功**，详见 [在线 MVP 环境决策](docs/engineering/mvp-online-preview.md)。
 - `test` / `prod`：继续承担原有 GitHub Pages 静态展示路线；不能与在线 MVP 或正式商用生产环境混称。
 - `dev`：集成分支；GitHub Pages 开发预览 https://sanchuang-dev.github.io/local-life/。
 - `prod`：演示版本源码；GitHub Pages 展示 https://sanchuang-dev.github.io/local-life/prod/。
