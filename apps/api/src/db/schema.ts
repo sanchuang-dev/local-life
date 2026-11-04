@@ -610,8 +610,15 @@ export const crmebOrders = sqliteTable(
 )
 
 /**
- * Append-only order state events. The unique `(order_id, event_key)` pair is the
- * dedupe key; SQLite triggers make UPDATE/DELETE impossible even for buggy code.
+ * Append-only order timeline events.
+ *
+ * `sequence` is a per-order monotonically increasing revision that carries the
+ * dedupe/uniqueness guarantee. `event_key` is only a readable stream label
+ * (`order` for the order snapshot, `refund:<refund_no>` for a refund snapshot),
+ * so a state that returns to an earlier combination (paid → refunding → paid)
+ * still appends a new row instead of colliding with history. The adapter only
+ * appends when the new complete snapshot differs from the latest event in the
+ * same stream; SQLite triggers make UPDATE/DELETE impossible even for buggy code.
  */
 export const crmebOrderEvents = sqliteTable(
   'crmeb_order_events',
@@ -620,6 +627,7 @@ export const crmebOrderEvents = sqliteTable(
     orderId: text('order_id')
       .notNull()
       .references(() => crmebOrders.id, { onDelete: 'cascade' }),
+    sequence: integer('sequence').notNull(),
     eventKey: text('event_key').notNull(),
     payloadHash: text('payload_hash').notNull(),
     payloadJson: text('payload_json'),
@@ -627,7 +635,8 @@ export const crmebOrderEvents = sqliteTable(
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   },
   (table) => [
-    uniqueIndex('crmeb_order_events_order_event_uq').on(table.orderId, table.eventKey),
+    uniqueIndex('crmeb_order_events_order_sequence_uq').on(table.orderId, table.sequence),
+    index('crmeb_order_events_order_event_idx').on(table.orderId, table.eventKey),
     index('crmeb_order_events_order_idx').on(table.orderId),
     index('crmeb_order_events_occurred_idx').on(table.occurredAt),
   ],

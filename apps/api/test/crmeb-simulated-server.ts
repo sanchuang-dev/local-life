@@ -69,6 +69,7 @@ export interface SimulatedCrmebOptions {
   /** Simulate an outapi permission/error envelope on these lists. */
   productListFailureStatus?: number
   orderListFailureStatus?: number
+  refundListFailureStatus?: number
   /** Return a different numeric id on order detail to exercise key collisions. */
   orderDetailIdOverrides?: Record<string, number>
 }
@@ -96,6 +97,7 @@ export interface SimulatedCrmeb {
     driftProductList: boolean
     productListFailureStatus: number | undefined
     orderListFailureStatus: number | undefined
+    refundListFailureStatus: number | undefined
     orderDetailIdOverrides: Record<string, number>
   }
   close(): Promise<void>
@@ -148,6 +150,7 @@ export async function startSimulatedCrmeb(
       driftProductList: options.driftProductList ?? false,
       productListFailureStatus: options.productListFailureStatus,
       orderListFailureStatus: options.orderListFailureStatus,
+      refundListFailureStatus: options.refundListFailureStatus,
       orderDetailIdOverrides: options.orderDetailIdOverrides ?? {},
     },
     async close() {
@@ -264,6 +267,10 @@ export async function startSimulatedCrmeb(
     }
 
     if (method === 'GET' && url.pathname === '/outapi/refund/list') {
+      if (state.options.refundListFailureStatus) {
+        failure(response, state.options.refundListFailureStatus, '您暂时没有访问权限')
+        return
+      }
       const page = Number(url.searchParams.get('page') ?? '1')
       const limit = Number(url.searchParams.get('limit') ?? '100')
       const safePage = Number.isSafeInteger(page) && page > 0 ? page : 1

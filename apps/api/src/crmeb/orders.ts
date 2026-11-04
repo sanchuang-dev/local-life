@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { and, count, eq, gt, inArray } from 'drizzle-orm'
+import { and, count, desc, eq, gt, inArray, max } from 'drizzle-orm'
 import {
   API_ERROR_CODES,
   crmebOrderSyncResponseSchema,
@@ -149,6 +149,157 @@ function itemsSnapshot(raw: CrmebRawOrder): unknown[] {
   }))
 }
 
+/**
+ * `crmeb_order_events` is a per-order timeline, not a state-combination set.
+ *
+ * `event_key` is only a readable *stream* label: `order` for order snapshots and
+ * `refund:<refund_no>` for a refund snapshot. Dedupe compares the complete
+ * snapshot against the newest event of the same stream, and `sequence` carries
+ * the uniqueness guarantee, so `paid → refunding → paid` appends three rows and
+ * a refunded amount change appends another row for the same refund no/type.
+ */
+const ORDER_EVENT_KEY = 'order'
+
+function refundEventKey(refundNo: string): string {
+  return `refund:${refundNo}`
+}
+
+type EventTransaction = Parameters<
+  Parameters<AppDatabase['transaction']>[0]
+>[0]
+
+interface OrderEventSnapshot {
+  paid: boolean
+  rawStatus: number
+  refundStatus: number | null
+  status: CrmebOrderStatus
+  validTransaction: boolean
+  payAmountCents: number
+  /** Any `refund_type > 0` after-sale row excludes the order from valid sales. */
+  hasRefund: boolean
+  source: 'outapi_pull'
+  reason?: string
+}
+
+function orderEventPayload(snapshot: OrderEventSnapshot): string {
+  // Key order is fixed so the same observation always hashes identically.
+  return JSON.stringify({
+    paid: snapshot.paid,
+    rawStatus: snapshot.rawStatus,
+    refundStatus: snapshot.refundStatus,
+    status: snapshot.status,
+    validTransaction: snapshot.validTransaction,
+    payAmountCents: snapshot.payAmountCents,
+    hasRefund: snapshot.hasRefund,
+    source: snapshot.source,
+    ...(snapshot.reason ? { reason: snapshot.reason } : {}),
+  })
+}
+
+interface RefundEventSnapshot {
+  refundNo: string
+  refundType: number
+  refundAmountCents: number
+  refundedAmountCents: number
+  refundedAt: string | null
+  source: 'outapi_pull'
+}
+
+function refundEventPayload(snapshot: RefundEventSnapshot): string {
+  return JSON.stringify({
+    refundNo: snapshot.refundNo,
+    refundType: snapshot.refundType,
+    refundAmountCents: snapshot.refundAmountCents,
+    refundedAmountCents: snapshot.refundedAmountCents,
+    refundedAt: snapshot.refundedAt,
+    source: snapshot.source,
+  })
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const code = (error as Error & { code?: unknown }).code
+  return code === 'SQLITE_CONSTRAINT_UNIQUE' || code === 'SQLITE_CONSTRAINT_PRIMARYKEY'
+}
+
+function nextEventSequence(writer: EventTransaction, orderId: string): number {
+  const row = writer
+    .select({ value: max(crmebOrderEvents.sequence) })
+    .from(crmebOrderEvents)
+    .where(eq(crmebOrderEvents.orderId, orderId))
+    .get()
+  return (row?.value ?? 0) + 1
+}
+
+function latestEventHash(
+  writer: EventTransaction,
+  orderId: string,
+  eventKey: string,
+): string | undefined {
+  return writer
+    .select({ payloadHash: crmebOrderEvents.payloadHash })
+    .from(crmebOrderEvents)
+    .where(
+      and(
+        eq(crmebOrderEvents.orderId, orderId),
+        eq(crmebOrderEvents.eventKey, eventKey),
+      ),
+    )
+    .orderBy(desc(crmebOrderEvents.sequence))
+    .limit(1)
+    .get()?.payloadHash
+}
+
+/**
+ * Appends one timeline event per changed snapshot. Repeated or retried syncs
+ * with an identical snapshot append nothing, and the unique `(order_id,
+ * sequence)` index is the last-resort guard against duplicate revisions.
+ */
+function appendOrderEvent(
+  writer: EventTransaction,
+  orderId: string,
+  eventKey: string,
+  payloadJson: string,
+  occurredAt: Date,
+): number {
+  const payloadHash = sha256(payloadJson)
+  if (latestEventHash(writer, orderId, eventKey) === payloadHash) return 0
+  try {
+    writer
+      .insert(crmebOrderEvents)
+      .values({
+        id: randomUUID(),
+        orderId,
+        sequence: nextEventSequence(writer, orderId),
+        eventKey,
+        payloadHash,
+        payloadJson,
+        occurredAt,
+        createdAt: occurredAt,
+      })
+      .run()
+  } catch (error) {
+    if (!isUniqueViolation(error)) throw error
+    // A concurrent writer took the next revision; either it recorded the same
+    // snapshot (nothing to append) or retry once with the refreshed sequence.
+    if (latestEventHash(writer, orderId, eventKey) === payloadHash) return 0
+    writer
+      .insert(crmebOrderEvents)
+      .values({
+        id: randomUUID(),
+        orderId,
+        sequence: nextEventSequence(writer, orderId),
+        eventKey,
+        payloadHash,
+        payloadJson,
+        occurredAt,
+        createdAt: occurredAt,
+      })
+      .run()
+  }
+  return 1
+}
+
 interface PersistedOrder {
   created: boolean
   updated: boolean
@@ -212,16 +363,16 @@ function persistOrder(
           .get()
 
   const rawHash = sha256(canonicalJson(raw))
-  const eventKey = `order:${paid ? 1 : 0}:${rawStatus}:${refundStatus ?? 'none'}`
-  const eventPayload = {
+  const eventPayloadJson = orderEventPayload({
     paid,
     rawStatus,
     refundStatus,
     status,
     validTransaction,
+    payAmountCents,
+    hasRefund: refundCount > 0,
     source: 'outapi_pull',
-  }
-  const eventPayloadJson = JSON.stringify(eventPayload)
+  })
 
   return db.transaction((tx) => {
     // The numeric CRMEB id is the stable identity; order_id is only a business
@@ -309,21 +460,9 @@ function persistOrder(
       }
     }
 
-    const inserted = tx
-      .insert(crmebOrderEvents)
-      .values({
-        id: randomUUID(),
-        orderId: rowId,
-        eventKey,
-        payloadHash: sha256(eventPayloadJson),
-        payloadJson: eventPayloadJson,
-        occurredAt: syncedAt,
-        createdAt: syncedAt,
-      })
-      .onConflictDoNothing()
-      .run()
+    const events = appendOrderEvent(tx, rowId, ORDER_EVENT_KEY, eventPayloadJson, syncedAt)
 
-    return { created, updated, rowId, events: inserted.changes > 0 ? 1 : 0 }
+    return { created, updated, rowId, events }
   })
 }
 
@@ -405,7 +544,15 @@ function persistRefund(
     }
 
     const order = tx
-      .select({ id: crmebOrders.id, validTransaction: crmebOrders.validTransaction })
+      .select({
+        id: crmebOrders.id,
+        paid: crmebOrders.paid,
+        status: crmebOrders.status,
+        rawStatus: crmebOrders.rawStatus,
+        refundStatus: crmebOrders.refundStatus,
+        payAmountCents: crmebOrders.payAmountCents,
+        validTransaction: crmebOrders.validTransaction,
+      })
       .from(crmebOrders)
       .where(
         and(
@@ -420,6 +567,7 @@ function persistRefund(
 
     // Any after-sale application excludes the order from valid transactions.
     // Order status itself stays whatever the authoritative order detail says.
+    const orderValidTransaction = false
     if (order.validTransaction) {
       tx.update(crmebOrders)
         .set({ validTransaction: false, updatedAt: syncedAt })
@@ -427,35 +575,136 @@ function persistRefund(
         .run()
     }
 
-    const eventKey = `refund:${raw.order_id}:${refundType}`
-    const eventPayloadJson = JSON.stringify({
-      refundNo: raw.order_id,
-      refundType,
-      refundAmountCents,
-      refundedAmountCents,
-      source: 'outapi_pull',
-    })
-    const inserted = tx
-      .insert(crmebOrderEvents)
-      .values({
-        id: randomUUID(),
-        orderId: order.id,
-        eventKey,
-        payloadHash: sha256(eventPayloadJson),
-        payloadJson: eventPayloadJson,
-        occurredAt: syncedAt,
-        createdAt: syncedAt,
-      })
-      .onConflictDoNothing()
-      .run()
+    // The order stream records the exclusion too, so the timeline never claims
+    // this order was a valid sale after a refund row became known.
+    const refundCount = tx
+      .select({ value: count() })
+      .from(crmebRefunds)
+      .where(
+        and(
+          eq(crmebRefunds.channel, CHANNEL),
+          eq(crmebRefunds.externalOrderId, storeOrderId),
+          gt(crmebRefunds.refundType, 0),
+        ),
+      )
+      .get()
+    const orderEvents = appendOrderEvent(
+      tx,
+      order.id,
+      ORDER_EVENT_KEY,
+      orderEventPayload({
+        paid: order.paid,
+        rawStatus: order.rawStatus,
+        refundStatus: order.refundStatus,
+        status: order.status,
+        validTransaction: orderValidTransaction,
+        payAmountCents: order.payAmountCents,
+        hasRefund: (refundCount?.value ?? 0) > 0,
+        source: 'outapi_pull',
+      }),
+      syncedAt,
+    )
+
+    const refundEvents = appendOrderEvent(
+      tx,
+      order.id,
+      refundEventKey(raw.order_id),
+      refundEventPayload({
+        refundNo: raw.order_id,
+        refundType,
+        refundAmountCents,
+        refundedAmountCents,
+        refundedAt: refundedAt?.toISOString() ?? null,
+        source: 'outapi_pull',
+      }),
+      syncedAt,
+    )
 
     return {
       created,
       updated,
-      events: inserted.changes > 0 ? 1 : 0,
+      events: orderEvents + refundEvents,
       matchedOrder: true,
     }
   })
+}
+
+/**
+ * Revokes every channel-wide `valid_transaction=true` order when the refund
+ * sweep is incomplete. Scanning one page or failing halfway is not evidence that
+ * orders synced by *previous* runs are still clean, so the old "only this page's
+ * orders" behaviour is deliberately replaced by a channel-wide revocation.
+ * Each revoked order gets an audit event recording the reason.
+ */
+function invalidateStaleValidTransactions(
+  db: AppDatabase,
+  invalidatedAt: Date,
+): { orders: number; events: number } {
+  let events = 0
+  const orders = db.transaction((tx) => {
+    const stale = tx
+      .select({
+        id: crmebOrders.id,
+        externalOrderId: crmebOrders.externalOrderId,
+        paid: crmebOrders.paid,
+        status: crmebOrders.status,
+        rawStatus: crmebOrders.rawStatus,
+        refundStatus: crmebOrders.refundStatus,
+        payAmountCents: crmebOrders.payAmountCents,
+      })
+      .from(crmebOrders)
+      .where(
+        and(
+          eq(crmebOrders.channel, CHANNEL),
+          eq(crmebOrders.validTransaction, true),
+        ),
+      )
+      .all()
+    if (stale.length === 0) return 0
+
+    tx.update(crmebOrders)
+      .set({ validTransaction: false, updatedAt: invalidatedAt })
+      .where(
+        and(
+          eq(crmebOrders.channel, CHANNEL),
+          eq(crmebOrders.validTransaction, true),
+        ),
+      )
+      .run()
+
+    for (const row of stale) {
+      const refundCount = tx
+        .select({ value: count() })
+        .from(crmebRefunds)
+        .where(
+          and(
+            eq(crmebRefunds.channel, CHANNEL),
+            eq(crmebRefunds.externalOrderId, row.externalOrderId),
+            gt(crmebRefunds.refundType, 0),
+          ),
+        )
+        .get()
+      events += appendOrderEvent(
+        tx,
+        row.id,
+        ORDER_EVENT_KEY,
+        orderEventPayload({
+          paid: row.paid,
+          rawStatus: row.rawStatus,
+          refundStatus: row.refundStatus,
+          status: row.status,
+          validTransaction: false,
+          payAmountCents: row.payAmountCents,
+          hasRefund: (refundCount?.value ?? 0) > 0,
+          source: 'outapi_pull',
+          reason: 'refund_scan_incomplete',
+        }),
+        invalidatedAt,
+      )
+    }
+    return stale.length
+  })
+  return { orders, events }
 }
 
 export interface CrmebOrderSyncDeps {
@@ -516,6 +765,7 @@ export async function runCrmebOrderSync(
     unmatched: 0,
   }
   let eventsAppended = 0
+  let refundScanInvalidated = 0
   const refundCursor = {
     page: refundPage,
     pageSize: refundLimit,
@@ -655,25 +905,24 @@ export async function runCrmebOrderSync(
       !refundScanFailed &&
       refundRowErrors === 0
     if (!refundCursor.complete) {
+      const incompleteReason = refundCursor.hasMore
+        ? `售后扫描达到单次上限（${REFUND_SCAN_MAX_PAGES} 页），请用 refundPage=${refundCursor.nextPage ?? refundPage} 继续`
+        : refundScanFailed
+          ? '售后扫描在上游请求处中断'
+          : refundRowErrors > 0
+            ? `售后扫描存在 ${refundRowErrors} 条无法解析的售后行`
+            : refundPage !== 1
+              ? `售后扫描未从第 1 页开始（refundPage=${refundPage}）`
+              : '售后扫描未完整完成'
+      const invalidation = invalidateStaleValidTransactions(db, new Date())
+      refundScanInvalidated = invalidation.orders
+      eventsAppended += invalidation.events
       errors.push({
         scope: 'refund',
         externalOrderNo: null,
         code: 'refund_scan_incomplete',
-        message: refundCursor.hasMore
-          ? `售后扫描达到单次上限（${REFUND_SCAN_MAX_PAGES} 页），请用 refundPage=${refundCursor.nextPage ?? refundPage} 继续`
-          : '售后扫描未从第 1 页完整完成，本次不认定任何有效成交',
+        message: `${incompleteReason}；渠道内 ${invalidation.orders} 条未确认的有效成交已撤销`,
       })
-      if (processedOrderIds.length > 0) {
-        db.update(crmebOrders)
-          .set({ validTransaction: false, updatedAt: new Date() })
-          .where(
-            and(
-              eq(crmebOrders.channel, CHANNEL),
-              inArray(crmebOrders.id, processedOrderIds),
-            ),
-          )
-          .run()
-      }
     }
 
     const validRows = processedOrderIds.length
@@ -709,6 +958,11 @@ export async function runCrmebOrderSync(
         validTransactions,
         eventsAppended,
         cursorJson: JSON.stringify(cursor),
+        scopeJson: JSON.stringify({
+          ...scope,
+          refundScanComplete: refundCursor.complete,
+          refundScanInvalidated,
+        }),
         errorsJson: JSON.stringify(errors.slice(0, 50)),
         errorMessage: errors.length
           ? errors

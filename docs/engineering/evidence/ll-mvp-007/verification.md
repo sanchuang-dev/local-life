@@ -625,3 +625,214 @@ pnpm check -> exit 0
 上文（§0–§11）的证据是在 `feat/ll-mvp-007-crmeb-adapter` 基于 `origin/dev@1d4f000` 的工作树上采集的，当时 CRMEB 迁移编号为 `0002_opposite_echo.sql`。
 
 集成阶段分支 rebase 到 `origin/dev`（含 #60 `0002_nosy_white_queen`、#61 `0003_crm_core`）后，CRMEB 迁移按 Drizzle 顺序重新生成为 **`0004_polite_black_bird.sql`**（DDL 与 append-only 触发器等价），因此上文出现的“0002”仅指迁移编号，不是当前文件名。功能、HTTP 契约、H5 行为与负例结论不受编号变化影响；rebase 后已重新执行 `pnpm install --frozen-lockfile` 与 `pnpm check`（API 77/77、web 61/61、scripts 7/7、全量构建通过），并在全新 SQLite 上验证迁移可应用。真实 CRMEB 实例/凭证/微信/支付仍未具备，阻塞结论不变。
+
+---
+
+## 13. t3 修复后独立回归验证（真实 HTTP + SIMULATED CRMEB + SQLite 直查，追加于 2026-11-04）
+
+> 本节追加在 §0–§12 之后，**不改写任何历史结论**。被测对象是 t1 修复后的工作树（HEAD `8b7cf04` + t1 未提交改动）。所有上游响应来自本机隔离的 **SIMULATED CRMEB** fixture（明确 simulated，不是生产 mock，也不是真实实例）；**当前没有真实 CRMEB 实例、outapi appid/appsecret、微信网页授权或支付商户号，因此本节只证明隔离运行时行为，不构成真实商城联调。**
+
+### 13.1 方法、进程与命令
+
+| 组件 | 实际取值 |
+| --- | --- |
+| 工作树 | `8b7cf04be433d6ef0b52a87630a0ab108eacd654` + t1 未提交改动（见 13.8） |
+| 真实 API | `apps/api/node_modules/.bin/tsx src/index.ts`，`127.0.0.1:53763`，真实 HTTP（非 `app.request` 直调） |
+| SQLite | `/tmp/ll-mvp-007-verify/http-run/verify.sqlite`（API 启动时执行全部迁移；另用只读连接直查同一文件） |
+| 上游 | `/tmp/ll-mvp-007-verify/simulated-crmeb.mjs`，`127.0.0.1:53761`，**SIMULATED CRMEB outapi**；状态文件在每次请求时重读，便于在两次同步之间改变订单/售后 |
+| 管理员会话 | 真实 `GET /auth/csrf` → `POST /auth/login`（CSRF double-submit + 会话 Cookie），再 `POST /admin/integrations/crmeb/orders/sync` |
+| 临时脚本 | 全部位于 `/tmp/ll-mvp-007-verify/`，未进入仓库，也未 commit/push |
+
+命令与日志（临时日志不提交）：
+
+```bash
+pnpm install --frozen-lockfile
+pnpm check
+node /tmp/ll-mvp-007-verify/http-verification.mjs      # 25 项断言，exit 0
+node /tmp/ll-mvp-007-verify/migration-check.mjs        # 0005 旧库升级 + 全新库，exit 0
+node /tmp/ll-mvp-007-verify/sql-evidence.mjs           # 对 HTTP 运行库的直查快照，exit 0
+```
+
+日志：`/tmp/ll-mvp-007-verify/{install,check6,http-verification,migration-check,sql-evidence}.log`。
+
+隔离 fixture 数据（均为 simulated）：
+
+| 订单号 / 数字 id | 用途 | 初始状态 |
+| --- | --- | --- |
+| `vb1001` / 9001 | 状态回转 | paid=1、status=3、refund_status=0、¥99.90，无售后 |
+| `vb1002` / 9002 | 退款金额变化 | paid=1、status=3，售后 `rf2001`（refund_type=2，先 ¥10.00 后 ¥25.00） |
+| `vb1003` / 9003 | 扫描失败失效/恢复 | paid=1、status=3、refund_status=0、¥66.00，无售后 |
+
+### 13.2 P1-1：paid → refunding → paid 不再被旧唯一键吞掉
+
+第一次同步 `vb1001`（completed、valid）后，把详情 `refund_status` 改为 `1` 并在售后列表加入 `rf1001`（`refund_type=1`，¥20.00）。第二次同步的真实 HTTP 结果：
+
+```text
+POST /admin/integrations/crmeb/orders/sync -> 200
+status=succeeded  orders.updated=1  refunds.created=1
+validTransactions=0  eventsAppended=3
+```
+
+SQLite 直查（`crmeb_order_events`，按 sequence）：
+
+```sql
+SELECT sequence, event_key,
+       json_extract(payload_json,'$.status')          AS status,
+       json_extract(payload_json,'$.refundStatus')    AS refund_status,
+       json_extract(payload_json,'$.validTransaction') AS valid_transaction,
+       json_extract(payload_json,'$.hasRefund')       AS has_refund,
+       json_extract(payload_json,'$.reason')          AS reason
+FROM crmeb_order_events
+WHERE order_id = (SELECT id FROM crmeb_orders WHERE external_order_no = 'vb1001')
+ORDER BY sequence;
+```
+
+| sequence | event_key | status | refundStatus | validTransaction | hasRefund | reason |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `order` | completed | 0 | 1 | 0 | — |
+| 2 | `order` | **refunding** | **1** | **0** | 0 | — |
+| 3 | `order` | refunding | 1 | 0 | **1** | — |
+| 4 | `refund:rf1001` | — | — | — | — | — |
+
+`sequence = [1,2,3,4]` 严格递增；旧 schema 的 `unique(order_id, event_key)` 会在第 2 条（同为 `order` 流）就冲突并吞掉状态回转，现在两条 `order` 事件都在。随后模拟上游取消售后（`refund_status` 回到 0、售后列表移除 `rf1001`）再同步：
+
+- 第 5 条事件：`order` / completed / valid=0 / hasRefund=1。适配器的售后镜像按 append-only 保留该行，所以仅凭上游列表变化不会恢复有效成交；这是保守策略下的停点。
+- 为继续验证“退款取消后恢复 paid”，测试夹具直接删除镜像行 `crmeb_refunds.rf1001`（**夹具动作，不是产品行为**），再次同步：
+  - `eventsAppended=1`，第 6 条事件 `order` / completed / valid=**1** / hasRefund=0，`crmeb_orders.valid_transaction` 回到 1。
+
+最终该订单 7 条事件、sequence 1..7，payload 依次反映 `completed(valid=1) → refunding(valid=0) → completed(valid=0,hasRefund=1) → completed(valid=1)`，历史行全部保留。结论：**状态回转在真实 HTTP + SQLite 层成立，不是只跑单测。**
+
+### 13.3 P1-1：同一售后状态下退款金额变化追加，重复同步幂等
+
+对 `vb1002` 首轮同步记录售后 `rf2001`（`refund_type=2`，`refund_price/refunded_price=10.00`）：
+
+```text
+refund stream 事件：sequence 3，event_key=refund:rf2001，金额 1000 分
+订单流同轮追加：sequence 2（hasRefund=1、valid=0）
+```
+
+只把金额改成 `25.00`（`refund_type` 仍为 2，订单详情不变）后再次同步：
+
+```text
+POST .../sync -> 200  status=succeeded  eventsAppended=1  refunds.updated=1
+refund 事件：sequence 4，event_key=refund:rf2001
+crmeb_refunds: refund_type=2, refund_amount_cents=2500, refunded_amount_cents=2500
+```
+
+随后同一快照再同步一次：
+
+```text
+eventsAppended=0  refunds.unchanged=1  orders.unchanged=1
+该订单事件总数仍为 4，sequence 仍为 [1,2,3,4]
+```
+
+另外，最终完整重复同步（并发测试后）同样 `eventsAppended=0`，`orders.unchanged=1`、`refunds.unchanged=1`。结论：**金额变化产生新事件，重复同步不追加，幂等成立。**
+
+### 13.4 P1-2：退款扫描不完整撤销渠道内陈旧 valid_transaction，并可恢复
+
+先完整扫描一次，`vb1003` 为 `valid_transaction=1`（事件 sequence 1）。然后**让本轮订单页为空**（`vb1003` 不在页内），并以 `refundPage=2` 起始触发不完整扫描：
+
+```text
+POST .../sync {"refundPage":2,"refundLimit":100} -> 200
+status=failed  cursor.refunds.complete=false  validTransactions=0
+errors[0].code=refund_scan_incomplete
+errors[0].message=售后扫描未从第 1 页开始（refundPage=2）；渠道内 2 条未确认的有效成交已撤销
+```
+
+run 的 `scope_json`（SQLite 直查）：
+
+```json
+{
+  "page": 1, "limit": 50, "sinceAddTime": null,
+  "refundPage": 2, "refundLimit": 100, "refundScan": "mandatory", "actorRole": "admin",
+  "refundScanComplete": false, "refundScanInvalidated": 2
+}
+```
+
+其中 `refundScanInvalidated=2` 包含 `vb1001` 与 `vb1003` 两条不在本轮订单页内的旧有效成交，证明失效范围是**渠道级**而不是本页。`vb1003` 变为 `valid_transaction=0`，并追加：
+
+| sequence | event_key | validTransaction | reason |
+| --- | --- | --- | --- |
+| 1 | `order` | 1 | — |
+| 2 | `order` | **0** | **refund_scan_incomplete** |
+
+随后完整扫描（`refundPage=1`、订单页重新包含 `vb1003`、售后列表干净）：
+
+```text
+status=succeeded  cursor.refunds.complete=true  validTransactions=1
+vb1003.valid_transaction=1；事件 sequence 3：valid=1、reason=null（恢复事件）
+```
+
+再验证上游错误分支：`refund/list` 返回 `status=403`（订单页为空），run 同时记录 `forbidden` 与 `refund_scan_incomplete`（“售后扫描在上游请求处中断；渠道内 1 条…已撤销”），`scan_complete=0`、`invalidated=1`，`vb1003` 再次置 0 并追加 reason 事件；随后完整扫描又恢复为 1。结论：**非第 1 页与上游错误两种不完整路径都会撤销陈旧有效标记、写入 run 与审计事件，且能在完整扫描后恢复干净订单。**
+
+### 13.5 幂等与单进程并发守卫
+
+- 并发：对同一 API 用延迟 700ms 的 mock 同时发两个同步请求，HTTP 结果 `[200, 409]`，409 包络为 `{"error":{"code":"crmeb_sync_in_progress",...}}`；同步 run 只增加 1 行，事件数不变（无重复记账）。
+- 单进程守卫之外的多实例/多进程并发未验证（文档已声明仅单进程）。
+
+### 13.6 迁移 0005：旧库原地升级 + 全新库全量迁移
+
+方法：复制当前迁移目录并去掉 `0005_*` 与 journal 条目，得到 0000–0004 的 pre-fix 目录；用与 API 启动相同的 drizzle `migrate()` 建旧库并插入旧事件（旧唯一键 `(order_id,event_key)` 下两条同 `created_at` 的行只能使用不同 event_key）；再对同一库用当前迁移目录执行 0005。关键输出：
+
+```text
+升级前行（全部保留）：evt-a-1(order,500) evt-a-2(refund:R1,500) evt-a-3(refund:R2,900) evt-b-1(order,400)
+升级后 sequence：evt-a-1=1, evt-a-2=2, evt-a-3=3, evt-b-1=1
+order-a: rows=3, first=1, last=3, distinct_sequences=3
+order-b: rows=1, first=1, last=1, distinct_sequences=1
+sequence 列：INTEGER NOT NULL DEFAULT 0
+索引：crmeb_order_events_order_sequence_uq UNIQUE(order_id, sequence)；
+      旧 crmeb_order_events_order_event_uq 已删除，重建普通索引 order_event_idx
+触发器：crmeb_order_events_no_update / no_delete / sequence_guard 均在
+UPDATE -> crmeb_order_events rows are append-only
+DELETE -> crmeb_order_events rows are append-only
+重复 (order_id, sequence) -> UNIQUE constraint failed
+sequence=0 -> crmeb_order_events.sequence must be a positive integer
+升级后仍可插入同 event_key 的新行：evt-a-4(order, sequence=4) 成功
+```
+
+全新库：当前迁移目录共应用 **6** 个迁移，`sequence` 为 `notnull=1`，`crmeb_order_events_order_sequence_uq` 为唯一索引，旧 `order_event_uq` 不存在，三个触发器均存在。结论：**旧库原地升级不丢历史、序号回填确定、唯一约束与 append-only/插入守卫均生效；全新库 0000→0005 全量迁移通过。**
+
+### 13.7 最终数据库不变量
+
+```sql
+SELECT o.external_order_no, COUNT(*) AS events,
+       MIN(e.sequence) AS first_sequence, MAX(e.sequence) AS last_sequence,
+       COUNT(DISTINCT e.sequence) AS distinct_sequences
+FROM crmeb_order_events e JOIN crmeb_orders o ON o.id = e.order_id
+GROUP BY o.id ORDER BY o.external_order_no;
+```
+
+| 订单 | 事件数 | 首/末 sequence | 不同 sequence | 连续性 |
+| --- | --- | --- | --- | --- |
+| vb1001 | 7 | 1 / 7 | 7 | 是（最后一条为扫描失败失效事件） |
+| vb1002 | 4 | 1 / 4 | 4 | 是 |
+| vb1003 | 5 | 1 / 5 | 5 | 是 |
+
+`PRAGMA integrity_check` = `ok`；`crmeb_order_events` 的三个触发器与 `(order_id,sequence)` 唯一索引在最终库中仍在。
+
+### 13.8 安装、检查与工作树
+
+```text
+pnpm install --frozen-lockfile -> exit 0（Lockfile up to date，Done in 838ms）
+pnpm check -> exit 0
+  oxlint: 13 warnings, 0 errors
+  typecheck: contracts / admin / web / api 全部 Done
+  admin tests: 9 files / 75 tests passed
+  API tests: 82 passed, 0 failed
+  scripts tests: 7 passed, 0 failed
+  build: contracts / api / admin / web 全部 Done
+```
+
+说明：验证期间宿主上另一个无关会话反复执行 `pkill -f vite`（该模式也匹配 `vitest`），曾误杀过测试进程并使一次并行负载下的 admin 单测 120s 超时；宿主空闲后已用原样 `pnpm check` 重跑并以本次 exit 0 为准（`check6.log`）。
+
+工作树 `git status --porcelain` 只包含 t1 声明的 6 个修改 + 2 个新增迁移文件，以及本节追加的 `docs/engineering/evidence/ll-mvp-007/verification.md`；没有 `/tmp` 脚本或 mock 进入仓库，未 commit/push。
+
+### 13.9 清理、限制与阻塞
+
+- 服务已停：验证用的 API `127.0.0.1:53763` 与 SIMULATED CRMEB `127.0.0.1:53761` 均已关闭，`lsof`/`pgrep` 无残留进程；SQLite 与脚本留在 `/tmp/ll-mvp-007-verify/`。
+- **未做真实商城联调**：无真实 CRMEB 实例/outapi 凭证，无法验证真实 token 生命周期、真实 refund/list 排序与时间窗、真实订单/售后数据；无微信授权与支付商户号。
+- 售后镜像 append-only：上游售后取消不会删除本地 `crmeb_refunds` 行，因此“取消后退款单消失”的完整恢复需要真实实例验证；本轮第 5→6 条事件的恢复通过夹具删除镜像行模拟，属保守策略下可接受的欠计风险，不是 P1 回归。
+- 并发只验证单进程守卫；未做多实例压测。售后 >10000 条/单轮上限与跨 run 合并仍未验证（文档已声明）。
+- 0005 回填在同一 `created_at` 下按 UUID `id` 定序，确定但非真实插入顺序；与实现一致，已在审查补充观察中记录。
+
+**结论：两处 P1 在真实 Node API + 隔离 SIMULATED CRMEB + SQLite 直查层面成立，迁移升级成立；未发现需要阻断本轮返工的新问题。本节所有结论仍不是真实商城联调通过。**

@@ -29,6 +29,7 @@ apps/api/src/crmeb/orders.ts           # 订单/售后拉取同步、状态映�
 apps/api/src/crmeb/routes.ts           # 公开/管理路由与权限
 apps/api/src/crmeb/{audit,money,errors}.ts
 apps/api/db/migrations/0004_polite_black_bird.sql  # rebase 到 dev 后顺延为 0004（上游已有 0002/0003）
+apps/api/db/migrations/0005_opposite_gunslinger.sql  # 事件序号化（原地回填 + 唯一约束 + 触发器保留）
 apps/api/test/crmeb-*.test.ts          # node:test + 本机 HTTP SIMULATED CRMEB
 ```
 
@@ -144,8 +145,8 @@ apps/api/test/crmeb-*.test.ts          # node:test + 本机 HTTP SIMULATED CRMEB
 
 1. `GET /outapi/order/list`（`page`、`limit`，可选 `sinceAddTime` → CRMEB `YYYY/MM/DD HH:mm:ss-YYYY/MM/DD HH:mm:ss` 窗口，UTC）发现订单；
 2. 对每个订单调用 `GET /outapi/order/<order_id>`，**详情是 `status`/`refund_status` 的权威来源**（列表 `unset refund_status`，也无 `is_cancel`/`update_time`）；
-3. `GET /outapi/refund/list` **强制**分页扫描售后（`refund_type=0` 即 >0，`page`/`limit`，默认 100/页，单次最多 100 页 = 10000 条），按 `store_order_id` 关联订单；游标写入 run；
-4. 若售后扫描未从第 1 页完成、达到单次上限或出现无法解析的售后行，本次 run 记 `refund_scan_incomplete`，并把本次处理过的订单 `valid_transaction` 置 false，**绝不把未完成退款对账的订单算作有效成交**；
+3. `GET /outapi/refund/list` **强制**分页扫描售后（`refund_type=0` 表示无售后、`>0` 才计售后，`page`/`limit`，默认 100/页，单次最多 100 页 = 10000 条），按 `store_order_id` 关联订单；游标写入 run；
+4. 若售后扫描未从第 1 页完成、达到单次上限、上游请求失败或出现无法解析的售后行，本次 run 记 `refund_scan_incomplete`，并把**渠道内所有** `valid_transaction=true` 的订单置 false（不再局限本轮处理页），**绝不把未确认退款对账的订单算作有效成交**；失效条数与 `refundScanComplete` 一并写入 run 的 `scope_json`，错误摘要含失效数量；
 5. 写入镜像、追加事件、更新审计。
 
 ### 7.1 状态映射（白名单）
@@ -168,7 +169,9 @@ apps/api/test/crmeb-*.test.ts          # node:test + 本机 HTTP SIMULATED CRMEB
 
 - `crmeb_orders`：**稳定键是 CRMEB 数字 id `(channel, external_order_id)` 唯一**；`order_id` 只是展示/关联号，仅建普通索引。同步先按数字 id 查找，再按 `order_id` 比对：同一 `order_id` 换数字 id、或同一数字 id 换 `order_id` 时抛 `contract_mismatch` 并记入 run 错误，保留旧行不覆盖；重复同步走 upsert 对比，不重复记账。
 - `crmeb_refunds`：`(channel, external_refund_no)` 与 `(channel, external_refund_id)` 唯一。
-- `crmeb_order_events`：append-only，`unique(order_id, event_key)` 去重；`event_key` 为状态元组（`order:<paid>:<status>:<refund_status>`）或售后事件（`refund:<refund_no>:<refund_type>`）；SQLite 触发器禁止 UPDATE/DELETE。
+- `crmeb_order_events`：append-only **按订单时间线追加**。唯一键是 `(order_id, sequence)`，`sequence` 是订单内从 1 开始、严格递增的修订号；`event_key` 只作可读的流标签（订单快照 `order`、售后快照 `refund:<refund_no>`），**不再承担唯一性**。每次同步把「完整快照」（状态、金额、有效成交标记、是否已有售后等）与同一流最新事件的 `payload_hash` 比较，相同（重复/重试/并发同步）不追加，不同才追加下一条 `sequence`。因此 `paid → refunding → paid` 会追加 3 条事件，退款金额变化也追加新事件；SQLite 触发器禁止 UPDATE/DELETE，另有插入触发器强制 `sequence >= 1`。
+- **旧库升级**：`0005_opposite_gunslinger.sql` 原地升级 `crmeb_order_events`（不重建、不删历史）：按 `(created_at, id)` 稳定排序回填订单内 `sequence`，删除旧状态组合唯一索引并建立 `unique(order_id, sequence)`；迁移期间仅在本事务内临时移除 UPDATE 触发器，随后按 0004 原文重建，并新增插入守卫触发器拒绝 `sequence < 1`。旧 `event_key` 行原样保留，升级后首次同步会为每个事件流追加一条新语义的基线事件。
+- **失效与恢复**：退款扫描不完整（非第 1 页起始、触顶、上游错误、不可读售后行）时，渠道内所有 `valid_transaction=true` 订单立即置 false 并各追加一条带 `reason: refund_scan_incomplete` 的订单事件；后续一次完整扫描并重新观测到干净订单时，订单恢复 `valid_transaction=true` 并追加恢复事件（`hasRefund=true` 的订单保持 false）。游标与 scope 只记录事实，不把「未扫描」当作「保持原值」。
 - `crmeb_sync_runs`：每次运行记录真实触发者（`actor_user_id`）、真实角色（`actor_role`，当前仅 admin）、窗口（scope 含 refundPage/refundLimit/refundScan=mandatory/actorRole）、订单/售后游标、条数、有效成交数、追加事件数、错误摘要、起止时间。同步仅 admin 可触发；列表级失败会把 run 标 `failed` 并返回 5xx；单条失败进入错误列表、run 标 `failed` 但其余条目仍写入，可重试。
 - 进程内并发守卫：重叠同步返回 409 `crmeb_sync_in_progress`；数据库唯一键兜底跨进程/重放。**多实例部署时该守卫只保证单进程**，需要数据库级锁或调度器时另行实现。
 - 未知值不猜测：无法解析的金额/状态/售后结构按单条失败记录，不写入错误业务值。
@@ -205,6 +208,19 @@ pnpm check
 - 不调用任何 outapi 写接口；不调用 `/api/remote_register`；不实现 SSO/OIDC；不创建订单、不代登录、不代支付、不转发支付回调。
 - 来源归因是**弱关联**：`referralCode` 是公开码，拿到本社区网格员码的人可以伪造 claim；因此只写 `claimed`，对账/奖励不得当作已确认归属。越界/无效码只落 hash，不落 `claimed_staff_id`。
 
+### 9.1 本轮不修的已知限制（不得据此对外承诺）
+
+- **P2 商品详情软删除缺口**：CRMEB outapi 商品详情不返回 `is_del`，Adapter 只能按 `is_show` 过滤。因此详情接口「返回结果」不等于「一定可售」：真实可售状态（删除/售罄/库存/价格）仍以商城 H5 页面为准，本卡不修。
+- **点击归因与订单未闭环**：`crmeb_click_attributions` 的 click/claim 与 CRMEB 订单之间没有可证明的关联（无签名回调、无订单来源字段），因此**不得**用订单或成交额反推网格员业绩；归因只作弱记录，奖励/对账需另立卡并补齐可验证链路。本卡不修。
+
+### 9.2 复审/验证残余观察（不阻断本轮 P1，记为后续）
+
+- **扫描失败摘要措辞**：若第 1 页成功、第 2 页才发生上游/契约失败，`refund_scan_incomplete` 的摘要可能优先显示“达到分页上限”；失效动作、游标与上游错误条目本身正确，仅摘要优先级需修正，避免运维误读。
+- **测试 fixture 隔离**：`crmeb-orders.test.ts` 有两处用例直接修改模块级 fixture 且未还原，存在测试顺序依赖；后续应改为每个用例独立 fixture（当前 82/82 通过，不影响 P1 结论）。
+- **审计快照字段**：订单事件快照目前包含状态/金额/有效标记/是否售后，不含商品构成、`pay_type`、`platformUserId`；仅商品构成变化不产生新事件。若后续对账需要该粒度，应扩展 `orderEventPayload` 并补回归。
+- **售后取消语义**：`crmeb_refunds` 为 append-only，上游取消售后若使行从 `refund/list` 消失，本地行不会被删除，订单可能保守保持 `valid_transaction=false`（欠计、不误记）。真实实例上需先验证取消/关闭的返回形状，再实现“取消后恢复”，本轮不做。
+- **多实例并发**：仅验证单进程守卫（双请求 200/409）；跨进程/多实例仍未实测，需要数据库级锁或调度器。
+
 ## 10. 风险清单
 
 | 风险 | 处理 |
@@ -212,10 +228,10 @@ pnpm check
 | 上游契约漂移（字段改名/嵌套变化） | zod 校验 → 503 `crmeb_contract_mismatch`，不透传脏数据 |
 | outapi 逐接口授权漏勾 | 403 → 503 并提示检查对外接口权限 |
 | token 泄漏 | 仅服务端内存缓存；日志/响应/URL 均不含 token、secret |
-| 重复/并发同步 | 唯一键 upsert + append-only 去重键 + 进程内守卫 + 运行审计 |
+| 重复/并发同步 | 唯一键 upsert + 按订单时间线的 `(order_id, sequence)` 快照去重 + 进程内守卫 + 运行审计 |
 | 金额精度 | 十进制字符串解析为整数分，异常值显式失败 |
 | 订单状态证据不足 | 白名单映射，未知落 `unknown` 且不计成交；售后记录保守排除 |
-| 退款对账不完整 | 强制分页扫描 + run 游标；未完成第 1 页→末尾的 run 把订单置非有效成交并报 `refund_scan_incomplete` |
+| 退款对账不完整 | 强制分页扫描 + run 游标；未完成第 1 页→末尾（含上游错误/不可读行）的 run 撤销**渠道内全部** `valid_transaction=true` 并报 `refund_scan_incomplete`，失效条数写入 run scope；后续完整扫描重新观测干净订单才恢复 |
 | 订单号/数字 id 漂移 | 稳定键为数字 id；冲突抛 `contract_mismatch`、保留旧行并记 run 错误 |
 | 归因伪造/污染 | claim 与 confirmed 分离，浏览器不能写 confirmed；越界降级；自然购买不挂活动、无活动 referral 不升级 |
 | 多实例并发 | 当前仅单进程守卫；多实例需外部分布式锁/调度 |
@@ -227,7 +243,7 @@ pnpm check
 - `crmeb-client.test.ts`：decimal 金额（含 0.1+0.2 陷阱、非法值）、配置全有/全无与非法值启动失败、token 缓存、提前刷新、401 单次重取、重复 401 终止、契约漂移、超时。
 - `crmeb-products.test.ts`：未配置 `not_configured` + healthz 仍 ok、列表归一化/分页/图片/单位/上架过滤、非法分页拦截、详情二次上架校验、不泄露 stock、上游 403/契约漂移显式错误。
 - `crmeb-identity-attribution.test.ts`：绑定端点未认证/非管理员/无 CSRF/伪造 extra 字段拒绝、唯一约束冲突、审计写入、居民 `/me` 只返回 linked/status/method/verifiedAt（无 crmebUid）、撤销+重绑审计、越界/无效码不回显 staff id（DB CHECK 约束兜底）；购买需登录/CSRF；无活动自然购买 201（`activityId=null`、`unconfirmed`、无 staff、真实 H5 链接），无活动+合法网格员码仍 `unconfirmed`/无 staff 仅 hash，非法活动 404、跨社区 403、带活动合法码 `claimed`；伪造 `gridWorkerId`/`confirmed`/`crmebUid` 400；未配置 503。
-- `crmeb-orders.test.ts`：状态白名单、拉取幂等（重复同步 created=0/events=0）、退款/未支付/未知排除、售后扫描排除、refund/list 150 条分页+游标持久化、未完成退款扫描禁止有效成交、订单号/数字 id 冲突保留旧行、`includeRefunds` 不再接受（400）、事件 append-only 触发器、同步审计（trigger/actorRole/actorUserId）、admin-only 权限/CSRF、未配置 503、列表失败留审计可重试、单条失败不掩盖其余、并发 409、身份映射参与订单归属。
+- `crmeb-orders.test.ts`：状态白名单、拉取幂等（重复同步 created=0/events=0）、退款/未支付/未知排除、售后扫描排除、refund/list 150 条分页+游标持久化、未完成退款扫描禁止有效成交、订单号/数字 id 冲突保留旧行、`includeRefunds` 不再接受（400）、事件 append-only/序号触发器、同步审计（trigger/actorRole/actorUserId）、admin-only 权限/CSRF、未配置 503、列表失败留审计可重试、单条失败不掩盖其余、并发 409、身份映射参与订单归属；P1 回归：`paid→refunding→paid` 事件 ≥3 且 sequence 递增、同 refund_type 金额变化追加事件而重复同步不追加、退款扫描不完整（非第 1 页/上游错误）撤销渠道内全部陈旧 valid_transaction 且完整扫描后干净订单恢复、0005 旧库原地升级序号回填与唯一约束、全新库全量迁移。
 
 ## 12. 与调研文档的差异说明
 
