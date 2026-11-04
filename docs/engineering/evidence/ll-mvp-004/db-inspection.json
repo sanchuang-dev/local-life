@@ -1,0 +1,220 @@
+{
+  "databasePath": "/tmp/ll-mvp-004-verify/verify.sqlite",
+  "capturedAt": "2026-11-04T03:43:15.386Z",
+  "sqliteTables": [
+    "__drizzle_migrations",
+    "activities",
+    "activity_invitations",
+    "activity_participations",
+    "activity_rule_versions",
+    "activity_teams",
+    "audit_logs",
+    "communities",
+    "oauth_states",
+    "rate_limits",
+    "resident_community_assignments",
+    "sessions",
+    "staff_accounts",
+    "staff_community_assignments",
+    "users",
+    "wechat_identities"
+  ],
+  "tableCount": 16,
+  "counts": {
+    "users": 25,
+    "communities": 1,
+    "activities": 10,
+    "activity_teams": 11,
+    "activity_participations": 19,
+    "activity_invitations": 11,
+    "audit_logs": 59,
+    "sessions": 26
+  },
+  "activityIds": {
+    "primary": "1060b203-44cd-4950-9ac1-64d813365fea",
+    "secondary": "d5d04a01-dacf-4d38-bd40-89bb85786352",
+    "concurrency": "3b4047bc-f2c2-4ad6-bf2f-03e39322d72d",
+    "paused": "f05cb3ff-d2c4-4a0a-a0e4-6b82f2a92b3e",
+    "ended": "568e914c-4e1f-470c-bc29-05a2a6adc0d8",
+    "expired": "37218b1b-25df-4035-9cbf-1df843039012",
+    "draft": "4355f663-7069-4b65-aa61-811190c135fc"
+  },
+  "teams": [
+    {
+      "id": "9f2eb510-45f1-4a9d-a2b9-33872e13de77",
+      "activity_id": "1060b203-44cd-4950-9ac1-64d813365fea",
+      "status": "locked",
+      "locked_at": 1793763293159,
+      "seats": 3,
+      "seat_nos": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "78f1da4a-8ddf-4668-8d81-40b423abbe89",
+      "activity_id": "d5d04a01-dacf-4d38-bd40-89bb85786352",
+      "status": "open",
+      "locked_at": null,
+      "seats": 1,
+      "seat_nos": [
+        1
+      ]
+    },
+    {
+      "id": "09a9f688-a51b-4be6-91c0-fd8f718158fc",
+      "activity_id": "1060b203-44cd-4950-9ac1-64d813365fea",
+      "status": "open",
+      "locked_at": null,
+      "seats": 1,
+      "seat_nos": [
+        1
+      ]
+    },
+    {
+      "id": "19a52105-ba6f-43fc-a23a-0adbf0d4b84f",
+      "activity_id": "3b4047bc-f2c2-4ad6-bf2f-03e39322d72d",
+      "status": "locked",
+      "locked_at": 1793763293302,
+      "seats": 3,
+      "seat_nos": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "652e6c4e-bb07-46cd-9a61-15bb4a2597a6",
+      "activity_id": "4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a",
+      "status": "open",
+      "locked_at": null,
+      "seats": 1,
+      "seat_nos": [
+        1
+      ]
+    },
+    {
+      "id": "7055e9d9-593f-4073-82f2-3f5d8e88230f",
+      "activity_id": "4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a",
+      "status": "open",
+      "locked_at": null,
+      "seats": 1,
+      "seat_nos": [
+        1
+      ]
+    },
+    {
+      "id": "f821ee1c-db1e-49ab-b8e8-da016c47d2c4",
+      "activity_id": "4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a",
+      "status": "open",
+      "locked_at": null,
+      "seats": 1,
+      "seat_nos": [
+        1
+      ]
+    },
+    {
+      "id": "a103076f-97b0-4215-b564-90681e5a15af",
+      "activity_id": "4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a",
+      "status": "locked",
+      "locked_at": 1793763629632,
+      "seats": 3,
+      "seat_nos": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "7708fb80-166a-4b29-9122-4a2420266203",
+      "activity_id": "4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a",
+      "status": "open",
+      "locked_at": null,
+      "seats": 1,
+      "seat_nos": [
+        1
+      ]
+    },
+    {
+      "id": "d0e089f8-1bf2-42b7-92ec-96b727114321",
+      "activity_id": "4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a",
+      "status": "locked",
+      "locked_at": 1793763708910,
+      "seats": 3,
+      "seat_nos": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "1444e51a-d669-48cc-a89c-d9555986245e",
+      "activity_id": "4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a",
+      "status": "open",
+      "locked_at": null,
+      "seats": 1,
+      "seat_nos": [
+        1
+      ]
+    }
+  ],
+  "primaryTeamMembers": [
+    {
+      "seat_no": 1,
+      "role": "leader",
+      "invite_source": "self",
+      "display_name": "居民A",
+      "code": null
+    },
+    {
+      "seat_no": 2,
+      "role": "member",
+      "invite_source": "invite",
+      "display_name": "居民B",
+      "code": "2d93bb40e6aa244092e27b68fc9b17aa"
+    },
+    {
+      "seat_no": 3,
+      "role": "member",
+      "invite_source": "invite",
+      "display_name": "居民C",
+      "code": "2d93bb40e6aa244092e27b68fc9b17aa"
+    }
+  ],
+  "concurrencyTeam": {
+    "id": "19a52105-ba6f-43fc-a23a-0adbf0d4b84f",
+    "activity_id": "3b4047bc-f2c2-4ad6-bf2f-03e39322d72d",
+    "status": "locked",
+    "locked_at": 1793763293302,
+    "seats": 3,
+    "seat_nos": [
+      1,
+      2,
+      3
+    ]
+  },
+  "participationAudit": [
+    {
+      "event": "participation.created",
+      "c": 19
+    },
+    {
+      "event": "team.locked",
+      "c": 4
+    }
+  ],
+  "invariants": {
+    "noTeamOverThreeSeats": true,
+    "allLockedTeamsFull": true,
+    "primaryLockedAtPresent": true,
+    "concurrencyLockedAtPresent": true,
+    "primarySeatNumbers": [
+      1,
+      2,
+      3
+    ],
+    "auditMetadataHasNoInviteCode": true
+  },
+  "pass": true
+}

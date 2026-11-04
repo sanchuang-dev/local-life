@@ -1,0 +1,28 @@
+{
+  "capturedAt": "2026-11-04T03:52:02.486Z",
+  "adminLoginStatus": 200,
+  "communityId": "59200bd3-3ba6-47e6-994b-6a484de7c007",
+  "tag": "20261104035202",
+  "activities": {
+    "primary": {
+      "id": "11e64e7c-1e7f-4466-bc3d-dafd31772227",
+      "title": "浏览器三人团验收 20261104035202",
+      "status": "published",
+      "startsAt": "2026-11-03T03:52:02.424Z",
+      "endsAt": "2026-12-04T03:52:02.425Z"
+    },
+    "paused": {
+      "id": "e36e75f7-7752-4598-b2fb-eb84282f2dd7",
+      "title": "浏览器暂停验收 20261104035202",
+      "status": "paused",
+      "pauseStatus": 200
+    },
+    "ended": {
+      "id": "5a6948d4-d830-4bec-b2f9-4976168fcdf3",
+      "title": "浏览器结束验收 20261104035202",
+      "status": "ended",
+      "endStatus": 200
+    }
+  },
+  "deepLink": "http://localhost:5173/local-life/#/community/activity/silver-neighborhood?activityId=11e64e7c-1e7f-4466-bc3d-dafd31772227"
+}

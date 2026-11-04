@@ -1,0 +1,168 @@
+{
+  "databasePath": "/tmp/ll-mvp-004-verify/verify-r2.sqlite",
+  "capturedAt": "2026-11-04T03:52:57.312Z",
+  "sqliteTables": [
+    "__drizzle_migrations",
+    "activities",
+    "activity_invitations",
+    "activity_participations",
+    "activity_rule_versions",
+    "activity_teams",
+    "audit_logs",
+    "communities",
+    "oauth_states",
+    "rate_limits",
+    "resident_community_assignments",
+    "sessions",
+    "staff_accounts",
+    "staff_community_assignments",
+    "users",
+    "wechat_identities"
+  ],
+  "tableCount": 16,
+  "counts": {
+    "users": 16,
+    "communities": 1,
+    "activities": 10,
+    "activity_teams": 6,
+    "activity_participations": 12,
+    "activity_invitations": 6,
+    "audit_logs": 51,
+    "sessions": 17
+  },
+  "activityIds": {
+    "primary": "db78d9ed-1a26-4115-9c77-d57f2d7a50f7",
+    "secondary": "a5ebc177-c757-4d04-b2c2-bab37fb90b0b",
+    "concurrency": "792b24bc-67f1-4e50-9909-5c5d4fa4e145",
+    "paused": "cd26158a-87b3-43af-a538-6f0d47fffaed",
+    "ended": "61dd48dd-dea5-4230-8940-33feff074342",
+    "expired": "63433639-3cb2-4073-b849-33eb6a34f6dc",
+    "draft": "899f55c8-063f-46fe-9c6c-d40d37f5ea36"
+  },
+  "teams": [
+    {
+      "id": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+      "activity_id": "db78d9ed-1a26-4115-9c77-d57f2d7a50f7",
+      "status": "locked",
+      "locked_at": 1793764317411,
+      "seats": 3,
+      "seat_nos": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "f757963c-9ea5-4d94-b9ed-7ba1508798fd",
+      "activity_id": "a5ebc177-c757-4d04-b2c2-bab37fb90b0b",
+      "status": "open",
+      "locked_at": null,
+      "seats": 1,
+      "seat_nos": [
+        1
+      ]
+    },
+    {
+      "id": "bc2f135b-a0ac-46ff-a2b3-c6d0719dd700",
+      "activity_id": "db78d9ed-1a26-4115-9c77-d57f2d7a50f7",
+      "status": "open",
+      "locked_at": null,
+      "seats": 1,
+      "seat_nos": [
+        1
+      ]
+    },
+    {
+      "id": "206dea8a-6a04-43e4-8d12-3f13fbddff31",
+      "activity_id": "792b24bc-67f1-4e50-9909-5c5d4fa4e145",
+      "status": "locked",
+      "locked_at": 1793764317492,
+      "seats": 3,
+      "seat_nos": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "3967c08a-87b0-464a-a33c-4f2a6ec53d7c",
+      "activity_id": "11e64e7c-1e7f-4466-bc3d-dafd31772227",
+      "status": "locked",
+      "locked_at": 1793764353934,
+      "seats": 3,
+      "seat_nos": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "52d2736f-bc1a-4682-a0a6-680141620e86",
+      "activity_id": "11e64e7c-1e7f-4466-bc3d-dafd31772227",
+      "status": "open",
+      "locked_at": null,
+      "seats": 1,
+      "seat_nos": [
+        1
+      ]
+    }
+  ],
+  "primaryTeamMembers": [
+    {
+      "seat_no": 1,
+      "role": "leader",
+      "invite_source": "self",
+      "display_name": "居民A",
+      "code": null
+    },
+    {
+      "seat_no": 2,
+      "role": "member",
+      "invite_source": "invite",
+      "display_name": "居民B",
+      "code": "d16af3653251432fd2f09545b9015f61"
+    },
+    {
+      "seat_no": 3,
+      "role": "member",
+      "invite_source": "invite",
+      "display_name": "居民C",
+      "code": "d16af3653251432fd2f09545b9015f61"
+    }
+  ],
+  "concurrencyTeam": {
+    "id": "206dea8a-6a04-43e4-8d12-3f13fbddff31",
+    "activity_id": "792b24bc-67f1-4e50-9909-5c5d4fa4e145",
+    "status": "locked",
+    "locked_at": 1793764317492,
+    "seats": 3,
+    "seat_nos": [
+      1,
+      2,
+      3
+    ]
+  },
+  "participationAudit": [
+    {
+      "event": "participation.created",
+      "c": 12
+    },
+    {
+      "event": "team.locked",
+      "c": 3
+    }
+  ],
+  "invariants": {
+    "noTeamOverThreeSeats": true,
+    "allLockedTeamsFull": true,
+    "primaryLockedAtPresent": true,
+    "concurrencyLockedAtPresent": true,
+    "primarySeatNumbers": [
+      1,
+      2,
+      3
+    ],
+    "auditMetadataHasNoInviteCode": true
+  },
+  "pass": true
+}
