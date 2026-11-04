@@ -1,0 +1,1129 @@
+{
+  "task": "t6 / #60 LL-MVP-004 real Chrome verification",
+  "capturedAt": "2026-11-04T03:42:04.076Z",
+  "chrome": {
+    "executablePath": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "version": "Chrome/156.0.8078.80",
+    "headless": true,
+    "puppeteerCore": "24.43.1"
+  },
+  "webOrigin": "http://localhost:5173",
+  "apiBase": "http://127.0.0.1:4080",
+  "activityId": "4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a",
+  "pausedActivityId": "d02e0612-02b3-4a11-85a4-2e4e5d13700c",
+  "endedActivityId": "eebe686a-4e58-42d5-b439-3e27419c1b10",
+  "viewports": {
+    "mobile": "375x812 @2x",
+    "narrow": "320x568 @2x"
+  },
+  "users": {
+    "A": {
+      "userId": "e9e1a1fa-9a74-44b4-89c7-7a7068c88df6",
+      "displayName": "本地测试居民",
+      "login": "UI button (开发测试登录)"
+    },
+    "B": {
+      "userId": "9b7bcb05-2efb-49c3-8fd6-59ac60ddab7c",
+      "displayName": "居民B",
+      "login": "real /api/auth/dev/login in isolated context"
+    },
+    "C": {
+      "userId": "df83c3c2-f9e7-4da2-9140-85d52b49691a",
+      "displayName": "居民C",
+      "login": "real /api/auth/dev/login in isolated context"
+    },
+    "D": {
+      "userId": "ea5681be-6607-45cd-a94b-8507744c2303",
+      "displayName": "居民D",
+      "login": "real /api/auth/dev/login in isolated context"
+    },
+    "E": {
+      "userId": "6314a021-a46c-4804-842c-3a3c45ad37c7",
+      "displayName": "居民E",
+      "login": "real /api/auth/dev/login in isolated context"
+    }
+  },
+  "share": {
+    "url": "http://localhost:5173/local-life/#/community/activity/silver-neighborhood?activityId=4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a&invite=ea8afd46eb2474f1161f734f57bf7a11",
+    "qrDecoded": "http://localhost:5173/local-life/#/community/activity/silver-neighborhood?activityId=4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a&invite=ea8afd46eb2474f1161f734f57bf7a11",
+    "navigatorShareUrl": "http://localhost:5173/local-life/#/community/activity/silver-neighborhood?activityId=4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a&invite=ea8afd46eb2474f1161f734f57bf7a11",
+    "inviteCode": "ea8afd46eb2474f1161f734f57bf7a11",
+    "otherTeamShareUrl": "http://localhost:5173/local-life/#/community/activity/silver-neighborhood?activityId=4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a&invite=ec7baf1828f1c7444273f5a5dd5e0ad0"
+  },
+  "assertions": [
+    {
+      "id": "br-01",
+      "name": "A 未登录打开活动页看到登录门禁",
+      "pass": true,
+      "detail": {
+        "authenticated": false
+      }
+    },
+    {
+      "id": "br-02",
+      "name": "375 登录门禁页无横向溢出",
+      "pass": true,
+      "detail": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "bodyScrollWidth": 375,
+        "innerWidth": 375
+      }
+    },
+    {
+      "id": "br-03",
+      "name": "A 通过页面“开发测试登录”按钮完成真实登录",
+      "pass": true,
+      "detail": {
+        "clicked": true,
+        "text": "开发测试登录"
+      }
+    },
+    {
+      "id": "br-04",
+      "name": "A 登录后自动重读活动状态并显示可参与表单",
+      "pass": true,
+      "detail": {
+        "userId": "e9e1a1fa-9a74-44b4-89c7-7a7068c88df6",
+        "displayName": "本地测试居民"
+      }
+    },
+    {
+      "id": "br-05",
+      "name": "A 点击确认参与提交真实 confirm 请求",
+      "pass": true,
+      "detail": {
+        "clicked": true,
+        "text": "确认参与本活动"
+      }
+    },
+    {
+      "id": "br-06",
+      "name": "A 成团 1/3，团长占第 1 席，服务端写入成功",
+      "pass": true,
+      "detail": {
+        "teamId": "d0e089f8-1bf2-42b7-92ec-96b727114321",
+        "seats": 1
+      }
+    },
+    {
+      "id": "br-07",
+      "name": "375 1/3 团队卡无横向溢出",
+      "pass": true,
+      "detail": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "bodyScrollWidth": 375,
+        "innerWidth": 375
+      }
+    },
+    {
+      "id": "br-08",
+      "name": "A 从团队卡真实邀请入口打开分享弹层",
+      "pass": true,
+      "detail": {
+        "clicked": true,
+        "text": "邀请 2 位街坊加入三人团"
+      }
+    },
+    {
+      "id": "br-09",
+      "name": "375 分享弹层无横向溢出",
+      "pass": true,
+      "detail": {
+        "documentScrollWidth": 375,
+        "documentClientWidth": 375,
+        "bodyScrollWidth": 375,
+        "innerWidth": 375
+      }
+    },
+    {
+      "id": "br-10",
+      "name": "A 点击“复制链接”",
+      "pass": true,
+      "detail": {
+        "clicked": true,
+        "text": "复制链接"
+      }
+    },
+    {
+      "id": "br-11",
+      "name": "分享 URL 来自真实页面且包含 activityId 与 invite",
+      "pass": true,
+      "detail": {
+        "shareUrl": "http://localhost:5173/local-life/#/community/activity/silver-neighborhood?activityId=4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a&invite=ea8afd46eb2474f1161f734f57bf7a11",
+        "clipboardPlatform": "headless-denied:NotAllowedError",
+        "activityId": "4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a",
+        "inviteCode": "ea8afd46eb2474f1161f734f57bf7a11"
+      }
+    },
+    {
+      "id": "br-12",
+      "name": "navigator.share 收到的 URL 与复制链接一致",
+      "pass": true,
+      "detail": {
+        "sharedUrl": "http://localhost:5173/local-life/#/community/activity/silver-neighborhood?activityId=4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a&invite=ea8afd46eb2474f1161f734f57bf7a11",
+        "shareUrl": "http://localhost:5173/local-life/#/community/activity/silver-neighborhood?activityId=4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a&invite=ea8afd46eb2474f1161f734f57bf7a11"
+      }
+    },
+    {
+      "id": "br-13",
+      "name": "二维码解码内容与分享 URL 完全一致（含 activityId + invite）",
+      "pass": true,
+      "detail": {
+        "decoded": "http://localhost:5173/local-life/#/community/activity/silver-neighborhood?activityId=4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a&invite=ea8afd46eb2474f1161f734f57bf7a11",
+        "shareUrl": "http://localhost:5173/local-life/#/community/activity/silver-neighborhood?activityId=4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a&invite=ea8afd46eb2474f1161f734f57bf7a11",
+        "size": "296x296",
+        "note": null
+      }
+    },
+    {
+      "id": "br-14",
+      "name": "320 分享弹层无横向溢出",
+      "pass": true,
+      "detail": {
+        "documentScrollWidth": 320,
+        "documentClientWidth": 320,
+        "bodyScrollWidth": 320,
+        "innerWidth": 320
+      }
+    },
+    {
+      "id": "br-15",
+      "name": "320 1/3 团队卡无横向溢出",
+      "pass": true,
+      "detail": {
+        "documentScrollWidth": 320,
+        "documentClientWidth": 320,
+        "bodyScrollWidth": 320,
+        "innerWidth": 320
+      }
+    },
+    {
+      "id": "br-16",
+      "name": "B 在独立上下文打开 A 的真实分享链接，先看到登录门禁",
+      "pass": true
+    },
+    {
+      "id": "br-17",
+      "name": "B 登录后深链 invite 参数保留且未自动报名",
+      "pass": true,
+      "detail": {
+        "participation": null
+      }
+    },
+    {
+      "id": "br-18",
+      "name": "B 点击确认接受邀请",
+      "pass": true,
+      "detail": {
+        "clicked": true,
+        "text": "确认接受邀请并参与"
+      }
+    },
+    {
+      "id": "br-19",
+      "name": "B 成为第 2 席、邀请归属 A、同团 2/3",
+      "pass": true,
+      "detail": {
+        "teamId": "d0e089f8-1bf2-42b7-92ec-96b727114321",
+        "seat": 2,
+        "inviter": "本地测试居民"
+      }
+    },
+    {
+      "id": "br-20",
+      "name": "C 点击确认接受邀请",
+      "pass": true,
+      "detail": {
+        "clicked": true,
+        "text": "确认接受邀请并参与"
+      }
+    },
+    {
+      "id": "br-21",
+      "name": "C 成为第 3 席，三人团 3/3 锁定且不再暴露邀请码",
+      "pass": true,
+      "detail": {
+        "status": "locked",
+        "seats": 3,
+        "inviteCode": null
+      }
+    },
+    {
+      "id": "br-22",
+      "name": "A/B/C 是三个不同的真实用户账户",
+      "pass": true,
+      "detail": {
+        "A": "e9e1a1fa-9a74-44b4-89c7-7a7068c88df6",
+        "B": "9b7bcb05-2efb-49c3-8fd6-59ac60ddab7c",
+        "C": "df83c3c2-f9e7-4da2-9140-85d52b49691a"
+      }
+    },
+    {
+      "id": "br-23",
+      "name": "A 刷新后读取到同一团队 3/3 locked",
+      "pass": true,
+      "detail": {
+        "teamId": "d0e089f8-1bf2-42b7-92ec-96b727114321"
+      }
+    },
+    {
+      "id": "br-24",
+      "name": "A 刷新前仍是自己确认后的 1/3，刷新后同一团队变为 3/3 locked",
+      "pass": true,
+      "detail": {
+        "before": "我的三人团\n真实业务\n进行中\n1 / 3\n还差 2 位街坊\n\n你是本团团长。席位与成员来自服务端实时状态，刷新或换设备后保持一致。\n\n参与成功，已加入三人团。\n",
+        "after": "我的三人团\n真实业务\n已成团\n3 / 3\n已成团\n\n你是本团团长。席位与成员来自服务端实时状态，刷新或换设备后保持一致。\n\n参与成功，已加入三人团。\n\n我\n\n我"
+      }
+    },
+    {
+      "id": "br-25",
+      "name": "320 3/3 locked 团队卡无横向溢出",
+      "pass": true,
+      "detail": {
+        "documentScrollWidth": 320,
+        "documentClientWidth": 320,
+        "bodyScrollWidth": 320,
+        "innerWidth": 320
+      }
+    },
+    {
+      "id": "br-26",
+      "name": "A 离开页面后重新进入深链，团队与 3/3 状态持久一致",
+      "pass": true,
+      "detail": {
+        "teamId": "d0e089f8-1bf2-42b7-92ec-96b727114321"
+      }
+    },
+    {
+      "id": "br-27",
+      "name": "A 重进后团队卡展示 3 个真实成员/本人",
+      "pass": true,
+      "detail": "我的三人团\n真实业务\n已成团\n3 / 3\n已成团\n\n你是本团团长。席位与成员来自服务端实时状态，刷新或换设备后保持一致。\n\n我\n\n我\n\n团长 · 本人\n\n居\n\n居民B\n\n成员\n\n居\n\n居民C\n\n成员\n\n已成团，本场不再接受新成员；邀请入口已关闭。"
+    },
+    {
+      "id": "br-28",
+      "name": "D 点击确认接受邀请",
+      "pass": true,
+      "detail": {
+        "clicked": true,
+        "text": "确认接受邀请并参与"
+      }
+    },
+    {
+      "id": "br-29",
+      "name": "第四人 D 看到明确的“团队已满”错误反馈且未入团",
+      "pass": true,
+      "detail": {
+        "feedbackVisible": true,
+        "participation": null
+      }
+    },
+    {
+      "id": "br-30",
+      "name": "320 团队已满反馈无横向溢出",
+      "pass": true,
+      "detail": {
+        "documentScrollWidth": 320,
+        "documentClientWidth": 320,
+        "bodyScrollWidth": 320,
+        "innerWidth": 320
+      }
+    },
+    {
+      "id": "br-31",
+      "name": "D 在未持邀请时自行参与，另建一个三人团",
+      "pass": true,
+      "detail": {
+        "clicked": true,
+        "text": "确认参与本活动"
+      }
+    },
+    {
+      "id": "br-32",
+      "name": "D 的独立团为 1/3，与 A 的团不同",
+      "pass": true,
+      "detail": {
+        "dTeamId": "1444e51a-d669-48cc-a89c-d9555986245e",
+        "aTeamId": "d0e089f8-1bf2-42b7-92ec-96b727114321"
+      }
+    },
+    {
+      "id": "br-33",
+      "name": "D 打开自己的分享弹层",
+      "pass": true,
+      "detail": {
+        "clicked": true,
+        "text": "邀请 2 位街坊加入三人团"
+      }
+    },
+    {
+      "id": "br-34",
+      "name": "D 的分享 URL 是同一活动下另一条真实邀请链接",
+      "pass": true,
+      "detail": {
+        "dShareUrl": "http://localhost:5173/local-life/#/community/activity/silver-neighborhood?activityId=4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a&invite=ec7baf1828f1c7444273f5a5dd5e0ad0",
+        "invite": "ec7baf1828f1c7444273f5a5dd5e0ad0"
+      }
+    },
+    {
+      "id": "br-35",
+      "name": "B 已加入后打开另一条邀请链接，团队与归属不变",
+      "pass": true,
+      "detail": {
+        "teamId": "d0e089f8-1bf2-42b7-92ec-96b727114321",
+        "seat": 2,
+        "autoConfirmPosts": 0
+      }
+    },
+    {
+      "id": "br-36",
+      "name": "B 打开另一邀请链接后团队卡仍显示 A 的 3/3 团队",
+      "pass": true,
+      "detail": "我的三人团\n真实业务\n已成团\n3 / 3\n已成团\n\n你是本团成员 · 由 本地测试居民 邀请加入。席位与成员来自服务端实时状态，刷新或换设备后保持一致。\n\n本\n\n本地测试居民\n\n团长\n\n我\n\n我\n\n成员 · 本人\n\n居\n\n居民C\n\n成员\n\n已成团，本场不再接受新成员；邀请入口已关闭。"
+    },
+    {
+      "id": "br-37",
+      "name": "暂停活动 H5 显示不可参与的真实状态",
+      "pass": true,
+      "detail": {
+        "activityStatus": "paused",
+        "joinable": false
+      }
+    },
+    {
+      "id": "br-38",
+      "name": "暂停活动按钮禁用且无可提交的参与入口",
+      "pass": true,
+      "detail": {
+        "text": "我的三人团\n真实业务\n暂不可参与\n参与本活动，组成三人团\n\n三人团固定 3 个不同居民账户，发起人占一席，另邀两位街坊。只有你主动确认参与，服务端才会写入记录。\n\n确认参与本活动\n\n活动尚未发布，暂不可参与。"
+      }
+    },
+    {
+      "id": "br-39",
+      "name": "结束活动 H5 显示“活动已结束，暂不可参与”",
+      "pass": true,
+      "detail": {
+        "activityStatus": "ended"
+      }
+    },
+    {
+      "id": "br-40",
+      "name": "320 登录门禁页无横向溢出",
+      "pass": true,
+      "detail": {
+        "documentScrollWidth": 320,
+        "documentClientWidth": 320,
+        "bodyScrollWidth": 320,
+        "innerWidth": 320
+      }
+    }
+  ],
+  "passed": 40,
+  "failed": 0,
+  "screenshots": [
+    {
+      "name": "375-login-gate.png",
+      "path": "browser/375-login-gate.png"
+    },
+    {
+      "name": "375-team-nonmember.png",
+      "path": "browser/375-team-nonmember.png"
+    },
+    {
+      "name": "375-team-1of3.png",
+      "path": "browser/375-team-1of3.png"
+    },
+    {
+      "name": "375-share-sheet.png",
+      "path": "browser/375-share-sheet.png"
+    },
+    {
+      "name": "375-share-qr.png",
+      "path": "browser/375-share-qr.png"
+    },
+    {
+      "name": "320-share-sheet.png",
+      "path": "browser/320-share-sheet.png"
+    },
+    {
+      "name": "320-team-1of3.png",
+      "path": "browser/320-team-1of3.png"
+    },
+    {
+      "name": "375-team-2of3.png",
+      "path": "browser/375-team-2of3.png"
+    },
+    {
+      "name": "375-team-3of3-C.png",
+      "path": "browser/375-team-3of3-C.png"
+    },
+    {
+      "name": "375-team-locked-A.png",
+      "path": "browser/375-team-locked-A.png"
+    },
+    {
+      "name": "320-team-locked-A.png",
+      "path": "browser/320-team-locked-A.png"
+    },
+    {
+      "name": "375-team-locked-reenter.png",
+      "path": "browser/375-team-locked-reenter.png"
+    },
+    {
+      "name": "375-team-nonmember-invite-D.png",
+      "path": "browser/375-team-nonmember-invite-D.png"
+    },
+    {
+      "name": "375-team-full-D.png",
+      "path": "browser/375-team-full-D.png"
+    },
+    {
+      "name": "320-team-full-D.png",
+      "path": "browser/320-team-full-D.png"
+    },
+    {
+      "name": "375-team-locked-B-after-other-link.png",
+      "path": "browser/375-team-locked-B-after-other-link.png"
+    },
+    {
+      "name": "375-paused.png",
+      "path": "browser/375-paused.png"
+    },
+    {
+      "name": "375-ended.png",
+      "path": "browser/375-ended.png"
+    },
+    {
+      "name": "320-login-gate.png",
+      "path": "browser/320-login-gate.png"
+    }
+  ],
+  "network": [
+    {
+      "at": "2026-11-04T03:41:30.924Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:30.951Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:30.951Z",
+      "method": "GET",
+      "url": "/api/activities/public/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:30.951Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:30.951Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:31.045Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:31.722Z",
+      "method": "GET",
+      "url": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:31.742Z",
+      "method": "POST",
+      "url": "/api/auth/dev/login",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:31.802Z",
+      "method": "GET",
+      "url": "/api/activities/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:31.845Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:32.331Z",
+      "method": "GET",
+      "url": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:32.337Z",
+      "method": "POST",
+      "url": "/api/activities/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:32.404Z",
+      "method": "GET",
+      "url": "/api/activities/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:40.811Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:40.817Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:40.817Z",
+      "method": "GET",
+      "url": "/api/activities/public/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:40.817Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:40.817Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:41.012Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:41.036Z",
+      "method": "GET",
+      "url": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:41.056Z",
+      "method": "POST",
+      "url": "/api/auth/dev/login",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:41.557Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:41.558Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:41.576Z",
+      "method": "GET",
+      "url": "/api/activities/public/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:41.629Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:41.654Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:41.742Z",
+      "method": "GET",
+      "url": "/api/activities/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:41.807Z",
+      "method": "GET",
+      "url": "/api/activities/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:42.242Z",
+      "method": "GET",
+      "url": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:42.327Z",
+      "method": "POST",
+      "url": "/api/activities/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:42.386Z",
+      "method": "GET",
+      "url": "/api/activities/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:48.187Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:48.188Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:48.188Z",
+      "method": "GET",
+      "url": "/api/activities/public/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:48.188Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:48.188Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:48.357Z",
+      "method": "GET",
+      "url": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:48.373Z",
+      "method": "POST",
+      "url": "/api/auth/dev/login",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:48.672Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:48.672Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:48.673Z",
+      "method": "GET",
+      "url": "/api/activities/public/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:48.676Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:48.676Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:48.737Z",
+      "method": "GET",
+      "url": "/api/activities/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:48.904Z",
+      "method": "GET",
+      "url": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:48.923Z",
+      "method": "POST",
+      "url": "/api/activities/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:48.924Z",
+      "method": "GET",
+      "url": "/api/activities/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:49.504Z",
+      "method": "GET",
+      "url": "/api/activities/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:49.572Z",
+      "method": "GET",
+      "url": "/api/activities/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:51.086Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:51.087Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:51.087Z",
+      "method": "GET",
+      "url": "/api/activities/public/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:51.088Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:51.088Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:51.197Z",
+      "method": "GET",
+      "url": "/api/activities/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:51.229Z",
+      "method": "GET",
+      "url": "/api/activities/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:53.133Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:53.133Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:53.133Z",
+      "method": "GET",
+      "url": "/api/activities/public/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:53.134Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:53.134Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:53.309Z",
+      "method": "GET",
+      "url": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:53.321Z",
+      "method": "POST",
+      "url": "/api/auth/dev/login",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:53.541Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:53.541Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:53.543Z",
+      "method": "GET",
+      "url": "/api/activities/public/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:53.575Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:53.575Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:53.673Z",
+      "method": "GET",
+      "url": "/api/activities/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:54.327Z",
+      "method": "GET",
+      "url": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:54.335Z",
+      "method": "POST",
+      "url": "/api/activities/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a/participation",
+      "status": 409
+    },
+    {
+      "at": "2026-11-04T03:41:54.409Z",
+      "method": "GET",
+      "url": "/api/activities/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:55.696Z",
+      "method": "GET",
+      "url": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:55.722Z",
+      "method": "POST",
+      "url": "/api/activities/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:55.796Z",
+      "method": "GET",
+      "url": "/api/activities/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:57.604Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:57.604Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:57.604Z",
+      "method": "GET",
+      "url": "/api/activities/public/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:57.605Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:57.607Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:57.701Z",
+      "method": "GET",
+      "url": "/api/activities/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:57.701Z",
+      "method": "GET",
+      "url": "/api/activities/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:59.704Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:59.704Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:59.704Z",
+      "method": "GET",
+      "url": "/api/activities/public/d02e0612-02b3-4a11-85a4-2e4e5d13700c",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:59.704Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:59.710Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:59.831Z",
+      "method": "GET",
+      "url": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:41:59.855Z",
+      "method": "POST",
+      "url": "/api/auth/dev/login",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:42:00.091Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:42:00.091Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:42:00.092Z",
+      "method": "GET",
+      "url": "/api/activities/public/d02e0612-02b3-4a11-85a4-2e4e5d13700c",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:42:00.092Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:42:00.095Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:42:00.212Z",
+      "method": "GET",
+      "url": "/api/activities/d02e0612-02b3-4a11-85a4-2e4e5d13700c/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:42:00.250Z",
+      "method": "GET",
+      "url": "/api/activities/d02e0612-02b3-4a11-85a4-2e4e5d13700c/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:42:00.891Z",
+      "method": "GET",
+      "url": "/api/activities/public/eebe686a-4e58-42d5-b439-3e27419c1b10",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:42:00.958Z",
+      "method": "GET",
+      "url": "/api/activities/eebe686a-4e58-42d5-b439-3e27419c1b10/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:42:01.069Z",
+      "method": "GET",
+      "url": "/api/activities/eebe686a-4e58-42d5-b439-3e27419c1b10/participation",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:42:03.535Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:42:03.537Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:42:03.548Z",
+      "method": "GET",
+      "url": "/api/activities/public/4a16bcc3-82b1-4fa8-b1fa-02dc6369ea0a",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:42:03.576Z",
+      "method": "GET",
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "at": "2026-11-04T03:42:03.576Z",
+      "method": "GET",
+      "url": "/api/auth/methods",
+      "status": 200
+    }
+  ]
+}

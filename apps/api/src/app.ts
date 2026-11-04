@@ -36,6 +36,7 @@ import { constantTimeTextEqual, hashPassword, hashToken, randomToken, verifyPass
 import { logEvent } from './log.js'
 import { registerActivityRoutes } from './activities/routes.js'
 import { registerCrmRoutes } from './crm/routes.js'
+import { registerParticipationRoutes } from './participation/routes.js'
 import type { AppBindings, AppContext, AuthSession, HttpErrorStatus } from './http.js'
 
 export interface AppOptions {
@@ -860,6 +861,14 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
   })
 
   registerCrmRoutes(app, {
+    db,
+    config,
+    fail,
+    validCsrf,
+    bodySchemaError,
+  })
+
+  registerParticipationRoutes(app, {
     db,
     config,
     fail,

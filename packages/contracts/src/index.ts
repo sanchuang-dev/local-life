@@ -22,6 +22,9 @@ export const API_ERROR_CODES = {
   conflict: 'conflict',
   rateLimited: 'rate_limited',
   notConfigured: 'not_configured',
+  activityUnavailable: 'activity_unavailable',
+  teamFull: 'team_full',
+  inviteInvalid: 'invite_invalid',
 } as const
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES]
@@ -847,4 +850,196 @@ export const adminCrmFilterOptionsResponseSchema = z.object({
 })
 export type AdminCrmFilterOptionsResponse = z.infer<
   typeof adminCrmFilterOptionsResponseSchema
+>
+
+/* -------------------------------------------------------------------------- */
+/* Resident participation & three-person team domain (#60 LL-MVP-004)         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Route identifiers for a resident's participation in one activity. `state` is
+ * read with GET and `confirm` is written with POST; both address the same
+ * per-activity participation of the authenticated resident, so the URL matches.
+ * The resident identity always comes from the server session, never from a body.
+ */
+export const PARTICIPATION_ROUTES = {
+  state: '/activities/:activityId/participation',
+  confirm: '/activities/:activityId/participation',
+} as const
+
+/** Why the resident cannot join right now. `null` means no blocking reason. */
+export const participationUnavailableReasonSchema = z.enum([
+  'activity_not_published',
+  'activity_ended',
+])
+
+export type ParticipationUnavailableReason = z.infer<
+  typeof participationUnavailableReasonSchema
+>
+
+export const participationRoleSchema = z.enum(['leader', 'member'])
+export type ParticipationRole = z.infer<typeof participationRoleSchema>
+
+/**
+ * How this activity's attribution was frozen: joining on one's own (`self`) or
+ * accepting an invitation (`invite`). Later link opens never change it, and it is
+ * deliberately separate from any community grid-worker promotion attribution.
+ */
+export const participationInviteSourceSchema = z.enum(['self', 'invite'])
+export type ParticipationInviteSource = z.infer<typeof participationInviteSourceSchema>
+
+export const participationTeamStatusSchema = z.enum(['open', 'locked'])
+export type ParticipationTeamStatus = z.infer<typeof participationTeamStatusSchema>
+
+/**
+ * Invite codes are opaque 32-character lowercase hex tokens minted by the API.
+ * The same shape is returned on an open team and accepted by the confirm request,
+ * so clients can round-trip the code without reformatting it.
+ */
+export const participationInviteCodeSchema = z
+  .string()
+  .regex(/^[a-f0-9]{32}$/, 'must be a 32-character lowercase hex invite code')
+
+export type ParticipationInviteCode = z.infer<typeof participationInviteCodeSchema>
+
+/** A seat holder shown in the team roster. There are never more than three. */
+export const participationTeamMemberSchema = z.object({
+  seatNo: z.number().int().min(1).max(3),
+  displayName: z.string().min(1),
+  role: participationRoleSchema,
+  isSelf: z.boolean(),
+  joinedAt: isoTimestamp,
+})
+
+export type ParticipationTeamMember = z.infer<typeof participationTeamMemberSchema>
+
+/**
+ * The resident's current team for one activity. `seatsTotal` is a literal 3
+ * because this contract only supports a three-person team. A team that reached
+ * 3/3 is locked and must stop exposing an invite code, otherwise a fourth
+ * resident could be invited into a full team.
+ */
+export const participationTeamSchema = z
+  .object({
+    id: z.string().uuid(),
+    status: participationTeamStatusSchema,
+    seatsTotal: z.literal(3),
+    seatsFilled: z.number().int().min(0).max(3),
+    inviteCode: participationInviteCodeSchema.nullable(),
+    members: z.array(participationTeamMemberSchema).max(3),
+  })
+  .superRefine((team, ctx) => {
+    if (team.seatsFilled !== team.members.length) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'seatsFilled must equal the number of listed members',
+        path: ['seatsFilled'],
+      })
+    }
+    if (team.status === 'locked') {
+      if (team.seatsFilled !== 3) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'a locked team must be full (3/3)',
+          path: ['seatsFilled'],
+        })
+      }
+      if (team.inviteCode !== null) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'a locked team must not expose an invite code',
+          path: ['inviteCode'],
+        })
+      }
+    }
+    const usedSeats = new Set<number>()
+    team.members.forEach((member, index) => {
+      if (usedSeats.has(member.seatNo)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'seatNo must be unique inside a team',
+          path: ['members', index, 'seatNo'],
+        })
+      }
+      usedSeats.add(member.seatNo)
+    })
+  })
+
+export type ParticipationTeam = z.infer<typeof participationTeamSchema>
+
+/**
+ * The authenticated resident's participation. There is at most one of these per
+ * activity and resident, which is why the state exposes a single nullable item
+ * instead of a list.
+ */
+export const activityParticipationSchema = z.object({
+  id: z.string().uuid(),
+  teamId: z.string().uuid(),
+  seatNo: z.number().int().min(1).max(3),
+  role: participationRoleSchema,
+  inviteSource: participationInviteSourceSchema,
+  invitationId: z.string().uuid().nullable(),
+  inviterDisplayName: z.string().nullable(),
+  joinedAt: isoTimestamp,
+})
+
+export type ActivityParticipation = z.infer<typeof activityParticipationSchema>
+
+/**
+ * Response of `GET /activities/:activityId/participation`. `joinable` reflects
+ * whether this resident may confirm now; `unavailableReason` explains only the
+ * activity lifecycle blockers defined by this contract.
+ *
+ * Invitation attribution and grid-worker sales attribution are separate records.
+ * Keeping sales attribution out of this DTO is intentional: no field here may be
+ * used to pay or credit invitation bonuses.
+ */
+export const activityParticipationStateSchema = z
+  .object({
+    activityId: z.string().uuid(),
+    activityStatus: activityPublicStatusSchema,
+    joinable: z.boolean(),
+    unavailableReason: participationUnavailableReasonSchema.nullable(),
+    participation: activityParticipationSchema.nullable(),
+    team: participationTeamSchema.nullable(),
+  })
+  .superRefine((state, ctx) => {
+    if (state.joinable && state.unavailableReason !== null) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'unavailableReason must be null when joinable is true',
+        path: ['unavailableReason'],
+      })
+    }
+    if (state.participation && state.team && state.participation.teamId !== state.team.id) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'participation.teamId must match team.id',
+        path: ['participation', 'teamId'],
+      })
+    }
+  })
+
+export type ActivityParticipationState = z.infer<typeof activityParticipationStateSchema>
+
+/**
+ * Body of `POST /activities/:activityId/participation`. Strict on purpose: the
+ * resident is identified by the session cookie only. A forged `userId` (or any
+ * other unknown field) must fail parsing instead of being silently ignored.
+ */
+export const activityParticipationConfirmRequestSchema = z.strictObject({
+  inviteCode: participationInviteCodeSchema.optional(),
+})
+
+export type ActivityParticipationConfirmRequest = z.infer<
+  typeof activityParticipationConfirmRequestSchema
+>
+
+export const activityParticipationConfirmResponseSchema = z.object({
+  created: z.boolean(),
+  state: activityParticipationStateSchema,
+})
+
+export type ActivityParticipationConfirmResponse = z.infer<
+  typeof activityParticipationConfirmResponseSchema
 >

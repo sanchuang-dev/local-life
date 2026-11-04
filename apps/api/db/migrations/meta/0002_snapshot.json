@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "83a7d43b-31f2-41a0-8634-1f24958d047f",
+  "id": "c15ca94b-1513-44ef-873e-7b492420707c",
   "prevId": "8a0befde-8549-4fe4-a50e-c3e075f0f1e0",
   "tables": {
     "activities": {
@@ -209,6 +209,284 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "activity_invitations": {
+      "name": "activity_invitations",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "code": {
+          "name": "code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "activity_id": {
+          "name": "activity_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "team_id": {
+          "name": "team_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "inviter_user_id": {
+          "name": "inviter_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "activity_invitations_code_uq": {
+          "name": "activity_invitations_code_uq",
+          "columns": [
+            "code"
+          ],
+          "isUnique": true
+        },
+        "activity_invitations_team_uq": {
+          "name": "activity_invitations_team_uq",
+          "columns": [
+            "team_id"
+          ],
+          "isUnique": true
+        },
+        "activity_invitations_activity_idx": {
+          "name": "activity_invitations_activity_idx",
+          "columns": [
+            "activity_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "activity_invitations_activity_id_activities_id_fk": {
+          "name": "activity_invitations_activity_id_activities_id_fk",
+          "tableFrom": "activity_invitations",
+          "tableTo": "activities",
+          "columnsFrom": [
+            "activity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "activity_invitations_team_id_activity_teams_id_fk": {
+          "name": "activity_invitations_team_id_activity_teams_id_fk",
+          "tableFrom": "activity_invitations",
+          "tableTo": "activity_teams",
+          "columnsFrom": [
+            "team_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "activity_invitations_inviter_user_id_users_id_fk": {
+          "name": "activity_invitations_inviter_user_id_users_id_fk",
+          "tableFrom": "activity_invitations",
+          "tableTo": "users",
+          "columnsFrom": [
+            "inviter_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "activity_invitations_code_check": {
+          "name": "activity_invitations_code_check",
+          "value": "length(\"activity_invitations\".\"code\") = 32 AND \"activity_invitations\".\"code\" NOT GLOB '*[^0-9a-f]*'"
+        }
+      }
+    },
+    "activity_participations": {
+      "name": "activity_participations",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "activity_id": {
+          "name": "activity_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "team_id": {
+          "name": "team_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "seat_no": {
+          "name": "seat_no",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "invite_source": {
+          "name": "invite_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "invitation_id": {
+          "name": "invitation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "joined_at": {
+          "name": "joined_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "activity_participations_activity_user_uq": {
+          "name": "activity_participations_activity_user_uq",
+          "columns": [
+            "activity_id",
+            "user_id"
+          ],
+          "isUnique": true
+        },
+        "activity_participations_team_seat_uq": {
+          "name": "activity_participations_team_seat_uq",
+          "columns": [
+            "team_id",
+            "seat_no"
+          ],
+          "isUnique": true
+        },
+        "activity_participations_user_idx": {
+          "name": "activity_participations_user_idx",
+          "columns": [
+            "user_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "activity_participations_activity_id_activities_id_fk": {
+          "name": "activity_participations_activity_id_activities_id_fk",
+          "tableFrom": "activity_participations",
+          "tableTo": "activities",
+          "columnsFrom": [
+            "activity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "activity_participations_team_id_activity_teams_id_fk": {
+          "name": "activity_participations_team_id_activity_teams_id_fk",
+          "tableFrom": "activity_participations",
+          "tableTo": "activity_teams",
+          "columnsFrom": [
+            "team_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "activity_participations_user_id_users_id_fk": {
+          "name": "activity_participations_user_id_users_id_fk",
+          "tableFrom": "activity_participations",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "activity_participations_invitation_id_activity_invitations_id_fk": {
+          "name": "activity_participations_invitation_id_activity_invitations_id_fk",
+          "tableFrom": "activity_participations",
+          "tableTo": "activity_invitations",
+          "columnsFrom": [
+            "invitation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "activity_participations_seat_no_check": {
+          "name": "activity_participations_seat_no_check",
+          "value": "\"activity_participations\".\"seat_no\" BETWEEN 1 AND 3"
+        },
+        "activity_participations_role_source_check": {
+          "name": "activity_participations_role_source_check",
+          "value": "(\"activity_participations\".\"role\" = 'leader' AND \"activity_participations\".\"seat_no\" = 1 AND \"activity_participations\".\"invite_source\" = 'self' AND \"activity_participations\".\"invitation_id\" IS NULL)\n        OR (\"activity_participations\".\"role\" = 'member' AND \"activity_participations\".\"seat_no\" BETWEEN 2 AND 3 AND \"activity_participations\".\"invite_source\" = 'invite' AND \"activity_participations\".\"invitation_id\" IS NOT NULL)"
+        }
+      }
+    },
     "activity_rule_versions": {
       "name": "activity_rule_versions",
       "columns": {
@@ -290,6 +568,117 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
+    },
+    "activity_teams": {
+      "name": "activity_teams",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "activity_id": {
+          "name": "activity_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "leader_user_id": {
+          "name": "leader_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "locked_at": {
+          "name": "locked_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "activity_teams_activity_leader_uq": {
+          "name": "activity_teams_activity_leader_uq",
+          "columns": [
+            "activity_id",
+            "leader_user_id"
+          ],
+          "isUnique": true
+        },
+        "activity_teams_activity_idx": {
+          "name": "activity_teams_activity_idx",
+          "columns": [
+            "activity_id"
+          ],
+          "isUnique": false
+        },
+        "activity_teams_leader_idx": {
+          "name": "activity_teams_leader_idx",
+          "columns": [
+            "leader_user_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "activity_teams_activity_id_activities_id_fk": {
+          "name": "activity_teams_activity_id_activities_id_fk",
+          "tableFrom": "activity_teams",
+          "tableTo": "activities",
+          "columnsFrom": [
+            "activity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "activity_teams_leader_user_id_users_id_fk": {
+          "name": "activity_teams_leader_user_id_users_id_fk",
+          "tableFrom": "activity_teams",
+          "tableTo": "users",
+          "columnsFrom": [
+            "leader_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "activity_teams_status_check": {
+          "name": "activity_teams_status_check",
+          "value": "\"activity_teams\".\"status\" IN ('open', 'locked')"
+        },
+        "activity_teams_locked_at_check": {
+          "name": "activity_teams_locked_at_check",
+          "value": "(\"activity_teams\".\"status\" = 'locked' AND \"activity_teams\".\"locked_at\" IS NOT NULL)\n        OR (\"activity_teams\".\"status\" = 'open' AND \"activity_teams\".\"locked_at\" IS NULL)"
+        }
+      }
     },
     "audit_logs": {
       "name": "audit_logs",
@@ -399,851 +788,6 @@
       },
       "indexes": {},
       "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "crm_follow_ups": {
-      "name": "crm_follow_ups",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "lead_id": {
-          "name": "lead_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "staff_id": {
-          "name": "staff_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "content": {
-          "name": "content",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "next_contact_at": {
-          "name": "next_contact_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "crm_follow_ups_lead_created_idx": {
-          "name": "crm_follow_ups_lead_created_idx",
-          "columns": [
-            "lead_id",
-            "created_at"
-          ],
-          "isUnique": false
-        },
-        "crm_follow_ups_staff_created_idx": {
-          "name": "crm_follow_ups_staff_created_idx",
-          "columns": [
-            "staff_id",
-            "created_at"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "crm_follow_ups_lead_id_crm_leads_id_fk": {
-          "name": "crm_follow_ups_lead_id_crm_leads_id_fk",
-          "tableFrom": "crm_follow_ups",
-          "tableTo": "crm_leads",
-          "columnsFrom": [
-            "lead_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "crm_follow_ups_staff_id_staff_accounts_id_fk": {
-          "name": "crm_follow_ups_staff_id_staff_accounts_id_fk",
-          "tableFrom": "crm_follow_ups",
-          "tableTo": "staff_accounts",
-          "columnsFrom": [
-            "staff_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "crm_lead_events": {
-      "name": "crm_lead_events",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "lead_id": {
-          "name": "lead_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "actor_user_id": {
-          "name": "actor_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "event": {
-          "name": "event",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "from_status": {
-          "name": "from_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "to_status": {
-          "name": "to_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "from_owner_staff_id": {
-          "name": "from_owner_staff_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "to_owner_staff_id": {
-          "name": "to_owner_staff_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "note": {
-          "name": "note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "crm_lead_events_lead_created_idx": {
-          "name": "crm_lead_events_lead_created_idx",
-          "columns": [
-            "lead_id",
-            "created_at"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "crm_lead_events_lead_id_crm_leads_id_fk": {
-          "name": "crm_lead_events_lead_id_crm_leads_id_fk",
-          "tableFrom": "crm_lead_events",
-          "tableTo": "crm_leads",
-          "columnsFrom": [
-            "lead_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "crm_lead_events_actor_user_id_users_id_fk": {
-          "name": "crm_lead_events_actor_user_id_users_id_fk",
-          "tableFrom": "crm_lead_events",
-          "tableTo": "users",
-          "columnsFrom": [
-            "actor_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "crm_lead_events_from_owner_staff_id_staff_accounts_id_fk": {
-          "name": "crm_lead_events_from_owner_staff_id_staff_accounts_id_fk",
-          "tableFrom": "crm_lead_events",
-          "tableTo": "staff_accounts",
-          "columnsFrom": [
-            "from_owner_staff_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "crm_lead_events_to_owner_staff_id_staff_accounts_id_fk": {
-          "name": "crm_lead_events_to_owner_staff_id_staff_accounts_id_fk",
-          "tableFrom": "crm_lead_events",
-          "tableTo": "staff_accounts",
-          "columnsFrom": [
-            "to_owner_staff_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "crm_leads": {
-      "name": "crm_leads",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "community_id": {
-          "name": "community_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "owner_staff_id": {
-          "name": "owner_staff_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "resident_user_id": {
-          "name": "resident_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "contact_name": {
-          "name": "contact_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "contact_phone": {
-          "name": "contact_phone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "source_type": {
-          "name": "source_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "source_activity_id": {
-          "name": "source_activity_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "promotion_staff_id": {
-          "name": "promotion_staff_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_by_staff_id": {
-          "name": "created_by_staff_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "next_contact_at": {
-          "name": "next_contact_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "last_contacted_at": {
-          "name": "last_contacted_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "crm_leads_community_owner_status_idx": {
-          "name": "crm_leads_community_owner_status_idx",
-          "columns": [
-            "community_id",
-            "owner_staff_id",
-            "status"
-          ],
-          "isUnique": false
-        },
-        "crm_leads_next_contact_idx": {
-          "name": "crm_leads_next_contact_idx",
-          "columns": [
-            "next_contact_at"
-          ],
-          "isUnique": false
-        },
-        "crm_leads_source_activity_idx": {
-          "name": "crm_leads_source_activity_idx",
-          "columns": [
-            "source_activity_id"
-          ],
-          "isUnique": false
-        },
-        "crm_leads_promotion_staff_idx": {
-          "name": "crm_leads_promotion_staff_idx",
-          "columns": [
-            "promotion_staff_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "crm_leads_community_id_communities_id_fk": {
-          "name": "crm_leads_community_id_communities_id_fk",
-          "tableFrom": "crm_leads",
-          "tableTo": "communities",
-          "columnsFrom": [
-            "community_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "crm_leads_owner_staff_id_staff_accounts_id_fk": {
-          "name": "crm_leads_owner_staff_id_staff_accounts_id_fk",
-          "tableFrom": "crm_leads",
-          "tableTo": "staff_accounts",
-          "columnsFrom": [
-            "owner_staff_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "crm_leads_resident_user_id_users_id_fk": {
-          "name": "crm_leads_resident_user_id_users_id_fk",
-          "tableFrom": "crm_leads",
-          "tableTo": "users",
-          "columnsFrom": [
-            "resident_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "crm_leads_source_activity_id_activities_id_fk": {
-          "name": "crm_leads_source_activity_id_activities_id_fk",
-          "tableFrom": "crm_leads",
-          "tableTo": "activities",
-          "columnsFrom": [
-            "source_activity_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "crm_leads_promotion_staff_id_staff_accounts_id_fk": {
-          "name": "crm_leads_promotion_staff_id_staff_accounts_id_fk",
-          "tableFrom": "crm_leads",
-          "tableTo": "staff_accounts",
-          "columnsFrom": [
-            "promotion_staff_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "crm_leads_created_by_staff_id_staff_accounts_id_fk": {
-          "name": "crm_leads_created_by_staff_id_staff_accounts_id_fk",
-          "tableFrom": "crm_leads",
-          "tableTo": "staff_accounts",
-          "columnsFrom": [
-            "created_by_staff_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "crm_order_events": {
-      "name": "crm_order_events",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "order_id": {
-          "name": "order_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "actor_user_id": {
-          "name": "actor_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "event": {
-          "name": "event",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "from_status": {
-          "name": "from_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "to_status": {
-          "name": "to_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "note": {
-          "name": "note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "crm_order_events_order_created_idx": {
-          "name": "crm_order_events_order_created_idx",
-          "columns": [
-            "order_id",
-            "created_at"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "crm_order_events_order_id_crm_service_orders_id_fk": {
-          "name": "crm_order_events_order_id_crm_service_orders_id_fk",
-          "tableFrom": "crm_order_events",
-          "tableTo": "crm_service_orders",
-          "columnsFrom": [
-            "order_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "crm_order_events_actor_user_id_users_id_fk": {
-          "name": "crm_order_events_actor_user_id_users_id_fk",
-          "tableFrom": "crm_order_events",
-          "tableTo": "users",
-          "columnsFrom": [
-            "actor_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "crm_service_orders": {
-      "name": "crm_service_orders",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "community_id": {
-          "name": "community_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "lead_id": {
-          "name": "lead_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "order_no": {
-          "name": "order_no",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "business_type": {
-          "name": "business_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "customer_name": {
-          "name": "customer_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "contact_phone": {
-          "name": "contact_phone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "evidence_ref": {
-          "name": "evidence_ref",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "notes": {
-          "name": "notes",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_by_staff_id": {
-          "name": "created_by_staff_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "attributed_staff_id": {
-          "name": "attributed_staff_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "source_activity_id": {
-          "name": "source_activity_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "promotion_staff_id": {
-          "name": "promotion_staff_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "confirmed_by_user_id": {
-          "name": "confirmed_by_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "confirmed_at": {
-          "name": "confirmed_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "confirmation_note": {
-          "name": "confirmation_note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "failure_reason": {
-          "name": "failure_reason",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "crm_service_orders_community_order_no_uq": {
-          "name": "crm_service_orders_community_order_no_uq",
-          "columns": [
-            "community_id",
-            "order_no"
-          ],
-          "isUnique": true
-        },
-        "crm_service_orders_community_status_idx": {
-          "name": "crm_service_orders_community_status_idx",
-          "columns": [
-            "community_id",
-            "status"
-          ],
-          "isUnique": false
-        },
-        "crm_service_orders_lead_idx": {
-          "name": "crm_service_orders_lead_idx",
-          "columns": [
-            "lead_id"
-          ],
-          "isUnique": false
-        },
-        "crm_service_orders_attributed_staff_idx": {
-          "name": "crm_service_orders_attributed_staff_idx",
-          "columns": [
-            "attributed_staff_id"
-          ],
-          "isUnique": false
-        },
-        "crm_service_orders_business_type_idx": {
-          "name": "crm_service_orders_business_type_idx",
-          "columns": [
-            "business_type"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "crm_service_orders_community_id_communities_id_fk": {
-          "name": "crm_service_orders_community_id_communities_id_fk",
-          "tableFrom": "crm_service_orders",
-          "tableTo": "communities",
-          "columnsFrom": [
-            "community_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "crm_service_orders_lead_id_crm_leads_id_fk": {
-          "name": "crm_service_orders_lead_id_crm_leads_id_fk",
-          "tableFrom": "crm_service_orders",
-          "tableTo": "crm_leads",
-          "columnsFrom": [
-            "lead_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "crm_service_orders_created_by_staff_id_staff_accounts_id_fk": {
-          "name": "crm_service_orders_created_by_staff_id_staff_accounts_id_fk",
-          "tableFrom": "crm_service_orders",
-          "tableTo": "staff_accounts",
-          "columnsFrom": [
-            "created_by_staff_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "crm_service_orders_attributed_staff_id_staff_accounts_id_fk": {
-          "name": "crm_service_orders_attributed_staff_id_staff_accounts_id_fk",
-          "tableFrom": "crm_service_orders",
-          "tableTo": "staff_accounts",
-          "columnsFrom": [
-            "attributed_staff_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "crm_service_orders_source_activity_id_activities_id_fk": {
-          "name": "crm_service_orders_source_activity_id_activities_id_fk",
-          "tableFrom": "crm_service_orders",
-          "tableTo": "activities",
-          "columnsFrom": [
-            "source_activity_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "crm_service_orders_promotion_staff_id_staff_accounts_id_fk": {
-          "name": "crm_service_orders_promotion_staff_id_staff_accounts_id_fk",
-          "tableFrom": "crm_service_orders",
-          "tableTo": "staff_accounts",
-          "columnsFrom": [
-            "promotion_staff_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "crm_service_orders_confirmed_by_user_id_users_id_fk": {
-          "name": "crm_service_orders_confirmed_by_user_id_users_id_fk",
-          "tableFrom": "crm_service_orders",
-          "tableTo": "users",
-          "columnsFrom": [
-            "confirmed_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}

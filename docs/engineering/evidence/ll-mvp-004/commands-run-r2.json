@@ -1,0 +1,104 @@
+{
+  "workingDirectory": "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-004",
+  "branch": "feat/ll-mvp-004-real-teams",
+  "baseCommit": "1d4f000",
+  "databasePath": "/tmp/ll-mvp-004-verify/verify-r2.sqlite",
+  "commands": [
+    {
+      "step": 1,
+      "command": "pnpm --filter @sanchuang-dev/local-life-contracts build",
+      "exitCode": 0,
+      "evidence": "tsc -p tsconfig.json 通过（无错误输出）。"
+    },
+    {
+      "step": 2,
+      "command": "pnpm --filter @sanchuang-dev/local-life-api test",
+      "exitCode": 0,
+      "evidence": "# tests 33 / # pass 33 / # fail 0 / # cancelled 0。"
+    },
+    {
+      "step": 3,
+      "command": "pnpm --filter @sanchuang-dev/local-life-api typecheck",
+      "exitCode": 0,
+      "evidence": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json 通过。"
+    },
+    {
+      "step": 4,
+      "command": "rm -f /tmp/ll-mvp-004-verify/verify-r2.sqlite* && env NODE_ENV=development DATABASE_PATH=/tmp/ll-mvp-004-verify/verify-r2.sqlite pnpm --filter @sanchuang-dev/local-life-api db:prepare",
+      "exitCode": 0,
+      "evidence": "全新 SQLite：/tmp/ll-mvp-004-verify/verify-r2.sqlite（16 个表），未复用 R1 数据。"
+    },
+    {
+      "step": 5,
+      "command": "expect -f /tmp/ll-mvp-004-verify/scripts/bootstrap-admin-r2.expect /tmp/ll-mvp-004-verify/verify-r2.sqlite",
+      "exitCode": 0,
+      "evidence": "真实 bootstrap-admin 在 pty 中创建 verify.admin（显示名 QA 验收管理员 R2，admin/active）；输出“管理员账户创建成功”。"
+    },
+    {
+      "step": 6,
+      "command": "env NODE_ENV=development HOST=127.0.0.1 PORT=4080 DATABASE_PATH=/tmp/ll-mvp-004-verify/verify-r2.sqlite AUTH_DEV_ENABLED=true TRUSTED_ORIGINS='http://localhost:5173,http://127.0.0.1:5173' WEB_BASE_URL='http://localhost:5173/local-life/' SESSION_TTL_HOURS=168 pnpm --filter @sanchuang-dev/local-life-api exec tsx src/index.ts",
+      "exitCode": null,
+      "evidence": "真实 API 进程运行中；GET http://127.0.0.1:4080/healthz → 200，service=local-life-api，uptimeSeconds=2。"
+    },
+    {
+      "step": 7,
+      "command": "env LOCAL_LIFE_API_PORT=4080 LOCAL_LIFE_WEB_PORT=5173 pnpm --filter @sanchuang-dev/local-life-web dev",
+      "exitCode": null,
+      "evidence": "真实 Vite H5 运行中；GET http://localhost:5173/local-life/ → 200；GET http://localhost:5173/api/healthz → 200（同源代理）。"
+    },
+    {
+      "step": 8,
+      "command": "OUT=docs/engineering/evidence/ll-mvp-004/http-checks-r2.json DB_PATH=/tmp/ll-mvp-004-verify/verify-r2.sqlite SESSION_OUT=/tmp/ll-mvp-004-verify/a-session-r2.json node /tmp/ll-mvp-004-verify/scripts/http-verify.mjs",
+      "exitCode": 0,
+      "evidence": "40/40 真实 HTTP 断言通过；状态码 200×24、400×4、401×2、403×2、404×4、409×4，无 5xx；Cookie/CSRF 仅写入仓库外 /tmp 会话文件。"
+    },
+    {
+      "step": 9,
+      "command": "HTTP_FILE=docs/engineering/evidence/ll-mvp-004/http-checks-r2.json OUT_FILE=docs/engineering/evidence/ll-mvp-004/browser-setup-r2.json node /tmp/ll-mvp-004-verify/scripts/browser-setup.mjs",
+      "exitCode": 0,
+      "evidence": "经真实管理员 API 创建/发布主活动 11e64e7c…，paused 与 ended 活动 pause/end 均 200。"
+    },
+    {
+      "step": 10,
+      "command": "SETUP_FILE=docs/engineering/evidence/ll-mvp-004/browser-setup-r2.json OUT_FILE=docs/engineering/evidence/ll-mvp-004/browser-run-r2.json SHOTS_DIR=docs/engineering/evidence/ll-mvp-004/browser-r2 SHOT_DIRNAME=browser-r2 node /tmp/ll-mvp-004-verify/scripts/browser-verify.cjs",
+      "exitCode": 0,
+      "evidence": "Chrome 156.0.8078.80 40/40 断言通过；104 条 /api 响应（103×200、1×409）；19 张截图；br-38 暂停文案断言 PASS。"
+    },
+    {
+      "step": 11,
+      "command": "SETUP_FILE=…/browser-setup-r2.json OUT_FILE=…/paused-page-r2.json node /tmp/ll-mvp-004-verify/scripts/paused-text.cjs",
+      "exitCode": 1,
+      "evidence": "首次运行退出 1：相对 SETUP_FILE 被 require 按脚本目录解析而 MODULE_NOT_FOUND；属验收脚本参数问题，非产品失败。"
+    },
+    {
+      "step": 12,
+      "command": "SETUP_FILE=/Users/tao/Desktop/workspace/new-local-life/ll-mvp-004/docs/engineering/evidence/ll-mvp-004/browser-setup-r2.json OUT_FILE=/Users/tao/Desktop/workspace/new-local-life/ll-mvp-004/docs/engineering/evidence/ll-mvp-004/paused-page-r2.json node /tmp/ll-mvp-004-verify/scripts/paused-text.cjs",
+      "exitCode": 0,
+      "evidence": "绝对路径重跑通过；headerHasPaused=true、cardSaysPaused=true、cardSaysNotPublished=false。"
+    },
+    {
+      "step": 13,
+      "command": "DB_PATH=/tmp/ll-mvp-004-verify/verify-r2.sqlite HTTP_FILE=docs/engineering/evidence/ll-mvp-004/http-checks-r2.json OUT_FILE=docs/engineering/evidence/ll-mvp-004/db-inspection-r2.json node /tmp/ll-mvp-004-verify/scripts/db-inspect.mjs",
+      "exitCode": 0,
+      "evidence": "16 表；users=16、activities=10、activity_teams=6、activity_participations=12、activity_invitations=6；无团 >3 席、locked 团均 3 席、审计无邀请码；pass=true。"
+    },
+    {
+      "step": 14,
+      "command": "停止 API 进程 → 用同一 verify-r2.sqlite 重启 → A_COOKIE=$(node -e …a-session-r2.json…) HTTP_FILE=…/http-checks-r2.json OUT_FILE=…/restart-persistence-r2.json DB_PATH=… node /tmp/ll-mvp-004-verify/scripts/restart-recheck.mjs",
+      "exitCode": 0,
+      "evidence": "4/4：重启后 200、A 数据库会话有效、同 teamId 2baa21eb-ef4a-4fb5-9e3e-70df9be7f782、locked 3/3。"
+    },
+    {
+      "step": 15,
+      "command": "sips -g pixelWidth -g pixelHeight docs/engineering/evidence/ll-mvp-004/browser-r2/*.png",
+      "exitCode": 0,
+      "evidence": "375×812@2x → 750×1624；320×568@2x → 640×1136；二维码 296×296；19 张齐全。"
+    },
+    {
+      "step": 16,
+      "command": "git status --porcelain=v1",
+      "exitCode": 0,
+      "evidence": "相对本轮开工，仅 docs/engineering/evidence/ll-mvp-004/ 有新增/修改；T1–T4/t9 的既有未提交实现改动未被验收人触碰。"
+    }
+  ]
+}

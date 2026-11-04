@@ -6,7 +6,7 @@
 
 - 客户线索、跟进与下次联系、广电手机卡/电视业务受理单、状态机、运营人工核验有效成交、完整审计，全部归属**一个社区**。
 - 共享契约只存在一处：`packages/contracts/src/index.ts` 的 CRM 段；API 与客户端不得复制 DTO。
-- 数据表只追加：不改既有 `activities` / 活动规则 / 参与 / 三人团（#60）相关表；CRM 表由迁移 `0002` 新增。
+- 数据表只追加：不改既有 `activities` / 活动规则 / 参与 / 三人团（#60）相关表；CRM 表由迁移 `0003`（承接三人团 0002） 新增。
 - **没有广电开通/激活接口**。`confirmed` 的唯一含义是“运营人工核验后的有效成交”，不是“已开通”“已激活”。契约与数据库都没有 `activated` / `activationStatus` / `activatedAt` 一类字段。
 - 不实现自动佣金、分账、对账、居民名单导入、线索自动去重或复杂 CRM 自动化。
 - 所有写接口（创建之外）使用 `expectedUpdatedAt` 乐观并发，冲突返回 `409 conflict`。
@@ -69,7 +69,7 @@
 
 语义约束已写进 zod：`activity` 来源必须带 `sourceActivityId`；只有 `grid_promotion` 可带 `promotionStaffId`（服务端缺省为当前归属）；`confirmed` 订单必须 `activationSource = manual_verification` 且有 `confirmation`，非 `confirmed` 订单的 `activationSource` 必须为 `null`。
 
-## 3. 数据模型（`apps/api/src/db/schema.ts`，迁移 `0002`）
+## 3. 数据模型（`apps/api/src/db/schema.ts`，迁移 `0003`（承接三人团 0002））
 
 ### 3.1 `crm_leads`
 
@@ -216,7 +216,7 @@
 ## 9. 与 #60 并行和迁移编号协调
 
 - 本卡基线：`origin/dev@1d4f000`；`apps/api/db/migrations/` 只有 `0000` / `0001`。
-- 2026-11-04 核对：`origin/dev` 与并行 worktree `ll-mvp-004`（Issue #60）均未占用 `0002`。Captain 已确认 **`0002` 由 #61 / ll-mvp-005 占用**，迁移文件为 `apps/api/db/migrations/0002_crm_core.sql`（journal idx=2）。
+- 2026-11-04 核对：`origin/dev` 与并行 worktree `ll-mvp-004`（Issue #60）均未占用 `0002`。Captain 已确认 **`0002` 由 #61 / ll-mvp-005 占用**，迁移文件为 `apps/api/db/migrations/0003_crm_core.sql`（journal idx=2）。
 - 本 PR 只追加 CRM 表与索引/触发器，不修改 `0000` / `0001`，不修改既有活动表与 #60 的活动参与/三人团相关表；contracts 只追加 CRM 段，不改 #60 段。
 - 若 #60 在集成时先合并并占用了 `0002`，由 Captain 在集成本 PR 时把本迁移整体顺延为 `0003`：重命名 SQL 文件、同步 `meta/_journal.json` 的 tag/idx 与 `meta/0003_snapshot.json`，保持 SQL 语义不变，并重跑“全新库 + 既有 0000/0001/0002 库”升级测试。本卡不预先占用 `0003`，避免空号。
 - 合并顺序由 Captain 决定；两个 PR 不得共用 worktree。
@@ -234,14 +234,14 @@
 
 ## 11. 迁移验证记录
 
-迁移 `0002_crm_core.sql` 除 drizzle-kit 生成的表/索引外，手工补充了 6 个追加式触发器（lead events、follow-ups、order events 各一组 UPDATE/DELETE ABORT）。
+迁移 `0003_crm_core.sql` 除 drizzle-kit 生成的表/索引外，手工补充了 6 个追加式触发器（lead events、follow-ups、order events 各一组 UPDATE/DELETE ABORT）。
 
 已执行并跟过的命令：
 
 ```bash
 pnpm --filter @sanchuang-dev/local-life-contracts build
 pnpm --filter @sanchuang-dev/local-life-api typecheck
-cd apps/api && pnpm db:generate          # 生成 0002_crm_core.sql + meta/0002_snapshot.json
+cd apps/api && pnpm db:generate          # 基于最新 0002 快照生成 0003 增量与 meta/0003_snapshot.json
 ```
 
 迁移升级验证（临时脚本，验证后已删除）：
