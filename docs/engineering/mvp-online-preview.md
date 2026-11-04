@@ -9,13 +9,13 @@
 - **环境性质：公开 HTTPS 域名上的受控 MVP 联调/演示环境**，供负责人以真实浏览器和手机查看。**允许外部访客直接访问居民 H5 的公开活动内容，但未验收的报名、交易、中奖、福利兑现等业务必须不可操作**；后台登录及服务端鉴权必需。它不是正式商用生产环境；不得接入真实未授权居民名单或虚构交易/发奖。
 - **分支例外：`feat/* → dev → mvp`**。实施卡仍从最新 `dev` 开 `feat/*` 并提交 Draft PR → `dev`；通过维护者独立验收后，以独立晋级 PR 将已审查的 `dev` 内容提升至 `mvp`。`mvp` 是**可变的在线验收发布源**，不是开发工作分支，也不是代替组织 `prod` 的商用生产分支。除紧急回滚，不允许直接向 `mvp` 提交业务修改。
 - 现存 `test` / `prod` 与 `preview.yml` 的 GitHub Pages **静态展示**路线保留，不能将其等同于本环境；`main` 仍仅为仓库默认/工作流入口。正式商用发布路线须另行验收并冻结，不能从 `mvp` 自动推断已可商用。
-- 在线化应当**先于全部业务模块完工**；第一阶段只部署已实现的 H5 + 管理台 + API + SQLite，未实现的三人团、CRM、商城与核销真实能力必须清楚显示为不可用/演示，不得假成功。
+- 在线化应当**先于全部业务模块完工**；第一阶段只部署已实现的 H5 + 管理台 + API + SQLite，三人团和 CRM 虽已合入 `dev`，但未在线验收前不得宣传成公网可用；商城、核销及其他未验收能力必须清楚显示真实状态，不得假成功。
 
 ## 2. 当前核验与阻塞（仅 2026-11-04 观测，不等于部署验收）
 
-- **2026-11-04 已实测**：`local.proto.3cgroup.cn` A 记录解析到 `8.148.148.135`，HTTPS TLS handshake 错误，**暂不可正常访问**。新增 `local-admin.proto.3cgroup.cn` **尚未执行 DNS/TLS 查询，不得视为已解析或证书就绪**。
+- **2026-11-04 已实测**：`local.proto.3cgroup.cn` A 记录解析到 `8.148.148.135`，HTTPS TLS handshake 错误，**暂不可正常访问**。`local-admin.proto.3cgroup.cn` 现已由连接电脑独立复核：A 记录也指向 `8.148.148.135`，HTTPS 同样在 TLS 握手阶段报 `tlsv1 alert internal error`；这不是主机 Caddy 日志级的根因判定。
 - 历史 `local-life.proto.3cgroup.cn` 解析到同一 IP，HTTPS 返回 200，响应服务器为 Caddy。说明可优先调查复用现有主机和 Caddy，但**没有授权改动现有站点**，也不能因此假设证书、端口、容器或磁盘可用。
-- 当前 `dev` 的 `apps/web/vite.config.ts` 构建 base 固定为 `/local-life/`；`apps/admin` 默认根 base；`/api/*` 在开发期由 Vite 去前缀代理到 Hono 原始路由，线上必须由真实反向代理等价实现。
+- 当前 `dev` 已包含 `0002_nosy_white_queen`（三人团）与 `0003_crm_core`（CRM）迁移；`apps/web/vite.config.ts` 构建 base 固定为 `/local-life/`；`apps/admin` 默认根 base；`/api/*` 在开发期由 Vite 去前缀代理到 Hono 原始路由，线上必须由真实反向代理等价实现。
 - 现有 CI 仅监听 `dev/test/prod`，Pages Workflow 仅部署 `dev/prod` 的静态 H5；**`mvp` 构建、部署、备份/回滚及权限门禁尚未实现**。
 
 ## 3. 双域名、同一套 API/SQLite 的 MVP 服务形态（2026-11-04 已批准设计；待实证部署）
@@ -70,7 +70,7 @@
 
 ## 3B. 现有公司原型机与部署责任边界（仓库证据，非主机实测）
 
-- 当前 [`sanchuang-dev/proto-infra@prod/Caddyfile`](https://github.com/sanchuang-dev/proto-infra/blob/prod/Caddyfile) 已声明 `proto.3cgroup.cn`、`local-life.proto.3cgroup.cn` 等静态站点及 `benefit.proto.3cgroup.cn` 的 `127.0.0.1:18080` 反向代理；**尚未声明 `local.proto.3cgroup.cn` 和 `local-admin.proto.3cgroup.cn`**。前者 TLS 失败与此相符，但根因必须核对主机实际生效配置和日志；后者 DNS/TLS 尚未实测。
+- 当前 [`sanchuang-dev/proto-infra@prod/Caddyfile`](https://github.com/sanchuang-dev/proto-infra/blob/prod/Caddyfile) 已声明 `proto.3cgroup.cn`、`local-life.proto.3cgroup.cn` 等静态站点及 `benefit.proto.3cgroup.cn` 的 `127.0.0.1:18080` 反向代理；**尚未声明 `local.proto.3cgroup.cn` 和 `local-admin.proto.3cgroup.cn`**。两个新域名均实测解析到 `8.148.148.135` 且 TLS 握手失败，与缺少 Caddy 站点声明的事实相符，但根因仍须核对主机生效配置和日志。
 - [`proto-infra@prod/docs/DEPLOYMENT.md`](https://github.com/sanchuang-dev/proto-infra/blob/prod/docs/DEPLOYMENT.md) 记录公司独立阿里云 **2C2G** 原型机，原型入口的 Caddy 配置与旧静态站发布由 `proto-infra` 管理。其旧 [`deploy-local-life.yml`](https://github.com/sanchuang-dev/proto-infra/blob/prod/.github/workflows/deploy-local-life.yml) 固定抓取历史 `local-life/prod` 静态源，**不应直接复用为新的 H5/Admin/API/SQLite MVP 全栈部署器**；保留旧域名业务及兼容路径。
 - **职责分离**：`proto-infra` 管**两个新域名**的 Caddy ingress、主机侧共享入口与证书配置；`local-life` 管自己的 `mvp` 提交、**两个根路径静态构建**、受控部署、唯一私有 API 进程与数据目录。两个 Caddy 站点是一次性受控变更，由 `proto-infra` 独立审核/晋级，不能让每次 `mvp` 更新覆盖共享 Caddyfile。
 - **自动部署方案 A 不绕过 `proto-infra` 的发布纪律**：目标站点首次接入须按 `proto-infra` 的 `prod` 授权流程完成；以后 `local-life@mvp` push 只发布本应用的预先获准目录及隔离服务，不触发 `proto-infra` 配置变更，也不擅自触碰其他原型。
