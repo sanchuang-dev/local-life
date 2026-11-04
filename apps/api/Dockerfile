@@ -2,6 +2,10 @@
 # Build on CI, never on the shared 2C/2G prototype server.
 FROM node:22-bookworm-slim AS builder
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+# better-sqlite3 is a native binding; compile it against this exact Node 22 Linux ABI.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /workspace
 COPY . .
 RUN corepack enable \
