@@ -72,7 +72,7 @@ pnpm --filter @sanchuang-dev/local-life-api bootstrap-admin  # 初始化首个�
 
 ## 6. 分支、验证与牛马
 
-- `main` 是默认分支和工作流入口，**不是生产分支**；业务施工仍从最新 `dev` 开 `feat/*` 并向 `dev` 提交 Draft PR。**本仓库在线 MVP 验收环境的已批准例外为 `dev → mvp`**：仅经维护者验收的增量以独立晋级 PR 进入 `mvp`，供 `https://local.proto.3cgroup.cn` 真实 H5/Admin/API 部署；`mvp` 不是商用生产分支。现有 `test/prod` 继续承担 GitHub Pages 静态展示兼容，部署设计与授权边界详见 [在线 MVP 环境决策](docs/engineering/mvp-online-preview.md)。
+- `main` 是默认分支和工作流入口，**不是生产分支**；业务施工仍从最新 `dev` 开 `feat/*` 并向 `dev` 提交 Draft PR。**本仓库在线 MVP 验收环境的已批准例外为 `dev → mvp`**：仅经维护者验收的增量以独立晋级 PR 进入 `mvp`，合并后自动部署；居民 H5 使用 `https://local.proto.3cgroup.cn/`、管理后台使用 `https://local-admin.proto.3cgroup.cn/`，两域名各自同源 `/api/*` 代理到同一 Hono/SQLite；`mvp` 不是商用生产分支。现有 `test/prod` 继续承担 GitHub Pages 静态展示兼容，部署设计与授权边界详见 [在线 MVP 环境决策](docs/engineering/mvp-online-preview.md)。
 - 小步施工，只修改任务范围；不顺手迁移旧页面、重构无关模块或删除历史证据。
 - 提交前至少运行 `pnpm install --frozen-lockfile` 与 `pnpm check`。改 UI/路由还必须用真实浏览器验证 375 与 320 宽度下的入口、返回、图片和深链接；改 API 必须发真实 HTTP 请求；改 Pages 必须验证 dev 与 `/prod/` 两份构建的 base 路径。身份、权限、持久化和 OAuth 必须覆盖成功路径、未认证/越权/重放/过期/缺配置负例。
 - CI 绿不等于验收通过，未验证不得宣称通过。外部微信/商城/支付依赖未具备真实凭证时，记录阻塞项，不以 mock 冒称真实环境验收。
