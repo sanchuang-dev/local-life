@@ -66,6 +66,16 @@
 - 数据库迁移推荐**向前兼容的增量演进**。仅回退代码无法处理的新 DB schema 时，应停止自动回滚并升级维护者决定，禁止自动恢复过期备份掩盖丢失。
 - MVP 虽然是验收环境，但位于公网，因此 API 采用 `NODE_ENV=production` / `AUTH_DEV_ENABLED=false`，且未配置微信授权时不通过弱化生产校验来开放模拟登录。
 
+## 3B. 现有公司原型机与部署责任边界（仓库证据，非主机实测）
+
+- 当前 [`sanchuang-dev/proto-infra@prod/Caddyfile`](https://github.com/sanchuang-dev/proto-infra/blob/prod/Caddyfile) 已声明 `proto.3cgroup.cn`、`local-life.proto.3cgroup.cn` 等静态站点及 `benefit.proto.3cgroup.cn` 的 `127.0.0.1:18080` 反向代理；**尚未声明 `local.proto.3cgroup.cn`**。这与新域名 TLS 请求失败相符，但实际根因仍需读主机生效配置及 Caddy 日志才能确认。
+- [`proto-infra@prod/docs/DEPLOYMENT.md`](https://github.com/sanchuang-dev/proto-infra/blob/prod/docs/DEPLOYMENT.md) 记录公司独立阿里云 **2C2G** 原型机，原型入口的 Caddy 配置与旧静态站发布由 `proto-infra` 管理。其旧 [`deploy-local-life.yml`](https://github.com/sanchuang-dev/proto-infra/blob/prod/.github/workflows/deploy-local-life.yml) 固定抓取历史 `local-life/prod` 静态源，**不应直接复用为新的 H5/Admin/API/SQLite MVP 全栈部署器**；保留旧域名业务及兼容路径。
+- **职责分离**：`proto-infra` 管 Caddy ingress、主机侧共享入口与证书配置；`local-life` 管自己的 `mvp` 提交、应用构建、受控部署、私有进程与数据目录。新增 Caddy 站点是一次性受控变更，由 `proto-infra` 独立审核/晋级，不能让每次 `mvp` 更新覆盖共享 Caddyfile。
+- **自动部署方案 A 不绕过 `proto-infra` 的发布纪律**：目标站点首次接入须按 `proto-infra` 的 `prod` 授权流程完成；以后 `local-life@mvp` push 只发布本应用的预先获准目录及隔离服务，不触发 `proto-infra` 配置变更，也不擅自触碰其他原型。
+- 优先复用现有主机但尚未完成资源预检：验算 CPU、可用 RAM、磁盘、现有容器/服务端口、Caddy 生效配置和日志；构建产物优先在 CI 编译而非 2C2G 主机现场编译。若资源确实不足，先向负责人报告事实与额外成本，再决定是否迁移/增加主机。
+- `proto-infra` 现有部署密钥属于**那个仓库**，不能假设 `local-life` 的 GitHub Actions 自动继承；后者须获得单独授予且范围受限的应用发布权限。禁止拷贝或记录历史 SSH 密码到仓库、日志或聊天。
+- 首次接入实机前，若需要持久化 SQLite 与 Node API，优先镜像已有同主机服务的隔离部署形态；到底使用单容器+私有绑定卷还是 systemd 单进程，以 **当前主机实际 Docker/systemd 资源与运维工具** 为准，避免同时维护两种实施路径。
+
 ## 4. 首次可看版本的验收标准
 
 - 新域名有效证书下可访问 H5 首页、指定活动深链、`/admin/` 登录页和 `/api/healthz`；外部任何 HTTP 均跳 HTTPS。
