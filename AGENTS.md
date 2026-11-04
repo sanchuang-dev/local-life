@@ -6,7 +6,7 @@
 
 - 自 [Issue #57](https://github.com/sanchuang-dev/local-life/issues/57) 起，本仓库进入 **Pre-MVP 真实工程基座**：pnpm workspace + 居民 H5 + 管理台 + Node API。
 - **居民 H5** 保留已评审页面、视觉和路由；居民主身份现已接入账户 API。微信网页授权只有在公众号 AppID、AppSecret、授权回调域名等真实配置齐备后才可使用。
-- **管理台** 已具备管理员/运营员/网格员登录、退出、会话、社区分配和居民列表的服务端权限校验；**活动创建/发布/暂停和居民 H5 公开读取已由 LL-MVP-003 落地**。参与/三人团、跟进、成交、订单、奖励与对账仍由后续业务卡实现。
+- **管理台** 已具备管理员/运营员/网格员登录、退出、会话、社区分配和居民列表的服务端权限校验；**活动创建/发布/暂停和居民 H5 公开读取已由 LL-MVP-003 落地**。参与/三人团与网格员 CRM 已分别由 LL-MVP-004/005 合入 `dev`，但不是已部署的线上能力；奖励履约、商城、分账等仍由后续业务卡处理。
 - **API** 使用 SQLite + Drizzle 持久化用户、微信身份、后台账户、社区范围、会话、OAuth state、限流与审计记录。数据库只允许落在 `apps/api` 内。
 - 所有未实现业务必须显式标注，不得用 Mock 成功、写死数据或假鉴权伪装。
 - 产品仍按 MVP 任务卡逐步收敛；旧 [V0.3](https://github.com/sanchuang-dev/base-prototype/blob/demo/local-life/docs/PRD-V0.3.md) 只是历史参考。
@@ -54,7 +54,7 @@ pnpm --filter @sanchuang-dev/local-life-api bootstrap-admin  # 初始化首个�
 - H5 账户状态通过 `hooks/useResidentAuth.ts` 访问 API；真实 API 调用不得散落复制 DTO，加载、空、错误、禁用状态必须如实展示。
 - 管理台由 `App.tsx` 先校验真实后台会话，成功后才渲染 `app/shell/AppShell.tsx`；由 `app/auth-context.tsx` 统一传递会话到顶部身份/退出与真实功能路由。前端菜单隐藏不能替代 API 鉴权。管理员可管理社区与后台账户；运营员/网格员只能访问服务器分配的社区范围。
 - AppShell（导航/页签/主题）与 DataPanel（受控数据面板）沿用 Benefit Hub 已验证设计思路，但保持 Local Life 自身的 Token 与 URL 单一真相源。业务查询状态由页面管理，不在 DataPanel 自造 API 缓存；详见 `docs/engineering/admin-foundation.md`。
-- 内容、活动参与、跟进、成交、订单、奖励与对账模块未完成前，必须明确标注未实现，不显示虚构业务数据；已上线代码中的活动配置与发布不能被误写为未实现。
+- 内容、奖励履约、商城及对账等未完成/未验收模块必须标注真实状态，不显示虚构业务数据；已合入代码的活动发布、三人团和 CRM 不得误写为完全未实现，更不得误称已经线上部署。
 
 ## 5. API、身份与持久化
 
