@@ -1,0 +1,20 @@
+{
+  "note": "POST-t8 unconfigured CRMEB; real API without CRMEB env; Chrome headless 156.",
+  "capturedAt": "2026-11-04T05:26:41.666Z",
+  "scenario": {
+    "width": 375,
+    "scrollWidth": 375,
+    "text": "9:41\n惠生活\n惠生活\n\n居民权益 · 积分好礼 · 本地服务\n\n优惠购接入真实 CRMEB 商品（只读展示与购买跳转，平台不代下单、不代支付）； 积分兑换与本地生活仍为示例数据，不会真实扣积分或产生订单。加载失败或未配置时如实提示，不展示模拟商品。\n\n积分兑换\n优惠购\n本地生活\n优惠购\n真实商城商品\n优惠购尚未接入商城\n\n未配置 CRMEB_BASE_URL、CRMEB_OUTAPI_APPID、CRMEB_OUTAPI_APPSECRET；不会返回任何模拟商品或订单 配置完成前，这里不会展示模拟商品，也不提供模拟购买。\n\n检查配置后重试\n先去看看积分兑换（示例数据）\n首页\n社区\n健康\n惠生活\n（当前）\n我的",
+    "productTiles": 0,
+    "apiRequests": [
+      {
+        "method": "GET",
+        "url": "http://localhost:5173/api/integrations/crmeb/status"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:5173/api/integrations/crmeb/status"
+      }
+    ]
+  }
+}
