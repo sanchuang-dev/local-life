@@ -154,6 +154,31 @@ async function requestOtp(
   return { response, state }
 }
 
+/**
+ * Requests a code with full control over the forwarding headers, so the IP
+ * throttle can be exercised the way a reverse proxy and a spoofing client would
+ * actually present themselves.
+ */
+async function requestOtpWithHeaders(
+  context: TestContext,
+  phone: string,
+  headers: Record<string, string>,
+  purpose: PhoneOtpPurpose = 'login',
+) {
+  const state = await csrf(context.app)
+  return context.app.request(PHONE_AUTH_ROUTES.requestOtp, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      cookie: state.cookie,
+      'x-csrf-token': state.token,
+      origin: COOKIE_ORIGIN,
+      ...headers,
+    },
+    body: JSON.stringify({ phone, purpose }),
+  })
+}
+
 function lastCode(context: TestContext, phone: string): string {
   const normalized = normalizeMainlandPhone(phone)
   const message = [...context.outbox]
@@ -698,6 +723,114 @@ test('per-IP daily cap bounds a single address even across many numbers', async 
       .where(eq(phoneVerificationCodes.phone, blockedPhone))
       .all()
     assert.equal(stored.length, 0)
+  } finally {
+    context.sqlite.close()
+  }
+})
+
+/**
+ * The left-most `X-Forwarded-For` entry is written by the caller, so keying the
+ * throttle on it lets one client mint a fresh bucket per request. Only the
+ * right-most entry (appended by the trusted reverse proxy) may be used; a proxy
+ * that sets `X-Real-IP` instead is honoured as well.
+ */
+test('spoofed X-Forwarded-For prefixes cannot mint fresh IP throttle buckets', async () => {
+  const context = testContext()
+  try {
+    const trustedHop = '203.0.113.7'
+    // 20 delivered codes, each with a rotating spoofed prefix and the same hop.
+    for (let index = 0; index < 20; index += 1) {
+      const phone = `1380013${String(8100 + index).padStart(4, '0')}`
+      const response = await requestOtp(
+        context,
+        phone,
+        'login',
+        `10.0.0.${index}, 198.51.100.${index}, ${trustedHop}`,
+      )
+      assert.equal(response.response.status, 202, `request ${index + 1} should succeed`)
+    }
+
+    // A brand-new spoofed prefix must not reset the bucket.
+    const spoofedPhone = '13900139000'
+    const spoofed = await requestOtp(context, spoofedPhone, 'login', `172.16.0.99, ${trustedHop}`)
+    assert.equal(spoofed.response.status, 429)
+    assert.equal(
+      (await readJson<{ error: { code: string } }>(spoofed.response)).error.code,
+      'otp_request_limit',
+    )
+    const stored = context.db
+      .select()
+      .from(phoneVerificationCodes)
+      .where(eq(phoneVerificationCodes.phone, spoofedPhone))
+      .all()
+    assert.equal(stored.length, 0, 'a throttled request stores no code')
+
+    // A single-value header maps to the same right-most hop.
+    const bare = await requestOtp(context, '13900139001', 'login', trustedHop)
+    assert.equal(bare.response.status, 429)
+
+    // A genuinely different proxy hop is a different bucket.
+    const otherHop = await requestOtp(context, '13900139002', 'login', '10.0.0.1, 198.51.100.9')
+    assert.equal(otherHop.response.status, 202)
+
+    // Proxies configured to set X-Real-IP instead of X-Forwarded-For still work.
+    const realIp = await requestOtpWithHeaders(context, '13900139003', {
+      'x-real-ip': '198.51.100.10',
+    })
+    assert.equal(realIp.status, 202)
+  } finally {
+    context.sqlite.close()
+  }
+})
+
+/**
+ * A provider outage must not behave like a delivered message: the undelivered
+ * code is dead, no window is charged and the resident may retry at once instead
+ * of waiting out the resend cooldown.
+ */
+test('a failed SMS delivery consumes no quota and can be retried immediately', async () => {
+  const delivered: CapturedSms[] = []
+  let failNext = true
+  const flaky: SmsSender = {
+    async sendVerificationCode(message) {
+      delivered.push({ ...message })
+      if (failNext) {
+        failNext = false
+        throw new Error('provider down')
+      }
+    },
+  }
+  const context = testContext({ sender: flaky })
+  try {
+    const phone = '13800138000'
+    const failed = await requestOtp(context, phone, 'login')
+    assert.equal(failed.response.status, 503)
+    assert.equal(
+      (await readJson<{ error: { code: string } }>(failed.response)).error.code,
+      'sms_delivery_failed',
+    )
+    assert.equal(delivered.length, 1)
+    assert.equal(context.db.select().from(phoneOtpRequestCounters).all().length, 0)
+
+    // The code the resident never received cannot be used.
+    const deadCode = delivered[0]?.code
+    assert.ok(deadCode)
+    const dead = await phoneLogin(context, phone, deadCode)
+    assert.equal(dead.status, 400)
+    assert.equal((await readJson<{ error: { code: string } }>(dead)).error.code, 'otp_invalid')
+
+    // Retry without advancing the clock: no cooldown residue, no quota spent.
+    const retry = await requestOtp(context, phone, 'login')
+    assert.equal(retry.response.status, 202)
+    assert.equal(delivered.length, 2)
+
+    const login = await phoneLogin(context, phone, delivered[1]?.code ?? '')
+    assert.equal(login.status, 200)
+
+    // Only the delivered message advanced the three windows.
+    const counters = context.db.select().from(phoneOtpRequestCounters).all()
+    assert.equal(counters.length, 3)
+    for (const counter of counters) assert.equal(counter.count, 1)
   } finally {
     context.sqlite.close()
   }

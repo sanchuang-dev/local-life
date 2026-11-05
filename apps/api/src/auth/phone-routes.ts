@@ -57,15 +57,28 @@ export interface PhoneAuthRouteDeps {
 }
 
 /**
- * Client address for the IP throttle. This API is served behind the site reverse
- * proxy (Vite dev proxy / production proxy), which sets `x-forwarded-for`; the
- * tests inject it explicitly. Without a proxy the value degrades to a single
- * shared bucket, which is still bounded.
+ * Client address for the IP throttle.
+ *
+ * Deployment prerequisite (must be stated in the PR): the site reverse proxy
+ * (Caddy in the reference deployment) appends the client address to
+ * `X-Forwarded-For`, and the API is not reachable directly. The **left-most**
+ * entry is whatever the client sent, so trusting it lets one caller mint
+ * unlimited throttle buckets by rotating a spoofed header. Only the **right-most**
+ * entry — appended by the nearest trusted hop — may key the limiter;
+ * `X-Real-IP` is the fallback for proxies configured to set that instead. With
+ * neither header the value degrades to one shared bucket, which is still
+ * bounded.
  */
 function clientIp(c: AppContext): string {
   const forwarded = c.req.header('x-forwarded-for')
-  const first = forwarded?.split(',')[0]?.trim()
-  if (first) return first.slice(0, 64)
+  if (forwarded) {
+    const hops = forwarded
+      .split(',')
+      .map((hop) => hop.trim())
+      .filter(Boolean)
+    const nearest = hops.at(-1)
+    if (nearest) return nearest.slice(0, 64)
+  }
   const real = c.req.header('x-real-ip')?.trim()
   return real ? real.slice(0, 64) : 'unknown'
 }

@@ -157,12 +157,28 @@ function windowStart(now: Date, windowMs: number): Date {
   return new Date(Math.floor(now.getTime() / windowMs) * windowMs)
 }
 
+function windowKey(scope: 'phone' | 'ip', identifier: string, windowMs: number): string {
+  return hashToken(`otp-window:${scope}:${windowMs}:${identifier}`)
+}
+
+function windowCount(db: AppDatabase, key: string, startedAt: Date): number {
+  const row = db
+    .select()
+    .from(phoneOtpRequestCounters)
+    .where(eq(phoneOtpRequestCounters.key, key))
+    .get()
+  return row && row.windowStartedAt.getTime() === startedAt.getTime() ? row.count : 0
+}
+
 /**
- * Fixed-window counter keyed by a SHA-256 of the scope, so no phone number and
- * no IP address is stored in the throttle table. Exceeding the window throws
+ * Read-only budget check for one fixed window. Exceeding it throws
  * `otp_request_limit` with a `Retry-After` value derived from the clock.
+ *
+ * The counter itself is only advanced by {@link recordWindowHit} after the
+ * message actually reached the provider, so a blocked or failed request cannot
+ * consume the resident's quota.
  */
-function bumpWindow(
+function assertWindowBudget(
   db: AppDatabase,
   scope: 'phone' | 'ip',
   identifier: string,
@@ -170,26 +186,32 @@ function bumpWindow(
   windowMs: number,
   max: number,
 ): void {
-  const key = hashToken(`otp-window:${scope}:${windowMs}:${identifier}`)
+  const key = windowKey(scope, identifier, windowMs)
   const startedAt = windowStart(now, windowMs)
-  const row = db
-    .select()
-    .from(phoneOtpRequestCounters)
-    .where(eq(phoneOtpRequestCounters.key, key))
-    .get()
-  const count = row && row.windowStartedAt.getTime() === startedAt.getTime() ? row.count : 0
-  if (count >= max) {
-    const retryAfterSeconds = Math.max(
-      1,
-      Math.ceil((startedAt.getTime() + windowMs - now.getTime()) / 1000),
-    )
-    throw new PhoneOtpError(
-      429,
-      API_ERROR_CODES.otpRequestLimit,
-      '验证码请求过于频繁，请稍后再试',
-      retryAfterSeconds,
-    )
-  }
+  if (windowCount(db, key, startedAt) < max) return
+  const retryAfterSeconds = Math.max(
+    1,
+    Math.ceil((startedAt.getTime() + windowMs - now.getTime()) / 1000),
+  )
+  throw new PhoneOtpError(
+    429,
+    API_ERROR_CODES.otpRequestLimit,
+    '验证码请求过于频繁，请稍后再试',
+    retryAfterSeconds,
+  )
+}
+
+/** Count one delivered message against its fixed window. */
+function recordWindowHit(
+  db: AppDatabase,
+  scope: 'phone' | 'ip',
+  identifier: string,
+  now: Date,
+  windowMs: number,
+): void {
+  const key = windowKey(scope, identifier, windowMs)
+  const startedAt = windowStart(now, windowMs)
+  const count = windowCount(db, key, startedAt)
   db.insert(phoneOtpRequestCounters)
     .values({ key, count: count + 1, windowStartedAt: startedAt })
     .onConflictDoUpdate({
@@ -199,11 +221,21 @@ function bumpWindow(
     .run()
 }
 
+/**
+ * Resend cooldown. Only codes that were actually delivered and are still live
+ * count: a failed delivery invalidates its row, so the resident may retry
+ * immediately instead of being punished for a provider outage.
+ */
 function assertCooldown(db: AppDatabase, phone: string, now: Date): void {
   const latest = db
     .select({ createdAt: phoneVerificationCodes.createdAt })
     .from(phoneVerificationCodes)
-    .where(eq(phoneVerificationCodes.phone, phone))
+    .where(
+      and(
+        eq(phoneVerificationCodes.phone, phone),
+        isNull(phoneVerificationCodes.invalidatedAt),
+      ),
+    )
     .orderBy(desc(phoneVerificationCodes.createdAt))
     .get()
   if (!latest) return
@@ -236,9 +268,15 @@ function randomVerificationCode(): string {
  *
  * Order matters: the sender check happens first (a production deployment with no
  * provider answers 503 `not_configured` and nothing is stored), then the cheap
- * cooldown read, then the bounded counters. Counters only advance for requests
- * that are actually issued, so a rejected retry cannot be used to amplify the
- * lockout of a victim's phone number.
+ * cooldown read, then the bounded windows. The windows are checked read-only
+ * before issuing and only incremented **after** the provider accepted the
+ * message: a failed delivery invalidates the code, consumes no quota and does
+ * not start the resend cooldown. A rejected request therefore cannot be used to
+ * amplify the lockout of a victim's phone number.
+ *
+ * Two requests that race past the read-only check can both deliver; the window
+ * may overshoot by the number of in-flight requests, which is bounded and far
+ * less harmful than charging residents for messages that were never sent.
  */
 export async function requestPhoneVerificationCode(
   context: PhoneOtpContext,
@@ -255,9 +293,30 @@ export async function requestPhoneVerificationCode(
 
   const issuedAt = now()
   assertCooldown(db, input.phone, issuedAt)
-  bumpWindow(db, 'phone', input.phone, issuedAt, PHONE_OTP_PHONE_HOURLY_WINDOW_MS, PHONE_OTP_PHONE_HOURLY_MAX)
-  bumpWindow(db, 'phone', input.phone, issuedAt, PHONE_OTP_PHONE_DAILY_WINDOW_MS, PHONE_OTP_PHONE_DAILY_MAX)
-  bumpWindow(db, 'ip', input.ip, issuedAt, PHONE_OTP_PHONE_DAILY_WINDOW_MS, PHONE_OTP_IP_DAILY_MAX)
+  assertWindowBudget(
+    db,
+    'phone',
+    input.phone,
+    issuedAt,
+    PHONE_OTP_PHONE_HOURLY_WINDOW_MS,
+    PHONE_OTP_PHONE_HOURLY_MAX,
+  )
+  assertWindowBudget(
+    db,
+    'phone',
+    input.phone,
+    issuedAt,
+    PHONE_OTP_PHONE_DAILY_WINDOW_MS,
+    PHONE_OTP_PHONE_DAILY_MAX,
+  )
+  assertWindowBudget(
+    db,
+    'ip',
+    input.ip,
+    issuedAt,
+    PHONE_OTP_PHONE_DAILY_WINDOW_MS,
+    PHONE_OTP_IP_DAILY_MAX,
+  )
 
   // Housekeeping: expired history is useless and must not grow forever.
   db.delete(phoneVerificationCodes)
@@ -311,7 +370,8 @@ export async function requestPhoneVerificationCode(
     })
   } catch (error) {
     // The resident never received a code: invalidate it instead of leaving a
-    // live credential they cannot know.
+    // live credential they cannot know. No window was charged, and because the
+    // row is invalidated the resend cooldown does not apply either.
     db.update(phoneVerificationCodes)
       .set({ invalidatedAt: now() })
       .where(eq(phoneVerificationCodes.id, id))
@@ -322,6 +382,11 @@ export async function requestPhoneVerificationCode(
       '短信发送失败，请稍后重试',
     )
   }
+
+  // Charge the windows only for a message the provider accepted.
+  recordWindowHit(db, 'phone', input.phone, issuedAt, PHONE_OTP_PHONE_HOURLY_WINDOW_MS)
+  recordWindowHit(db, 'phone', input.phone, issuedAt, PHONE_OTP_PHONE_DAILY_WINDOW_MS)
+  recordWindowHit(db, 'ip', input.ip, issuedAt, PHONE_OTP_PHONE_DAILY_WINDOW_MS)
 
   return {
     expiresInSeconds: PHONE_OTP_TTL_SECONDS,
