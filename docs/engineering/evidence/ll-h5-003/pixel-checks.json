@@ -1,0 +1,582 @@
+{
+  "images": [
+    {
+      "file": "mvp-320-community_activity_silver-neighborhood.png",
+      "size": [
+        320,
+        640
+      ],
+      "top_dark_pixels": 2570,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.95,
+      "distinct_colors": 56143
+    },
+    {
+      "file": "mvp-320-home.png",
+      "size": [
+        320,
+        640
+      ],
+      "top_dark_pixels": 10381,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.95,
+      "distinct_colors": 4415
+    },
+    {
+      "file": "mvp-320-life.png",
+      "size": [
+        320,
+        640
+      ],
+      "top_dark_pixels": 631,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.951,
+      "distinct_colors": 2522
+    },
+    {
+      "file": "mvp-320-me.png",
+      "size": [
+        320,
+        640
+      ],
+      "top_dark_pixels": 32,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.953,
+      "distinct_colors": 1819
+    },
+    {
+      "file": "mvp-375-community_activity_silver-neighborhood.png",
+      "size": [
+        375,
+        812
+      ],
+      "top_dark_pixels": 2948,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.958,
+      "distinct_colors": 72228
+    },
+    {
+      "file": "mvp-375-home.png",
+      "size": [
+        375,
+        812
+      ],
+      "top_dark_pixels": 12767,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.957,
+      "distinct_colors": 4554
+    },
+    {
+      "file": "mvp-375-life.png",
+      "size": [
+        375,
+        812
+      ],
+      "top_dark_pixels": 631,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.959,
+      "distinct_colors": 2759
+    },
+    {
+      "file": "mvp-375-me.png",
+      "size": [
+        375,
+        812
+      ],
+      "top_dark_pixels": 32,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.96,
+      "distinct_colors": 2303
+    },
+    {
+      "file": "mvp-375-safe-area-bottom34.png",
+      "size": [
+        375,
+        812
+      ],
+      "top_dark_pixels": 12767,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.972,
+      "distinct_colors": 4545
+    },
+    {
+      "file": "mvp-deeplink-activity-detail.png",
+      "size": [
+        375,
+        812
+      ],
+      "top_dark_pixels": 2948,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.958,
+      "distinct_colors": 72194
+    },
+    {
+      "file": "mvp-deeplink-workbench-leads.png",
+      "size": [
+        375,
+        812
+      ],
+      "top_dark_pixels": 516,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.96,
+      "distinct_colors": 650
+    },
+    {
+      "file": "mvp-deeplink-workbench.png",
+      "size": [
+        375,
+        812
+      ],
+      "top_dark_pixels": 275,
+      "top_uniform_lines": 15,
+      "bottom_light_ratio": 0.96,
+      "distinct_colors": 647
+    },
+    {
+      "file": "mvp-desktop-community_activity_silver-neighborhood.png",
+      "size": [
+        1440,
+        900
+      ],
+      "top_dark_pixels": 3401,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.989,
+      "distinct_colors": 212176
+    },
+    {
+      "file": "mvp-desktop-home.png",
+      "size": [
+        1440,
+        900
+      ],
+      "top_dark_pixels": 28022,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.989,
+      "distinct_colors": 4489
+    },
+    {
+      "file": "mvp-desktop-life.png",
+      "size": [
+        1440,
+        900
+      ],
+      "top_dark_pixels": 645,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.989,
+      "distinct_colors": 2651
+    },
+    {
+      "file": "mvp-desktop-me.png",
+      "size": [
+        1440,
+        900
+      ],
+      "top_dark_pixels": 0,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.989,
+      "distinct_colors": 2407
+    },
+    {
+      "file": "mvp-desktop-workbench.png",
+      "size": [
+        1440,
+        900
+      ],
+      "top_dark_pixels": 275,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.989,
+      "distinct_colors": 650
+    },
+    {
+      "file": "mvp-desktop-workbench_leads.png",
+      "size": [
+        1440,
+        900
+      ],
+      "top_dark_pixels": 516,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.989,
+      "distinct_colors": 663
+    },
+    {
+      "file": "mvp-interaction-activity-back.png",
+      "size": [
+        375,
+        812
+      ],
+      "top_dark_pixels": 407,
+      "top_uniform_lines": 37,
+      "bottom_light_ratio": 0.958,
+      "distinct_colors": 2217
+    },
+    {
+      "file": "mvp-interaction-me.png",
+      "size": [
+        375,
+        812
+      ],
+      "top_dark_pixels": 32,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.96,
+      "distinct_colors": 2331
+    },
+    {
+      "file": "pages-320-home.png",
+      "size": [
+        320,
+        640
+      ],
+      "top_dark_pixels": 10507,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.95,
+      "distinct_colors": 4379
+    },
+    {
+      "file": "pages-320-life.png",
+      "size": [
+        320,
+        640
+      ],
+      "top_dark_pixels": 631,
+      "top_uniform_lines": 37,
+      "bottom_light_ratio": 0.951,
+      "distinct_colors": 2521
+    },
+    {
+      "file": "pages-375-activity-detail.png",
+      "size": [
+        375,
+        812
+      ],
+      "top_dark_pixels": 2948,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.958,
+      "distinct_colors": 72168
+    },
+    {
+      "file": "pages-375-home.png",
+      "size": [
+        375,
+        812
+      ],
+      "top_dark_pixels": 12767,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.957,
+      "distinct_colors": 4592
+    },
+    {
+      "file": "pages-375-life.png",
+      "size": [
+        375,
+        812
+      ],
+      "top_dark_pixels": 631,
+      "top_uniform_lines": 37,
+      "bottom_light_ratio": 0.959,
+      "distinct_colors": 2758
+    },
+    {
+      "file": "pages-375-me.png",
+      "size": [
+        375,
+        812
+      ],
+      "top_dark_pixels": 32,
+      "top_uniform_lines": 15,
+      "bottom_light_ratio": 0.96,
+      "distinct_colors": 2302
+    },
+    {
+      "file": "pages-375-workbench-leads.png",
+      "size": [
+        375,
+        812
+      ],
+      "top_dark_pixels": 516,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.96,
+      "distinct_colors": 650
+    },
+    {
+      "file": "pages-375-workbench.png",
+      "size": [
+        375,
+        812
+      ],
+      "top_dark_pixels": 275,
+      "top_uniform_lines": 15,
+      "bottom_light_ratio": 0.96,
+      "distinct_colors": 647
+    },
+    {
+      "file": "pages-desktop-home.png",
+      "size": [
+        1440,
+        900
+      ],
+      "top_dark_pixels": 28022,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.989,
+      "distinct_colors": 4489
+    },
+    {
+      "file": "pages-desktop-life.png",
+      "size": [
+        1440,
+        900
+      ],
+      "top_dark_pixels": 645,
+      "top_uniform_lines": 0,
+      "bottom_light_ratio": 0.989,
+      "distinct_colors": 2651
+    }
+  ],
+  "checks": [
+    {
+      "name": "mvp-320-community_activity_silver-neighborhood.png non-blank",
+      "ok": true,
+      "detail": 56143
+    },
+    {
+      "name": "mvp-320-home.png non-blank",
+      "ok": true,
+      "detail": 4415
+    },
+    {
+      "name": "mvp-320-life.png non-blank",
+      "ok": true,
+      "detail": 2522
+    },
+    {
+      "name": "mvp-320-me.png non-blank",
+      "ok": true,
+      "detail": 1819
+    },
+    {
+      "name": "mvp-375-community_activity_silver-neighborhood.png non-blank",
+      "ok": true,
+      "detail": 72228
+    },
+    {
+      "name": "mvp-375-home.png non-blank",
+      "ok": true,
+      "detail": 4554
+    },
+    {
+      "name": "mvp-375-life.png non-blank",
+      "ok": true,
+      "detail": 2759
+    },
+    {
+      "name": "mvp-375-me.png non-blank",
+      "ok": true,
+      "detail": 2303
+    },
+    {
+      "name": "mvp-375-safe-area-bottom34.png non-blank",
+      "ok": true,
+      "detail": 4545
+    },
+    {
+      "name": "mvp-deeplink-activity-detail.png non-blank",
+      "ok": true,
+      "detail": 72194
+    },
+    {
+      "name": "mvp-deeplink-workbench-leads.png non-blank",
+      "ok": true,
+      "detail": 650
+    },
+    {
+      "name": "mvp-deeplink-workbench.png non-blank",
+      "ok": true,
+      "detail": 647
+    },
+    {
+      "name": "mvp-desktop-community_activity_silver-neighborhood.png non-blank",
+      "ok": true,
+      "detail": 212176
+    },
+    {
+      "name": "mvp-desktop-home.png non-blank",
+      "ok": true,
+      "detail": 4489
+    },
+    {
+      "name": "mvp-desktop-life.png non-blank",
+      "ok": true,
+      "detail": 2651
+    },
+    {
+      "name": "mvp-desktop-me.png non-blank",
+      "ok": true,
+      "detail": 2407
+    },
+    {
+      "name": "mvp-desktop-workbench.png non-blank",
+      "ok": true,
+      "detail": 650
+    },
+    {
+      "name": "mvp-desktop-workbench_leads.png non-blank",
+      "ok": true,
+      "detail": 663
+    },
+    {
+      "name": "mvp-interaction-activity-back.png non-blank",
+      "ok": true,
+      "detail": 2217
+    },
+    {
+      "name": "mvp-interaction-me.png non-blank",
+      "ok": true,
+      "detail": 2331
+    },
+    {
+      "name": "pages-320-home.png non-blank",
+      "ok": true,
+      "detail": 4379
+    },
+    {
+      "name": "pages-320-life.png non-blank",
+      "ok": true,
+      "detail": 2521
+    },
+    {
+      "name": "pages-375-activity-detail.png non-blank",
+      "ok": true,
+      "detail": 72168
+    },
+    {
+      "name": "pages-375-home.png non-blank",
+      "ok": true,
+      "detail": 4592
+    },
+    {
+      "name": "pages-375-life.png non-blank",
+      "ok": true,
+      "detail": 2758
+    },
+    {
+      "name": "pages-375-me.png non-blank",
+      "ok": true,
+      "detail": 2302
+    },
+    {
+      "name": "pages-375-workbench-leads.png non-blank",
+      "ok": true,
+      "detail": 650
+    },
+    {
+      "name": "pages-375-workbench.png non-blank",
+      "ok": true,
+      "detail": 647
+    },
+    {
+      "name": "pages-desktop-home.png non-blank",
+      "ok": true,
+      "detail": 4489
+    },
+    {
+      "name": "pages-desktop-life.png non-blank",
+      "ok": true,
+      "detail": 2651
+    },
+    {
+      "name": "all -375- screenshots are exactly 375x812",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "all -320- screenshots are exactly 320x640",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "all -desktop- screenshots are exactly 1440x900",
+      "ok": true,
+      "detail": []
+    },
+    {
+      "name": "mvp-desktop-home.png desktop has no 390px phone frame",
+      "ok": true,
+      "detail": {
+        "column_width": null,
+        "left": [
+          238,
+          242,
+          241
+        ],
+        "right": [
+          252,
+          252,
+          252
+        ],
+        "center": [
+          255,
+          255,
+          255
+        ]
+      }
+    },
+    {
+      "name": "mvp-desktop-home.png desktop shows page background outside the column",
+      "ok": true,
+      "detail": {
+        "left": [
+          238,
+          242,
+          241
+        ],
+        "right": [
+          252,
+          252,
+          252
+        ]
+      }
+    },
+    {
+      "name": "pages-desktop-home.png desktop has no 390px phone frame",
+      "ok": true,
+      "detail": {
+        "column_width": null,
+        "left": [
+          238,
+          242,
+          241
+        ],
+        "right": [
+          252,
+          252,
+          252
+        ],
+        "center": [
+          255,
+          255,
+          255
+        ]
+      }
+    },
+    {
+      "name": "pages-desktop-home.png desktop shows page background outside the column",
+      "ok": true,
+      "detail": {
+        "left": [
+          238,
+          242,
+          241
+        ],
+        "right": [
+          252,
+          252,
+          252
+        ]
+      }
+    },
+    {
+      "name": "no screenshot is a fixed 390px phone viewport",
+      "ok": true,
+      "detail": []
+    }
+  ]
+}
