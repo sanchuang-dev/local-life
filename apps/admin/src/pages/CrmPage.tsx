@@ -15,6 +15,7 @@ import {
   Typography,
 } from 'antd'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import type {
   AdminCrmFilterOptionsResponse,
   CrmBusinessType,
@@ -63,6 +64,15 @@ import './crm.css'
  */
 
 type CrmTab = 'leads' | 'orders'
+
+/**
+ * `/customers?view=leads|orders` is the single source of truth for the CRM
+ * sub-view: the tab bar lives in the white PageHeader, and any missing or
+ * unrecognized value falls back to the leads list.
+ */
+function parseCrmView(view: string | null): CrmTab {
+  return view === 'orders' ? 'orders' : 'leads'
+}
 
 const LEAD_STATUS_META: Record<CrmLeadStatus, { label: string; color: string }> = {
   new: { label: '新线索', color: 'blue' },
@@ -223,11 +233,25 @@ export function CrmPage() {
 }
 
 function CrmConsole({ session }: { session: AuthenticatedSession }) {
-  const [tab, setTab] = useState<CrmTab>('leads')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tab = parseCrmView(searchParams.get('view'))
+  // Panels mount lazily on first activation and then stay mounted (same
+  // keep-alive semantics the previous in-body antd Tabs provided), so an
+  // unsubmitted filter draft survives tab switches and browser back/forward.
+  const [mountedTabs, setMountedTabs] = useState<ReadonlySet<CrmTab>>(() => new Set([tab]))
+  if (!mountedTabs.has(tab)) {
+    setMountedTabs(new Set(mountedTabs).add(tab))
+  }
   const [filterOptions, setFilterOptions] = useState<AdminCrmFilterOptionsResponse | null>(null)
   const [optionsError, setOptionsError] = useState<string | null>(null)
   const [optionsToken, setOptionsToken] = useState(0)
   const role = session.staff.role
+
+  const switchTab = (key: string) => {
+    const next = parseCrmView(key)
+    // Push a history entry per switch so browser back/forward replays views.
+    if (next !== tab) setSearchParams({ view: next })
+  }
 
   useEffect(() => {
     let active = true
@@ -254,6 +278,16 @@ function CrmConsole({ session }: { session: AuthenticatedSession }) {
         title="客户与业务单"
         description="按授权社区与网格员查询客户线索、跟进与广电业务受理单；人工核验后才记为有效成交。"
         status={<Tag color="green">真实数据</Tag>}
+        subnav={
+          <Tabs
+            activeKey={tab}
+            onChange={switchTab}
+            items={[
+              { key: 'leads', label: '客户线索' },
+              { key: 'orders', label: '业务受理单' },
+            ]}
+          />
+        }
       />
 
       <div className="page-stack">
@@ -286,26 +320,28 @@ function CrmConsole({ session }: { session: AuthenticatedSession }) {
           />
         ) : null}
 
-        <Tabs
-          activeKey={tab}
-          onChange={(key) => setTab(key === 'orders' ? 'orders' : 'leads')}
-          items={[
-            {
-              key: 'leads',
-              label: '客户线索',
-              children: (
-                <LeadPanel session={session} filterOptions={filterOptions} />
-              ),
-            },
-            {
-              key: 'orders',
-              label: '业务受理单',
-              children: (
-                <OrderPanel session={session} filterOptions={filterOptions} />
-              ),
-            },
-          ]}
-        />
+        {mountedTabs.has('leads') ? (
+          <div
+            className="crm-subview"
+            data-view="leads"
+            role="tabpanel"
+            aria-label="客户线索"
+            hidden={tab !== 'leads'}
+          >
+            <LeadPanel session={session} filterOptions={filterOptions} />
+          </div>
+        ) : null}
+        {mountedTabs.has('orders') ? (
+          <div
+            className="crm-subview"
+            data-view="orders"
+            role="tabpanel"
+            aria-label="业务受理单"
+            hidden={tab !== 'orders'}
+          >
+            <OrderPanel session={session} filterOptions={filterOptions} />
+          </div>
+        ) : null}
       </div>
     </div>
   )

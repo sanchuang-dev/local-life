@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { App as AntdApp, ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
+import { createMemoryRouter, RouterProvider } from 'react-router'
 import type {
   AdminCrmFilterOptionsResponse,
   CrmFollowUp,
@@ -251,18 +252,26 @@ function stubApi(routes: ReadonlyArray<readonly [string, Handler]>): FetchCall[]
   return calls
 }
 
-function renderPage(session: AuthenticatedSession) {
-  return render(
+/**
+ * Renders the CRM page at its real `/customers` route so the `view` query
+ * param behaves exactly like in the browser shell (deep links, back/forward).
+ */
+function renderPage(session: AuthenticatedSession, initialPath = '/customers') {
+  const router = createMemoryRouter([{ path: '/customers', element: <CrmPage /> }], {
+    initialEntries: [initialPath],
+  })
+  const result = render(
     <ConfigProvider locale={zhCN} theme={adminTheme}>
       <AntdApp>
         <AdminAuthProvider
           value={{ session, busy: false, error: null, onLogout: async () => undefined }}
         >
-          <CrmPage />
+          <RouterProvider router={router} />
         </AdminAuthProvider>
       </AntdApp>
     </ConfigProvider>,
   )
+  return { ...result, router }
 }
 
 /** The advanced-filter modal is force-rendered, so every field label appears twice. */
@@ -343,6 +352,116 @@ describe('CrmPage permission boundary', () => {
 
     expect(await screen.findByText('没有业务受理单权限')).toBeTruthy()
     expect(screen.getByText('没有业务单查询权限')).toBeTruthy()
+  })
+})
+
+describe('CrmPage view deep link', () => {
+  function leadsRoute(items: CrmLeadSummary[] = [leadSummary()]): readonly [string, Handler] {
+    return ['/api/admin/crm/leads?', () => json({ items, total: items.length, page: 1, pageSize: 20 })]
+  }
+
+  function ordersRoute(items: CrmOrderSummary[] = [orderSummary()]): readonly [string, Handler] {
+    return [
+      '/api/admin/crm/orders?',
+      () => json({ items, total: items.length, page: 1, pageSize: 20 }),
+    ]
+  }
+
+  /** The CRM second-level tab bar must live inside the white sticky page header. */
+  function headerTabs(): HTMLElement {
+    const bar = document.querySelector('.page-header .page-header-subnav .ant-tabs')
+    expect(bar).toBeTruthy()
+    return bar as HTMLElement
+  }
+
+  function activeHeaderTab(): string | null {
+    return headerTabs().querySelector('.ant-tabs-tab-active')?.textContent ?? null
+  }
+
+  /** Both keep-alive subviews stay in the DOM once mounted, so scope queries. */
+  function subview(view: 'leads' | 'orders'): HTMLElement {
+    const element = document.querySelector(`.crm-subview[data-view="${view}"]`)
+    expect(element).toBeTruthy()
+    return element as HTMLElement
+  }
+
+  it('defaults to the leads view without a param and never rewrites the URL', async () => {
+    const calls = stubApi([stubListOptions(), leadsRoute(), ordersRoute()])
+    const { router } = renderPage(ADMIN_SESSION)
+
+    expect(await screen.findByText('张三')).toBeTruthy()
+    expect(activeHeaderTab()).toBe('客户线索')
+    expect(router.state.location.search).toBe('')
+    // The orders panel stays unmounted until its first activation.
+    expect(calledUrls(calls).some((url) => url.startsWith('/api/admin/crm/orders?'))).toBe(false)
+  })
+
+  it('opens the orders view directly from ?view=orders without fetching leads', async () => {
+    const calls = stubApi([stubListOptions(), leadsRoute(), ordersRoute()])
+    renderPage(ADMIN_SESSION, '/customers?view=orders')
+
+    expect(await screen.findByText('GD20261104001')).toBeTruthy()
+    expect(activeHeaderTab()).toBe('业务受理单')
+    expect(calledUrls(calls).some((url) => url.startsWith('/api/admin/crm/orders?'))).toBe(true)
+    expect(calledUrls(calls).some((url) => url.startsWith('/api/admin/crm/leads?'))).toBe(false)
+  })
+
+  it('falls back to the leads view for an unrecognized view param', async () => {
+    stubApi([stubListOptions(), leadsRoute(), ordersRoute()])
+    const { router } = renderPage(ADMIN_SESSION, '/customers?view=whatever')
+
+    expect(await screen.findByText('张三')).toBeTruthy()
+    expect(activeHeaderTab()).toBe('客户线索')
+    expect(router.state.location.search).toBe('?view=whatever')
+  })
+
+  it('pushes one history entry per tab switch and replays views on back/forward', async () => {
+    stubApi([stubListOptions(), leadsRoute(), ordersRoute()])
+    const { router } = renderPage(ADMIN_SESSION)
+
+    expect(await screen.findByText('张三')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('tab', { name: '业务受理单' }))
+    await waitFor(() => expect(router.state.location.search).toBe('?view=orders'))
+    expect(await screen.findByText('GD20261104001')).toBeTruthy()
+    expect(activeHeaderTab()).toBe('业务受理单')
+
+    fireEvent.click(screen.getByRole('tab', { name: '客户线索' }))
+    await waitFor(() => expect(router.state.location.search).toBe('?view=leads'))
+    expect(activeHeaderTab()).toBe('客户线索')
+    expect(await within(subview('leads')).findByText('张三')).toBeTruthy()
+
+    await act(() => router.navigate(-1))
+    expect(router.state.location.search).toBe('?view=orders')
+    expect(activeHeaderTab()).toBe('业务受理单')
+    expect(await within(subview('orders')).findByText('GD20261104001')).toBeTruthy()
+
+    await act(() => router.navigate(-1))
+    expect(router.state.location.search).toBe('')
+    expect(activeHeaderTab()).toBe('客户线索')
+
+    await act(() => router.navigate(1))
+    expect(router.state.location.search).toBe('?view=orders')
+    expect(activeHeaderTab()).toBe('业务受理单')
+  })
+
+  it('keeps an unsubmitted lead keyword while switching views and back', async () => {
+    stubApi([stubListOptions(), leadsRoute(), ordersRoute()])
+    const { router } = renderPage(ADMIN_SESSION)
+
+    expect(await screen.findByText('张三')).toBeTruthy()
+    const keywordInput = () =>
+      within(subview('leads')).getAllByLabelText('关键词')[0] as HTMLInputElement
+    fireEvent.change(keywordInput(), { target: { value: '张' } })
+    // No 查询 click: the draft has not been submitted to the server yet.
+
+    fireEvent.click(screen.getByRole('tab', { name: '业务受理单' }))
+    await waitFor(() => expect(router.state.location.search).toBe('?view=orders'))
+    expect(await within(subview('orders')).findByText('GD20261104001')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('tab', { name: '客户线索' }))
+    await waitFor(() => expect(router.state.location.search).toBe('?view=leads'))
+    expect(keywordInput().value).toBe('张')
   })
 })
 
