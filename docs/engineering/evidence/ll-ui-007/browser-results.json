@@ -1,0 +1,1212 @@
+{
+  "generatedAt": "2026-11-05T06:44:32.817Z",
+  "runTag": "6jv7od1g",
+  "adminOrigin": "http://localhost:5474",
+  "apiOrigin": "http://127.0.0.1:4280",
+  "checks": [
+    {
+      "name": "admin API login succeeds",
+      "ok": true,
+      "detail": "{\"id\":\"e154d930-8549-473e-8447-c6cc788749c5\",\"username\":\"evidence.admin\",\"role\":\"admin\",\"communities\":[]}"
+    },
+    {
+      "name": "main area shows create entries",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "no drawer open on arrival",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "create forms are not in the main area",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "main cards present",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "initial load reads both lists from the API",
+      "ok": true,
+      "detail": "2/2"
+    },
+    {
+      "name": "community drawer width is compact (<= 480)",
+      "ok": true,
+      "detail": "{\"title\":\"新建社区\",\"wrapperWidth\":400,\"wrapperLeft\":1440,\"wrapperRight\":1840,\"bodyScrollWidth\":400,\"bodyClientWidth\":400,\"bodyOverflowX\":false,\"bodyScrollHeight\":794,\"bodyClientHeight\":794,\"footerVisible\":true,\"footerBottom\":900,\"viewportWidth\":1440,\"viewportHeight\":900,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "community drawer fits 1440 viewport",
+      "ok": true,
+      "detail": "{\"title\":\"新建社区\",\"wrapperWidth\":400,\"wrapperLeft\":1440,\"wrapperRight\":1840,\"bodyScrollWidth\":400,\"bodyClientWidth\":400,\"bodyOverflowX\":false,\"bodyScrollHeight\":794,\"bodyClientHeight\":794,\"footerVisible\":true,\"footerBottom\":900,\"viewportWidth\":1440,\"viewportHeight\":900,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "community drawer footer action visible",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "invalid community name is blocked client-side",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "invalid submit preserves typed value",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "invalid submit keeps drawer open",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "invalid submit issues no POST",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "create community reports success",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "community drawer focus returns to trigger",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "created community persisted through the real API",
+      "ok": true,
+      "detail": "[\"幸福社区\",\"验收社区-61xd5coo\",\"验收社区-63465jfc\",\"阳光社区-63465jfc\",\"验收社区-65iexfco\",\"阳光社区-65iexfco\",\"验收社区-66fk0kks\",\"阳光社区-66fk0kks\",\"验收社区-67in0jcg\",\"阳光社区-67in0jcg\",\"重复提交-67in0jcg\",\"验收社区-68i1ni30\",\"验收社区-69hd5ei0\",\"验收社区-6a9a2lcg\",\"验收社区-6bf9vnlc\",\"验收社区-6c83w7po\",\"验收社区-6dq50naw\",\"验收社区-6ffq010o\",\"验收社区-6gukl9f8\",\"阳光社区-6gukl9f8\",\"验收社区-6htmrk48\",\"阳光社区-6htmrk48\",\"重复提交-6htmrk48\",\"验收社区-6jv7od1g\"]"
+    },
+    {
+      "name": "community create refreshes only the community list",
+      "ok": true,
+      "detail": "3 communities / 2 staff GETs"
+    },
+    {
+      "name": "community create preserves page scroll",
+      "ok": true,
+      "detail": "scroll 0 -> 0"
+    },
+    {
+      "name": "community create preserves selected community",
+      "ok": true,
+      "detail": "幸福社区 -> 幸福社区"
+    },
+    {
+      "name": "created community appears in refreshed selector options",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "second community persisted through the real API",
+      "ok": true,
+      "detail": "[\"幸福社区\",\"验收社区-61xd5coo\",\"验收社区-63465jfc\",\"阳光社区-63465jfc\",\"验收社区-65iexfco\",\"阳光社区-65iexfco\",\"验收社区-66fk0kks\",\"阳光社区-66fk0kks\",\"验收社区-67in0jcg\",\"阳光社区-67in0jcg\",\"重复提交-67in0jcg\",\"验收社区-68i1ni30\",\"验收社区-69hd5ei0\",\"验收社区-6a9a2lcg\",\"验收社区-6bf9vnlc\",\"验收社区-6c83w7po\",\"验收社区-6dq50naw\",\"验收社区-6ffq010o\",\"验收社区-6gukl9f8\",\"阳光社区-6gukl9f8\",\"验收社区-6htmrk48\",\"阳光社区-6htmrk48\",\"重复提交-6htmrk48\",\"验收社区-6jv7od1g\",\"阳光社区-6jv7od1g\"]"
+    },
+    {
+      "name": "community selector options come from the refreshed API list",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "creating a community keeps current community selection",
+      "ok": true,
+      "detail": "幸福社区 -> 幸福社区"
+    },
+    {
+      "name": "Escape closes a clean drawer",
+      "ok": true,
+      "detail": "cdp-key-event"
+    },
+    {
+      "name": "focus returns after Escape",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "staff drawer is wider than community drawer",
+      "ok": true,
+      "detail": "{\"title\":\"新增后台账户（运营员/网格员）\",\"wrapperWidth\":560,\"wrapperLeft\":1440,\"wrapperRight\":2000,\"bodyScrollWidth\":560,\"bodyClientWidth\":560,\"bodyOverflowX\":false,\"bodyScrollHeight\":794,\"bodyClientHeight\":794,\"footerVisible\":true,\"footerBottom\":900,\"viewportWidth\":1440,\"viewportHeight\":900,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "staff drawer fits 1440 viewport",
+      "ok": true,
+      "detail": "{\"title\":\"新增后台账户（运营员/网格员）\",\"wrapperWidth\":560,\"wrapperLeft\":1440,\"wrapperRight\":2000,\"bodyScrollWidth\":560,\"bodyClientWidth\":560,\"bodyOverflowX\":false,\"bodyScrollHeight\":794,\"bodyClientHeight\":794,\"footerVisible\":true,\"footerBottom\":900,\"viewportWidth\":1440,\"viewportHeight\":900,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "staff drawer exposes role and responsible community fields",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "staff form requires role and community",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "invalid staff submit keeps drawer open",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "create staff account reports success",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "created staff row comes from real API refresh",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "staff drawer focus returns to trigger",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "staff create refreshes only the staff list",
+      "ok": true,
+      "detail": "3 staff / 4 communities GETs"
+    },
+    {
+      "name": "staff create issued exactly one POST",
+      "ok": true,
+      "detail": "0 -> 1"
+    },
+    {
+      "name": "real API 409 is surfaced inside the drawer",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "failed create keeps typed username",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "failed create keeps drawer open",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "dirty drawer close asks for confirmation",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "continue editing keeps drawer open",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "continue editing keeps typed values",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "discarding a dirty form closes without creating",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "focus returns after guarded close",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "reopening after discard starts clean",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "clean cancel closes without confirmation",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "double click creates exactly one community",
+      "ok": true,
+      "detail": "[\"幸福社区\",\"验收社区-61xd5coo\",\"验收社区-63465jfc\",\"阳光社区-63465jfc\",\"验收社区-65iexfco\",\"阳光社区-65iexfco\",\"验收社区-66fk0kks\",\"阳光社区-66fk0kks\",\"验收社区-67in0jcg\",\"阳光社区-67in0jcg\",\"重复提交-67in0jcg\",\"验收社区-68i1ni30\",\"验收社区-69hd5ei0\",\"验收社区-6a9a2lcg\",\"验收社区-6bf9vnlc\",\"验收社区-6c83w7po\",\"验收社区-6dq50naw\",\"验收社区-6ffq010o\",\"验收社区-6gukl9f8\",\"阳光社区-6gukl9f8\",\"验收社区-6htmrk48\",\"阳光社区-6htmrk48\",\"重复提交-6htmrk48\",\"验收社区-6jv7od1g\",\"阳光社区-6jv7od1g\",\"重复提交-6jv7od1g\"]"
+    },
+    {
+      "name": "1024 community drawer has no overflow",
+      "ok": true,
+      "detail": "{\"title\":\"新建社区\",\"wrapperWidth\":400,\"wrapperLeft\":1024,\"wrapperRight\":1424,\"bodyScrollWidth\":400,\"bodyClientWidth\":400,\"bodyOverflowX\":false,\"bodyScrollHeight\":694,\"bodyClientHeight\":694,\"footerVisible\":true,\"footerBottom\":800,\"viewportWidth\":1024,\"viewportHeight\":800,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "1024 community drawer footer visible",
+      "ok": true,
+      "detail": "{\"title\":\"新建社区\",\"wrapperWidth\":400,\"wrapperLeft\":1024,\"wrapperRight\":1424,\"bodyScrollWidth\":400,\"bodyClientWidth\":400,\"bodyOverflowX\":false,\"bodyScrollHeight\":694,\"bodyClientHeight\":694,\"footerVisible\":true,\"footerBottom\":800,\"viewportWidth\":1024,\"viewportHeight\":800,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "1024 main page has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"scrollWidth\":1024,\"clientWidth\":1024,\"width\":1024,\"height\":800,\"left\":0,\"right\":1024,\"top\":0,\"bottom\":800,\"viewportWidth\":1024,\"viewportHeight\":800,\"documentScrollWidth\":1024,\"documentClientWidth\":1024,\"horizontalOverflow\":false}"
+    },
+    {
+      "name": "1024 staff drawer has no overflow",
+      "ok": true,
+      "detail": "{\"title\":\"新增后台账户（运营员/网格员）\",\"wrapperWidth\":560,\"wrapperLeft\":1024,\"wrapperRight\":1584,\"bodyScrollWidth\":560,\"bodyClientWidth\":560,\"bodyOverflowX\":false,\"bodyScrollHeight\":694,\"bodyClientHeight\":694,\"footerVisible\":true,\"footerBottom\":800,\"viewportWidth\":1024,\"viewportHeight\":800,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "1024 staff drawer footer visible",
+      "ok": true,
+      "detail": "{\"title\":\"新增后台账户（运营员/网格员）\",\"wrapperWidth\":560,\"wrapperLeft\":1024,\"wrapperRight\":1584,\"bodyScrollWidth\":560,\"bodyClientWidth\":560,\"bodyOverflowX\":false,\"bodyScrollHeight\":694,\"bodyClientHeight\":694,\"footerVisible\":true,\"footerBottom\":800,\"viewportWidth\":1024,\"viewportHeight\":800,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "768 community main page has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"scrollWidth\":768,\"clientWidth\":768,\"width\":768,\"height\":800,\"left\":0,\"right\":768,\"top\":0,\"bottom\":800,\"viewportWidth\":768,\"viewportHeight\":800,\"documentScrollWidth\":768,\"documentClientWidth\":768,\"horizontalOverflow\":false}"
+    },
+    {
+      "name": "768 community drawer has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"title\":\"新建社区\",\"wrapperWidth\":400,\"wrapperLeft\":768,\"wrapperRight\":1168,\"bodyScrollWidth\":400,\"bodyClientWidth\":400,\"bodyOverflowX\":false,\"bodyScrollHeight\":694,\"bodyClientHeight\":694,\"footerVisible\":true,\"footerBottom\":800,\"viewportWidth\":768,\"viewportHeight\":800,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "768 community drawer footer stays inside viewport",
+      "ok": true,
+      "detail": "{\"title\":\"新建社区\",\"wrapperWidth\":400,\"wrapperLeft\":768,\"wrapperRight\":1168,\"bodyScrollWidth\":400,\"bodyClientWidth\":400,\"bodyOverflowX\":false,\"bodyScrollHeight\":694,\"bodyClientHeight\":694,\"footerVisible\":true,\"footerBottom\":800,\"viewportWidth\":768,\"viewportHeight\":800,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "768 community drawer fits viewport width",
+      "ok": true,
+      "detail": "{\"title\":\"新建社区\",\"wrapperWidth\":400,\"wrapperLeft\":768,\"wrapperRight\":1168,\"bodyScrollWidth\":400,\"bodyClientWidth\":400,\"bodyOverflowX\":false,\"bodyScrollHeight\":694,\"bodyClientHeight\":694,\"footerVisible\":true,\"footerBottom\":800,\"viewportWidth\":768,\"viewportHeight\":800,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "768 community drawer body scrolls instead of clipping the form",
+      "ok": true,
+      "detail": "{\"title\":\"新建社区\",\"wrapperWidth\":400,\"wrapperLeft\":768,\"wrapperRight\":1168,\"bodyScrollWidth\":400,\"bodyClientWidth\":400,\"bodyOverflowX\":false,\"bodyScrollHeight\":694,\"bodyClientHeight\":694,\"footerVisible\":true,\"footerBottom\":800,\"viewportWidth\":768,\"viewportHeight\":800,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "768 community focus returns to trigger",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "768 staff main page has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"scrollWidth\":768,\"clientWidth\":768,\"width\":768,\"height\":800,\"left\":0,\"right\":768,\"top\":0,\"bottom\":800,\"viewportWidth\":768,\"viewportHeight\":800,\"documentScrollWidth\":768,\"documentClientWidth\":768,\"horizontalOverflow\":false}"
+    },
+    {
+      "name": "768 staff drawer has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"title\":\"新增后台账户（运营员/网格员）\",\"wrapperWidth\":560,\"wrapperLeft\":768,\"wrapperRight\":1328,\"bodyScrollWidth\":560,\"bodyClientWidth\":560,\"bodyOverflowX\":false,\"bodyScrollHeight\":694,\"bodyClientHeight\":694,\"footerVisible\":true,\"footerBottom\":800,\"viewportWidth\":768,\"viewportHeight\":800,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "768 staff drawer footer stays inside viewport",
+      "ok": true,
+      "detail": "{\"title\":\"新增后台账户（运营员/网格员）\",\"wrapperWidth\":560,\"wrapperLeft\":768,\"wrapperRight\":1328,\"bodyScrollWidth\":560,\"bodyClientWidth\":560,\"bodyOverflowX\":false,\"bodyScrollHeight\":694,\"bodyClientHeight\":694,\"footerVisible\":true,\"footerBottom\":800,\"viewportWidth\":768,\"viewportHeight\":800,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "768 staff drawer fits viewport width",
+      "ok": true,
+      "detail": "{\"title\":\"新增后台账户（运营员/网格员）\",\"wrapperWidth\":560,\"wrapperLeft\":768,\"wrapperRight\":1328,\"bodyScrollWidth\":560,\"bodyClientWidth\":560,\"bodyOverflowX\":false,\"bodyScrollHeight\":694,\"bodyClientHeight\":694,\"footerVisible\":true,\"footerBottom\":800,\"viewportWidth\":768,\"viewportHeight\":800,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "768 staff drawer body scrolls instead of clipping the form",
+      "ok": true,
+      "detail": "{\"title\":\"新增后台账户（运营员/网格员）\",\"wrapperWidth\":560,\"wrapperLeft\":768,\"wrapperRight\":1328,\"bodyScrollWidth\":560,\"bodyClientWidth\":560,\"bodyOverflowX\":false,\"bodyScrollHeight\":694,\"bodyClientHeight\":694,\"footerVisible\":true,\"footerBottom\":800,\"viewportWidth\":768,\"viewportHeight\":800,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "768 staff focus returns to trigger",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "767 community main page has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"scrollWidth\":767,\"clientWidth\":767,\"width\":767,\"height\":800,\"left\":0,\"right\":767,\"top\":0,\"bottom\":800,\"viewportWidth\":767,\"viewportHeight\":800,\"documentScrollWidth\":767,\"documentClientWidth\":767,\"horizontalOverflow\":false}"
+    },
+    {
+      "name": "767 community drawer has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"title\":\"新建社区\",\"wrapperWidth\":400,\"wrapperLeft\":767,\"wrapperRight\":1167,\"bodyScrollWidth\":400,\"bodyClientWidth\":400,\"bodyOverflowX\":false,\"bodyScrollHeight\":694,\"bodyClientHeight\":694,\"footerVisible\":true,\"footerBottom\":800,\"viewportWidth\":767,\"viewportHeight\":800,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "767 community drawer footer stays inside viewport",
+      "ok": true,
+      "detail": "{\"title\":\"新建社区\",\"wrapperWidth\":400,\"wrapperLeft\":767,\"wrapperRight\":1167,\"bodyScrollWidth\":400,\"bodyClientWidth\":400,\"bodyOverflowX\":false,\"bodyScrollHeight\":694,\"bodyClientHeight\":694,\"footerVisible\":true,\"footerBottom\":800,\"viewportWidth\":767,\"viewportHeight\":800,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "767 community drawer fits viewport width",
+      "ok": true,
+      "detail": "{\"title\":\"新建社区\",\"wrapperWidth\":400,\"wrapperLeft\":767,\"wrapperRight\":1167,\"bodyScrollWidth\":400,\"bodyClientWidth\":400,\"bodyOverflowX\":false,\"bodyScrollHeight\":694,\"bodyClientHeight\":694,\"footerVisible\":true,\"footerBottom\":800,\"viewportWidth\":767,\"viewportHeight\":800,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "767 community drawer body scrolls instead of clipping the form",
+      "ok": true,
+      "detail": "{\"title\":\"新建社区\",\"wrapperWidth\":400,\"wrapperLeft\":767,\"wrapperRight\":1167,\"bodyScrollWidth\":400,\"bodyClientWidth\":400,\"bodyOverflowX\":false,\"bodyScrollHeight\":694,\"bodyClientHeight\":694,\"footerVisible\":true,\"footerBottom\":800,\"viewportWidth\":767,\"viewportHeight\":800,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "767 community focus returns to trigger",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "375 community main page has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"scrollWidth\":375,\"clientWidth\":375,\"width\":375,\"height\":812,\"left\":0,\"right\":375,\"top\":0,\"bottom\":812,\"viewportWidth\":375,\"viewportHeight\":812,\"documentScrollWidth\":375,\"documentClientWidth\":375,\"horizontalOverflow\":false}"
+    },
+    {
+      "name": "375 community drawer has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"title\":\"新建社区\",\"wrapperWidth\":375,\"wrapperLeft\":375,\"wrapperRight\":750,\"bodyScrollWidth\":375,\"bodyClientWidth\":375,\"bodyOverflowX\":false,\"bodyScrollHeight\":706,\"bodyClientHeight\":706,\"footerVisible\":true,\"footerBottom\":812,\"viewportWidth\":375,\"viewportHeight\":812,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "375 community drawer footer stays inside viewport",
+      "ok": true,
+      "detail": "{\"title\":\"新建社区\",\"wrapperWidth\":375,\"wrapperLeft\":375,\"wrapperRight\":750,\"bodyScrollWidth\":375,\"bodyClientWidth\":375,\"bodyOverflowX\":false,\"bodyScrollHeight\":706,\"bodyClientHeight\":706,\"footerVisible\":true,\"footerBottom\":812,\"viewportWidth\":375,\"viewportHeight\":812,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "375 community drawer fits viewport width",
+      "ok": true,
+      "detail": "{\"title\":\"新建社区\",\"wrapperWidth\":375,\"wrapperLeft\":375,\"wrapperRight\":750,\"bodyScrollWidth\":375,\"bodyClientWidth\":375,\"bodyOverflowX\":false,\"bodyScrollHeight\":706,\"bodyClientHeight\":706,\"footerVisible\":true,\"footerBottom\":812,\"viewportWidth\":375,\"viewportHeight\":812,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "375 community drawer body scrolls instead of clipping the form",
+      "ok": true,
+      "detail": "{\"title\":\"新建社区\",\"wrapperWidth\":375,\"wrapperLeft\":375,\"wrapperRight\":750,\"bodyScrollWidth\":375,\"bodyClientWidth\":375,\"bodyOverflowX\":false,\"bodyScrollHeight\":706,\"bodyClientHeight\":706,\"footerVisible\":true,\"footerBottom\":812,\"viewportWidth\":375,\"viewportHeight\":812,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "375 community focus returns to trigger",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "375 staff main page has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"scrollWidth\":375,\"clientWidth\":375,\"width\":375,\"height\":812,\"left\":0,\"right\":375,\"top\":0,\"bottom\":812,\"viewportWidth\":375,\"viewportHeight\":812,\"documentScrollWidth\":375,\"documentClientWidth\":375,\"horizontalOverflow\":false}"
+    },
+    {
+      "name": "375 staff drawer has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"title\":\"新增后台账户（运营员/网格员）\",\"wrapperWidth\":375,\"wrapperLeft\":375,\"wrapperRight\":750,\"bodyScrollWidth\":375,\"bodyClientWidth\":375,\"bodyOverflowX\":false,\"bodyScrollHeight\":706,\"bodyClientHeight\":706,\"footerVisible\":true,\"footerBottom\":812,\"viewportWidth\":375,\"viewportHeight\":812,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "375 staff drawer footer stays inside viewport",
+      "ok": true,
+      "detail": "{\"title\":\"新增后台账户（运营员/网格员）\",\"wrapperWidth\":375,\"wrapperLeft\":375,\"wrapperRight\":750,\"bodyScrollWidth\":375,\"bodyClientWidth\":375,\"bodyOverflowX\":false,\"bodyScrollHeight\":706,\"bodyClientHeight\":706,\"footerVisible\":true,\"footerBottom\":812,\"viewportWidth\":375,\"viewportHeight\":812,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "375 staff drawer fits viewport width",
+      "ok": true,
+      "detail": "{\"title\":\"新增后台账户（运营员/网格员）\",\"wrapperWidth\":375,\"wrapperLeft\":375,\"wrapperRight\":750,\"bodyScrollWidth\":375,\"bodyClientWidth\":375,\"bodyOverflowX\":false,\"bodyScrollHeight\":706,\"bodyClientHeight\":706,\"footerVisible\":true,\"footerBottom\":812,\"viewportWidth\":375,\"viewportHeight\":812,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "375 staff drawer body scrolls instead of clipping the form",
+      "ok": true,
+      "detail": "{\"title\":\"新增后台账户（运营员/网格员）\",\"wrapperWidth\":375,\"wrapperLeft\":375,\"wrapperRight\":750,\"bodyScrollWidth\":375,\"bodyClientWidth\":375,\"bodyOverflowX\":false,\"bodyScrollHeight\":706,\"bodyClientHeight\":706,\"footerVisible\":true,\"footerBottom\":812,\"viewportWidth\":375,\"viewportHeight\":812,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "375 staff focus returns to trigger",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "320 community main page has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"scrollWidth\":320,\"clientWidth\":320,\"width\":320,\"height\":640,\"left\":0,\"right\":320,\"top\":0,\"bottom\":640,\"viewportWidth\":320,\"viewportHeight\":640,\"documentScrollWidth\":320,\"documentClientWidth\":320,\"horizontalOverflow\":false}"
+    },
+    {
+      "name": "320 community drawer has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"title\":\"新建社区\",\"wrapperWidth\":320,\"wrapperLeft\":320,\"wrapperRight\":640,\"bodyScrollWidth\":320,\"bodyClientWidth\":320,\"bodyOverflowX\":false,\"bodyScrollHeight\":534,\"bodyClientHeight\":534,\"footerVisible\":true,\"footerBottom\":640,\"viewportWidth\":320,\"viewportHeight\":640,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "320 community drawer footer stays inside viewport",
+      "ok": true,
+      "detail": "{\"title\":\"新建社区\",\"wrapperWidth\":320,\"wrapperLeft\":320,\"wrapperRight\":640,\"bodyScrollWidth\":320,\"bodyClientWidth\":320,\"bodyOverflowX\":false,\"bodyScrollHeight\":534,\"bodyClientHeight\":534,\"footerVisible\":true,\"footerBottom\":640,\"viewportWidth\":320,\"viewportHeight\":640,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "320 community drawer fits viewport width",
+      "ok": true,
+      "detail": "{\"title\":\"新建社区\",\"wrapperWidth\":320,\"wrapperLeft\":320,\"wrapperRight\":640,\"bodyScrollWidth\":320,\"bodyClientWidth\":320,\"bodyOverflowX\":false,\"bodyScrollHeight\":534,\"bodyClientHeight\":534,\"footerVisible\":true,\"footerBottom\":640,\"viewportWidth\":320,\"viewportHeight\":640,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "320 community drawer body scrolls instead of clipping the form",
+      "ok": true,
+      "detail": "{\"title\":\"新建社区\",\"wrapperWidth\":320,\"wrapperLeft\":320,\"wrapperRight\":640,\"bodyScrollWidth\":320,\"bodyClientWidth\":320,\"bodyOverflowX\":false,\"bodyScrollHeight\":534,\"bodyClientHeight\":534,\"footerVisible\":true,\"footerBottom\":640,\"viewportWidth\":320,\"viewportHeight\":640,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "320 community focus returns to trigger",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "320 staff main page has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"scrollWidth\":320,\"clientWidth\":320,\"width\":320,\"height\":640,\"left\":0,\"right\":320,\"top\":0,\"bottom\":640,\"viewportWidth\":320,\"viewportHeight\":640,\"documentScrollWidth\":320,\"documentClientWidth\":320,\"horizontalOverflow\":false}"
+    },
+    {
+      "name": "320 staff drawer has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"title\":\"新增后台账户（运营员/网格员）\",\"wrapperWidth\":320,\"wrapperLeft\":320,\"wrapperRight\":640,\"bodyScrollWidth\":305,\"bodyClientWidth\":305,\"bodyOverflowX\":false,\"bodyScrollHeight\":569,\"bodyClientHeight\":510,\"footerVisible\":true,\"footerBottom\":640,\"viewportWidth\":320,\"viewportHeight\":640,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "320 staff drawer footer stays inside viewport",
+      "ok": true,
+      "detail": "{\"title\":\"新增后台账户（运营员/网格员）\",\"wrapperWidth\":320,\"wrapperLeft\":320,\"wrapperRight\":640,\"bodyScrollWidth\":305,\"bodyClientWidth\":305,\"bodyOverflowX\":false,\"bodyScrollHeight\":569,\"bodyClientHeight\":510,\"footerVisible\":true,\"footerBottom\":640,\"viewportWidth\":320,\"viewportHeight\":640,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "320 staff drawer fits viewport width",
+      "ok": true,
+      "detail": "{\"title\":\"新增后台账户（运营员/网格员）\",\"wrapperWidth\":320,\"wrapperLeft\":320,\"wrapperRight\":640,\"bodyScrollWidth\":305,\"bodyClientWidth\":305,\"bodyOverflowX\":false,\"bodyScrollHeight\":569,\"bodyClientHeight\":510,\"footerVisible\":true,\"footerBottom\":640,\"viewportWidth\":320,\"viewportHeight\":640,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "320 staff drawer body scrolls instead of clipping the form",
+      "ok": true,
+      "detail": "{\"title\":\"新增后台账户（运营员/网格员）\",\"wrapperWidth\":320,\"wrapperLeft\":320,\"wrapperRight\":640,\"bodyScrollWidth\":305,\"bodyClientWidth\":305,\"bodyOverflowX\":false,\"bodyScrollHeight\":569,\"bodyClientHeight\":510,\"footerVisible\":true,\"footerBottom\":640,\"viewportWidth\":320,\"viewportHeight\":640,\"documentOverflowX\":false}"
+    },
+    {
+      "name": "320 staff focus returns to trigger",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "grid worker API login succeeds",
+      "ok": true,
+      "detail": "{\"id\":\"19763716-44ac-4f70-82aa-91041fd3a8c9\",\"username\":\"grid.6jv7od1g\",\"role\":\"grid_worker\",\"communities\":[{\"id\":\"2ed4df2a-4d00-41e0-bc8e-acc37148946d\",\"name\":\"验收社区-6jv7od1g\"}]}"
+    },
+    {
+      "name": "grid worker sees only assigned communities",
+      "ok": true,
+      "detail": "{\"items\":[{\"id\":\"2ed4df2a-4d00-41e0-bc8e-acc37148946d\",\"name\":\"验收社区-6jv7od1g\"}]}"
+    },
+    {
+      "name": "server rejects worker community create with 403",
+      "ok": true,
+      "detail": "{\"status\":403,\"body\":{\"error\":{\"code\":\"forbidden\",\"message\":\"只有管理员可以创建社区\",\"requestId\":\"66e17195-4066-4728-8f1e-c8a6c2006211\"}}}"
+    },
+    {
+      "name": "server rejects worker staff create with 403",
+      "ok": true,
+      "detail": "{\"status\":403,\"body\":{\"error\":{\"code\":\"forbidden\",\"message\":\"只有管理员可以创建后台账户\",\"requestId\":\"15aec329-1b3e-4766-a993-d10a222240e2\"}}}"
+    },
+    {
+      "name": "server rejects anonymous admin read with 401",
+      "ok": true,
+      "detail": "{\"status\":401,\"body\":{\"error\":{\"code\":\"unauthorized\",\"message\":\"请先登录管理后台\",\"requestId\":\"8daddac5-a158-4cea-ba25-2c75cc0b0014\"}}}"
+    },
+    {
+      "name": "grid worker UI hides 新建社区",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "grid worker UI hides 新增账户",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "grid worker UI mounts no admin drawer",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "grid worker sees assigned community only",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "passed": 102,
+  "failed": 0,
+  "requests": [
+    {
+      "url": "http://localhost:5474/communities",
+      "method": "GET",
+      "timestamp": 17791.467454
+    },
+    {
+      "url": "http://localhost:5474/@vite/client",
+      "method": "GET",
+      "timestamp": 17791.476146
+    },
+    {
+      "url": "http://localhost:5474/src/main.tsx",
+      "method": "GET",
+      "timestamp": 17791.476465
+    },
+    {
+      "url": "http://localhost:5474/@react-refresh",
+      "method": "GET",
+      "timestamp": 17791.479046
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/antd.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17791.487278
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/antd_locale_zh___CN.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17791.487369
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/react.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17791.48743
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/react-dom_client.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17791.4875
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/react-router.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17791.487575
+    },
+    {
+      "url": "http://localhost:5474/src/App.tsx",
+      "method": "GET",
+      "timestamp": 17791.487646
+    },
+    {
+      "url": "http://localhost:5474/src/app/theme.ts",
+      "method": "GET",
+      "timestamp": 17791.487712
+    },
+    {
+      "url": "http://localhost:5474/src/index.css",
+      "method": "GET",
+      "timestamp": 17791.487836
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17791.487945
+    },
+    {
+      "url": "http://localhost:5474/@fs/E:/tomz/local-life-wt/ui-007/node_modules/.pnpm/vite@8.3.4_@types+node@24.1_31550c061482022cb50f0774f2c55186/node_modules/vite/dist/client/env.mjs",
+      "method": "GET",
+      "timestamp": 17791.489778
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/rolldown-runtime-SbdDWaPq.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17791.585339
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/react-XU9BOcOH.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17791.590834
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/client-CtF9ocLn.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17791.591173
+    },
+    {
+      "url": "http://localhost:5474/src/app/auth-context.tsx",
+      "method": "GET",
+      "timestamp": 17791.613391
+    },
+    {
+      "url": "http://localhost:5474/src/app/routes.tsx",
+      "method": "GET",
+      "timestamp": 17791.613491
+    },
+    {
+      "url": "http://localhost:5474/src/pages/LoginPage.tsx",
+      "method": "GET",
+      "timestamp": 17791.613574
+    },
+    {
+      "url": "http://localhost:5474/src/shared/lib/work-tabs.ts",
+      "method": "GET",
+      "timestamp": 17791.613639
+    },
+    {
+      "url": "http://localhost:5474/src/services/auth.ts",
+      "method": "GET",
+      "timestamp": 17791.613703
+    },
+    {
+      "url": "http://localhost:5474/src/layouts/AdminLayout.tsx",
+      "method": "GET",
+      "timestamp": 17791.644928
+    },
+    {
+      "url": "http://localhost:5474/src/pages/ActivitiesPage.tsx",
+      "method": "GET",
+      "timestamp": 17791.645042
+    },
+    {
+      "url": "http://localhost:5474/src/pages/ActivityCheckinPage.tsx",
+      "method": "GET",
+      "timestamp": 17791.645121
+    },
+    {
+      "url": "http://localhost:5474/src/pages/ComponentPreviewPage.tsx",
+      "method": "GET",
+      "timestamp": 17791.645203
+    },
+    {
+      "url": "http://localhost:5474/src/pages/CrmPage.tsx",
+      "method": "GET",
+      "timestamp": 17791.645271
+    },
+    {
+      "url": "http://localhost:5474/src/pages/DashboardPage.tsx",
+      "method": "GET",
+      "timestamp": 17791.64533
+    },
+    {
+      "url": "http://localhost:5474/src/pages/NotFoundPage.tsx",
+      "method": "GET",
+      "timestamp": 17791.645395
+    },
+    {
+      "url": "http://localhost:5474/src/pages/PlaceholderPage.tsx",
+      "method": "GET",
+      "timestamp": 17791.645457
+    },
+    {
+      "url": "http://localhost:5474/src/pages/UsersPage.tsx",
+      "method": "GET",
+      "timestamp": 17791.645514
+    },
+    {
+      "url": "http://localhost:5474/src/pages/SystemInfoPage.tsx",
+      "method": "GET",
+      "timestamp": 17791.645571
+    },
+    {
+      "url": "http://localhost:5474/src/app/shell/navigation.ts",
+      "method": "GET",
+      "timestamp": 17791.645668
+    },
+    {
+      "url": "http://localhost:5474/@fs/E:/tomz/local-life-wt/ui-007/packages/contracts/dist/index.js",
+      "method": "GET",
+      "timestamp": 17791.64593
+    },
+    {
+      "url": "http://localhost:5474/src/app/shell/AppShell.tsx",
+      "method": "GET",
+      "timestamp": 17791.654658
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/@ant-design_icons.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17791.659569
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/dayjs.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17791.659719
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/dayjs_plugin_utc.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17791.659832
+    },
+    {
+      "url": "http://localhost:5474/src/components/PageHeader.tsx",
+      "method": "GET",
+      "timestamp": 17791.659906
+    },
+    {
+      "url": "http://localhost:5474/src/shared/components/DataPanel.tsx",
+      "method": "GET",
+      "timestamp": 17791.659965
+    },
+    {
+      "url": "http://localhost:5474/src/services/activities.ts",
+      "method": "GET",
+      "timestamp": 17791.66003
+    },
+    {
+      "url": "http://localhost:5474/src/pages/activities.css",
+      "method": "GET",
+      "timestamp": 17791.660105
+    },
+    {
+      "url": "http://localhost:5474/src/services/rewards.ts",
+      "method": "GET",
+      "timestamp": 17791.669349
+    },
+    {
+      "url": "http://localhost:5474/src/services/crm.ts",
+      "method": "GET",
+      "timestamp": 17791.670034
+    },
+    {
+      "url": "http://localhost:5474/src/pages/crm.css",
+      "method": "GET",
+      "timestamp": 17791.670132
+    },
+    {
+      "url": "http://localhost:5474/src/services/api.ts",
+      "method": "GET",
+      "timestamp": 17791.677842
+    },
+    {
+      "url": "http://localhost:5474/src/pages/users.css",
+      "method": "GET",
+      "timestamp": 17791.677986
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/zod.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17791.679104
+    },
+    {
+      "url": "http://localhost:5474/@fs/E:/tomz/local-life-wt/ui-007/packages/contracts/dist/rewards.js",
+      "method": "GET",
+      "timestamp": 17791.679195
+    },
+    {
+      "url": "http://localhost:5474/@fs/E:/tomz/local-life-wt/ui-007/packages/contracts/dist/crmeb.js",
+      "method": "GET",
+      "timestamp": 17791.679361
+    },
+    {
+      "url": "http://localhost:5474/src/app/shell/AppSidebar.tsx",
+      "method": "GET",
+      "timestamp": 17791.67952
+    },
+    {
+      "url": "http://localhost:5474/src/app/shell/shell.css",
+      "method": "GET",
+      "timestamp": 17791.679605
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/react-dom-DHbhrdcq.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17791.694433
+    },
+    {
+      "url": "http://localhost:5474/src/shared/lib/data-panel-state.ts",
+      "method": "GET",
+      "timestamp": 17791.718285
+    },
+    {
+      "url": "http://localhost:5474/src/shared/lib/data-panel-prefs.ts",
+      "method": "GET",
+      "timestamp": 17791.718393
+    },
+    {
+      "url": "http://localhost:5474/src/shared/components/DataPanel.css",
+      "method": "GET",
+      "timestamp": 17791.718462
+    },
+    {
+      "url": "http://localhost:5474/src/app/shell/sidebar.css",
+      "method": "GET",
+      "timestamp": 17791.769786
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/ZoomOutOutlined-Dgo1fEkL.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17791.804901
+    },
+    {
+      "url": "http://localhost:5474/api/auth/session",
+      "method": "GET",
+      "timestamp": 17792.063944
+    },
+    {
+      "url": "http://localhost:5474/api/auth/session",
+      "method": "GET",
+      "timestamp": 17792.065583
+    },
+    {
+      "url": "http://localhost:5474/api/admin/communities",
+      "method": "GET",
+      "timestamp": 17792.383269
+    },
+    {
+      "url": "http://localhost:5474/api/admin/communities",
+      "method": "GET",
+      "timestamp": 17792.394474
+    },
+    {
+      "url": "http://localhost:5474/api/admin/staff",
+      "method": "GET",
+      "timestamp": 17792.541601
+    },
+    {
+      "url": "http://localhost:5474/api/admin/staff",
+      "method": "GET",
+      "timestamp": 17792.541899
+    },
+    {
+      "url": "http://localhost:5474/api/crm/residents?communityId=3e269e96-1e00-4506-8d68-b5f6cee26f2b",
+      "method": "GET",
+      "timestamp": 17792.579676
+    },
+    {
+      "url": "http://localhost:5474/api/admin/communities",
+      "method": "POST",
+      "timestamp": 17794.000965
+    },
+    {
+      "url": "http://localhost:5474/api/admin/communities",
+      "method": "GET",
+      "timestamp": 17794.067514
+    },
+    {
+      "url": "http://localhost:5474/api/admin/communities",
+      "method": "POST",
+      "timestamp": 17795.98691
+    },
+    {
+      "url": "http://localhost:5474/api/admin/communities",
+      "method": "GET",
+      "timestamp": 17796.044872
+    },
+    {
+      "url": "http://localhost:5474/api/admin/staff",
+      "method": "POST",
+      "timestamp": 17801.425897
+    },
+    {
+      "url": "http://localhost:5474/api/admin/staff",
+      "method": "GET",
+      "timestamp": 17801.525732
+    },
+    {
+      "url": "http://localhost:5474/api/admin/staff",
+      "method": "POST",
+      "timestamp": 17803.927078
+    },
+    {
+      "url": "http://localhost:5474/api/admin/communities",
+      "method": "POST",
+      "timestamp": 17805.661634
+    },
+    {
+      "url": "http://localhost:5474/api/admin/communities",
+      "method": "GET",
+      "timestamp": 17805.743687
+    },
+    {
+      "url": "http://localhost:5474/communities",
+      "method": "GET",
+      "timestamp": 17814.169725
+    },
+    {
+      "url": "http://localhost:5474/@vite/client",
+      "method": "GET",
+      "timestamp": 17814.179804
+    },
+    {
+      "url": "http://localhost:5474/src/main.tsx",
+      "method": "GET",
+      "timestamp": 17814.180048
+    },
+    {
+      "url": "http://localhost:5474/@react-refresh",
+      "method": "GET",
+      "timestamp": 17814.182968
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/antd.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17814.183826
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/antd_locale_zh___CN.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17814.183918
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/react.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17814.183982
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/react-dom_client.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17814.184042
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/react-router.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17814.184113
+    },
+    {
+      "url": "http://localhost:5474/src/App.tsx",
+      "method": "GET",
+      "timestamp": 17814.184182
+    },
+    {
+      "url": "http://localhost:5474/src/app/theme.ts",
+      "method": "GET",
+      "timestamp": 17814.184266
+    },
+    {
+      "url": "http://localhost:5474/src/index.css",
+      "method": "GET",
+      "timestamp": 17814.184327
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17814.184414
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/rolldown-runtime-SbdDWaPq.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17814.184852
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/react-XU9BOcOH.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17814.184962
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/client-CtF9ocLn.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17814.185082
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/react-dom-DHbhrdcq.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17814.185198
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/ZoomOutOutlined-Dgo1fEkL.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17814.185307
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/dayjs.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17814.185408
+    },
+    {
+      "url": "http://localhost:5474/@fs/E:/tomz/local-life-wt/ui-007/node_modules/.pnpm/vite@8.3.4_@types+node@24.1_31550c061482022cb50f0774f2c55186/node_modules/vite/dist/client/env.mjs",
+      "method": "GET",
+      "timestamp": 17814.186248
+    },
+    {
+      "url": "http://localhost:5474/src/app/auth-context.tsx",
+      "method": "GET",
+      "timestamp": 17814.188977
+    },
+    {
+      "url": "http://localhost:5474/src/app/routes.tsx",
+      "method": "GET",
+      "timestamp": 17814.18907
+    },
+    {
+      "url": "http://localhost:5474/src/pages/LoginPage.tsx",
+      "method": "GET",
+      "timestamp": 17814.189137
+    },
+    {
+      "url": "http://localhost:5474/src/shared/lib/work-tabs.ts",
+      "method": "GET",
+      "timestamp": 17814.189196
+    },
+    {
+      "url": "http://localhost:5474/src/services/auth.ts",
+      "method": "GET",
+      "timestamp": 17814.189254
+    },
+    {
+      "url": "http://localhost:5474/src/layouts/AdminLayout.tsx",
+      "method": "GET",
+      "timestamp": 17814.195177
+    },
+    {
+      "url": "http://localhost:5474/src/pages/ActivitiesPage.tsx",
+      "method": "GET",
+      "timestamp": 17814.195316
+    },
+    {
+      "url": "http://localhost:5474/src/pages/ActivityCheckinPage.tsx",
+      "method": "GET",
+      "timestamp": 17814.195606
+    },
+    {
+      "url": "http://localhost:5474/src/pages/ComponentPreviewPage.tsx",
+      "method": "GET",
+      "timestamp": 17814.19569
+    },
+    {
+      "url": "http://localhost:5474/src/pages/CrmPage.tsx",
+      "method": "GET",
+      "timestamp": 17814.195755
+    },
+    {
+      "url": "http://localhost:5474/src/pages/DashboardPage.tsx",
+      "method": "GET",
+      "timestamp": 17814.195815
+    },
+    {
+      "url": "http://localhost:5474/src/pages/NotFoundPage.tsx",
+      "method": "GET",
+      "timestamp": 17814.195874
+    },
+    {
+      "url": "http://localhost:5474/src/pages/PlaceholderPage.tsx",
+      "method": "GET",
+      "timestamp": 17814.195943
+    },
+    {
+      "url": "http://localhost:5474/src/pages/UsersPage.tsx",
+      "method": "GET",
+      "timestamp": 17814.195998
+    },
+    {
+      "url": "http://localhost:5474/src/pages/SystemInfoPage.tsx",
+      "method": "GET",
+      "timestamp": 17814.196049
+    },
+    {
+      "url": "http://localhost:5474/src/app/shell/navigation.ts",
+      "method": "GET",
+      "timestamp": 17814.196115
+    },
+    {
+      "url": "http://localhost:5474/@fs/E:/tomz/local-life-wt/ui-007/packages/contracts/dist/index.js",
+      "method": "GET",
+      "timestamp": 17814.196391
+    },
+    {
+      "url": "http://localhost:5474/src/app/shell/AppShell.tsx",
+      "method": "GET",
+      "timestamp": 17814.202376
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/@ant-design_icons.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17814.208446
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/dayjs_plugin_utc.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17814.208572
+    },
+    {
+      "url": "http://localhost:5474/src/components/PageHeader.tsx",
+      "method": "GET",
+      "timestamp": 17814.208687
+    },
+    {
+      "url": "http://localhost:5474/src/shared/components/DataPanel.tsx",
+      "method": "GET",
+      "timestamp": 17814.208789
+    },
+    {
+      "url": "http://localhost:5474/src/services/activities.ts",
+      "method": "GET",
+      "timestamp": 17814.208872
+    },
+    {
+      "url": "http://localhost:5474/src/pages/activities.css",
+      "method": "GET",
+      "timestamp": 17814.208946
+    },
+    {
+      "url": "http://localhost:5474/src/services/api.ts",
+      "method": "GET",
+      "timestamp": 17814.210557
+    },
+    {
+      "url": "http://localhost:5474/src/services/rewards.ts",
+      "method": "GET",
+      "timestamp": 17814.210678
+    },
+    {
+      "url": "http://localhost:5474/src/pages/users.css",
+      "method": "GET",
+      "timestamp": 17814.21106
+    },
+    {
+      "url": "http://localhost:5474/src/services/crm.ts",
+      "method": "GET",
+      "timestamp": 17814.211198
+    },
+    {
+      "url": "http://localhost:5474/src/pages/crm.css",
+      "method": "GET",
+      "timestamp": 17814.211274
+    },
+    {
+      "url": "http://localhost:5474/node_modules/.vite/deps/zod.js?v=daf0a82f",
+      "method": "GET",
+      "timestamp": 17814.211442
+    },
+    {
+      "url": "http://localhost:5474/@fs/E:/tomz/local-life-wt/ui-007/packages/contracts/dist/rewards.js",
+      "method": "GET",
+      "timestamp": 17814.211683
+    },
+    {
+      "url": "http://localhost:5474/@fs/E:/tomz/local-life-wt/ui-007/packages/contracts/dist/crmeb.js",
+      "method": "GET",
+      "timestamp": 17814.211749
+    },
+    {
+      "url": "http://localhost:5474/src/app/shell/AppSidebar.tsx",
+      "method": "GET",
+      "timestamp": 17814.212172
+    },
+    {
+      "url": "http://localhost:5474/src/app/shell/shell.css",
+      "method": "GET",
+      "timestamp": 17814.21228
+    },
+    {
+      "url": "http://localhost:5474/src/shared/lib/data-panel-state.ts",
+      "method": "GET",
+      "timestamp": 17814.223374
+    },
+    {
+      "url": "http://localhost:5474/src/shared/lib/data-panel-prefs.ts",
+      "method": "GET",
+      "timestamp": 17814.223468
+    },
+    {
+      "url": "http://localhost:5474/src/shared/components/DataPanel.css",
+      "method": "GET",
+      "timestamp": 17814.223588
+    },
+    {
+      "url": "http://localhost:5474/src/app/shell/sidebar.css",
+      "method": "GET",
+      "timestamp": 17814.224506
+    },
+    {
+      "url": "http://localhost:5474/api/auth/session",
+      "method": "GET",
+      "timestamp": 17814.400567
+    },
+    {
+      "url": "http://localhost:5474/api/auth/session",
+      "method": "GET",
+      "timestamp": 17814.401444
+    },
+    {
+      "url": "http://localhost:5474/api/admin/communities",
+      "method": "GET",
+      "timestamp": 17814.586507
+    },
+    {
+      "url": "http://localhost:5474/api/crm/residents?communityId=2ed4df2a-4d00-41e0-bc8e-acc37148946d",
+      "method": "GET",
+      "timestamp": 17814.587151
+    },
+    {
+      "url": "http://localhost:5474/api/admin/communities",
+      "method": "GET",
+      "timestamp": 17814.59331
+    },
+    {
+      "url": "http://localhost:5474/api/crm/residents?communityId=2ed4df2a-4d00-41e0-bc8e-acc37148946d",
+      "method": "GET",
+      "timestamp": 17814.593665
+    }
+  ]
+}
