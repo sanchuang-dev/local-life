@@ -1,0 +1,30 @@
+/* /communities (#91): data-first layout with creation forms in local Drawers. */
+
+.users-drawer .ant-drawer-content-wrapper {
+  /* Ant Design applies the requested width inline; this keeps split viewports
+     and phones from overflowing. 100% (not 100vw) avoids the desktop scrollbar
+     width pushing the panel past the viewport edge. */
+  max-width: 100%;
+}
+
+.users-drawer .ant-drawer-body {
+  overflow-x: hidden;
+}
+
+.users-drawer-error,
+.users-drawer-hint {
+  margin-bottom: 16px;
+}
+
+.users-drawer-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 575px) {
+  .users-drawer-footer .ant-btn {
+    flex: 1 1 auto;
+  }
+}

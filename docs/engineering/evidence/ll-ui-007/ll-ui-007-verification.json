@@ -1,0 +1,139 @@
+{
+  "community": "E2E社区1105071110",
+  "staff": "e2e.grid.1105071110",
+  "operator": "e2e.ops.1105071110",
+  "results": [
+    {
+      "name": "登录真实管理员会话",
+      "ok": true,
+      "detail": "e2eadmin",
+      "at": "2026-11-05T07:11:11.949Z"
+    },
+    {
+      "name": "主区域先显示社区/账户/居民数据与新建入口",
+      "ok": true,
+      "detail": "现有社区=3",
+      "at": "2026-11-05T07:11:12.478Z"
+    },
+    {
+      "name": "创建社区真实表单：空名称被校验拦截",
+      "ok": true,
+      "at": "2026-11-05T07:11:13.655Z"
+    },
+    {
+      "name": "创建社区真实表单：去除首尾空格后长度非法被拦截",
+      "ok": true,
+      "at": "2026-11-05T07:11:13.891Z"
+    },
+    {
+      "name": "真实 API 创建社区后列表刷新",
+      "ok": true,
+      "detail": "3 -> 4",
+      "at": "2026-11-05T07:11:15.053Z"
+    },
+    {
+      "name": "创建后保留滚动上下文",
+      "ok": true,
+      "detail": "scrollTop 177 -> 177",
+      "at": "2026-11-05T07:11:15.053Z"
+    },
+    {
+      "name": "创建后当前选中社区未被重置",
+      "ok": true,
+      "detail": "当前选中=E2E社区1105065507",
+      "at": "2026-11-05T07:11:15.054Z"
+    },
+    {
+      "name": "脏表单关闭确认：继续编辑保留输入",
+      "ok": true,
+      "detail": "未保存社区X",
+      "at": "2026-11-05T07:11:15.636Z"
+    },
+    {
+      "name": "关闭后焦点返回触发按钮",
+      "ok": true,
+      "detail": "{\"tag\":\"BUTTON\",\"text\":\"新建社区\"}",
+      "at": "2026-11-05T07:11:16.151Z"
+    },
+    {
+      "name": "真实 API 创建后台账户（角色+负责社区）并刷新列表",
+      "ok": true,
+      "detail": "e2e.grid.1105071110",
+      "at": "2026-11-05T07:11:18.301Z"
+    },
+    {
+      "name": "真实 API 失败时保留输入并显示服务端错误",
+      "ok": true,
+      "detail": "登录账号=e2e.grid.1105071110",
+      "at": "2026-11-05T07:11:19.417Z"
+    },
+    {
+      "name": "后台账户脏表单关闭确认可用",
+      "ok": true,
+      "at": "2026-11-05T07:11:20.230Z"
+    },
+    {
+      "name": "1024 宽度下 Drawer 不横向溢出",
+      "ok": true,
+      "detail": "scrollWidth=1024 right=1024",
+      "at": "2026-11-05T07:11:21.077Z"
+    },
+    {
+      "name": "768 宽度下 Drawer 底部操作可见且不溢出",
+      "ok": true,
+      "detail": "scrollWidth=768 buttons=2",
+      "at": "2026-11-05T07:11:22.443Z"
+    },
+    {
+      "name": "375 宽度下页面与社区 Drawer 不横向溢出、底部操作可见",
+      "ok": true,
+      "detail": "page=375 drawer=375 right=375 buttons=2",
+      "at": "2026-11-05T07:11:23.826Z"
+    },
+    {
+      "name": "375 宽度下宽 Drawer 可滚动、不横向溢出、底部操作可见",
+      "ok": true,
+      "detail": "{\"scrollWidth\":375,\"body\":{\"scrollHeight\":706,\"clientHeight\":706,\"overflowX\":\"hidden\"}}",
+      "at": "2026-11-05T07:11:25.129Z"
+    },
+    {
+      "name": "管理员可创建非管理员账户",
+      "ok": true,
+      "detail": "e2e.ops.1105071110",
+      "at": "2026-11-05T07:11:26.767Z"
+    },
+    {
+      "name": "非管理员 UI 不显示管理写入入口",
+      "ok": true,
+      "detail": "{\"hasCreateCommunity\":false,\"hasCreateStaff\":false,\"hasStaffCard\":false,\"bodyHasRoleTag\":true}",
+      "at": "2026-11-05T07:11:28.754Z"
+    },
+    {
+      "name": "服务端对非管理员写请求返回真实 403",
+      "ok": true,
+      "detail": "{\"status\":403,\"body\":{\"error\":{\"code\":\"forbidden\",\"message\":\"只有管理员可以创建社区\",\"requestId\":\"d4c25050-42ea-405c-8f98-bb0ff4a84e7a\"}}}",
+      "at": "2026-11-05T07:11:28.763Z"
+    },
+    {
+      "name": "浏览器 console 无未预期的运行时错误",
+      "ok": true,
+      "detail": "已忽略既有 antd 弃用警告 3 条（App.tsx Spin tip，非本卡范围）",
+      "at": "2026-11-05T07:11:28.799Z"
+    }
+  ],
+  "shots": [
+    "01-communities-1440-initial.png",
+    "02-community-drawer-1440.png",
+    "03-community-validation-1440.png",
+    "04-community-created-1440.png",
+    "05-community-close-confirm-1440.png",
+    "06-staff-drawer-1440.png",
+    "07-staff-created-1440.png",
+    "08-staff-duplicate-error-1440.png",
+    "09-staff-drawer-1024.png",
+    "10-staff-drawer-768.png",
+    "11-community-drawer-375.png",
+    "12-staff-drawer-375.png",
+    "13-operator-readonly-1440.png"
+  ]
+}
