@@ -1,5 +1,8 @@
-import { AlertTriangle, CheckCircle2, MessageCircle, RefreshCw, ShieldCheck } from 'lucide-react'
+import { useState } from 'react'
+import { AlertTriangle, MessageCircle, RefreshCw, ShieldCheck } from 'lucide-react'
+import { presentLoginMarker } from '@sanchuang-dev/local-life-contracts'
 import { useActivityLoginReturn } from '../../hooks/useActivityLoginReturn'
+import { activityLoginMarker, type ActivityLoginResult } from './loginReturn'
 
 type ActivityLoginCardProps = {
   activityId: string | null
@@ -7,6 +10,11 @@ type ActivityLoginCardProps = {
   inviteCode: string | null
   /** The deep link carried an invite value that failed contract validation. */
   inviteInvalid: boolean
+  /**
+   * One-off login marker snapshot, captured by the page before the URL cleanup
+   * (#92). Only the failure marker is presented here.
+   */
+  loginResult: ActivityLoginResult
 }
 
 const primaryButtonClassName =
@@ -24,37 +32,39 @@ const primaryButtonClassName =
  *
  * A denied or failed authorization always offers "重新发起登录"; nothing here
  * joins the activity — participation still needs an explicit confirm below.
+ *
+ * This card only exists while the session is unauthenticated, so it never
+ * presents a success: `?auth=success` on a browser without a session shows the
+ * normal login entry. Success belongs to the authenticated branch
+ * (`ActivityLoginSuccessNotice`), gated on the server-confirmed session.
  */
 export function ActivityLoginCard({
   activityId,
   inviteCode,
   inviteInvalid,
+  loginResult,
 }: ActivityLoginCardProps) {
   const login = useActivityLoginReturn({ activityId, inviteCode, inviteInvalid })
-  const { availability, loginResult, pendingContext } = login
+  const { availability, pendingContext } = login
+  const [dismissed, setDismissed] = useState(false)
+  // `false` is the session state this card mounts in: a success marker is never
+  // presented here, only a failure the resident can retry.
+  const marker = dismissed ? null : activityLoginMarker(loginResult)
+  const errorMessage =
+    presentLoginMarker(marker, false, false) === 'error' && loginResult?.status === 'error'
+      ? loginResult.message
+      : null
 
   return (
     <div className="mt-3 grid gap-2" aria-label="微信登录">
-      {loginResult?.status === 'success' ? (
-        <p
-          role="status"
-          className="flex items-start gap-2 rounded-[12px] bg-[#eef7f2] px-3 py-2.5 text-[12px] leading-5 text-[#1f6b51]"
-        >
-          <CheckCircle2 size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
-          <span className="min-w-0">
-            微信登录成功。页面不会自动报名，参与仍需你在下方主动确认。
-          </span>
-        </p>
-      ) : null}
-
-      {loginResult?.status === 'error' ? (
+      {errorMessage ? (
         <div
           role="alert"
           className="rounded-[12px] bg-[#fff1ee] px-3 py-2.5 text-[12px] leading-5 text-rose-700"
         >
           <p className="flex items-start gap-2">
             <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
-            <span className="min-w-0 break-words">{loginResult.message}</span>
+            <span className="min-w-0 break-words">{errorMessage}</span>
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             <button
@@ -67,7 +77,7 @@ export function ActivityLoginCard({
             </button>
             <button
               type="button"
-              onClick={login.dismissLoginResult}
+              onClick={() => setDismissed(true)}
               className="inline-flex min-h-[44px] items-center rounded-full px-3 text-[12px] font-semibold text-slate-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
             >
               稍后再说

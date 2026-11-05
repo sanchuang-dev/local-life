@@ -135,13 +135,17 @@ test('WeChat login returns to the activity invite link and never auto-joins it',
       { headers: { cookie: `${nonceCookie}; ${returnCookie}` } },
     )
     assert.equal(callback.status, 302)
+    const callbackLocation = callback.headers.get('location')!
     assert.equal(
-      callback.headers.get('location'),
-      `https://local-life.example.test${activityReturnTo(activityId)}&auth=success`,
+      callbackLocation,
+      `https://local-life.example.test${activityReturnTo(activityId)}&auth=success#`,
     )
     // Clean history path: BrowserRouter (base `/`) must not receive a `/#/` hash.
-    assert.equal(new URL(callback.headers.get('location')!).hash, '')
-    assert.equal(new URL(callback.headers.get('location')!).searchParams.get('invite'), INVITE_CODE)
+    // The explicit empty fragment is what stops the browser from keeping WeChat's
+    // `#wechat_redirect` (a redirect without a fragment inherits the old one).
+    assert.equal(new URL(callbackLocation).hash, '')
+    assert.ok(callbackLocation.endsWith('#'))
+    assert.equal(new URL(callbackLocation).searchParams.get('invite'), INVITE_CODE)
     assert.ok(hasSessionCookie(callback))
     // Both attempt cookies are burned together with the state.
     assert.equal(cookieValue(callback, 'll_oauth_nonce'), '')
@@ -220,7 +224,7 @@ test('callback fails on missing nonce, tampered state and expired state without 
     )
     assert.equal(
       missingNonce.headers.get('location'),
-      `https://local-life.example.test${activityReturnTo(activityId)}&auth_error=wechat_state_invalid`,
+      `https://local-life.example.test${activityReturnTo(activityId)}&auth_error=wechat_state_invalid#`,
     )
     const wrongNonce = await context.app.request(
       `/auth/wechat/callback?state=${state}&code=oauth-code`,
@@ -228,7 +232,7 @@ test('callback fails on missing nonce, tampered state and expired state without 
     )
     assert.equal(
       wrongNonce.headers.get('location'),
-      `https://local-life.example.test${activityReturnTo(activityId)}&auth_error=wechat_state_invalid`,
+      `https://local-life.example.test${activityReturnTo(activityId)}&auth_error=wechat_state_invalid#`,
     )
 
     // Tampered state: it no longer hashes to the stored record, and the cookie is
@@ -251,7 +255,7 @@ test('callback fails on missing nonce, tampered state and expired state without 
     )
     assert.equal(
       expired.headers.get('location'),
-      `https://local-life.example.test${activityReturnTo(activityId)}&auth_error=wechat_state_invalid`,
+      `https://local-life.example.test${activityReturnTo(activityId)}&auth_error=wechat_state_invalid#`,
     )
 
     for (const response of [missingNonce, wrongNonce, tampered, expired]) {
@@ -291,7 +295,7 @@ test('a consumed state cannot be replayed and the second callback gets no sessio
     )
     assert.equal(
       replay.headers.get('location'),
-      `https://local-life.example.test${activityReturnTo(activityId)}&auth_error=wechat_state_invalid`,
+      `https://local-life.example.test${activityReturnTo(activityId)}&auth_error=wechat_state_invalid#`,
     )
     assert.equal(hasSessionCookie(replay), false)
     // The provider is never asked twice for the same code.
@@ -374,7 +378,7 @@ test('denying the authorization returns to the activity with a retryable error a
     )
     assert.equal(
       denied.headers.get('location'),
-      `https://local-life.example.test${activityReturnTo(activityId)}&auth_error=wechat_authorization_failed`,
+      `https://local-life.example.test${activityReturnTo(activityId)}&auth_error=wechat_authorization_failed#`,
     )
     assert.equal(hasSessionCookie(denied), false)
     assert.equal(cookieValue(denied, 'll_oauth_nonce'), '')
@@ -437,7 +441,47 @@ test('the GitHub Pages hash router keeps the activity route in the hash with its
     assert.equal(destination.origin, 'https://sanchuang-dev.github.io')
     assert.equal(destination.pathname, '/local-life/')
     assert.equal(destination.hash, `#${returnTo}&auth=success`)
+    // A hash target already owns the fragment, so it needs no extra empty one.
+    assert.equal(destination.href.endsWith('&auth=success#'), false)
     assert.ok(cookiePair(callback, 'll_session'))
+  } finally {
+    context.sqlite.close()
+  }
+})
+
+test('a clean-path return target ends with an explicit empty fragment', async () => {
+  const provider = countingProvider()
+  const context = oauthContext('https://local-life.example.test', provider.fetcher)
+  const activityId = randomUUID()
+
+  try {
+    // WeChat returns the browser to our callback with `#wechat_redirect` in the
+    // URL. A 302 whose Location has no fragment keeps the previous fragment, so
+    // the clean-path target must carry an explicit empty one to replace it.
+    const start = await startOauth(context.app, activityReturnTo(activityId))
+    const state = new URL(start.headers.get('location')!).searchParams.get('state')!
+    const callback = await context.app.request(
+      `/auth/wechat/callback?state=${state}&code=oauth-code`,
+      {
+        headers: {
+          cookie: `${cookiePair(start, 'll_oauth_nonce')}; ${cookiePair(start, 'll_oauth_return')}`,
+        },
+      },
+    )
+    const location = callback.headers.get('location')!
+    assert.ok(location.endsWith('&auth=success#'))
+    assert.equal(new URL(location).hash, '')
+    assert.equal(new URL(location).href.endsWith('#'), true)
+
+    // Without a target the historical `/me` landing page keeps its hash shape;
+    // that fragment is already explicit, so nothing is appended.
+    const noTarget = await startOauth(context.app, null)
+    const noTargetState = new URL(noTarget.headers.get('location')!).searchParams.get('state')!
+    const fallback = await context.app.request(
+      `/auth/wechat/callback?state=${noTargetState}&code=oauth-code`,
+      { headers: { cookie: cookiePair(noTarget, 'll_oauth_nonce') } },
+    )
+    assert.equal(fallback.headers.get('location'), 'https://local-life.example.test/#/me?auth=success')
   } finally {
     context.sqlite.close()
   }
@@ -503,7 +547,7 @@ test('a valid community scope still round-trips through the return flow', async 
     )
     assert.equal(
       callback.headers.get('location'),
-      `https://local-life.example.test${activityReturnTo(activityId)}&auth=success`,
+      `https://local-life.example.test${activityReturnTo(activityId)}&auth=success#`,
     )
     // Community residence is identity context; it must not create participation.
     assert.equal(context.db.select().from(activityParticipations).all().length, 0)

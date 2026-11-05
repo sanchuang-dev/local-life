@@ -11,6 +11,8 @@ import type { PublicActivityDetail } from '@sanchuang-dev/local-life-contracts'
 import type { useActivityParticipation } from '../../hooks/useActivityParticipation'
 import type { useResidentAuth } from '../../hooks/useResidentAuth'
 import { ActivityLoginCard } from './ActivityLoginCard'
+import { ActivityLoginSuccessNotice } from './ActivityLoginResult'
+import type { ActivityLoginResult } from './loginReturn'
 
 type ResidentAuth = ReturnType<typeof useResidentAuth>
 type Participation = ReturnType<typeof useActivityParticipation>
@@ -30,6 +32,11 @@ type ParticipationTeamCardProps = {
   inviteCode: string | null
   /** The deep link had an `invite` value that failed contract validation. */
   inviteInvalid: boolean
+  /**
+   * One-off login-marker snapshot captured by the page before the URL cleanup
+   * (#92). Only the authenticated branch may present it as a success.
+   */
+  loginResult?: ActivityLoginResult
   onShare: () => void
 }
 
@@ -78,6 +85,7 @@ export function ParticipationTeamCard({
   participation,
   inviteCode,
   inviteInvalid,
+  loginResult = null,
   onShare,
 }: ParticipationTeamCardProps) {
   const [feedback, setFeedback] = useState<Feedback | null>(null)
@@ -147,6 +155,7 @@ export function ParticipationTeamCard({
             activityId={activity.id}
             inviteCode={inviteCode}
             inviteInvalid={inviteInvalid}
+            loginResult={loginResult}
           />
           {auth.methods?.developmentResidentLogin ? (
             <button
@@ -429,6 +438,13 @@ export function ParticipationTeamCard({
           )}
           <span className="min-w-0 break-words">{feedback.text}</span>
         </p>
+      ) : null}
+
+      {/* A successful WeChat login is presented here, in the authenticated
+          branch, and only because `auth.session` comes from the server. The
+          unauthenticated branch never shows success, even when the URL says so. */}
+      {auth.session ? (
+        <ActivityLoginSuccessNotice result={loginResult} authenticated />
       ) : null}
 
       {body}

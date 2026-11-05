@@ -97,6 +97,14 @@ export function readBoundReturnTo(
  * Pages preview keeps the route in the hash (`HashRouter`) — the base path of
  * `WEB_BASE_URL` decides which shape is correct. Without a target we keep the
  * historical `/me` landing page byte-identical to the previous behaviour.
+ *
+ * A clean-path target ends with an explicit empty fragment (`#`). WeChat's
+ * authorize endpoint appends `#wechat_redirect` to the URL it returns the
+ * browser to, and a redirect whose `Location` has no fragment keeps the previous
+ * fragment (RFC 9110 §10.2.2; the Fetch standard's redirect step copies it).
+ * Without this the resident would keep `#wechat_redirect` in the address bar on
+ * the clean-path build. An explicit, empty fragment replaces it. Hash-mode
+ * targets already carry `#/…`, so they are unaffected.
  */
 export function oauthResultDestination(
   webBaseUrl: string,
@@ -113,7 +121,7 @@ export function oauthResultDestination(
     target.searchParams.set(paramName, paramValue)
     const route = `${target.pathname}${target.search}`
     return base.pathname === '/'
-      ? `${base.origin}${route}`
+      ? `${base.origin}${route}#`
       : `${base.origin}${base.pathname}#${route}`
   }
 

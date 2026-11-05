@@ -1,6 +1,7 @@
 import {
   API_ROUTES,
   participationInviteCodeSchema,
+  stripLoginResultParams,
   validateReturnTo,
 } from '@sanchuang-dev/local-life-contracts'
 
@@ -26,12 +27,6 @@ import {
  */
 
 export const ACTIVITY_LOGIN_CONTEXT_KEY = 'll.activity-login-context.v1'
-
-/**
- * Query markers the OAuth callback appends to the returned URL. They are read
- * once and stripped, so they never become part of a re-issued return target.
- */
-export const ACTIVITY_LOGIN_RESULT_PARAMS = ['auth', 'auth_error'] as const
 
 /** The H5 talks to the API through the same-origin `/api` prefix. */
 export const API_PREFIX = '/api'
@@ -165,16 +160,6 @@ export function routeToLocation(location: AppLocationSnapshot, route: string): s
   return normalized
 }
 
-/** Drop one-off OAuth result markers while keeping `activityId` / `invite`. */
-export function withoutQueryParams(route: string, names: readonly string[]): string {
-  const query = routeQuery(route)
-  const pathname = query ? route.slice(0, route.length - query.length) : route
-  const params = new URLSearchParams(query)
-  for (const name of names) params.delete(name)
-  const remaining = params.toString()
-  return remaining ? `${pathname}?${remaining}` : pathname
-}
-
 /** Current browser location in the shape the helpers below expect. */
 export function browserLocation(): AppLocationSnapshot {
   return {
@@ -197,10 +182,7 @@ export function buildWechatLoginRequest(
   activity: { activityId: string | null; inviteCode: string | null; inviteInvalid: boolean },
   now: number = Date.now(),
 ): { url: string; context: ActivityLoginContext } {
-  const route = withoutQueryParams(
-    appRouteFromLocation(location),
-    ACTIVITY_LOGIN_RESULT_PARAMS,
-  )
+  const route = stripLoginResultParams(appRouteFromLocation(location))
   const returnTo = sanitizeReturnTo(route)
   const query = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''
   return {
@@ -235,6 +217,20 @@ export function parseActivityLoginResult(query: string): ActivityLoginResult {
   }
   if (params.get('auth') === 'success') return { status: 'success' }
   return null
+}
+
+/**
+ * Read the one-off login markers from the current URL. Callers snapshot this
+ * once (lazy state) and then strip the markers, so a refresh cannot replay a
+ * stale result banner.
+ */
+export function readActivityLoginResult(): ActivityLoginResult {
+  return parseActivityLoginResult(routeQuery(appRouteFromLocation(browserLocation())))
+}
+
+/** Marker kind only, for the shared presentation rule. */
+export function activityLoginMarker(result: ActivityLoginResult): 'success' | 'error' | null {
+  return result?.status ?? null
 }
 
 function isActivityId(value: unknown): value is string {

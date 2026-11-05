@@ -1,20 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { API_ROUTES } from '@sanchuang-dev/local-life-contracts'
 import {
-  ACTIVITY_LOGIN_RESULT_PARAMS,
   API_PREFIX,
-  appRouteFromLocation,
   browserLocation,
   buildWechatLoginRequest,
-  clearActivityLoginContext,
   loadActivityLoginContext,
-  parseActivityLoginResult,
-  routeQuery,
-  routeToLocation,
   saveActivityLoginContext,
-  withoutQueryParams,
   type ActivityLoginContext,
-  type ActivityLoginResult,
 } from '../components/activity/loginReturn'
 
 /**
@@ -39,14 +31,11 @@ export type UseActivityLoginReturnOptions = {
 
 export type UseActivityLoginReturnResult = {
   availability: WechatLoginAvailability
-  loginResult: ActivityLoginResult
   pendingContext: ActivityLoginContext | null
   /** Save the pre-login context and hand the browser to WeChat. */
   startWechatLogin: () => void
   /** Re-read `/auth/methods` after a network failure. */
   retryAvailability: () => void
-  /** Dismiss a failed-attempt notice; the resident may then retry explicitly. */
-  dismissLoginResult: () => void
 }
 
 function readErrorMessage(response: Response): Promise<string> {
@@ -63,53 +52,28 @@ function readErrorMessage(response: Response): Promise<string> {
 }
 
 /**
- * Initial OAuth-result + saved-context read. Done as a lazy state initializer so
- * reading the URL and `sessionStorage` does not become a render-time effect.
- */
-function readInitialLoginState(): {
-  result: ActivityLoginResult
-  context: ActivityLoginContext | null
-} {
-  const route = appRouteFromLocation(browserLocation())
-  const result = parseActivityLoginResult(routeQuery(route))
-  if (result?.status === 'success') {
-    // Identity is established; the returned URL still carries activityId/invite,
-    // so the stored pre-login context has done its job and must not linger.
-    return { result, context: null }
-  }
-  return { result, context: loadActivityLoginContext() }
-}
-
-/**
  * Login-return mechanics for one activity page.
  *
  * The page keeps rendering whatever the participation API says; this hook only
- * answers "can we start WeChat login, where will it come back to, and what did
- * the last attempt report". It never confirms participation: logging in is not
- * joining, and the explicit confirm stays a separate resident action.
+ * answers "can we start WeChat login, where will it come back to". It never
+ * confirms participation: logging in is not joining, and the explicit confirm
+ * stays a separate resident action.
+ *
+ * Login markers (`auth` / `auth_error`) are deliberately NOT read here. This hook
+ * only mounts with the unauthenticated login card, and the page-level cleanup
+ * strips the markers before that card mounts, so reading them here would lose the
+ * failure notice. The page snapshots them once and passes them down instead.
  */
 export function useActivityLoginReturn({
   activityId,
   inviteCode,
   inviteInvalid,
 }: UseActivityLoginReturnOptions): UseActivityLoginReturnResult {
-  const [initial] = useState(readInitialLoginState)
   const [availability, setAvailability] = useState<WechatLoginAvailability>({ status: 'loading' })
-  const [loginResult, setLoginResult] = useState<ActivityLoginResult>(initial.result)
-  const [pendingContext, setPendingContext] = useState<ActivityLoginContext | null>(initial.context)
+  const [pendingContext, setPendingContext] = useState<ActivityLoginContext | null>(() =>
+    loadActivityLoginContext(),
+  )
   const [availabilityAttempt, setAvailabilityAttempt] = useState(0)
-
-  // Strip the one-off OAuth markers after they have been read, so a refresh
-  // cannot replay a stale "login failed" banner. URL/storage writes only.
-  useEffect(() => {
-    if (!initial.result) return
-    const location = browserLocation()
-    const route = appRouteFromLocation(location)
-    if (!parseActivityLoginResult(routeQuery(route))) return
-    const cleaned = withoutQueryParams(route, ACTIVITY_LOGIN_RESULT_PARAMS)
-    window.history.replaceState(window.history.state, '', routeToLocation(location, cleaned))
-    if (initial.result.status === 'success') clearActivityLoginContext()
-  }, [initial])
 
   useEffect(() => {
     let active = true
@@ -167,7 +131,6 @@ export function useActivityLoginReturn({
     })
     saveActivityLoginContext(request.context)
     setPendingContext(request.context)
-    setLoginResult(null)
     window.location.assign(request.url)
   }, [activityId, inviteCode, inviteInvalid])
 
@@ -176,15 +139,11 @@ export function useActivityLoginReturn({
     setAvailabilityAttempt((attempt) => attempt + 1)
   }, [])
 
-  const dismissLoginResult = useCallback(() => setLoginResult(null), [])
-
   return {
     availability,
-    loginResult,
     pendingContext,
     startWechatLogin,
     retryAvailability,
-    dismissLoginResult,
   }
 }
 

@@ -22,6 +22,8 @@ import type { PublicActivityDetail } from '@sanchuang-dev/local-life-contracts'
 import { CampaignSheet } from '../components/CampaignSheet'
 import { ParticipationTeamCard } from '../components/activity/ParticipationTeamCard'
 import { RewardProgressCard } from '../components/activity/RewardProgressCard'
+import { ActivityLoginMarkerCleanup } from '../components/activity/ActivityLoginResult'
+import { readActivityLoginResult, type ActivityLoginResult } from '../components/activity/loginReturn'
 import {
   credentialExpiryText,
   formatRewardDateTime,
@@ -346,6 +348,9 @@ export function SilverNeighborhoodCampaignPage() {
   const { state: activityState, retry: retryActivity } = usePublicActivity(requestedActivityId)
   const activity = activityState.status === 'ready' ? activityState.activity : null
   const auth = useResidentAuth()
+  // One-off `?auth=success` / `?auth_error=code` markers, read once before the
+  // page-level cleanup strips them from the address bar (#92).
+  const [loginResult] = useState<ActivityLoginResult>(() => readActivityLoginResult())
   const participation = useActivityParticipation({
     activityId: activity?.id ?? null,
     sessionKey: auth.session?.user.id ?? null,
@@ -488,6 +493,12 @@ export function SilverNeighborhoodCampaignPage() {
 
   return (
     <div className="pb-7">
+      {/* Mounted outside every auth branch: the one-off login markers must be
+          stripped whatever the page ends up rendering. */}
+      <ActivityLoginMarkerCleanup
+        authenticated={auth.session !== null}
+        loading={auth.loading}
+      />
       <section className="relative overflow-hidden bg-[#eaf5e9]" aria-label="活动信息">
         <div className="relative">
           <img
@@ -554,6 +565,7 @@ export function SilverNeighborhoodCampaignPage() {
         participation={participation}
         inviteCode={inviteParam.code}
         inviteInvalid={inviteParam.invalid}
+        loginResult={loginResult}
         onShare={openShareSheet}
       />
 

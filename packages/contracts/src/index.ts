@@ -226,6 +226,59 @@ export function validateReturnTo(raw: unknown): ReturnToValidation {
 }
 
 /* -------------------------------------------------------------------------- */
+/* One-off login result markers (#92)                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Markers the WeChat OAuth callback appends to the returned H5 URL. They are
+ * read exactly once and then stripped, so they never become part of a re-issued
+ * return target or of a shared link.
+ */
+export const LOGIN_RESULT_QUERY_PARAMS = ['auth', 'auth_error'] as const
+
+export type LoginResultMarker = 'success' | 'error' | null
+
+/**
+ * Remove the one-off login markers from a `/path?query` route while keeping
+ * every other parameter untouched, in the order it arrived: `activityId`,
+ * `invite` and any campaign parameter must survive the cleanup byte-for-byte.
+ */
+export function stripLoginResultParams(route: string): string {
+  const queryIndex = route.indexOf('?')
+  if (queryIndex === -1) return route
+  const pathname = route.slice(0, queryIndex)
+  const kept = route
+    .slice(queryIndex + 1)
+    .split('&')
+    .filter((segment) => {
+      if (!segment) return false
+      const key = segment.split('=', 1)[0] ?? ''
+      return !(LOGIN_RESULT_QUERY_PARAMS as readonly string[]).includes(key)
+    })
+  return kept.length > 0 ? `${pathname}?${kept.join('&')}` : pathname
+}
+
+/**
+ * Whether a one-off login marker may be presented, and as what.
+ *
+ * `?auth=success` is plain client-visible input: it records what the callback
+ * *reported*, not that this browser holds a session. Rendering the success state
+ * without a server-confirmed session is exactly the fake success a recipient of
+ * the URL would see, so success requires `authenticated`. A failed authorization
+ * leaves no session and stays presentable (the resident is offered a retry).
+ * While the session is still loading, nothing is presented.
+ */
+export function presentLoginMarker(
+  marker: LoginResultMarker,
+  authenticated: boolean,
+  loading: boolean,
+): LoginResultMarker {
+  if (loading || marker === null) return null
+  if (marker === 'success') return authenticated ? 'success' : null
+  return 'error'
+}
+
+/* -------------------------------------------------------------------------- */
 /* Activity domain (#59 LL-MVP-003)                                           */
 /* -------------------------------------------------------------------------- */
 
