@@ -1,0 +1,459 @@
+{
+  "capturedAt": "2026-11-05T06:01:59.423Z",
+  "dashboard": [
+    {
+      "viewport": "1440",
+      "successTag": {
+        "text": "已验证身份",
+        "backgroundColor": "rgb(192, 204, 200)",
+        "borderColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(19, 139, 121)"
+      },
+      "viewportWidth": 1440,
+      "identity": {
+        "title": "当前工作身份",
+        "top": 179.61,
+        "bottom": 344.61,
+        "height": 165,
+        "bodyTop": 217.61,
+        "styleHeight": "100%",
+        "position": "relative"
+      },
+      "start": {
+        "title": "开始工作",
+        "top": 179.61,
+        "bottom": 344.61,
+        "height": 165,
+        "bodyTop": 217.61,
+        "styleHeight": "100%",
+        "position": "relative"
+      },
+      "equalHeight": true,
+      "topAligned": true,
+      "bottomAligned": true,
+      "rowAlignItems": {
+        "className": "ant-row ant-row-stretch css-dev-only-do-not-override-1y106cm css-var-_r_0_",
+        "alignItems": "normal"
+      },
+      "columns": [
+        {
+          "className": "ant-col ant-col-xs-24 ant-col-md-12 css-dev-only-do-not-override-1y106cm css-var-_r_0_",
+          "top": 179.61,
+          "height": 165,
+          "display": "block",
+          "alignItems": "normal"
+        },
+        {
+          "className": "ant-col ant-col-xs-24 ant-col-md-12 css-dev-only-do-not-override-1y106cm css-var-_r_0_",
+          "top": 179.61,
+          "height": 165,
+          "display": "block",
+          "alignItems": "normal"
+        }
+      ],
+      "alertInfo": null
+    },
+    {
+      "viewport": "1024",
+      "successTag": {
+        "text": "已验证身份",
+        "backgroundColor": "rgb(192, 204, 200)",
+        "borderColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(19, 139, 121)"
+      },
+      "viewportWidth": 1024,
+      "identity": {
+        "title": "当前工作身份",
+        "top": 179.61,
+        "bottom": 344.61,
+        "height": 165,
+        "bodyTop": 217.61,
+        "styleHeight": "100%",
+        "position": "relative"
+      },
+      "start": {
+        "title": "开始工作",
+        "top": 179.61,
+        "bottom": 344.61,
+        "height": 165,
+        "bodyTop": 217.61,
+        "styleHeight": "100%",
+        "position": "relative"
+      },
+      "equalHeight": true,
+      "topAligned": true,
+      "bottomAligned": true,
+      "rowAlignItems": {
+        "className": "ant-row ant-row-stretch css-dev-only-do-not-override-1y106cm css-var-_r_0_",
+        "alignItems": "normal"
+      },
+      "columns": [
+        {
+          "className": "ant-col ant-col-xs-24 ant-col-md-12 css-dev-only-do-not-override-1y106cm css-var-_r_0_",
+          "top": 179.61,
+          "height": 165,
+          "display": "block",
+          "alignItems": "normal"
+        },
+        {
+          "className": "ant-col ant-col-xs-24 ant-col-md-12 css-dev-only-do-not-override-1y106cm css-var-_r_0_",
+          "top": 179.61,
+          "height": 165,
+          "display": "block",
+          "alignItems": "normal"
+        }
+      ],
+      "alertInfo": null
+    },
+    {
+      "viewport": "768",
+      "successTag": {
+        "text": "已验证身份",
+        "backgroundColor": "rgb(192, 204, 200)",
+        "borderColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(19, 139, 121)"
+      },
+      "viewportWidth": 768,
+      "identity": {
+        "title": "当前工作身份",
+        "top": 179.61,
+        "bottom": 388.61,
+        "height": 209,
+        "bodyTop": 217.61,
+        "styleHeight": "100%",
+        "position": "relative"
+      },
+      "start": {
+        "title": "开始工作",
+        "top": 179.61,
+        "bottom": 388.61,
+        "height": 209,
+        "bodyTop": 217.61,
+        "styleHeight": "100%",
+        "position": "relative"
+      },
+      "equalHeight": true,
+      "topAligned": true,
+      "bottomAligned": true,
+      "rowAlignItems": {
+        "className": "ant-row ant-row-stretch css-dev-only-do-not-override-1y106cm css-var-_r_0_",
+        "alignItems": "normal"
+      },
+      "columns": [
+        {
+          "className": "ant-col ant-col-xs-24 ant-col-md-12 css-dev-only-do-not-override-1y106cm css-var-_r_0_",
+          "top": 179.61,
+          "height": 209,
+          "display": "block",
+          "alignItems": "normal"
+        },
+        {
+          "className": "ant-col ant-col-xs-24 ant-col-md-12 css-dev-only-do-not-override-1y106cm css-var-_r_0_",
+          "top": 179.61,
+          "height": 209,
+          "display": "block",
+          "alignItems": "normal"
+        }
+      ],
+      "alertInfo": null
+    },
+    {
+      "viewport": "375",
+      "successTag": {
+        "text": "已验证身份",
+        "backgroundColor": "rgb(192, 204, 200)",
+        "borderColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(19, 139, 121)"
+      },
+      "viewportWidth": 375,
+      "identity": {
+        "title": "当前工作身份",
+        "top": 200.03,
+        "bottom": 323.03,
+        "height": 123,
+        "bodyTop": 238.03,
+        "styleHeight": "100%",
+        "position": "relative"
+      },
+      "start": {
+        "title": "开始工作",
+        "top": 339.03,
+        "bottom": 504.03,
+        "height": 165,
+        "bodyTop": 377.03,
+        "styleHeight": "100%",
+        "position": "relative"
+      },
+      "equalHeight": false,
+      "topAligned": false,
+      "bottomAligned": false,
+      "rowAlignItems": {
+        "className": "ant-row ant-row-stretch css-dev-only-do-not-override-1y106cm css-var-_r_0_",
+        "alignItems": "normal"
+      },
+      "columns": [
+        {
+          "className": "ant-col ant-col-xs-24 ant-col-md-12 css-dev-only-do-not-override-1y106cm css-var-_r_0_",
+          "top": 200.03,
+          "height": 123,
+          "display": "block",
+          "alignItems": "normal"
+        },
+        {
+          "className": "ant-col ant-col-xs-24 ant-col-md-12 css-dev-only-do-not-override-1y106cm css-var-_r_0_",
+          "top": 339.03,
+          "height": 165,
+          "display": "block",
+          "alignItems": "normal"
+        }
+      ],
+      "alertInfo": null
+    }
+  ],
+  "components": [
+    {
+      "viewport": "1440",
+      "viewportWidth": 1440,
+      "alertInfo": {
+        "className": "ant-alert ant-alert-info ant-alert-outlined ant-alert-with-description css-var-_r_0_ css-dev-only-do-not-override-1y106cm",
+        "backgroundColor": "rgb(230, 244, 255)",
+        "borderColor": "rgb(145, 202, 255)",
+        "color": "rgb(31, 41, 55)",
+        "top": 938.75
+      },
+      "alertWarning": {
+        "className": "ant-alert ant-alert-warning ant-alert-outlined ant-alert-with-description css-var-_r_0_ css-dev-only-do-not-override-1y106cm",
+        "backgroundColor": "rgb(255, 251, 230)",
+        "borderColor": "rgb(255, 229, 143)",
+        "color": "rgb(31, 41, 55)",
+        "top": 179.61
+      },
+      "alertSuccess": null,
+      "alertError": null,
+      "cssVars": {
+        "--ant-color-success-border-hover": "#4ca692",
+        "--ant-color-info-border": "#91caff",
+        "--ant-color-error-border-hover": "#ffa39e",
+        "--ant-color-error-bg": "#fff2f0",
+        "--ant-color-info-border-hover": "#69b1ff",
+        "--ant-color-error-bg-hover": "#fff1f0",
+        "--ant-color-info-active": "#0958d9",
+        "--ant-color-info-bg": "#e6f4ff",
+        "--ant-color-info-text": "#1677ff",
+        "--ant-color-warning-hover": "#ffd666",
+        "--ant-color-success-border": "#6fb3a2",
+        "--ant-color-warning-bg": "#fffbe6",
+        "--ant-color-success-text": "#138b79",
+        "--ant-color-warning-outline": "rgba(255,215,5,0.1)",
+        "--ant-color-success-bg-hover": "#95bfb3",
+        "--ant-color-warning-text": "#faad14",
+        "--ant-color-warning-active": "#d48806",
+        "--ant-color-primary-hover": "#277a6e",
+        "--ant-color-error-border": "#ffccc7",
+        "--ant-color-error-affix": "#ff4d4f",
+        "--ant-color-primary-bg-hover": "#81a199",
+        "--ant-color-info": "#1677ff",
+        "--ant-color-primary-text-active": "#084742",
+        "--ant-color-info-text-active": "#0958d9",
+        "--ant-color-success": "#138b79",
+        "--ant-color-error-text-active": "#d9363e",
+        "--ant-color-error-outline": "rgba(255,38,5,0.06)",
+        "--ant-color-primary-active": "#084742",
+        "--ant-color-error-hover": "#ff7875",
+        "--ant-color-primary-border": "#5f9488",
+        "--ant-color-link": "#116d63",
+        "--ant-color-error-bg-filled-hover": "#ffdfdc",
+        "--ant-color-success-active": "#09665b",
+        "--ant-color-warning-affix": "#faad14",
+        "--ant-color-primary-text-hover": "#277a6e",
+        "--ant-color-error": "#ff4d4f",
+        "--ant-color-warning-border-hover": "#ffd666",
+        "--ant-color-info-hover": "#69b1ff",
+        "--ant-color-error-active": "#d9363e",
+        "--ant-color-link-hover": "#41877a",
+        "--ant-color-link-active": "#084742",
+        "--ant-color-error-text": "#ff4d4f",
+        "--ant-color-error-bg-active": "#ffccc7",
+        "--ant-color-primary-text": "#116d63",
+        "--ant-color-primary-border-hover": "#41877a",
+        "--ant-color-primary": "#116d63",
+        "--ant-color-success-text-active": "#09665b",
+        "--ant-color-info-text-hover": "#4096ff",
+        "--ant-color-info-bg-hover": "#bae0ff",
+        "--ant-color-warning-text-active": "#d48806",
+        "--ant-color-warning-border": "#ffe58f",
+        "--ant-color-success-bg": "#c0ccc8",
+        "--ant-color-error-text-hover": "#ff7875",
+        "--ant-color-success-text-hover": "#2e9985",
+        "--ant-color-warning-bg-hover": "#fff1b8",
+        "--ant-color-warning": "#faad14",
+        "--ant-color-warning-text-hover": "#ffc53d",
+        "--ant-color-success-hover": "#4ca692",
+        "--ant-color-primary-bg": "#a3adaa"
+      }
+    },
+    {
+      "viewport": "1024",
+      "viewportWidth": 1024,
+      "alertInfo": {
+        "className": "ant-alert ant-alert-info ant-alert-outlined ant-alert-with-description css-var-_r_0_ css-dev-only-do-not-override-1y106cm",
+        "backgroundColor": "rgb(230, 244, 255)",
+        "borderColor": "rgb(145, 202, 255)",
+        "color": "rgb(31, 41, 55)",
+        "top": 869.17
+      },
+      "alertWarning": {
+        "className": "ant-alert ant-alert-warning ant-alert-outlined ant-alert-with-description css-var-_r_0_ css-dev-only-do-not-override-1y106cm",
+        "backgroundColor": "rgb(255, 251, 230)",
+        "borderColor": "rgb(255, 229, 143)",
+        "color": "rgb(31, 41, 55)",
+        "top": 6.03
+      },
+      "alertSuccess": null,
+      "alertError": null,
+      "cssVars": {
+        "--ant-color-success-border-hover": "#4ca692",
+        "--ant-color-info-border": "#91caff",
+        "--ant-color-error-border-hover": "#ffa39e",
+        "--ant-color-error-bg": "#fff2f0",
+        "--ant-color-info-border-hover": "#69b1ff",
+        "--ant-color-error-bg-hover": "#fff1f0",
+        "--ant-color-info-active": "#0958d9",
+        "--ant-color-info-bg": "#e6f4ff",
+        "--ant-color-info-text": "#1677ff",
+        "--ant-color-warning-hover": "#ffd666",
+        "--ant-color-success-border": "#6fb3a2",
+        "--ant-color-warning-bg": "#fffbe6",
+        "--ant-color-success-text": "#138b79",
+        "--ant-color-warning-outline": "rgba(255,215,5,0.1)",
+        "--ant-color-success-bg-hover": "#95bfb3",
+        "--ant-color-warning-text": "#faad14",
+        "--ant-color-warning-active": "#d48806",
+        "--ant-color-primary-hover": "#277a6e",
+        "--ant-color-error-border": "#ffccc7",
+        "--ant-color-error-affix": "#ff4d4f",
+        "--ant-color-primary-bg-hover": "#81a199",
+        "--ant-color-info": "#1677ff",
+        "--ant-color-primary-text-active": "#084742",
+        "--ant-color-info-text-active": "#0958d9",
+        "--ant-color-success": "#138b79",
+        "--ant-color-error-text-active": "#d9363e",
+        "--ant-color-error-outline": "rgba(255,38,5,0.06)",
+        "--ant-color-primary-active": "#084742",
+        "--ant-color-error-hover": "#ff7875",
+        "--ant-color-primary-border": "#5f9488",
+        "--ant-color-link": "#116d63",
+        "--ant-color-error-bg-filled-hover": "#ffdfdc",
+        "--ant-color-success-active": "#09665b",
+        "--ant-color-warning-affix": "#faad14",
+        "--ant-color-primary-text-hover": "#277a6e",
+        "--ant-color-error": "#ff4d4f",
+        "--ant-color-warning-border-hover": "#ffd666",
+        "--ant-color-info-hover": "#69b1ff",
+        "--ant-color-error-active": "#d9363e",
+        "--ant-color-link-hover": "#41877a",
+        "--ant-color-link-active": "#084742",
+        "--ant-color-error-text": "#ff4d4f",
+        "--ant-color-error-bg-active": "#ffccc7",
+        "--ant-color-primary-text": "#116d63",
+        "--ant-color-primary-border-hover": "#41877a",
+        "--ant-color-primary": "#116d63",
+        "--ant-color-success-text-active": "#09665b",
+        "--ant-color-info-text-hover": "#4096ff",
+        "--ant-color-info-bg-hover": "#bae0ff",
+        "--ant-color-warning-text-active": "#d48806",
+        "--ant-color-warning-border": "#ffe58f",
+        "--ant-color-success-bg": "#c0ccc8",
+        "--ant-color-error-text-hover": "#ff7875",
+        "--ant-color-success-text-hover": "#2e9985",
+        "--ant-color-warning-bg-hover": "#fff1b8",
+        "--ant-color-warning": "#faad14",
+        "--ant-color-warning-text-hover": "#ffc53d",
+        "--ant-color-success-hover": "#4ca692",
+        "--ant-color-primary-bg": "#a3adaa"
+      }
+    },
+    {
+      "viewport": "768",
+      "viewportWidth": 768,
+      "alertInfo": {
+        "className": "ant-alert ant-alert-info ant-alert-outlined ant-alert-with-description css-var-_r_0_ css-dev-only-do-not-override-1y106cm",
+        "backgroundColor": "rgb(230, 244, 255)",
+        "borderColor": "rgb(145, 202, 255)",
+        "color": "rgb(31, 41, 55)",
+        "top": 806.59
+      },
+      "alertWarning": {
+        "className": "ant-alert ant-alert-warning ant-alert-outlined ant-alert-with-description css-var-_r_0_ css-dev-only-do-not-override-1y106cm",
+        "backgroundColor": "rgb(255, 251, 230)",
+        "borderColor": "rgb(255, 229, 143)",
+        "color": "rgb(31, 41, 55)",
+        "top": -56.55
+      },
+      "alertSuccess": null,
+      "alertError": null,
+      "cssVars": {
+        "--ant-color-success-border-hover": "#4ca692",
+        "--ant-color-info-border": "#91caff",
+        "--ant-color-error-border-hover": "#ffa39e",
+        "--ant-color-error-bg": "#fff2f0",
+        "--ant-color-info-border-hover": "#69b1ff",
+        "--ant-color-error-bg-hover": "#fff1f0",
+        "--ant-color-info-active": "#0958d9",
+        "--ant-color-info-bg": "#e6f4ff",
+        "--ant-color-info-text": "#1677ff",
+        "--ant-color-warning-hover": "#ffd666",
+        "--ant-color-success-border": "#6fb3a2",
+        "--ant-color-warning-bg": "#fffbe6",
+        "--ant-color-success-text": "#138b79",
+        "--ant-color-warning-outline": "rgba(255,215,5,0.1)",
+        "--ant-color-success-bg-hover": "#95bfb3",
+        "--ant-color-warning-text": "#faad14",
+        "--ant-color-warning-active": "#d48806",
+        "--ant-color-primary-hover": "#277a6e",
+        "--ant-color-error-border": "#ffccc7",
+        "--ant-color-error-affix": "#ff4d4f",
+        "--ant-color-primary-bg-hover": "#81a199",
+        "--ant-color-info": "#1677ff",
+        "--ant-color-primary-text-active": "#084742",
+        "--ant-color-info-text-active": "#0958d9",
+        "--ant-color-success": "#138b79",
+        "--ant-color-error-text-active": "#d9363e",
+        "--ant-color-error-outline": "rgba(255,38,5,0.06)",
+        "--ant-color-primary-active": "#084742",
+        "--ant-color-error-hover": "#ff7875",
+        "--ant-color-primary-border": "#5f9488",
+        "--ant-color-link": "#116d63",
+        "--ant-color-error-bg-filled-hover": "#ffdfdc",
+        "--ant-color-success-active": "#09665b",
+        "--ant-color-warning-affix": "#faad14",
+        "--ant-color-primary-text-hover": "#277a6e",
+        "--ant-color-error": "#ff4d4f",
+        "--ant-color-warning-border-hover": "#ffd666",
+        "--ant-color-info-hover": "#69b1ff",
+        "--ant-color-error-active": "#d9363e",
+        "--ant-color-link-hover": "#41877a",
+        "--ant-color-link-active": "#084742",
+        "--ant-color-error-text": "#ff4d4f",
+        "--ant-color-error-bg-active": "#ffccc7",
+        "--ant-color-primary-text": "#116d63",
+        "--ant-color-primary-border-hover": "#41877a",
+        "--ant-color-primary": "#116d63",
+        "--ant-color-success-text-active": "#09665b",
+        "--ant-color-info-text-hover": "#4096ff",
+        "--ant-color-info-bg-hover": "#bae0ff",
+        "--ant-color-warning-text-active": "#d48806",
+        "--ant-color-warning-border": "#ffe58f",
+        "--ant-color-success-bg": "#c0ccc8",
+        "--ant-color-error-text-hover": "#ff7875",
+        "--ant-color-success-text-hover": "#2e9985",
+        "--ant-color-warning-bg-hover": "#fff1b8",
+        "--ant-color-warning": "#faad14",
+        "--ant-color-warning-text-hover": "#ffc53d",
+        "--ant-color-success-hover": "#4ca692",
+        "--ant-color-primary-bg": "#a3adaa"
+      }
+    }
+  ],
+  "pageErrors": []
+}

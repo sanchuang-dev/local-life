@@ -11,8 +11,15 @@ import type { ThemeConfig } from 'antd'
 export const adminTheme: ThemeConfig = {
   token: {
     colorPrimary: '#116d63',
-    colorInfo: '#138b79',
+    // Info keeps Ant Design's blue so Alert/Tag/Message feedback is clearly
+    // distinct from Success; both background/border/text shades are derived
+    // from these two tokens by the theme algorithm — no per-component CSS
+    // overrides such as `.ant-alert-info` are allowed to re-skin them.
+    colorInfo: '#1677ff',
     colorLink: '#116d63',
+    // Success stays on the Local Life teal family so status feedback matches
+    // the brand; Warning/Error keep Ant Design defaults (gold/red), which are
+    // already unambiguous against Primary/Info/Success.
     colorSuccess: '#138b79',
     colorText: '#1f2937',
     colorTextSecondary: '#64748b',
