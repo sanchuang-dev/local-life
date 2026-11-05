@@ -132,7 +132,7 @@ function MiniProgramTopBar() {
                       : tabs.find((item) => item.path === pathname)?.label)
 
   const handleBack = () => {
-    // HashRouter tracks its own entry index. A direct deep link can have browser
+    // React Router tracks its own entry index. A direct deep link can have browser
     // history but no in-app predecessor; do not accidentally leave the prototype.
     const index = (window.history.state as { idx?: unknown } | null)?.idx
     if (typeof index === 'number' && index > 0) {

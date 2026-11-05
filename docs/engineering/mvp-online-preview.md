@@ -24,15 +24,15 @@
 
 | 外部 URL | 功能 | Caddy 与构建要求 |
 | --- | --- | --- |
-| `https://local.proto.3cgroup.cn/` | 居民 H5，公开活动只读 | 独立 H5 构建：`base=/`，保留 HashRouter |
+| `https://local.proto.3cgroup.cn/` | 居民 H5，公开活动只读 | 独立 H5 构建：`base=/`，使用 BrowserRouter |
 | `https://local.proto.3cgroup.cn/api/*` | 居民端同源 API | Caddy 去除 `/api` 前缀，再代理到同一 Hono |
-| `https://local-admin.proto.3cgroup.cn/` | 受保护运营管理台 | 独立 Admin 构建：`base=/`，保留 HashRouter；服务端强制鉴权 |
+| `https://local-admin.proto.3cgroup.cn/` | 受保护运营管理台 | 独立 Admin 构建：`base=/`，使用 BrowserRouter；服务端强制鉴权 |
 | `https://local-admin.proto.3cgroup.cn/api/*` | 后台同源 API | Caddy 以相同 `/api` 前缀语义代理到**相同 Hono 进程** |
 | 两域名各自的 `/api/healthz` | 真实后端健康检查 | 映射到现有 Hono `GET /healthz`，不可用静态 200 冒充 |
 
 部署安全与身份边界：
 
-1. **MVP 单独构建**：H5 和 Admin 的 Vite `base` 都为 `/`，因为它们分别运行在独立域名根路径；不能改动 GitHub Pages 的 `/local-life/`、`/local-life/prod/` 预览构建。HashRouter 页面刷新、资源路径、入口与深链接都必须测试。
+1. **MVP 单独构建**：H5 和 Admin 的 Vite `base` 都为 `/`，因为它们分别运行在独立域名根路径；不能改动 GitHub Pages 的 `/local-life/`、`/local-life/prod/` 预览构建。BrowserRouter 直接访问及刷新、资源路径、入口与深链接都必须测试；GitHub Pages 预览保留 HashRouter。
 2. **API 同源访问**：页面只对当前站点 `/api/*` 发送请求；Caddy 在两个域名上分别执行相同的路径去前缀和反向代理规则。浏览器不直接访问第三个 API Origin，因此无需新增跨源 CORS/credentials 接线。禁止为节省工作量暴露 API 内部端口。
 3. **Cookie 和 CSRF**：每个站点以各自的 host-only HttpOnly/Secure/SameSite=Lax Cookie 提供会话，不配置跨四级子域共享的 `COOKIE_DOMAIN`。两站可共用后台数据库/session 表，但浏览器 Cookie 按域隔离，**不承诺跨站单点登录**。Hono 对写请求继续校验 CSRF token 和完整 Origin；`local` 与 `local-admin` 是不同 Origin，虽处于同一 site，SameSite 本身**不能**替代 Origin/CSRF 验证。应为两站点单独回归登录、登出、Cookie 生命周期、跨站伪造 Origin 及错误 CSRF 负例。
 4. **配置**：公网运行 `NODE_ENV=production`、`AUTH_DEV_ENABLED=false`，`WEB_BASE_URL=https://local.proto.3cgroup.cn/`；`TRUSTED_ORIGINS` 必须是这两个 **精确 HTTPS Origin**（逗号分隔）。微信 OAuth 使用居民域名的授权回跳，真实 AppID、回调域名和后台操作权限必须有实际授权；不能把开发登录放行到公网。后台登录独立，不让管理台复用居民端的微信跳转回调。
@@ -83,7 +83,7 @@
 - **居民域名** HTTPS 可访问 H5 首页和活动深链，未认证用户能够只读查看公开活动；尚未放开的报名、奖励、购买等操作不可产生成功状态。
 - **后台域名** HTTPS 可访问独立 Admin 登录页，管理员使用真实会话登录、创建/发布活动；独立浏览器从居民域名读到同一 SQLite 的活动状态。运营员/网格员的社区越权及 CSRF 负例必须失败。
 - 两个域名的 `/api/healthz` 都指向同一真实 Hono API；仅凭静态 HTML 返回 200 不算通过。服务器重启持久数据不丢失，两个站点的 host-only Cookie 独立，并验证没有错误的跨域共享/跨 Origin 登录假设。
-- 两个新域名分别验证 DNS、TLS、HTTP→HTTPS、资产加载、登录/登出、Hash 深链、路由刷新。现有旧站和 GitHub Pages `dev/prod` 静态演示必须保持正常。
+- 两个新域名分别验证 DNS、TLS、HTTP→HTTPS、资产加载、登录/登出、浏览器历史深链、路由刷新。现有旧站和 GitHub Pages `dev/prod` 静态演示必须保持正常。
 - 线上部署准确报告 `mvp` commit SHA、构建 ID、数据库 schema 版本、健康/备份/回滚证据；首轮自动部署流水线完成前不能宣称上线。
 - 三人团、CRM、商城、兑奖等由各自业务卡验收后增量晋级 `mvp`；缺微信 OAuth/商城真实授权时功能明确不可用。
 - Chrome 375×812 和 320 宽度检查居民移动端入口、状态和错误；PC 验证后台布局；尽可能用手机真实浏览器/微信宿主验证 OAuth 和分享入口，无法验证则列出明确阻塞。
@@ -101,7 +101,7 @@
 发现以下情形立即向负责人确认，暂停有风险的扩大实施，不要求负责人盯常规小卡：
 
 - 两个新域名中任一个 HTTPS 的失败原因超出普通 Caddy 站点/证书排查，必须改动现有正常服务、DNS 托管或更换主机；
-- 需要重新设计身份/跨域 Cookie、脱离既有 HashRouter、大规模移动既有路由或复制第二套后端；
+- 需要重新设计身份/跨域 Cookie、大规模移动既有路由或复制第二套后端；
 - SQLite、容器或备份方案要求破坏性迁移、触及生产居民数据，或需要新的付费资源/真实秘钥；
 - 超出已授权单卡范围的明显工时膨胀、Agent Teams 两轮复核仍不通过或跨卡共享 schema/迁移出现冲突；
 - 产品决策（团规则、奖励归属、真实试运营开放边界）仍未确认但施工会把它写成不可撤销合同。
