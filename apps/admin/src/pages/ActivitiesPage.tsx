@@ -17,6 +17,7 @@ import {
   Select,
   Space,
   Spin,
+  Switch,
   Tag,
   Timeline,
   Tooltip,
@@ -26,12 +27,14 @@ import dayjs, { type Dayjs } from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  activityRewardPlanSchema,
   createActivityRequestSchema,
   updateActivityRequestSchema,
   type ActivityAuditEntry,
   type ActivityCommunityRef,
   type ActivityKeyRules,
   type ActivityPublicRules,
+  type ActivityRewardPlan,
   type ActivityRuleVersion,
   type ActivityStatus,
   type AdminActivityDetail,
@@ -86,6 +89,24 @@ interface ActivityFormValues {
   purchase: string
   prizeClaim: string
   notes?: string
+  /** Reward plan (LL-MVP-006). The three-state `rewardPlan` semantics live in
+   * `rewardPlanFromForm`; these fields are only the editable projection. */
+  rewardPlanEnabled?: boolean
+  rewardPrizeName?: string
+  rewardUnitCostYuan?: number | null
+  rewardQuantityPerTeam?: number | null
+  rewardTotalQuantity?: number | null
+  rewardBudgetYuan?: number | null
+  rewardClaimRecipient?: 'leader' | 'any_member'
+  rewardCheckinRange?: [Dayjs | null, Dayjs | null] | null
+  rewardRedemptionHours?: number | null
+  rewardNotes?: string
+  /**
+   * The plan the server currently holds, carried through the form so an edit
+   * that does not touch the reward plan can echo it back verbatim. `undefined`
+   * means "the payload did not tell us" (older API), `null` means "no plan".
+   */
+  rewardPlanBaseline?: ActivityRewardPlan | null
 }
 
 const ACTIVITY_STATUS_META: Record<ActivityStatus, { label: string; color: string }> = {
@@ -260,6 +281,8 @@ export function keyRulesFromForm(values: ActivityFormValues): KeyRulesResult {
   ) {
     return { ok: false, message: '请填写有效的奖品数量上限。' }
   }
+  const plan = rewardPlanFromForm(values)
+  if (!plan.ok) return plan
   return {
     ok: true,
     keyRules: {
@@ -269,10 +292,98 @@ export function keyRulesFromForm(values: ActivityFormValues): KeyRulesResult {
       budgetCapCents: yuanToCents(values.budgetYuan),
       prizeQuantityCap: values.prizeQuantityCap,
       publicRules: publicRulesFromForm(values),
+      // Reward plan is *three-state* on the wire:
+      //   key absent  → the server keeps whatever plan it already froze
+      //   explicit null → the operator cleared the plan (destructive)
+      //   an object   → replace/define the plan
+      // The form therefore only emits a key when it has an opinion. Emitting
+      // `undefined` here is deliberate: it drops the key from the JSON body.
+      ...(plan.rewardPlan === undefined ? {} : { rewardPlan: plan.rewardPlan }),
     },
   }
 }
 
+type RewardPlanResult =
+  | { ok: true; rewardPlan: ActivityRewardPlan | null | undefined }
+  | { ok: false; message: string }
+
+/**
+ * Reads the reward-plan section of the form.
+ *
+ * `undefined` (key omitted from the payload) means "leave the server's plan
+ * alone"; `null` means "clear it"; an object means "this is the new plan".
+ * Clearing is only ever produced by an explicit operator action, never by a
+ * form that simply could not load the current plan.
+ */
+function rewardPlanFromForm(values: ActivityFormValues): RewardPlanResult {
+  const baseline = values.rewardPlanBaseline
+  if (!values.rewardPlanEnabled) {
+    // Turning the switch off only means "clear it" when the server actually had
+    // a plan. With no baseline a `null` would be a destructive no-op that still
+    // mints a rule version, so the key stays omitted instead.
+    return { ok: true, rewardPlan: baseline ? null : undefined }
+  }
+
+  const prizeName = values.rewardPrizeName?.trim() ?? ''
+  if (!prizeName) return { ok: false, message: '请填写奖励计划中的奖品名称。' }
+  const unitCostYuan = values.rewardUnitCostYuan
+  if (typeof unitCostYuan !== 'number' || !Number.isFinite(unitCostYuan)) {
+    return { ok: false, message: '请填写奖励计划中的单件成本（元）。' }
+  }
+  const quantityPerTeam = values.rewardQuantityPerTeam
+  if (typeof quantityPerTeam !== 'number' || !Number.isInteger(quantityPerTeam)) {
+    return { ok: false, message: '请填写每团奖品数量（整数）。' }
+  }
+  const totalQuantity = values.rewardTotalQuantity
+  if (typeof totalQuantity !== 'number' || !Number.isInteger(totalQuantity)) {
+    return { ok: false, message: '请填写奖品总库存（整数）。' }
+  }
+  const budgetYuan = values.rewardBudgetYuan
+  if (typeof budgetYuan !== 'number' || !Number.isFinite(budgetYuan)) {
+    return { ok: false, message: '请填写奖励预算上限（元）。' }
+  }
+  const redemptionHours = values.rewardRedemptionHours
+  if (typeof redemptionHours !== 'number' || !Number.isInteger(redemptionHours)) {
+    return { ok: false, message: '请填写核销有效期（整数小时）。' }
+  }
+  const windowStart = values.rewardCheckinRange?.[0]
+  const windowEnd = values.rewardCheckinRange?.[1]
+  if (!windowStart || !windowEnd) {
+    return { ok: false, message: '请选择完整的签到窗口开始与结束时间。' }
+  }
+  if (shanghaiWallMillis(windowEnd) <= shanghaiWallMillis(windowStart)) {
+    return { ok: false, message: '签到窗口的结束时间必须晚于开始时间。' }
+  }
+
+  const notes = values.rewardNotes?.trim()
+  const parsed = activityRewardPlanSchema.safeParse({
+    prizeName,
+    prizeUnitCostCents: yuanToCents(unitCostYuan),
+    prizeQuantityPerTeam: quantityPerTeam,
+    totalPrizeQuantity: totalQuantity,
+    budgetCapCents: yuanToCents(budgetYuan),
+    claimRecipient: values.rewardClaimRecipient ?? 'leader',
+    checkinWindow: {
+      opensAt: shanghaiFieldsToIso(windowStart),
+      closesAt: shanghaiFieldsToIso(windowEnd),
+    },
+    redemptionValidHours: redemptionHours,
+    ...(notes ? { notes } : {}),
+  })
+  if (!parsed.success) {
+    return { ok: false, message: `奖励计划不符合共享契约：${formatIssues(parsed.error.issues)}` }
+  }
+  return { ok: true, rewardPlan: parsed.data }
+}
+
+/**
+ * Identity used to decide whether a save actually changes the key rules.
+ *
+ * `rewardPlan` is folded to `plan ?? null`, which is the same equality the API
+ * applies after it merges an absent key with the stored plan. Comparing the raw
+ * `undefined`/`null` distinction here would report a change for an ordinary edit
+ * and mint a rule version nobody asked for.
+ */
 function normalizeKeyRules(rules: ActivityKeyRules) {
   return {
     startsAt: rules.startsAt,
@@ -281,6 +392,7 @@ function normalizeKeyRules(rules: ActivityKeyRules) {
     budgetCapCents: rules.budgetCapCents,
     prizeQuantityCap: rules.prizeQuantityCap,
     publicRules: normalizePublicRules(rules.publicRules),
+    rewardPlan: rules.rewardPlan ?? null,
   }
 }
 
@@ -292,6 +404,7 @@ function keyRulesEqual(detail: AdminActivityDetail, next: ActivityKeyRules): boo
     budgetCapCents: detail.budgetCapCents,
     prizeQuantityCap: detail.prizeQuantityCap,
     publicRules: normalizePublicRules(detail.publicRules),
+    rewardPlan: detail.rewardPlan ?? null,
   }
   return JSON.stringify(current) === JSON.stringify(normalizeKeyRules(next))
 }
@@ -311,7 +424,244 @@ export function toFormValues(detail: AdminActivityDetail): ActivityFormValues {
     purchase: detail.publicRules.purchase,
     prizeClaim: detail.publicRules.prizeClaim,
     notes: detail.publicRules.notes ?? '',
+    ...rewardPlanToForm(detail.rewardPlan ?? null),
   }
+}
+
+/**
+ * Projects a server plan into the editable reward-plan fields.
+ *
+ * `rewardPlanBaseline` is the value the form echoes back on save; it is what
+ * lets an untouched plan travel through an unrelated edit unharmed.
+ */
+function rewardPlanToForm(plan: ActivityRewardPlan | null): Partial<ActivityFormValues> {
+  if (!plan) {
+    return {
+      rewardPlanEnabled: false,
+      rewardPrizeName: '',
+      rewardUnitCostYuan: null,
+      rewardQuantityPerTeam: 1,
+      rewardTotalQuantity: null,
+      rewardBudgetYuan: null,
+      rewardClaimRecipient: 'leader',
+      rewardCheckinRange: null,
+      rewardRedemptionHours: 72,
+      rewardNotes: '',
+      rewardPlanBaseline: null,
+    }
+  }
+  return {
+    rewardPlanEnabled: true,
+    rewardPrizeName: plan.prizeName,
+    rewardUnitCostYuan: centsToYuan(plan.prizeUnitCostCents),
+    rewardQuantityPerTeam: plan.prizeQuantityPerTeam,
+    rewardTotalQuantity: plan.totalPrizeQuantity,
+    rewardBudgetYuan: centsToYuan(plan.budgetCapCents),
+    rewardClaimRecipient: plan.claimRecipient,
+    rewardCheckinRange: [
+      isoToShanghai(plan.checkinWindow.opensAt),
+      isoToShanghai(plan.checkinWindow.closesAt),
+    ],
+    rewardRedemptionHours: plan.redemptionValidHours,
+    rewardNotes: plan.notes ?? '',
+    rewardPlanBaseline: plan,
+  }
+}
+
+/**
+ * Reward-plan editor rows.
+ *
+ * Rendered only while the plan switch is on, so an activity without a plan never
+ * shows a half-filled form that looks saveable. Every field maps 1:1 onto
+ * `activityRewardPlanSchema`; the cross-field rules the schema enforces
+ * (window order, stock ≥ per-team, budget ≥ one team) are surfaced here as
+ * plain-language validation instead of a raw contract error at submit time.
+ */
+function RewardPlanFields() {
+  return (
+    <>
+      <Form.Item
+        name="rewardPrizeName"
+        label="奖品名称"
+        rules={[
+          { required: true, whitespace: true, message: '请填写奖品名称' },
+          { max: 60, message: '最多 60 个字符' },
+        ]}
+      >
+        <Input maxLength={60} placeholder="例如：10 斤装东北大米" />
+      </Form.Item>
+
+      <Row gutter={12}>
+        <Col xs={24} sm={12}>
+          <Form.Item
+            name="rewardUnitCostYuan"
+            label="单件成本（元）"
+            rules={[{ required: true, message: '请填写单件成本' }]}
+            extra="库存与预算的金额都按 单件成本 × 数量 计算。"
+          >
+            <InputNumber
+              min={0.01}
+              max={100000}
+              precision={2}
+              style={{ width: '100%' }}
+              placeholder="0.00"
+            />
+          </Form.Item>
+        </Col>
+        <Col xs={24} sm={12}>
+          <Form.Item
+            name="rewardQuantityPerTeam"
+            label="每团奖品数量"
+            rules={[{ required: true, message: '请填写每团奖品数量' }]}
+            extra="按「团队」计，不是按人；一个达标团队领这么多份。"
+          >
+            <InputNumber
+              min={1}
+              max={100}
+              precision={0}
+              style={{ width: '100%' }}
+              placeholder="1"
+            />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      <Row gutter={12}>
+        <Col xs={24} sm={12}>
+          <Form.Item
+            name="rewardTotalQuantity"
+            label="奖品总库存（份）"
+            dependencies={['rewardQuantityPerTeam']}
+            rules={[
+              { required: true, message: '请填写奖品总库存' },
+              ({ getFieldValue }) => ({
+                validator: async (_rule, value: number | null | undefined) => {
+                  const perTeam = getFieldValue('rewardQuantityPerTeam') as number | undefined
+                  if (typeof value !== 'number' || typeof perTeam !== 'number') return
+                  if (value < perTeam) {
+                    throw new Error('总库存不能少于一个团队的数量，否则第一个达标团队就领不到')
+                  }
+                },
+              }),
+            ]}
+          >
+            <InputNumber
+              min={1}
+              max={100000}
+              precision={0}
+              style={{ width: '100%' }}
+              placeholder="0"
+            />
+          </Form.Item>
+        </Col>
+        <Col xs={24} sm={12}>
+          <Form.Item
+            name="rewardBudgetYuan"
+            label="奖励预算上限（元）"
+            dependencies={['rewardUnitCostYuan', 'rewardQuantityPerTeam']}
+            rules={[
+              { required: true, message: '请填写奖励预算上限' },
+              ({ getFieldValue }) => ({
+                validator: async (_rule, value: number | null | undefined) => {
+                  const unit = getFieldValue('rewardUnitCostYuan') as number | undefined
+                  const perTeam = getFieldValue('rewardQuantityPerTeam') as number | undefined
+                  if (typeof value !== 'number' || typeof unit !== 'number') return
+                  if (typeof perTeam !== 'number') return
+                  if (yuanToCents(value) < yuanToCents(unit) * perTeam) {
+                    throw new Error('预算至少要够一个团队，否则第一个达标团队必然 budget_exceeded')
+                  }
+                },
+              }),
+            ]}
+          >
+            <InputNumber
+              min={0.01}
+              max={1000000}
+              precision={2}
+              style={{ width: '100%' }}
+              placeholder="0.00"
+            />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      <Form.Item
+        name="rewardCheckinRange"
+        label="签到窗口（Asia/Shanghai，UTC+08:00）"
+        rules={[
+          {
+            validator: async (_rule, value: unknown) => {
+              const range = value as [Dayjs | null, Dayjs | null] | null | undefined
+              if (!range?.[0] || !range?.[1]) {
+                throw new Error('请选择完整的签到窗口开始与结束时间')
+              }
+              if (shanghaiWallMillis(range[1]) <= shanghaiWallMillis(range[0])) {
+                throw new Error('签到窗口的结束时间必须晚于开始时间')
+              }
+            },
+          },
+        ]}
+        extra="只有落在这个窗口内的签到会被接受；窗口通常应落在活动时间内。"
+      >
+        <DatePicker.RangePicker
+          showTime={{ format: 'HH:mm' }}
+          format="YYYY-MM-DD HH:mm"
+          allowEmpty={[false, false]}
+          placeholder={['签到开始', '签到结束']}
+          style={{ width: '100%' }}
+        />
+      </Form.Item>
+
+      <Row gutter={12}>
+        <Col xs={24} sm={12}>
+          <Form.Item
+            name="rewardClaimRecipient"
+            label="领取人"
+            rules={[{ required: true, message: '请选择领取人' }]}
+            extra="团队达标后由谁出面领取奖励。"
+          >
+            <Select
+              options={[
+                { value: 'leader', label: '仅队长' },
+                { value: 'any_member', label: '任意团员' },
+              ]}
+            />
+          </Form.Item>
+        </Col>
+        <Col xs={24} sm={12}>
+          <Form.Item
+            name="rewardRedemptionHours"
+            label="核销有效期（小时）"
+            rules={[{ required: true, message: '请填写核销有效期' }]}
+            extra="从发码时刻起算，过期后柜台需要重新签发。"
+          >
+            <InputNumber
+              min={1}
+              max={720}
+              precision={0}
+              style={{ width: '100%' }}
+              placeholder="72"
+            />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      <Form.Item
+        name="rewardNotes"
+        label="奖励备注（选填）"
+        rules={[{ max: 500, message: '最多 500 个字符' }]}
+      >
+        <Input.TextArea rows={2} maxLength={500} showCount placeholder="例如：奖品由社区仓库统一发放" />
+      </Form.Item>
+
+      <Alert
+        type="info"
+        showIcon
+        title="资格口径"
+        description="团队满 3 席且该团成员各自完成 3 条已核验签到才达标；自助签到在工作人员现场核验前不计入进度。奖励计划发布后随规则版本冻结，之后修改会生成新版本。"
+      />
+    </>
+  )
 }
 
 function PublicRulesDescriptions({ rules }: { rules: ActivityPublicRules }) {
@@ -481,7 +831,12 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
     const defaultCommunity = isAdmin
       ? communities[0]?.id
       : (assignedCommunities[0]?.id ?? communities[0]?.id)
-    if (defaultCommunity) form.setFieldsValue({ communityId: defaultCommunity })
+    form.setFieldsValue({
+      ...(defaultCommunity ? { communityId: defaultCommunity } : {}),
+      // A brand-new activity has no plan: keep the section collapsed but give
+      // the fields usable starting values for when the operator turns it on.
+      ...rewardPlanToForm(null),
+    })
     // Only the create-drawer opening should reset the form; later community
     // refreshes must not wipe what the operator is typing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1039,6 +1394,23 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
               <Descriptions.Item label="规则版本">
                 {detail.ruleVersion ? `v${detail.ruleVersion}` : '未冻结'}
               </Descriptions.Item>
+              <Descriptions.Item label="正式奖励计划">
+                {detail.rewardPlan ? (
+                  <Space orientation="vertical" size={2}>
+                    <Typography.Text>
+                      {detail.rewardPlan.prizeName} · {formatCents(detail.rewardPlan.prizeUnitCostCents)}{' '}
+                      × {detail.rewardPlan.prizeQuantityPerTeam}/团
+                    </Typography.Text>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      总库存 {detail.rewardPlan.totalPrizeQuantity} · 预算{' '}
+                      {formatCents(detail.rewardPlan.budgetCapCents)} · 核销有效期{' '}
+                      {detail.rewardPlan.redemptionValidHours} 小时
+                    </Typography.Text>
+                  </Space>
+                ) : (
+                  <Typography.Text type="secondary">未配置（居民签到与领奖入口不可用）</Typography.Text>
+                )}
+              </Descriptions.Item>
             </Descriptions>
             <PublicRulesDescriptions rules={detail.publicRules} />
             <Button onClick={closeEditor}>关闭</Button>
@@ -1235,6 +1607,48 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
               <Input.TextArea rows={2} maxLength={500} showCount placeholder="补充说明，可留空" />
             </Form.Item>
 
+            <Typography.Text type="secondary" className="activity-form-section">
+              奖励履约计划（LL-MVP-006 · 发布后冻结为快照，居民签到与领奖依赖它）
+            </Typography.Text>
+
+            <Form.Item
+              name="rewardPlanEnabled"
+              label="配置正式奖励计划"
+              valuePropName="checked"
+              extra="关闭表示该活动没有正式奖品；居民端签到、达标与领取入口都会被服务端以 409 拒绝。只有打开并填写完整，才会计入奖励资格、库存与预算。"
+            >
+              <Switch checkedChildren="已配置" unCheckedChildren="未配置" />
+            </Form.Item>
+
+            <Form.Item
+              noStyle
+              shouldUpdate={(prev, next) =>
+                prev.rewardPlanEnabled !== next.rewardPlanEnabled ||
+                prev.rewardPlanBaseline !== next.rewardPlanBaseline
+              }
+            >
+              {({ getFieldValue }) =>
+                getFieldValue('rewardPlanEnabled') ? (
+                  <RewardPlanFields />
+                ) : (
+                  <Alert
+                    type="info"
+                    showIcon
+                    title={
+                      getFieldValue('rewardPlanBaseline')
+                        ? '保存后该活动的奖励计划将被清空'
+                        : '未配置奖励计划'
+                    }
+                    description={
+                      getFieldValue('rewardPlanBaseline')
+                        ? '当前活动已冻结过奖励计划。关闭开关再保存会显式清空它，并生成新规则版本；已发放的奖励与凭据不受影响，但新的签到与领奖会立即关闭。'
+                        : '未配置奖励计划时，发布后居民签到、达标与领奖入口不可用，服务端返回 409 reward_unavailable。'
+                    }
+                  />
+                )
+              }
+            </Form.Item>
+
             {editorMode === 'edit' && detail?.status === 'draft' ? (
               <Alert
                 type="info"
@@ -1317,6 +1731,28 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
                   </Descriptions.Item>
                   <Descriptions.Item label="奖品数量上限">
                     {version.snapshot.prizeQuantityCap}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="正式奖励计划">
+                    {version.snapshot.rewardPlan ? (
+                      <Space orientation="vertical" size={2}>
+                        <Typography.Text>
+                          {version.snapshot.rewardPlan.prizeName} ·{' '}
+                          {formatCents(version.snapshot.rewardPlan.prizeUnitCostCents)} ×{' '}
+                          {version.snapshot.rewardPlan.prizeQuantityPerTeam}/团
+                        </Typography.Text>
+                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                          总库存 {version.snapshot.rewardPlan.totalPrizeQuantity} · 预算{' '}
+                          {formatCents(version.snapshot.rewardPlan.budgetCapCents)} · 签到窗口{' '}
+                          {formatDateTime(version.snapshot.rewardPlan.checkinWindow.opensAt)} 至{' '}
+                          {formatDateTime(version.snapshot.rewardPlan.checkinWindow.closesAt)} · 核销有效期{' '}
+                          {version.snapshot.rewardPlan.redemptionValidHours} 小时
+                        </Typography.Text>
+                      </Space>
+                    ) : (
+                      <Typography.Text type="secondary">
+                        未配置（该版本下居民签到与领奖入口不可用）
+                      </Typography.Text>
+                    )}
                   </Descriptions.Item>
                 </Descriptions>
                 <PublicRulesDescriptions rules={version.snapshot.publicRules} />

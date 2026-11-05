@@ -34,7 +34,7 @@ export function FilterChipRow({
               type="button"
               aria-pressed={selected}
               onClick={() => onChange(option.value)}
-              className={`min-h-10 shrink-0 whitespace-nowrap rounded-full border px-3.5 text-[12px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 ${
+              className={`min-h-11 shrink-0 whitespace-nowrap rounded-full border px-3.5 text-[12px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 ${
                 selected
                   ? 'border-teal-600 bg-teal-600 text-white'
                   : 'border-slate-200 bg-white text-slate-500'

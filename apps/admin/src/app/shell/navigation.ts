@@ -54,9 +54,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       {
         key: '/activities/checkin',
         label: '报名与核销',
-        description: '签到、福利核销凭据、库存与预算控制。',
-        status: 'planned',
-        planned: ['核销凭据与库存', '预算与重复兑现校验', '核销记录查询'],
+        description: '真实签到核验、团队奖励资格、奖品库存与预算、一次性核销凭据与争议审计。',
+        status: 'ready',
+        planned: [],
         roles: ['admin', 'operator'],
       },
     ],

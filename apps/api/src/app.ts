@@ -37,6 +37,7 @@ import { logEvent } from './log.js'
 import { registerActivityRoutes } from './activities/routes.js'
 import { registerCrmRoutes } from './crm/routes.js'
 import { registerParticipationRoutes } from './participation/routes.js'
+import { registerRewardRoutes } from './rewards/routes.js'
 import { registerCrmebRoutes } from './crmeb/routes.js'
 import type { AppBindings, AppContext, AuthSession, HttpErrorStatus } from './http.js'
 
@@ -870,6 +871,14 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
   })
 
   registerParticipationRoutes(app, {
+    db,
+    config,
+    fail,
+    validCsrf,
+    bodySchemaError,
+  })
+
+  registerRewardRoutes(app, {
     db,
     config,
     fail,

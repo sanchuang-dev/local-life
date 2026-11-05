@@ -292,6 +292,9 @@ function OrdersView() {
       <div className="mt-5">
         <TextLink to="/workbench/leads">返回我的线索</TextLink>
       </div>
+      <div>
+        <TextLink to="/workbench/verify">前往现场核验核销</TextLink>
+      </div>
     </div>
   )
 }
