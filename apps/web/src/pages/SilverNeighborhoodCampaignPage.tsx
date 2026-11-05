@@ -656,7 +656,13 @@ export function SilverNeighborhoodCampaignPage() {
                   真实接入
                 </span>
               </div>
-              <RewardProgressCard auth={auth} progress={rewardProgress} />
+              <RewardProgressCard
+                auth={auth}
+                progress={rewardProgress}
+                activityId={activity?.id ?? null}
+                inviteCode={inviteParam.code}
+                inviteInvalid={inviteParam.invalid}
+              />
             </div>
           ) : (
             <div className="mt-4">

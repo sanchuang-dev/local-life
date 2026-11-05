@@ -10,6 +10,7 @@ import {
 import type { PublicActivityDetail } from '@sanchuang-dev/local-life-contracts'
 import type { useActivityParticipation } from '../../hooks/useActivityParticipation'
 import type { useResidentAuth } from '../../hooks/useResidentAuth'
+import { ActivityLoginCard } from './ActivityLoginCard'
 
 type ResidentAuth = ReturnType<typeof useResidentAuth>
 type Participation = ReturnType<typeof useActivityParticipation>
@@ -141,15 +142,12 @@ export function ParticipationTeamCard({
           </p>
         ) : null}
         <div className="mt-3 grid gap-2">
-          {auth.methods?.wechat ? (
-            <button
-              type="button"
-              onClick={auth.startWechatLogin}
-              className="flex min-h-[48px] w-full items-center justify-center rounded-[14px] bg-teal-700 px-4 text-[14px] font-bold text-white transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
-            >
-              微信授权登录
-            </button>
-          ) : null}
+          {/* WeChat login with its own availability, return-to and retry states. */}
+          <ActivityLoginCard
+            activityId={activity.id}
+            inviteCode={inviteCode}
+            inviteInvalid={inviteInvalid}
+          />
           {auth.methods?.developmentResidentLogin ? (
             <button
               type="button"
@@ -159,11 +157,6 @@ export function ParticipationTeamCard({
             >
               {auth.busy ? '登录中…' : '开发测试登录'}
             </button>
-          ) : null}
-          {auth.methods && !auth.methods.wechat && !auth.methods.developmentResidentLogin ? (
-            <p className="rounded-[12px] bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-500">
-              微信网页授权尚未配置，当前无法登录。
-            </p>
           ) : null}
           {!auth.methods && !auth.loading ? (
             <p className="rounded-[12px] bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-500">
@@ -178,7 +171,7 @@ export function ParticipationTeamCard({
           ) : null}
         </div>
         <p className="mt-3 text-[11px] leading-4 text-slate-400">
-          登录成功后会自动重新读取本活动状态，活动与邀请参数保留在当前链接中。
+          登录成功后会自动重新读取本活动状态，活动与邀请参数保留在当前链接中；登录不会自动报名。
         </p>
       </>
     )

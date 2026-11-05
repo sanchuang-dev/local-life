@@ -130,6 +130,102 @@ export const authSessionResponseSchema = z.discriminatedUnion('authenticated', [
 export type AuthSessionResponse = z.infer<typeof authSessionResponseSchema>
 
 /* -------------------------------------------------------------------------- */
+/* Resident login return target (#92)                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * WeChat web authorization leaves the SPA entirely; the API then decides which
+ * URL the resident lands on afterwards. That decision must never be driven by
+ * unvalidated client input, otherwise the OAuth callback becomes an open
+ * redirect. Both the API (authority) and the H5 client (early feedback before a
+ * round trip) apply the same rules from here instead of keeping two copies.
+ *
+ * Validation is deliberately string-level and runtime-neutral (no `URL`, no
+ * Node/DOM types): this package is imported by the browser bundle, the API and
+ * plain Node tests. The API additionally resolves the accepted value with
+ * `new URL()` before using it, which is where origin equality is double-checked.
+ *
+ * A valid target is:
+ * - a relative absolute-path URL: exactly one leading `/`, never `//host`, so
+ *   it can never name another origin;
+ * - ASCII only and percent-encoded where needed. Backslashes, whitespace,
+ *   control characters and `#` are rejected because URL parsers silently
+ *   reinterpret them (`/\evil.test` parses as host `evil.test`);
+ * - free of `.` / `..` segments, which browsers would collapse into a different
+ *   path than the one that was allowlisted;
+ * - inside the resident H5 allowlist below, so a resident login can never be
+ *   bounced into the back office or an arbitrary page.
+ */
+
+/** App surfaces a resident login may return to. Keep in sync with `App.tsx`. */
+export const RESIDENT_RETURN_TO_PREFIXES = [
+  '/community',
+  '/me',
+  '/life',
+  '/health',
+  '/points',
+  '/gd',
+] as const
+
+/** Upper bound: share links carry `activityId` (36) and an invite code (32). */
+export const RETURN_TO_MAX_LENGTH = 512
+
+/**
+ * Printable ASCII path/query characters. Every other byte must be
+ * percent-encoded, which keeps the value free of spaces, `\`, `#` and control
+ * characters without relying on a URL parser.
+ */
+const SAFE_RETURN_TO_PATTERN = /^\/(?:[A-Za-z0-9\-._~!$&'()*+,;=:@%/?])*$/
+
+const ENCODED_DOT_SEGMENT = /^(?:\.|%2e){1,2}$/i
+
+export type ReturnToRejection = 'invalid_shape' | 'not_allowed_path'
+
+export type ReturnToValidation =
+  | { ok: true; returnTo: string | null }
+  | { ok: false; reason: ReturnToRejection }
+
+/** Prefix match with a path boundary, so `/community-evil` is not accepted. */
+export function isResidentReturnPath(pathname: string): boolean {
+  return RESIDENT_RETURN_TO_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  )
+}
+
+function hasDotPathSegment(pathname: string): boolean {
+  return pathname.split('/').some((segment) => {
+    if (ENCODED_DOT_SEGMENT.test(segment)) return true
+    try {
+      return ENCODED_DOT_SEGMENT.test(decodeURIComponent(segment))
+    } catch {
+      // Malformed percent-encoding cannot be a valid target.
+      return true
+    }
+  })
+}
+
+/**
+ * Validate one return target. `null` / `''` / `undefined` mean "no target was
+ * supplied" and resolve to `returnTo: null`, letting the caller keep its default
+ * landing page.
+ */
+export function validateReturnTo(raw: unknown): ReturnToValidation {
+  if (raw === undefined || raw === null || raw === '') return { ok: true, returnTo: null }
+  if (typeof raw !== 'string') return { ok: false, reason: 'invalid_shape' }
+  if (raw !== raw.trim() || raw.length > RETURN_TO_MAX_LENGTH) {
+    return { ok: false, reason: 'invalid_shape' }
+  }
+  if (!SAFE_RETURN_TO_PATTERN.test(raw)) return { ok: false, reason: 'invalid_shape' }
+  if (raw.startsWith('//')) return { ok: false, reason: 'invalid_shape' }
+
+  const pathname = raw.split('?', 1)[0] ?? ''
+  if (hasDotPathSegment(pathname)) return { ok: false, reason: 'invalid_shape' }
+  if (!isResidentReturnPath(pathname)) return { ok: false, reason: 'not_allowed_path' }
+
+  return { ok: true, returnTo: raw }
+}
+
+/* -------------------------------------------------------------------------- */
 /* Activity domain (#59 LL-MVP-003)                                           */
 /* -------------------------------------------------------------------------- */
 
