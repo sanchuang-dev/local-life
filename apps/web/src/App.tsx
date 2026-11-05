@@ -1,5 +1,5 @@
 import { Route, Routes } from 'react-router'
-import { MiniProgramShell } from './components/MiniProgramShell'
+import { AppShell } from './components/shell/AppShell'
 import { CommunityActivityPage } from './pages/CommunityActivityPage'
 import { CommunityBroadcastPage } from './pages/CommunityBroadcastPage'
 import { CommunityCulturePage } from './pages/CommunityCulturePage'
@@ -33,7 +33,7 @@ import { WorkbenchVerifyPage } from './pages/workbench/WorkbenchVerifyPage'
 
 export default function App() {
   return (
-    <MiniProgramShell>
+    <AppShell>
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/gd" element={<GdPage />} />
@@ -72,6 +72,6 @@ export default function App() {
         </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
-    </MiniProgramShell>
+    </AppShell>
   )
 }
