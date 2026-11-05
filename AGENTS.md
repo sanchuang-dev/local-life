@@ -13,7 +13,7 @@
 
 ## 2. 技术栈与目录
 
-固定栈：Node.js 22+、pnpm 10、React 19 + TypeScript + Vite、Tailwind CSS 4、React Router（HashRouter）、Lucide；管理台 Ant Design 6；API 为 Hono + zod + Drizzle ORM + SQLite。实际版本以各 `package.json` 与 `pnpm-lock.yaml` 为准。
+固定栈：Node.js 22+、pnpm 10、React 19 + TypeScript + Vite、Tailwind CSS 4、React Router（线上 MVP BrowserRouter；Pages 预览保留 HashRouter）、Lucide；管理台 Ant Design 6；API 为 Hono + zod + Drizzle ORM + SQLite。实际版本以各 `package.json` 与 `pnpm-lock.yaml` 为准。
 
 ```text
 apps/web/       # 居民移动端 H5，保留 /local-life/ Pages base
@@ -25,7 +25,7 @@ docs/engineering/    # 工程边界、身份/权限、安全配置与验证证�
 
 - 根目录只放 workspace 配置、锁文件、文档和工作流；业务代码进 `apps/*`，跨端契约进 `packages/*`。
 - 不引入 Nx / Turborepo / 微服务框架；不为「以后可能用到」预建空领域层。
-- 路由统一走 React Router；H5 继续用 `HashRouter` 兼容 GitHub Pages 深链接，不新增第二套路由逻辑。
+- 路由统一走 React Router；线上 MVP 的 H5 和 Admin 均使用 `BrowserRouter`，由已有 Caddy `try_files` 提供深链刷新回退；仅 GitHub Pages 的 H5 静态预览继续使用 `HashRouter`，共用一份 Route 表，不复制业务路由逻辑。
 - TypeScript 明确约束业务数据与 Props，不用无边界 `any`；后端代码保持 strict。
 
 ## 3. 命令与端口

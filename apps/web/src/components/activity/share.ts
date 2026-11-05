@@ -9,8 +9,8 @@ export const SILVER_NEIGHBORHOOD_ACTIVITY_PATH = '/community/activity/silver-nei
  * The URL must keep the real `activityId` (and, for a member inviting friends,
  * the team's `inviteCode`). A static GitHub Pages URL would drop both, so the
  * origin and the Vite base are read from the running site instead. `BASE_URL`
- * keeps the `/local-life/` Pages base working, and the hash query is what the
- * HashRouter reads back on the receiving side.
+ * keeps the `/local-life/` Pages preview working; the online MVP uses clean
+ * history paths so invitation URLs can be opened and refreshed directly.
  */
 export function buildActivityShareUrl(
   activityId: string,
@@ -19,7 +19,9 @@ export function buildActivityShareUrl(
   const params = new URLSearchParams({ activityId })
   if (inviteCode) params.set('invite', inviteCode)
   const origin = typeof window === 'undefined' ? '' : window.location.origin
-  return `${origin}${import.meta.env.BASE_URL}#${SILVER_NEIGHBORHOOD_ACTIVITY_PATH}?${params.toString()}`
+  const base = import.meta.env.BASE_URL
+  const route = `${SILVER_NEIGHBORHOOD_ACTIVITY_PATH}?${params.toString()}`
+  return base === '/' ? `${origin}${route}` : `${origin}${base}#${route}`
 }
 
 export type ParsedInviteParam = {

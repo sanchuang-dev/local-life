@@ -204,6 +204,14 @@ jobs:
             curl -fsS --connect-timeout 8 --max-time 20 "https://$host/" -o "$RUNNER_TEMP/$host.html"
             grep -Eq '(src|href)="/assets/' "$RUNNER_TEMP/$host.html"
             echo "MVP_PUBLIC_INDEX_CHECK_PASS=$host"
+            case "$host" in
+              local.proto.3cgroup.cn) deep_link=/community/activity/silver-neighborhood ;;
+              local-admin.proto.3cgroup.cn) deep_link=/communities ;;
+              *) exit 1 ;;
+            esac
+            curl -fsS --connect-timeout 8 --max-time 20 "https://$host$deep_link" -o "$RUNNER_TEMP/$host.deep.html"
+            cmp -s "$RUNNER_TEMP/$host.html" "$RUNNER_TEMP/$host.deep.html"
+            echo "MVP_BROWSER_ROUTE_FALLBACK_PASS=$host$deep_link"
             asset="$(grep -oE '(src|href)="/assets/[^"]+' "$RUNNER_TEMP/$host.html" | head -n1 | cut -d'"' -f2)"
             test -n "$asset"
             echo "MVP_PUBLIC_ASSET_CHECK_BEGIN=$host"
