@@ -7,6 +7,12 @@ import App from './App'
 import { adminTheme } from './app/theme'
 import './index.css'
 
+// Bookmarked /#/... links must continue opening their original page.
+const oldRoute = window.location.hash.slice(1)
+if (window.location.pathname === '/' && oldRoute.startsWith('/') && !oldRoute.startsWith('//')) {
+  window.history.replaceState(window.history.state, '', oldRoute)
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ConfigProvider locale={zhCN} theme={adminTheme}>
