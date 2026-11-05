@@ -1,83 +1,84 @@
-import { ChevronRight, ClipboardList, Gift, LogOut, UserRound } from 'lucide-react'
-import { Link } from 'react-router'
+import { ChevronRight, ClipboardList, Gift, LogOut, ShieldCheck, UserRound } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router'
 import { DemoNote } from '../components/DemoNote'
-import { PendingNotice } from '../components/PendingNotice'
-import { SectionHeading } from '../components/home/SectionHeading'
 import { staffRoleLabels } from '../components/crm/crmLabels'
-import { usePendingNotice } from '../hooks/usePendingNotice'
+import { useActivityParticipation } from '../hooks/useActivityParticipation'
+import { usePublicActivity } from '../hooks/usePublicActivity'
 import { useResidentAuth } from '../hooks/useResidentAuth'
-import {
-  meDemoNote,
-  meProfile,
-  meServices,
-  meSettings,
-  meStats,
-  type MeServiceItem,
-} from '../mocks/me'
+import { useRewardWallet } from '../hooks/useRewardWallet'
 
-const toneStyles = {
+const statTones = {
   mint: 'bg-[#e8f6f0] text-[#388b77]',
   peach: 'bg-[#fff3e6] text-[#c6925c]',
 } as const
 
-function ServiceRow({
-  item,
-  onPending,
-}: {
-  item: MeServiceItem
-  onPending: (notice: string) => void
-}) {
-  const Icon = item.icon
-  const content = (
-    <>
-      <span
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${toneStyles[item.tone]}`}
-        aria-hidden="true"
-      >
-        <Icon size={18} strokeWidth={1.7} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[14px] font-semibold text-slate-700">{item.label}</span>
-        {item.meta ? (
-          <span className="mt-0.5 block text-[11px] leading-4 text-slate-400">{item.meta}</span>
-        ) : null}
-      </span>
-      {item.to ? (
-        <ChevronRight size={17} className="shrink-0 text-slate-300" aria-hidden="true" />
-      ) : (
-        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-400">
-          演示
-        </span>
-      )}
-    </>
-  )
-
-  if (item.to) {
-    return (
-      <Link
-        to={item.to}
-        state={{ from: '/me' }}
-        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-teal-600"
-      >
-        {content}
-      </Link>
-    )
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={() => item.pendingNotice && onPending(item.pendingNotice)}
-      className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-teal-600"
-    >
-      {content}
-    </button>
-  )
-}
-
+/**
+ * 我的 — the resident account page.
+ *
+ * Everything rendered here is real account state: the session identity (or an
+ * explicit logged-out state), this activity's participation/team from the
+ * participation API and the wallet entries from the team-reward API. The old
+ * mock profile ("张阿姨"), demo stats (2680 points / 3 activities / 2 coupons),
+ * example services and settings rows are no longer rendered; the resident
+ * account, rewards and staff access remain.
+ */
 export function MePage() {
-  const { message, show, dismiss } = usePendingNotice()
   const auth = useResidentAuth()
+  const [searchParams] = useSearchParams()
+  // `?activityId=` lets a link open the account page already scoped to the
+  // activity the resident came from; otherwise the currently published activity
+  // of the public list is used. There is no cross-activity registration endpoint,
+  // so the page never invents a list of "my activities".
+  const requestedActivityId = searchParams.get('activityId')?.trim() || null
+  const { state: activityState } = usePublicActivity(requestedActivityId)
+  const activity = activityState.status === 'ready' ? activityState.activity : null
+  const participation = useActivityParticipation({
+    activityId: activity?.id ?? null,
+    sessionKey: auth.session?.user.id ?? null,
+    authLoading: auth.loading,
+  })
+  const wallet = useRewardWallet({
+    sessionKey: auth.session?.user.id ?? null,
+    authLoading: auth.loading,
+  })
+
+  const participationData = participation.state.status === 'ready' ? participation.state.data : null
+  const joined = participationData?.participation ?? null
+  const team = participationData?.team ?? null
+  const rewardCount = wallet.state.status === 'ready' ? wallet.state.entries.length : null
+  const activityHref = activity ? `/?activityId=${encodeURIComponent(activity.id)}` : '/'
+
+  const stats = [
+    {
+      id: 'join',
+      label: '当前活动报名',
+      value:
+        participation.state.status === 'loading' || participation.state.status === 'idle'
+          ? '读取中'
+          : joined
+            ? '已报名'
+            : '未报名',
+      hint: activity ? activity.title : '暂无已发布活动',
+      to: activityHref,
+      tone: 'mint' as const,
+    },
+    {
+      id: 'team',
+      label: '三人团',
+      value: team ? `${team.seatsFilled}/${team.seatsTotal}` : '未成团',
+      hint: team?.status === 'locked' ? '已成团' : '可在活动页邀请街坊',
+      to: activityHref,
+      tone: 'peach' as const,
+    },
+    {
+      id: 'rewards',
+      label: '我的奖励',
+      value: rewardCount === null ? '—' : String(rewardCount),
+      hint: rewardCount === null ? '读取中' : '真实奖励条目',
+      to: '/me/rewards',
+      tone: 'mint' as const,
+    },
+  ]
 
   return (
     <div className="px-4 pb-7 pt-4">
@@ -90,15 +91,19 @@ export function MePage() {
             <UserRound size={28} strokeWidth={1.6} />
           </span>
           <div className="min-w-0 flex-1">
-            <h1 className="text-[19px] font-semibold tracking-tight text-slate-900">
-              {auth.session?.user.displayName || meProfile.name}
+            <h1 className="break-words text-[19px] font-semibold tracking-tight text-slate-900">
+              {auth.session?.user.displayName || '未登录'}
             </h1>
             <p className="mt-0.5 text-[11px] leading-4 text-slate-400">
-              {auth.session ? '微信居民账户 · 已登录' : meProfile.community}
+              {auth.session
+                ? auth.session.staff
+                  ? `${staffRoleLabels[auth.session.staff.role]} · 已登录`
+                  : '居民账户 · 已登录'
+                : '登录后查看你的活动、三人团与奖励'}
             </p>
           </div>
           <span className="shrink-0 rounded-full bg-[#fff3e6] px-2 py-1 text-[10px] font-medium text-[#a96b2f]">
-            {auth.session ? '已登录' : meProfile.tag}
+            {auth.session ? '已登录' : '未登录'}
           </span>
         </div>
 
@@ -163,34 +168,33 @@ export function MePage() {
           <p className="mt-3 text-[11px] text-slate-400">正在读取账户状态…</p>
         )}
 
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          {meStats.map((stat) => {
-            const className = `flex min-h-[72px] min-w-0 flex-col items-center justify-center rounded-[16px] px-1 py-2 text-center transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 ${toneStyles[stat.tone]}`
-            const content = (
-              <>
-                <span className="text-[22px] font-semibold leading-none tracking-tight">
-                  {stat.value}
-                </span>
-                <span className="mt-1.5 text-[11px] font-medium">{stat.label}</span>
-              </>
-            )
-
-            return stat.to ? (
-              <Link key={stat.id} to={stat.to} state={{ from: '/me' }} className={className}>
-                {content}
-              </Link>
-            ) : (
-              <button
-                key={stat.id}
-                type="button"
-                onClick={() => stat.pendingNotice && show(stat.pendingNotice)}
-                className={className}
-              >
-                {content}
-              </button>
-            )
-          })}
-        </div>
+        {auth.session ? (
+          <>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {stats.map((stat) => (
+                <Link
+                  key={stat.id}
+                  to={stat.to}
+                  state={{ from: '/me' }}
+                  className={`flex min-h-[76px] min-w-0 flex-col items-center justify-center rounded-[16px] px-1 py-2 text-center transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 ${statTones[stat.tone]}`}
+                >
+                  <span className="text-[17px] font-semibold leading-none tracking-tight">
+                    {stat.value}
+                  </span>
+                  <span className="mt-1.5 text-[11px] font-medium">{stat.label}</span>
+                  <span className="mt-0.5 line-clamp-1 text-[9px] leading-3 opacity-70">
+                    {stat.hint}
+                  </span>
+                </Link>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] leading-4 text-slate-400">
+              以上状态读取自真实服务，展示当前活动的报名与三人团
+              {activity ? `（${activity.title}）` : ''}；其他活动的报名记录请在对应活动页查看。
+              活动暂无发布时不会显示示例报名或虚构团队。
+            </p>
+          </>
+        ) : null}
       </article>
 
       <Link
@@ -234,39 +238,32 @@ export function MePage() {
           </span>
           <ChevronRight size={17} className="shrink-0 text-[#52786c]" aria-hidden="true" />
         </Link>
-      ) : null}
+      ) : (
+        <Link
+          to="/workbench"
+          state={{ from: '/me' }}
+          className="mt-4 flex items-center gap-3 rounded-[18px] border border-slate-100 bg-white px-4 py-3.5 shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+        >
+          <span
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[#f4f8f6] text-[#52786c]"
+            aria-hidden="true"
+          >
+            <ShieldCheck size={20} strokeWidth={1.8} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[14px] font-semibold text-slate-800">工作人员入口</span>
+            <span className="mt-0.5 block text-[11px] leading-4 text-slate-400">
+              网格员使用工作台账号登录，居民账户不会自动获得工作人员权限
+            </span>
+          </span>
+          <ChevronRight size={17} className="shrink-0 text-slate-300" aria-hidden="true" />
+        </Link>
+      )}
 
-      <DemoNote>{meDemoNote}</DemoNote>
-
-      <section className="mt-6">
-        <SectionHeading title="我的服务" note="示例数据" />
-        <div className="overflow-hidden rounded-[18px] border border-slate-100 bg-white shadow-sm">
-          {meServices.map((item, index) => (
-            <div key={item.id} className={index > 0 ? 'border-t border-slate-100' : ''}>
-              <ServiceRow item={item} onPending={show} />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="mt-6">
-        <SectionHeading title="设置与帮助" note="部分待接入" />
-        <div className="overflow-hidden rounded-[18px] border border-slate-100 bg-white shadow-sm">
-          {meSettings.map((item, index) => (
-            <div key={item.id} className={index > 0 ? 'border-t border-slate-100' : ''}>
-              <ServiceRow item={item} onPending={show} />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <div className="mt-6">
-        <DemoNote tone="warn">
-          当前仅居民身份接入真实账户系统；积分、活动、优惠券、订单、收藏与客服仍是演示占位，不产生真实交易或履约记录。
-        </DemoNote>
-      </div>
-
-      <PendingNotice message={message} onDismiss={dismiss} />
+      <DemoNote tone="warn">
+        本页只展示真实账户、当前活动的报名与三人团状态、以及我的奖励。积分、优惠券、订单、收藏、
+        健康档案与地址管理等尚未接入真实服务的入口，已从本页移除示例资料与示例统计。
+      </DemoNote>
     </div>
   )
 }

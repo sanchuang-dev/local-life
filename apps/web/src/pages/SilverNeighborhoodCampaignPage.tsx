@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   AlertTriangle,
+  ArrowLeft,
   CheckCircle2,
   Check,
   LockKeyhole,
@@ -345,6 +346,14 @@ export function SilverNeighborhoodCampaignPage() {
   const inviteParam = parseInviteParam(searchParams.get('invite'))
   const { state: activityState, retry: retryActivity } = usePublicActivity(requestedActivityId)
   const activity = activityState.status === 'ready' ? activityState.activity : null
+  // The resident root (`/`) is now the activity home; this page stays the full
+  // playbook sub-page reachable from old deep links and QR codes. The back link
+  // keeps the same real activity and invite parameters so both entries agree.
+  const homeParams = new URLSearchParams()
+  if (activity) homeParams.set('activityId', activity.id)
+  if (inviteParam.code) homeParams.set('invite', inviteParam.code)
+  const homeQuery = homeParams.toString()
+  const homeUrl = homeQuery ? `/?${homeQuery}` : '/'
   const auth = useResidentAuth()
   const participation = useActivityParticipation({
     activityId: activity?.id ?? null,
@@ -488,6 +497,16 @@ export function SilverNeighborhoodCampaignPage() {
 
   return (
     <div className="pb-7">
+      <nav className="bg-[#eaf5e9] px-3 pt-2" aria-label="活动页导航">
+        <Link
+          to={homeUrl}
+          state={{ from: activityPath }}
+          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-1 text-[13px] font-medium text-[#27725b] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+        >
+          <ArrowLeft size={16} aria-hidden="true" />
+          返回活动首页
+        </Link>
+      </nav>
       <section className="relative overflow-hidden bg-[#eaf5e9]" aria-label="活动信息">
         <div className="relative">
           <img
