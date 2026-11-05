@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { App as AntdApp, ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
+import { createMemoryRouter, RouterProvider, useLocation } from 'react-router'
 import type {
   AdminCrmFilterOptionsResponse,
   CrmFollowUp,
@@ -251,18 +252,43 @@ function stubApi(routes: ReadonlyArray<readonly [string, Handler]>): FetchCall[]
   return calls
 }
 
-function renderPage(session: AuthenticatedSession) {
-  return render(
+function LocationProbe() {
+  const location = useLocation()
+  return <div data-testid="location-search">{location.search}</div>
+}
+
+function renderPage(session: AuthenticatedSession, initialPath = '/customers') {
+  const router = createMemoryRouter(
+    [{ path: '/customers', element: <><CrmPage /><LocationProbe /></> }],
+    { initialEntries: [initialPath] },
+  )
+  const result = render(
     <ConfigProvider locale={zhCN} theme={adminTheme}>
       <AntdApp>
         <AdminAuthProvider
           value={{ session, busy: false, error: null, onLogout: async () => undefined }}
         >
-          <CrmPage />
+          <RouterProvider router={router} />
         </AdminAuthProvider>
       </AntdApp>
     </ConfigProvider>,
   )
+  return { ...result, router }
+}
+
+/** The secondary nav's selected state, independent of the panel DOM. */
+function tabSelected(name: string): boolean {
+  return screen.getByRole('tab', { name }).getAttribute('aria-selected') === 'true'
+}
+
+/**
+ * The visible view body. The antd tab bar also emits its own (empty) tabpanels,
+ * so view assertions target the page-owned `data-crm-view` wrapper instead.
+ */
+function viewVisible(view: 'leads' | 'orders'): boolean {
+  const element = document.querySelector<HTMLElement>(`[data-crm-view="${view}"]`)
+  expect(element).toBeTruthy()
+  return element?.hidden === false
 }
 
 /** The advanced-filter modal is force-rendered, so every field label appears twice. */
@@ -343,6 +369,126 @@ describe('CrmPage permission boundary', () => {
 
     expect(await screen.findByText('没有业务受理单权限')).toBeTruthy()
     expect(screen.getByText('没有业务单查询权限')).toBeTruthy()
+  })
+})
+
+/** Default lead and order lists for the URL/navigation tests. */
+function navigationRoutes(): ReadonlyArray<readonly [string, Handler]> {
+  return [
+    stubListOptions(),
+    [
+      '/api/admin/crm/leads?',
+      () => json({ items: [leadSummary()], total: 1, page: 1, pageSize: 20 }),
+    ],
+    [
+      '/api/admin/crm/orders?',
+      () => json({ items: [orderSummary()], total: 1, page: 1, pageSize: 20 }),
+    ],
+  ]
+}
+
+describe('CrmPage secondary navigation URL state', () => {
+  it('opens ?view=orders directly and keeps the view after a remount (refresh)', async () => {
+    stubApi(navigationRoutes())
+
+    const first = renderPage(ADMIN_SESSION, '/customers?view=orders')
+    expect(await screen.findByText('GD20261104001')).toBeTruthy()
+    expect(tabSelected('业务受理单')).toBe(true)
+    expect(viewVisible('orders')).toBe(true)
+    expect(viewVisible('leads')).toBe(false)
+    expect(screen.getByTestId('location-search').textContent).toBe('?view=orders')
+    first.unmount()
+
+    renderPage(ADMIN_SESSION, '/customers?view=orders')
+    expect(await screen.findByText('GD20261104001')).toBeTruthy()
+    expect(tabSelected('业务受理单')).toBe(true)
+  })
+
+  it('falls back to leads for a missing view param', async () => {
+    const calls = stubApi(navigationRoutes())
+
+    renderPage(ADMIN_SESSION)
+
+    expect(await screen.findByText('张三')).toBeTruthy()
+    expect(tabSelected('客户线索')).toBe(true)
+    expect(viewVisible('leads')).toBe(true)
+    expect(viewVisible('orders')).toBe(false)
+    expect(screen.getByTestId('location-search').textContent).toBe('')
+    expect(calledUrls(calls).some((url) => url.startsWith('/api/admin/crm/orders?'))).toBe(false)
+  })
+
+  it('falls back to leads and normalizes an invalid view param', async () => {
+    stubApi(navigationRoutes())
+
+    renderPage(ADMIN_SESSION, '/customers?view=archived')
+
+    expect(await screen.findByText('张三')).toBeTruthy()
+    expect(tabSelected('客户线索')).toBe(true)
+    // The invalid value is removed with a replace navigation, not left in a
+    // copyable link that would show leads while claiming another view.
+    await waitFor(() => {
+      expect(screen.getByTestId('location-search').textContent).toBe('')
+    })
+  })
+
+  it('pushes the view into history so back/forward restore the right list', async () => {
+    stubApi(navigationRoutes())
+
+    const { router } = renderPage(ADMIN_SESSION)
+    expect(await screen.findByText('张三')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('tab', { name: '业务受理单' }))
+    expect(await screen.findByText('GD20261104001')).toBeTruthy()
+    expect(screen.getByTestId('location-search').textContent).toBe('?view=orders')
+    expect(tabSelected('业务受理单')).toBe(true)
+
+    fireEvent.click(screen.getByRole('tab', { name: '客户线索' }))
+    await waitFor(() => {
+      expect(screen.getByTestId('location-search').textContent).toBe('')
+    })
+    expect(tabSelected('客户线索')).toBe(true)
+
+    await act(async () => {
+      await router.navigate(-1)
+    })
+    expect(tabSelected('业务受理单')).toBe(true)
+    expect(viewVisible('orders')).toBe(true)
+    expect(screen.getByTestId('location-search').textContent).toBe('?view=orders')
+
+    await act(async () => {
+      await router.navigate(1)
+    })
+    expect(tabSelected('客户线索')).toBe(true)
+    expect(screen.getByTestId('location-search').textContent).toBe('')
+  })
+
+  it('keeps a submitted lead filter when switching views and back', async () => {
+    const calls = stubApi(navigationRoutes())
+
+    renderPage(ADMIN_SESSION)
+    expect(await screen.findByText('张三')).toBeTruthy()
+
+    fireEvent.change(firstLabel('关键词'), { target: { value: '张' } })
+    fireEvent.click(screen.getByRole('button', { name: /查\s*询/ }))
+    await waitFor(() => {
+      expect(
+        calledUrls(calls).filter((url) => url.startsWith('/api/admin/crm/leads?')).length,
+      ).toBe(2)
+    })
+
+    fireEvent.click(screen.getByRole('tab', { name: '业务受理单' }))
+    expect(await screen.findByText('GD20261104001')).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: '客户线索' }))
+
+    const keyword = firstLabel('关键词') as HTMLInputElement
+    expect(keyword.value).toBe('张')
+    // The lead panel stayed mounted: no extra list request on the way back.
+    expect(
+      calledUrls(calls).filter((url) => url.startsWith('/api/admin/crm/leads?')).length,
+    ).toBe(2)
+    expect(
+      calledUrls(calls).filter((url) => url.startsWith('/api/admin/crm/orders?')).length,
+    ).toBe(1)
   })
 })
 

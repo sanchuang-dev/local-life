@@ -15,6 +15,7 @@ import {
   Typography,
 } from 'antd'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router'
 import type {
   AdminCrmFilterOptionsResponse,
   CrmBusinessType,
@@ -63,6 +64,14 @@ import './crm.css'
  */
 
 type CrmTab = 'leads' | 'orders'
+
+/**
+ * The URL is the only source of truth for the secondary view: `/customers`
+ * (or any unknown `view`) is leads, `?view=orders` is the service-order list.
+ */
+function crmViewFromSearch(params: URLSearchParams): CrmTab {
+  return params.get('view') === 'orders' ? 'orders' : 'leads'
+}
 
 const LEAD_STATUS_META: Record<CrmLeadStatus, { label: string; color: string }> = {
   new: { label: '新线索', color: 'blue' },
@@ -223,11 +232,46 @@ export function CrmPage() {
 }
 
 function CrmConsole({ session }: { session: AuthenticatedSession }) {
-  const [tab, setTab] = useState<CrmTab>('leads')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const rawView = searchParams.get('view')
+  const view = crmViewFromSearch(searchParams)
+  // Leads starts mounted for the default view; the order panel mounts on first
+  // visit and then stays mounted, so switching tabs never discards its filters.
+  const [mountedViews, setMountedViews] = useState<Record<CrmTab, boolean>>(() => ({
+    leads: view === 'leads',
+    orders: view === 'orders',
+  }))
   const [filterOptions, setFilterOptions] = useState<AdminCrmFilterOptionsResponse | null>(null)
   const [optionsError, setOptionsError] = useState<string | null>(null)
   const [optionsToken, setOptionsToken] = useState(0)
   const role = session.staff.role
+
+  useEffect(() => {
+    setMountedViews((current) => (current[view] ? current : { ...current, [view]: true }))
+  }, [view])
+
+  // Unknown `view` values fall back to leads and are normalized once, without
+  // adding a history entry that back/forward would surface as a dead link.
+  useEffect(() => {
+    if (rawView === null || rawView === 'leads' || rawView === 'orders') return
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      next.delete('view')
+      return next
+    }, { replace: true })
+  }, [rawView, setSearchParams])
+
+  /** Tab clicks push a history entry so browser back/forward restore the view. */
+  const selectView = (key: string) => {
+    const nextView: CrmTab = key === 'orders' ? 'orders' : 'leads'
+    if (nextView === view) return
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      if (nextView === 'leads') next.delete('view')
+      else next.set('view', 'orders')
+      return next
+    })
+  }
 
   useEffect(() => {
     let active = true
@@ -254,6 +298,17 @@ function CrmConsole({ session }: { session: AuthenticatedSession }) {
         title="客户与业务单"
         description="按授权社区与网格员查询客户线索、跟进与广电业务受理单；人工核验后才记为有效成交。"
         status={<Tag color="green">真实数据</Tag>}
+        subnav={
+          <Tabs
+            className="crm-view-tabs"
+            activeKey={view}
+            onChange={selectView}
+            items={[
+              { key: 'leads', label: '客户线索' },
+              { key: 'orders', label: '业务受理单' },
+            ]}
+          />
+        }
       />
 
       <div className="page-stack">
@@ -286,26 +341,16 @@ function CrmConsole({ session }: { session: AuthenticatedSession }) {
           />
         ) : null}
 
-        <Tabs
-          activeKey={tab}
-          onChange={(key) => setTab(key === 'orders' ? 'orders' : 'leads')}
-          items={[
-            {
-              key: 'leads',
-              label: '客户线索',
-              children: (
-                <LeadPanel session={session} filterOptions={filterOptions} />
-              ),
-            },
-            {
-              key: 'orders',
-              label: '业务受理单',
-              children: (
-                <OrderPanel session={session} filterOptions={filterOptions} />
-              ),
-            },
-          ]}
-        />
+        <div className="crm-view" data-crm-view="leads" hidden={view !== 'leads'}>
+          {mountedViews.leads ? (
+            <LeadPanel session={session} filterOptions={filterOptions} />
+          ) : null}
+        </div>
+        <div className="crm-view" data-crm-view="orders" hidden={view !== 'orders'}>
+          {mountedViews.orders ? (
+            <OrderPanel session={session} filterOptions={filterOptions} />
+          ) : null}
+        </div>
       </div>
     </div>
   )

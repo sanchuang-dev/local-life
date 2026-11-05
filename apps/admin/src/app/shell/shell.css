@@ -257,6 +257,36 @@
   align-items: center;
 }
 
+/*
+ * Optional second-level navigation (`PageHeader` subnav slot): a full-width row
+ * below the title/description whose tab bar ends on the header's bottom edge.
+ * The header border stays the single divider (the antd nav rule is dropped) and
+ * the active ink bar sits on it instead of floating above a gray gap.
+ */
+.page-header-with-subnav {
+  flex-wrap: wrap;
+  row-gap: 4px;
+  padding-bottom: 0;
+}
+
+.page-header-subnav {
+  flex: 1 0 100%;
+  min-width: 0;
+}
+
+.page-header-subnav .ant-tabs-nav {
+  margin-bottom: 0;
+}
+
+.page-header-subnav .ant-tabs-nav::before {
+  border-bottom: 0;
+}
+
+/* The slot carries navigation only; panels stay in the scrolling page body. */
+.page-header-subnav .ant-tabs-content-holder {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .app-header {
     padding-inline: 12px !important;
