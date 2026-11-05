@@ -1,7 +1,9 @@
-import { ChevronRight, ClipboardList, Gift, LogOut, UserRound } from 'lucide-react'
+import { useState } from 'react'
+import { ChevronRight, ClipboardList, Gift, LogOut, Smartphone, UserRound } from 'lucide-react'
 import { Link } from 'react-router'
 import { DemoNote } from '../components/DemoNote'
 import { PendingNotice } from '../components/PendingNotice'
+import { PhoneVerificationForm } from '../components/auth/PhoneVerificationForm'
 import { SectionHeading } from '../components/home/SectionHeading'
 import { staffRoleLabels } from '../components/crm/crmLabels'
 import { usePendingNotice } from '../hooks/usePendingNotice'
@@ -78,6 +80,7 @@ function ServiceRow({
 export function MePage() {
   const { message, show, dismiss } = usePendingNotice()
   const auth = useResidentAuth()
+  const [showBindForm, setShowBindForm] = useState(false)
 
   return (
     <div className="px-4 pb-7 pt-4">
@@ -94,7 +97,7 @@ export function MePage() {
               {auth.session?.user.displayName || meProfile.name}
             </h1>
             <p className="mt-0.5 text-[11px] leading-4 text-slate-400">
-              {auth.session ? '微信居民账户 · 已登录' : meProfile.community}
+              {auth.session ? '居民账户 · 已登录' : meProfile.community}
             </p>
           </div>
           <span className="shrink-0 rounded-full bg-[#fff3e6] px-2 py-1 text-[10px] font-medium text-[#a96b2f]">
@@ -128,29 +131,95 @@ export function MePage() {
                   {auth.busy ? '登录中…' : '开发测试登录'}
                 </button>
               )}
-              {auth.methods && !auth.methods.wechat && !auth.methods.developmentResidentLogin && (
-                <span className="text-[11px] text-slate-500">微信网页授权尚未配置，当前无法登录。</span>
-              )}
-              {!auth.methods && !auth.loading && (
-                <span className="text-[11px] text-slate-500">账户服务暂不可用，请稍后重试。</span>
-              )}
             </div>
+
+            {auth.phoneStatus ? (
+              <PhoneVerificationForm
+                purpose="login"
+                configured={auth.phoneStatus.configured}
+                title="手机号验证码登录"
+                description="用本人手机号接收一次性验证码登录。同一手机号始终对应同一个居民账户，活动报名与奖励归属不会因登录方式改变而丢失。"
+                submitLabel="手机号登录"
+                onRequestCode={(phone) => auth.requestPhoneCode(phone, 'login')}
+                onSubmit={(phone, code) => auth.loginWithPhone(phone, code)}
+              />
+            ) : null}
+
+            {auth.methods &&
+              !auth.methods.wechat &&
+              !auth.methods.developmentResidentLogin &&
+              !auth.phoneStatus?.configured && (
+                <span className="mt-2 block text-[11px] text-slate-500">
+                  当前没有可用的登录方式，请联系社区运营人员。
+                </span>
+              )}
+            {!auth.methods && !auth.loading && (
+              <span className="mt-2 block text-[11px] text-slate-500">
+                账户服务暂不可用，请稍后重试。
+              </span>
+            )}
           </div>
         )}
 
         {auth.session && (
-          <div className="mt-3 flex items-center justify-between">
-            <span className="text-[11px] text-slate-400">平台居民 ID：{auth.session.user.id.slice(0, 8)}…</span>
-            <button
-              type="button"
-              disabled={auth.busy}
-              onClick={() => void auth.logout()}
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50"
-            >
-              <LogOut size={14} />
-              退出登录
-            </button>
-          </div>
+          <>
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">平台居民 ID：{auth.session.user.id.slice(0, 8)}…</span>
+              <button
+                type="button"
+                disabled={auth.busy}
+                onClick={() => void auth.logout()}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+              >
+                <LogOut size={14} />
+                退出登录
+              </button>
+            </div>
+
+            <div className="mt-3 rounded-[14px] border border-slate-100 bg-white p-3.5">
+              <p className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-600">
+                <Smartphone size={14} className="text-[#388b77]" aria-hidden="true" />
+                手机号
+              </p>
+              {auth.phoneStatus?.maskedPhone ? (
+                <p className="mt-1 text-[11px] leading-5 text-slate-500">
+                  已绑定 {auth.phoneStatus.maskedPhone}。手机号只用于身份核验，不会公开展示。
+                </p>
+              ) : auth.phoneStatus ? (
+                showBindForm ? (
+                  <PhoneVerificationForm
+                    purpose="bind"
+                    configured={auth.phoneStatus.configured}
+                    title="绑定手机号"
+                    description="验证本人手机号后，可用手机号登录同一个居民账户；既有报名与奖励归属保持不变。"
+                    submitLabel="绑定手机号"
+                    onRequestCode={(phone) => auth.requestPhoneCode(phone, 'bind')}
+                    onSubmit={(phone, code) => auth.bindPhone(phone, code).then(() => undefined)}
+                    onSuccess={() => setShowBindForm(false)}
+                  />
+                ) : auth.phoneStatus.configured ? (
+                  <div className="mt-1.5">
+                    <p className="text-[11px] leading-5 text-slate-500">
+                      当前账户尚未绑定手机号。
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowBindForm(true)}
+                      className="mt-2 min-h-9 rounded-full border border-teal-200 bg-white px-3 text-[12px] font-semibold text-teal-700"
+                    >
+                      绑定手机号
+                    </button>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-[11px] leading-5 text-slate-500">
+                    短信服务未配置，暂不支持手机号绑定。
+                  </p>
+                )
+              ) : (
+                <p className="mt-1 text-[11px] leading-5 text-slate-500">手机号状态暂不可用。</p>
+              )}
+            </div>
+          </>
         )}
 
         {auth.error && (

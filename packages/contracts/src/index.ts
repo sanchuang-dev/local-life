@@ -46,6 +46,21 @@ export const API_ERROR_CODES = {
    * budget accounting.
    */
   rewardPlanLocked: 'reward_plan_locked',
+  /**
+   * Phone (SMS one-time code) identity, Issue #93. This card ships the server
+   * state machine only: no SMS provider is bundled, so a production deployment
+   * without an injected sender fails closed with `not_configured` instead of
+   * pretending that public phone login works.
+   */
+  phoneInvalid: 'phone_invalid',
+  otpInvalid: 'otp_invalid',
+  otpExpired: 'otp_expired',
+  otpAttemptsExceeded: 'otp_attempts_exceeded',
+  otpCooldown: 'otp_cooldown',
+  otpRequestLimit: 'otp_request_limit',
+  phoneAlreadyBound: 'phone_already_bound',
+  phoneInUse: 'phone_in_use',
+  smsDeliveryFailed: 'sms_delivery_failed',
 } as const
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES]
@@ -1175,3 +1190,126 @@ export type ActivityParticipationConfirmResponse = z.infer<
 
 export * from './crmeb.js'
 export * from './rewards.js'
+
+/* -------------------------------------------------------------------------- */
+/* Phone (SMS one-time code) resident identity (#93 LL-H5-002)                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Routes of the phone identity surface. Kept in their own constant (like the
+ * activity/CRM reward domains) so the H5 client never hard-codes a path.
+ *
+ * - `POST otp`    request a 6-digit one-time code
+ * - `POST login`  exchange phone + code for a resident session
+ * - `POST bind`   bind a verified phone to the *current* resident session
+ * - `GET  status` report whether a sender is configured and which phone is bound
+ */
+export const PHONE_AUTH_ROUTES = {
+  status: '/auth/phone/status',
+  requestOtp: '/auth/phone/otp',
+  login: '/auth/phone/login',
+  bind: '/auth/phone/bind',
+} as const
+
+/** Mainland China mobile numbers only: `1` + `3-9` + 9 digits. */
+export const MAINLAND_MOBILE_PATTERN = /^1[3-9]\d{9}$/
+
+/**
+ * Canonicalizes a resident-typed mainland mobile number, or returns `null`.
+ *
+ * Residents paste numbers from WeChat, contacts and paper forms, so spaces,
+ * hyphens, parentheses and a `+86`/`86` country prefix are formatting, not
+ * identity. Everything else (short codes, landlines, foreign numbers, letters)
+ * is rejected instead of being coerced: the normalized 11-digit string is the
+ * UNIQUE identity key, so a lenient parse would merge distinct people.
+ */
+export function normalizeMainlandPhone(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  const compact = raw.trim().replace(/[\s()\-]/g, '')
+  if (!compact) return null
+  const digits = compact.startsWith('+86')
+    ? compact.slice(3)
+    : compact.startsWith('86') && compact.length > 11
+      ? compact.slice(2)
+      : compact
+  return MAINLAND_MOBILE_PATTERN.test(digits) ? digits : null
+}
+
+/** `13800138000` -> `138****8000`. The only phone shape the H5 ever displays. */
+export function maskMainlandPhone(phone: string): string {
+  return `${phone.slice(0, 3)}****${phone.slice(-4)}`
+}
+
+/**
+ * Request body validator. It accepts the raw typed value and only guarantees
+ * that {@link normalizeMainlandPhone} can canonicalize it; the API normalizes
+ * once more before touching the database, so the stored key is always the
+ * 11-digit form.
+ */
+export const mainlandPhoneSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(32)
+  .refine((value) => normalizeMainlandPhone(value) !== null, {
+    message: '请输入有效的中国大陆手机号（11 位，1 开头）',
+  })
+
+export const phoneOtpPurposeSchema = z.enum(['login', 'bind'])
+export type PhoneOtpPurpose = z.infer<typeof phoneOtpPurposeSchema>
+
+/**
+ * Strict on purpose: the resident is identified by the session cookie (bind) or
+ * by the verified phone (login). A forged `userId` must fail parsing instead of
+ * being silently ignored, following the participation contract precedent.
+ */
+export const phoneOtpRequestSchema = z.strictObject({
+  phone: mainlandPhoneSchema,
+  purpose: phoneOtpPurposeSchema,
+})
+
+export type PhoneOtpRequest = z.infer<typeof phoneOtpRequestSchema>
+
+/**
+ * Response of a successful code request. It never contains the code itself and
+ * never reveals whether the phone is already bound to an account: enumeration
+ * is answered identically for known and unknown numbers.
+ */
+export const phoneOtpRequestResponseSchema = z.object({
+  accepted: z.literal(true),
+  expiresInSeconds: z.number().int().positive(),
+  retryAfterSeconds: z.number().int().nonnegative(),
+  maxAttempts: z.number().int().positive(),
+})
+
+export type PhoneOtpRequestResponse = z.infer<typeof phoneOtpRequestResponseSchema>
+
+export const phoneOtpVerifyRequestSchema = z.strictObject({
+  phone: mainlandPhoneSchema,
+  code: z.string().regex(/^\d{6}$/, '验证码为 6 位数字'),
+})
+
+export type PhoneOtpVerifyRequest = z.infer<typeof phoneOtpVerifyRequestSchema>
+
+/** Result of binding a verified phone to the current resident session. */
+export const phoneBindResponseSchema = z.object({
+  bound: z.literal(true),
+  /** `true` when this account already owned the same verified phone. */
+  alreadyBound: z.boolean(),
+  maskedPhone: z.string().min(7),
+})
+
+export type PhoneBindResponse = z.infer<typeof phoneBindResponseSchema>
+
+/**
+ * Account panel state. `configured: false` means the deployment has no SMS
+ * sender, so the H5 must present the login method as unavailable instead of a
+ * button that can only fail.
+ */
+export const phoneAuthStatusResponseSchema = z.object({
+  configured: z.boolean(),
+  authenticated: z.boolean(),
+  maskedPhone: z.string().min(7).nullable(),
+})
+
+export type PhoneAuthStatusResponse = z.infer<typeof phoneAuthStatusResponseSchema>

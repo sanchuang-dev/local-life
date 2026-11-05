@@ -33,6 +33,8 @@ import {
   wechatIdentities,
 } from './db/schema.js'
 import { constantTimeTextEqual, hashPassword, hashToken, randomToken, verifyPassword } from './auth/security.js'
+import { registerPhoneAuthRoutes } from './auth/phone-routes.js'
+import type { SmsSender } from './auth/phone.js'
 import { logEvent } from './log.js'
 import { registerActivityRoutes } from './activities/routes.js'
 import { registerCrmRoutes } from './crm/routes.js'
@@ -48,6 +50,14 @@ export interface AppOptions {
   db?: AppDatabase
   config?: ApiConfig
   fetcher?: typeof fetch
+  /**
+   * SMS delivery for phone verification codes (#93). No provider is bundled:
+   * without an injected sender the phone endpoints answer 503 `not_configured`.
+   * The test suite injects a capturing fake; production passes nothing.
+   */
+  smsSender?: SmsSender
+  /** Injectable clock so OTP expiry/throttle windows are testable. */
+  now?: () => Date
 }
 
 const SESSION_COOKIE = 'll_session'
@@ -893,6 +903,18 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     fail,
     validCsrf,
     bodySchemaError,
+  })
+
+  registerPhoneAuthRoutes(app, {
+    db,
+    config,
+    fail,
+    validCsrf,
+    bodySchemaError,
+    createSession,
+    setSessionCookies,
+    smsSender: options.smsSender,
+    now: options.now ?? (() => new Date()),
   })
 
   app.notFound((c) =>

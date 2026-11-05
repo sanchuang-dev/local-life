@@ -21,6 +21,7 @@ import type {
   ParticipationInviteSource,
   ParticipationRole,
   ParticipationTeamStatus,
+  PhoneOtpPurpose,
   RewardCredentialStatus,
   RewardDisputeDecision,
   RewardEventKind,
@@ -161,6 +162,120 @@ export const auditLogs = sqliteTable(
   (table) => [
     index('audit_logs_created_idx').on(table.createdAt),
     index('audit_logs_target_idx').on(table.targetId),
+  ],
+)
+
+/* -------------------------------------------------------------------------- */
+/* Phone (SMS one-time code) resident identity (#93 LL-H5-002)                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Verified phone -> platform user mapping. The platform UUID stays the single
+ * business key: every participation, reward grant and session still points at
+ * `users.id`, so verifying a phone can never move existing attribution.
+ *
+ * Two UNIQUE indexes carry the identity rules on disk:
+ * - `phone` is unique, so one phone is at most one resident account. A second
+ *   account claiming the same phone is rejected by the database, never merged.
+ * - `user_id` is unique, so one resident account owns at most one verified
+ *   phone (replacing it is a separate, audited operation, not a silent rebind).
+ *
+ * `phone` is the canonical 11-digit mainland form written by the API; the CHECK
+ * constraint rejects any other shape even if application code is bypassed.
+ */
+export const residentPhoneIdentities = sqliteTable(
+  'resident_phone_identities',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    phone: text('phone').notNull(),
+    verifiedAt: integer('verified_at', { mode: 'timestamp_ms' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('resident_phone_identities_phone_uq').on(table.phone),
+    uniqueIndex('resident_phone_identities_user_uq').on(table.userId),
+    check(
+      'resident_phone_identities_phone_check',
+      sql`length(${table.phone}) = 11
+        AND ${table.phone} NOT GLOB '*[^0-9]*'
+        AND substr(${table.phone}, 1, 1) = '1'
+        AND substr(${table.phone}, 2, 1) BETWEEN '3' AND '9'`,
+    ),
+  ],
+)
+
+/**
+ * One-time verification codes. Only a salted SHA-256 hash is stored; the
+ * plaintext exists in exactly one SMS payload and never in a response, log or
+ * audit row.
+ *
+ * `attempts` is capped by `max_attempts` (CHECK), and consumption is a single
+ * conditional UPDATE (`consumed_at IS NULL AND invalidated_at IS NULL`), so two
+ * concurrent verifications can never both win. Codes are single-purpose:
+ * a `login` code cannot bind and a `bind` code cannot log in.
+ */
+export const phoneVerificationCodes = sqliteTable(
+  'phone_verification_codes',
+  {
+    id: text('id').primaryKey(),
+    phone: text('phone').notNull(),
+    purpose: text('purpose').$type<PhoneOtpPurpose>().notNull(),
+    codeHash: text('code_hash').notNull(),
+    attempts: integer('attempts').notNull(),
+    maxAttempts: integer('max_attempts').notNull(),
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+    consumedAt: integer('consumed_at', { mode: 'timestamp_ms' }),
+    invalidatedAt: integer('invalidated_at', { mode: 'timestamp_ms' }),
+    /** Hash of the requesting IP: frequency control must not store raw IPs. */
+    requestIpHash: text('request_ip_hash').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    index('phone_verification_codes_phone_purpose_idx').on(
+      table.phone,
+      table.purpose,
+      table.createdAt,
+    ),
+    index('phone_verification_codes_expiry_idx').on(table.expiresAt),
+    check(
+      'phone_verification_codes_purpose_check',
+      sql`${table.purpose} IN ('login', 'bind')`,
+    ),
+    check(
+      'phone_verification_codes_hash_check',
+      sql`length(${table.codeHash}) = 64 AND ${table.codeHash} NOT GLOB '*[^0-9a-f]*'`,
+    ),
+    check(
+      'phone_verification_codes_attempts_check',
+      sql`${table.attempts} >= 0
+        AND ${table.maxAttempts} > 0
+        AND ${table.attempts} <= ${table.maxAttempts}`,
+    ),
+    check(
+      'phone_verification_codes_expiry_check',
+      sql`${table.expiresAt} > ${table.createdAt}`,
+    ),
+  ],
+)
+
+/**
+ * Fixed-window request counters keyed by a hashed scope (`phone` or `IP`), so the
+ * throttle table holds no phone number and no address. Windows are bucketed by
+ * the clock; an expired bucket simply restarts at 1.
+ */
+export const phoneOtpRequestCounters = sqliteTable(
+  'phone_otp_request_counters',
+  {
+    key: text('key').primaryKey(),
+    count: integer('count').notNull(),
+    windowStartedAt: integer('window_started_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    check('phone_otp_request_counters_count_check', sql`${table.count} >= 0`),
   ],
 )
 
@@ -1164,6 +1279,7 @@ export const activityRewardDisputes = sqliteTable(
 
 export const userRelations = relations(users, ({ many }) => ({
   wechatIdentities: many(wechatIdentities),
+  phoneIdentities: many(residentPhoneIdentities),
   residentCommunities: many(residentCommunityAssignments),
   sessions: many(sessions),
 }))
@@ -1184,6 +1300,9 @@ export const schema = {
   oauthStates,
   rateLimits,
   auditLogs,
+  residentPhoneIdentities,
+  phoneVerificationCodes,
+  phoneOtpRequestCounters,
   activities,
   activityRuleVersions,
   crmLeads,
