@@ -1,0 +1,305 @@
+{
+  "base": "http://localhost:5274",
+  "consoleErrors": [
+    "Warning: [antd: Spin] `tip` is deprecated. Please use `description` instead.",
+    "Warning: [antd: Spin] `tip` is deprecated. Please use `description` instead.",
+    "Warning: [antd: Spin] `tip` is deprecated. Please use `description` instead.",
+    "Warning: [antd: Space] `direction` is deprecated. Please use `orientation` instead."
+  ],
+  "dashboard": {
+    "390": {
+      "viewport": {
+        "width": 390,
+        "height": 1000
+      },
+      "identityCard": {
+        "top": 200.03,
+        "bottom": 323.03,
+        "height": 123,
+        "left": 12,
+        "right": 378,
+        "width": 366
+      },
+      "startCard": {
+        "top": 339.03,
+        "bottom": 504.03,
+        "height": 165,
+        "left": 12,
+        "right": 378,
+        "width": 366
+      },
+      "identityCol": {
+        "className": "ant-col ant-col-xs-24 ant-col-md-12 css-dev-only-do-not-override-1y106cm css-var-_r_0_",
+        "box": {
+          "top": 200.03,
+          "bottom": 323.03,
+          "height": 123,
+          "left": 4,
+          "right": 386,
+          "width": 382
+        }
+      },
+      "startCol": {
+        "className": "ant-col ant-col-xs-24 ant-col-md-12 css-dev-only-do-not-override-1y106cm css-var-_r_0_",
+        "box": {
+          "top": 339.03,
+          "bottom": 504.03,
+          "height": 165,
+          "left": 4,
+          "right": 386,
+          "width": 382
+        }
+      },
+      "row": {
+        "box": {
+          "top": 200.03,
+          "bottom": 504.03,
+          "height": 304,
+          "left": 4,
+          "right": 386,
+          "width": 382
+        },
+        "display": "flex",
+        "alignItems": "normal",
+        "flexWrap": "wrap",
+        "classList": "ant-row ant-row-stretch css-dev-only-do-not-override-1y106cm css-var-_r_0_"
+      },
+      "documentWidth": 390
+    },
+    "768": {
+      "viewport": {
+        "width": 768,
+        "height": 1000
+      },
+      "identityCard": {
+        "top": 179.61,
+        "bottom": 388.61,
+        "height": 209,
+        "left": 80,
+        "right": 410,
+        "width": 330
+      },
+      "startCard": {
+        "top": 179.61,
+        "bottom": 388.61,
+        "height": 209,
+        "left": 426,
+        "right": 756,
+        "width": 330
+      },
+      "identityCol": {
+        "className": "ant-col ant-col-xs-24 ant-col-md-12 css-dev-only-do-not-override-1y106cm css-var-_r_0_",
+        "box": {
+          "top": 179.61,
+          "bottom": 388.61,
+          "height": 209,
+          "left": 72,
+          "right": 418,
+          "width": 346
+        }
+      },
+      "startCol": {
+        "className": "ant-col ant-col-xs-24 ant-col-md-12 css-dev-only-do-not-override-1y106cm css-var-_r_0_",
+        "box": {
+          "top": 179.61,
+          "bottom": 388.61,
+          "height": 209,
+          "left": 418,
+          "right": 764,
+          "width": 346
+        }
+      },
+      "row": {
+        "box": {
+          "top": 179.61,
+          "bottom": 388.61,
+          "height": 209,
+          "left": 72,
+          "right": 764,
+          "width": 692
+        },
+        "display": "flex",
+        "alignItems": "normal",
+        "flexWrap": "wrap",
+        "classList": "ant-row ant-row-stretch css-dev-only-do-not-override-1y106cm css-var-_r_0_"
+      },
+      "documentWidth": 768
+    },
+    "1024": {
+      "viewport": {
+        "width": 1024,
+        "height": 1000
+      },
+      "identityCard": {
+        "top": 179.61,
+        "bottom": 344.61,
+        "height": 165,
+        "left": 264,
+        "right": 628,
+        "width": 364
+      },
+      "startCard": {
+        "top": 179.61,
+        "bottom": 344.61,
+        "height": 165,
+        "left": 644,
+        "right": 1008,
+        "width": 364
+      },
+      "identityCol": {
+        "className": "ant-col ant-col-xs-24 ant-col-md-12 css-dev-only-do-not-override-1y106cm css-var-_r_0_",
+        "box": {
+          "top": 179.61,
+          "bottom": 344.61,
+          "height": 165,
+          "left": 256,
+          "right": 636,
+          "width": 380
+        }
+      },
+      "startCol": {
+        "className": "ant-col ant-col-xs-24 ant-col-md-12 css-dev-only-do-not-override-1y106cm css-var-_r_0_",
+        "box": {
+          "top": 179.61,
+          "bottom": 344.61,
+          "height": 165,
+          "left": 636,
+          "right": 1016,
+          "width": 380
+        }
+      },
+      "row": {
+        "box": {
+          "top": 179.61,
+          "bottom": 344.61,
+          "height": 165,
+          "left": 256,
+          "right": 1016,
+          "width": 760
+        },
+        "display": "flex",
+        "alignItems": "normal",
+        "flexWrap": "wrap",
+        "classList": "ant-row ant-row-stretch css-dev-only-do-not-override-1y106cm css-var-_r_0_"
+      },
+      "documentWidth": 1024
+    },
+    "1440": {
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "identityCard": {
+        "top": 179.61,
+        "bottom": 344.61,
+        "height": 165,
+        "left": 264,
+        "right": 836,
+        "width": 572
+      },
+      "startCard": {
+        "top": 179.61,
+        "bottom": 344.61,
+        "height": 165,
+        "left": 852,
+        "right": 1424,
+        "width": 572
+      },
+      "identityCol": {
+        "className": "ant-col ant-col-xs-24 ant-col-md-12 css-dev-only-do-not-override-1y106cm css-var-_r_0_",
+        "box": {
+          "top": 179.61,
+          "bottom": 344.61,
+          "height": 165,
+          "left": 256,
+          "right": 844,
+          "width": 588
+        }
+      },
+      "startCol": {
+        "className": "ant-col ant-col-xs-24 ant-col-md-12 css-dev-only-do-not-override-1y106cm css-var-_r_0_",
+        "box": {
+          "top": 179.61,
+          "bottom": 344.61,
+          "height": 165,
+          "left": 844,
+          "right": 1432,
+          "width": 588
+        }
+      },
+      "row": {
+        "box": {
+          "top": 179.61,
+          "bottom": 344.61,
+          "height": 165,
+          "left": 256,
+          "right": 1432,
+          "width": 1176
+        },
+        "display": "flex",
+        "alignItems": "normal",
+        "flexWrap": "wrap",
+        "classList": "ant-row ant-row-stretch css-dev-only-do-not-override-1y106cm css-var-_r_0_"
+      },
+      "documentWidth": 1440
+    }
+  },
+  "components": {
+    "768": {
+      "alert": {
+        "className": "ant-alert ant-alert-info ant-alert-outlined ant-alert-with-description css-var-_r_0_ css-dev-only-do-not-override-1y106cm",
+        "backgroundColor": "rgb(230, 244, 255)",
+        "borderColor": "rgb(145, 202, 255)",
+        "color": "rgb(31, 41, 55)"
+      },
+      "variables": {
+        "--ant-color-info": "#1677ff",
+        "--ant-color-info-bg": "#e6f4ff",
+        "--ant-color-info-border": "#91caff",
+        "--ant-color-success": "#138b79",
+        "--ant-color-success-bg": "#c0ccc8",
+        "--ant-color-success-border": "#6fb3a2",
+        "--ant-color-primary": "#116d63",
+        "--ant-color-warning": "#faad14",
+        "--ant-color-error": "#ff4d4f"
+      },
+      "documentWidth": 768
+    },
+    "1440": {
+      "alert": {
+        "className": "ant-alert ant-alert-info ant-alert-outlined ant-alert-with-description css-var-_r_0_ css-dev-only-do-not-override-1y106cm",
+        "backgroundColor": "rgb(230, 244, 255)",
+        "borderColor": "rgb(145, 202, 255)",
+        "color": "rgb(31, 41, 55)"
+      },
+      "variables": {
+        "--ant-color-info": "#1677ff",
+        "--ant-color-info-bg": "#e6f4ff",
+        "--ant-color-info-border": "#91caff",
+        "--ant-color-success": "#138b79",
+        "--ant-color-success-bg": "#c0ccc8",
+        "--ant-color-success-border": "#6fb3a2",
+        "--ant-color-primary": "#116d63",
+        "--ant-color-warning": "#faad14",
+        "--ant-color-error": "#ff4d4f"
+      },
+      "documentWidth": 1440
+    }
+  },
+  "communities": {
+    "url": "/communities",
+    "tag": {
+      "text": "正常",
+      "backgroundColor": "rgb(192, 204, 200)",
+      "borderColor": "rgba(0, 0, 0, 0)",
+      "color": "rgb(19, 139, 121)"
+    },
+    "documentWidth": 1440
+  },
+  "overflow": {
+    "390": false,
+    "768": false,
+    "1024": false,
+    "1440": false
+  }
+}

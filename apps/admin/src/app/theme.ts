@@ -11,7 +11,12 @@ import type { ThemeConfig } from 'antd'
 export const adminTheme: ThemeConfig = {
   token: {
     colorPrimary: '#116d63',
-    colorInfo: '#138b79',
+    // Info must not reuse the brand teal: Ant Design derives Alert/Tag
+    // background, border and text from these seeds, and a green-looking Info
+    // is indistinguishable from Success. Blue keeps "information" distinct
+    // while Success stays in the Local Life teal family. These are seed tokens
+    // only — no `.ant-alert-info`/`.ant-tag-*` overrides anywhere.
+    colorInfo: '#1677ff',
     colorLink: '#116d63',
     colorSuccess: '#138b79',
     colorText: '#1f2937',
