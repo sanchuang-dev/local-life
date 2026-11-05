@@ -209,6 +209,7 @@
   z-index: 10;
   min-height: 66px;
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
@@ -255,6 +256,36 @@
 .page-header-extra {
   flex: 0 0 auto;
   align-items: center;
+}
+
+/*
+ * Optional second-level navigation (PageHeader `subnav` slot): a full-width row
+ * below the title/description whose tab bar ends flush with the header's bottom
+ * edge. The header border stays the single divider — the antd nav rule line is
+ * dropped so the active ink bar overlaps it instead of doubling it.
+ */
+.page-header-with-subnav {
+  padding-bottom: 0;
+  gap: 4px 16px;
+}
+
+.page-header-subnav {
+  flex: 1 0 100%;
+  min-width: 0;
+  margin-top: 2px;
+}
+
+.page-header-subnav .ant-tabs-nav {
+  margin-bottom: 0;
+}
+
+.page-header-subnav .ant-tabs-nav::before {
+  border-bottom: 0;
+}
+
+.page-header-subnav .ant-tabs-content-holder,
+.page-header-subnav .ant-tabs-body-holder {
+  display: none;
 }
 
 @media (max-width: 900px) {
