@@ -4,7 +4,10 @@ import {
   API_ERROR_CODES,
   activityAuditEntryListResponseSchema,
   activityKeyRulesSchema,
+  activityKeyRulesWriteSchema,
+  findCheckinWindowIssues,
   activityPublicRulesSchema,
+  activityRewardPlanSchema,
   activityRuleVersionListResponseSchema,
   adminActivityDetailSchema,
   adminActivityListResponseSchema,
@@ -13,6 +16,7 @@ import {
   type ActivityAuditEntryListResponse,
   type ActivityKeyRules,
   type ActivityPublicRules,
+  type ActivityRewardPlan,
   type ActivityRuleVersionListResponse,
   type ActivityStatus,
   type AdminActivityDetail,
@@ -73,6 +77,7 @@ const adminSelection = {
   budgetCapCents: activities.budgetCapCents,
   prizeQuantityCap: activities.prizeQuantityCap,
   publicRulesJson: activities.publicRulesJson,
+  rewardPlanJson: activities.rewardPlanJson,
   currentRuleVersionId: activities.currentRuleVersionId,
   ruleVersion: activityRuleVersions.version,
   createdAt: activities.createdAt,
@@ -96,6 +101,7 @@ interface ActivityRow {
   budgetCapCents: number
   prizeQuantityCap: number
   publicRulesJson: string
+  rewardPlanJson: string | null
   currentRuleVersionId: string | null
   ruleVersion: number | null
   createdAt: Date
@@ -171,7 +177,19 @@ function parsePublicRules(publicRulesJson: string): ActivityPublicRules {
   return activityPublicRulesSchema.parse(parsed)
 }
 
+function parseRewardPlan(rewardPlanJson: string | null): ActivityRewardPlan | null {
+  if (rewardPlanJson === null) return null
+  const parsed: unknown = JSON.parse(rewardPlanJson)
+  return activityRewardPlanSchema.parse(parsed)
+}
+
+/**
+ * Rebuilds the current key rules from the activity row. The reward plan is
+ * spread in only when one is configured, so an activity without a plan produces
+ * exactly the pre-#62 shape (and therefore a byte-identical frozen snapshot).
+ */
 function currentKeyRules(row: ActivityRow): ActivityKeyRules {
+  const rewardPlan = parseRewardPlan(row.rewardPlanJson)
   return activityKeyRulesSchema.parse({
     startsAt: iso(row.startsAt),
     endsAt: iso(row.endsAt),
@@ -179,7 +197,103 @@ function currentKeyRules(row: ActivityRow): ActivityKeyRules {
     budgetCapCents: row.budgetCapCents,
     prizeQuantityCap: row.prizeQuantityCap,
     publicRules: parsePublicRules(row.publicRulesJson),
+    ...(rewardPlan === null ? {} : { rewardPlan }),
   })
+}
+
+/**
+ * Merges an incoming key-rules payload with the activity's stored reward plan.
+ *
+ * Three cases, and they must stay distinct:
+ *   - `rewardPlan` key ABSENT  -> inherit the stored plan (an ordinary edit that
+ *     only touches, say, `location` must not drop the plan)
+ *   - `rewardPlan: null`       -> clear it, deliberately
+ *   - `rewardPlan: {...}`      -> replace it
+ *
+ * The result is what gets written to the activity row AND to the frozen rule
+ * version snapshot. The snapshot half is the one that matters: fulfilment reads
+ * only `activity_rule_versions.snapshot_json`, so preserving the column alone
+ * would still lose the reward.
+ */
+function withEffectiveRewardPlan(
+  incoming: ActivityKeyRules,
+  current: ActivityRow,
+): ActivityKeyRules {
+  if ('rewardPlan' in incoming) {
+    // Explicit null or a concrete plan: the caller decided, so this is new input
+    // and the window cross-check applies in full.
+    return activityKeyRulesWriteSchema.parse(incoming)
+  }
+  // The plan is inherited, not supplied. Parse with the lenient read schema and
+  // then apply one narrow rule: an edit must not *introduce* an out-of-bounds
+  // window. An activity whose stored plan was already out of bounds (any row
+  // written before t13) stays editable, because otherwise the window can never
+  // be repaired - the operator would be locked out of the very edit that fixes
+  // it, and a published activity's plan cannot be changed at all.
+  const storedPlan = parseRewardPlan(current.rewardPlanJson)
+  const merged = activityKeyRulesSchema.parse({
+    ...incoming,
+    ...(storedPlan === null ? {} : { rewardPlan: storedPlan }),
+  })
+  if (merged.rewardPlan !== undefined && merged.rewardPlan !== null) {
+    const wasOutOfBounds =
+      storedPlan !== null &&
+      (Date.parse(storedPlan.checkinWindow.opensAt) < current.startsAt.getTime() ||
+        Date.parse(storedPlan.checkinWindow.closesAt) > current.endsAt.getTime())
+    if (!wasOutOfBounds) {
+      // Throw a domain error, not a ZodError: zod 4's ZodError is not an
+      // `instanceof Error`, so Hono's error handling refuses to route it through
+      // `onError` and the real server returns an empty-body 500 (no log, no
+      // requestId) instead of the `400 invalidRequest` this deserves. Going
+      // through ActivityError lands in `failWithActivityError` -> `fail()`.
+      const issues = findCheckinWindowIssues(merged)
+      if (issues.length > 0) {
+        throw new ActivityError(400, API_ERROR_CODES.invalidRequest, issues[0]!.message)
+      }
+    }
+  }
+  return merged
+}
+
+/**
+ * Deep equality for reward plans. Both sides are normalised through the schema
+ * first, so an omitted optional key and an explicit default compare equal.
+ */
+function rewardPlansEqual(left: ActivityRewardPlan | null, right: ActivityRewardPlan | null): boolean {
+  if (left === null || right === null) return left === right
+  return JSON.stringify(left) === JSON.stringify(right)
+}
+
+/** Statuses in which the reward plan is frozen. */
+const REWARD_PLAN_FROZEN_STATUSES: ReadonlySet<ActivityStatus> = new Set(['published', 'paused'])
+
+/**
+ * Rejects a reward-plan change on an activity whose plan is already frozen.
+ *
+ * The prize ledger is keyed by `(activity_id, prize_name)`, so renaming the
+ * prize does not merely relabel it: the next claim opens a *new* stock row with
+ * `claimed_quantity = 0` and `total_quantity` taken from the new plan. That
+ * resets the activity-wide quota and budget accounting — a silent quota refresh
+ * and prize swap. Freezing the plan after publication closes that path.
+ *
+ * Only `rewardPlan` is locked. Every other rule field (location, dates, caps)
+ * stays editable on a published activity and still creates a rule version.
+ */
+function assertRewardPlanUnchanged(
+  current: ActivityRow,
+  incoming: ActivityKeyRules,
+): void {
+  if (!REWARD_PLAN_FROZEN_STATUSES.has(current.status)) return
+  // A missing key means "leave the plan alone", which is always allowed.
+  if (!('rewardPlan' in incoming)) return
+  const incomingPlan = incoming.rewardPlan ?? null
+  const storedPlan = parseRewardPlan(current.rewardPlanJson)
+  if (rewardPlansEqual(incomingPlan, storedPlan)) return
+  throw new ActivityError(
+    409,
+    API_ERROR_CODES.rewardPlanLocked,
+    '奖励计划发布后不可修改，如需调整请结束活动后新建',
+  )
 }
 
 function keyRulesEqual(left: ActivityKeyRules, right: ActivityKeyRules): boolean {
@@ -211,6 +325,7 @@ function toAdminDetail(row: ActivityRow): AdminActivityDetail {
     description: row.description,
     publicRules: parsePublicRules(row.publicRulesJson),
     currentRuleVersionId: row.currentRuleVersionId,
+    rewardPlan: parseRewardPlan(row.rewardPlanJson),
   })
 }
 
@@ -435,7 +550,10 @@ export function createActivity(
 
   const now = new Date()
   const activityId = randomUUID()
-  const keyRules = activityKeyRulesSchema.parse(body.keyRules)
+  // Write path: the check-in window must sit inside the activity (t13). The
+  // stored-data parser `activityKeyRulesSchema` deliberately does NOT carry this
+  // rule, so a row written before the rule existed stays readable.
+  const keyRules = activityKeyRulesWriteSchema.parse(body.keyRules)
   try {
     db.transaction((tx) => {
       tx.insert(activities)
@@ -452,6 +570,10 @@ export function createActivity(
           budgetCapCents: keyRules.budgetCapCents,
           prizeQuantityCap: keyRules.prizeQuantityCap,
           publicRulesJson: JSON.stringify(keyRules.publicRules),
+          rewardPlanJson:
+            keyRules.rewardPlan === undefined || keyRules.rewardPlan === null
+              ? null
+              : JSON.stringify(keyRules.rewardPlan),
           currentRuleVersionId: null,
           createdByUserId: actor.userId,
           createdAt: now,
@@ -510,17 +632,38 @@ export function updateActivity(
       if (body.description !== undefined) set.description = body.description
 
       let createdVersion: number | null = null
+      // `rewardPlan` absent means "leave the plan as it is"; an explicit `null`
+      // means "clear it". Collapsing the two would let any edit that omits the
+      // optional field wipe a published activity's frozen plan.
+      // Freeze check runs on the RAW payload (before inheritance) because it must
+      // see "the caller actually sent a plan and it differs", not the merged
+      // result. Runs before any write so a rejection leaves no trace.
+      if (body.keyRules !== undefined) {
+        // Write path, so the check-in window cross-check applies here too: an
+        // edit must not be able to push the window outside the activity (t13).
+        // Note the ordering - the window guard runs before the freeze check, so a
+        // payload that is both out-of-bounds and a plan change reports the window
+        // problem, which is the one the operator can actually act on.
+        const incoming = activityKeyRulesWriteSchema.parse(body.keyRules)
+        assertRewardPlanUnchanged(current, incoming)
+      }
+      const effectiveKeyRules =
+        body.keyRules === undefined ? undefined : withEffectiveRewardPlan(body.keyRules, current)
       const keyRulesChanged =
-        body.keyRules !== undefined &&
-        !keyRulesEqual(activityKeyRulesSchema.parse(body.keyRules), currentKeyRules(current))
-      if (keyRulesChanged) {
-        const keyRules = activityKeyRulesSchema.parse(body.keyRules)
+        effectiveKeyRules !== undefined &&
+        !keyRulesEqual(effectiveKeyRules, currentKeyRules(current))
+      if (keyRulesChanged && effectiveKeyRules !== undefined) {
+        const keyRules = effectiveKeyRules
         set.startsAt = new Date(keyRules.startsAt)
         set.endsAt = new Date(keyRules.endsAt)
         set.location = keyRules.location
         set.budgetCapCents = keyRules.budgetCapCents
         set.prizeQuantityCap = keyRules.prizeQuantityCap
         set.publicRulesJson = JSON.stringify(keyRules.publicRules)
+        set.rewardPlanJson =
+          keyRules.rewardPlan === undefined || keyRules.rewardPlan === null
+            ? null
+            : JSON.stringify(keyRules.rewardPlan)
         if (current.status !== 'draft') {
           const version = nextRuleVersion(tx, activityId)
           const versionId = randomUUID()
@@ -528,6 +671,8 @@ export function updateActivity(
             id: versionId,
             activityId,
             version,
+            // The FROZEN snapshot must carry the effective plan, not the raw
+            // request body: fulfilment reads only this snapshot.
             rules: keyRules,
             actorUserId: actor.userId,
             createdAt: now,

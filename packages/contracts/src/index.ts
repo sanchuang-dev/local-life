@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { activityRewardPlanSchema } from './rewards.js'
+
 /** Route identifiers shared by the API and every client that calls it. */
 export const API_ROUTES = {
   health: '/healthz',
@@ -29,6 +31,21 @@ export const API_ERROR_CODES = {
   crmebTimeout: 'crmeb_timeout',
   crmebContractMismatch: 'crmeb_contract_mismatch',
   crmebSyncInProgress: 'crmeb_sync_in_progress',
+  rewardUnavailable: 'reward_unavailable',
+  checkinDuplicate: 'checkin_duplicate',
+  checkinNotVerified: 'checkin_not_verified',
+  rewardAlreadyRedeemed: 'reward_already_redeemed',
+  redemptionCodeInvalid: 'redemption_code_invalid',
+  redemptionCodeExpired: 'redemption_code_expired',
+  prizeStockExhausted: 'prize_stock_exhausted',
+  budgetExceeded: 'budget_exceeded',
+  /**
+   * A published/paused activity may not have its reward plan changed. The prize
+   * ledger is keyed by `(activity_id, prize_name)`, so renaming the prize would
+   * open a fresh stock row and silently reset the activity-wide quantity and
+   * budget accounting.
+   */
+  rewardPlanLocked: 'reward_plan_locked',
 } as const
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES]
@@ -164,6 +181,14 @@ export const activityKeyRulesSchema = z
     budgetCapCents: z.number().int().min(0).max(100_000_000),
     prizeQuantityCap: z.number().int().min(0).max(100_000),
     publicRules: activityPublicRulesSchema,
+    /**
+     * Prize fulfilment plan (LL-MVP-006). Optional *and* nullable on purpose:
+     * rule snapshots frozen before #62 carry no `rewardPlan` key at all and must
+     * keep parsing byte-identically, while a plan that was explicitly cleared is
+     * stored as `null`. Consumers must normalise with `snapshot.rewardPlan ?? null`
+     * and must never fall back to the mutable `activities` columns.
+     */
+    rewardPlan: activityRewardPlanSchema.nullable().optional(),
   })
   .superRefine((value, ctx) => {
     if (Date.parse(value.endsAt) <= Date.parse(value.startsAt)) {
@@ -177,12 +202,104 @@ export const activityKeyRulesSchema = z
 
 export type ActivityKeyRules = z.infer<typeof activityKeyRulesSchema>
 
+/** One violation of the check-in-window-inside-activity rule. */
+export interface CheckinWindowIssue {
+  message: string
+  path: (string | number)[]
+}
+
+/**
+ * Finds check-in-window violations; never throws.
+ *
+ * Exported standalone so the service layer can apply exactly this rule to the
+ * merged (inherited-plan) key rules without re-running the write schema, and so
+ * the read schema can stay lenient.
+ *
+ * Returns an array rather than throwing, on purpose. An earlier version threw a
+ * raw `z.ZodError` when called without a refinement `ctx`, and zod 4's
+ * `ZodError` does **not** satisfy `instanceof Error`. Hono's `#handleError`
+ * guards with `instanceof Error`, so it refused to run the app's `onError` and
+ * re-threw instead; under the real `@hono/node-server` entry point that surfaced
+ * as a **500 with an empty body**, no `request.failed` log and no requestId.
+ * A contract-legal request (omitting `rewardPlan`, which is `.optional()` and
+ * documented as "inherit the stored plan") therefore got a non-standard failure.
+ * Returning data keeps every caller on the normal `ActivityError` -> `fail()`
+ * path, which is what actually maps to `400 invalidRequest`.
+ */
+export function findCheckinWindowIssues(value: ActivityKeyRules): CheckinWindowIssue[] {
+  const plan = value.rewardPlan
+  if (plan === undefined || plan === null) return [] // no plan, no window to bound
+  const startsAt = Date.parse(value.startsAt)
+  const endsAt = Date.parse(value.endsAt)
+  const issues: CheckinWindowIssue[] = []
+  if (Date.parse(plan.checkinWindow.opensAt) < startsAt) {
+    issues.push({
+      message: 'checkinWindow.opensAt must not be earlier than startsAt',
+      path: ['rewardPlan', 'checkinWindow', 'opensAt'],
+    })
+  }
+  if (Date.parse(plan.checkinWindow.closesAt) > endsAt) {
+    issues.push({
+      message: 'checkinWindow.closesAt must not be later than endsAt',
+      path: ['rewardPlan', 'checkinWindow', 'closesAt'],
+    })
+  }
+  return issues
+}
+
+/**
+ * Zod refinement for the write schema: reports window violations as issues.
+ *
+ * Kept as a refinement (rather than a boolean check) so the issue path points at
+ * the offending field and the API returns `400 invalidRequest` with a message
+ * the operator can act on.
+ */
+export function assertCheckinWindowInsideActivity(
+  value: ActivityKeyRules,
+  ctx: Pick<z.RefinementCtx, 'addIssue'>,
+): void {
+  for (const issue of findCheckinWindowIssues(value)) {
+    ctx.addIssue({ code: 'custom', message: issue.message, path: issue.path })
+  }
+}
+
+/**
+ * The cross-check from `activityKeyRulesSchema` that MUST NOT live in that schema.
+ *
+ * A check-in window outside the activity window is not merely untidy: it lets a
+ * plan authorise check-ins - and therefore claims and redemptions - before the
+ * activity starts, i.e. hand out a prize for an event nobody has attended yet.
+ * `lifecycleBlockReason` gates only draft/paused/ended, so "published but not
+ * started yet" is not caught there. The guard is therefore mandatory on write.
+ *
+ * It is a separate schema rather than a `superRefine` on
+ * `activityKeyRulesSchema` because that schema is *also* the parser for
+ * already-stored data: every frozen `activity_rule_versions.snapshot_json` and
+ * every `activity_reward_*` read path re-parses through it. Folding this rule
+ * in would make any row written before the rule existed unreadable - the admin
+ * detail, the rule-version list, the check-in state and the reward overview
+ * would all throw, and an operator could not even repair the offending row
+ * because the update path re-validates the stored plan. Rejecting bad NEW input
+ * and refusing to read OLD rows are different jobs; only the former belongs
+ * here.
+ *
+ * Use this for every value that is about to be written (create/update). Do not
+ * use it to read stored rows.
+ */
+export const activityKeyRulesWriteSchema = activityKeyRulesSchema.superRefine((value, ctx) => {
+  assertCheckinWindowInsideActivity(value, ctx)
+})
+
+export type ActivityKeyRulesWrite = z.infer<typeof activityKeyRulesWriteSchema>
+
 export const createActivityRequestSchema = z.object({
   communityId: z.string().uuid(),
   title: z.string().trim().min(2).max(80),
   summary: z.string().trim().max(200).optional(),
   description: z.string().trim().max(2000).optional(),
-  keyRules: activityKeyRulesSchema,
+  // Write path: applies the check-in-window cross-check (see the comment on
+  // `activityKeyRulesWriteSchema` for why it is not on the read schema).
+  keyRules: activityKeyRulesWriteSchema,
 })
 
 export type CreateActivityRequest = z.infer<typeof createActivityRequestSchema>
@@ -193,7 +310,8 @@ export const updateActivityRequestSchema = z
     title: z.string().trim().min(2).max(80).optional(),
     summary: z.string().trim().max(200).optional(),
     description: z.string().trim().max(2000).optional(),
-    keyRules: activityKeyRulesSchema.optional(),
+    // Write path only: an edit must not be able to move the window out of bounds.
+    keyRules: activityKeyRulesWriteSchema.optional(),
   })
   .superRefine((value, ctx) => {
     if (
@@ -285,6 +403,13 @@ export const adminActivityDetailSchema = adminActivitySummarySchema.extend({
   description: z.string().nullable(),
   publicRules: activityPublicRulesSchema,
   currentRuleVersionId: z.string().uuid().nullable(),
+  /**
+   * The reward plan stored on the activity, exposed so an admin form can read
+   * back what was configured before re-submitting an edit. Without this a client
+   * has no way to round-trip the plan (a draft has no rule version yet), and
+   * every edit would silently drop it.
+   */
+  rewardPlan: activityRewardPlanSchema.nullable(),
 })
 
 export type AdminActivityDetail = z.infer<typeof adminActivityDetailSchema>
@@ -1049,3 +1174,4 @@ export type ActivityParticipationConfirmResponse = z.infer<
 >
 
 export * from './crmeb.js'
+export * from './rewards.js'

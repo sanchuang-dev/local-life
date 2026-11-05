@@ -1,0 +1,54 @@
+{
+  "generatedAt": "2026-11-04T18:36:28.000Z",
+  "api": "http://127.0.0.1:4091",
+  "db": "/tmp/ll-mvp-006-r2/verify.sqlite",
+  "_provenance": "这是 Finding D 修复前（t17 之前）那次运行的留存。本文件不是脚本新写出的结果文件，而是我从当次控制台输出逐条抄录的原文——原结果文件 r2-t13-update-path.json 在修复后被重新运行覆盖。evidence 字符串为当次输出原文，未做改写。",
+  "gitState": "工作区含 t13 已落地、t17 未落地的 apps/api/src/activities/service.ts + packages/contracts/src/index.ts",
+  "totals": {
+    "checks": 6,
+    "passed": 4,
+    "failed": 2
+  },
+  "failedIds": [
+    "t13u.rejectedWithEnvelope",
+    "t13u.failureLogged"
+  ],
+  "runs": [
+    {
+      "id": "setup.activity",
+      "label": "创建带合法奖励计划的活动（用于走继承计划的编辑路径）",
+      "pass": true,
+      "evidence": "status=201 plan.checkinWindow=2026-11-04T18:06:28.142Z..2026-11-04T21:36:28.142Z"
+    },
+    {
+      "id": "t13u.guardFailsClosed",
+      "label": "继承计划的编辑被拒绝，且数据库原值完全未变（不半途写入）",
+      "pass": true,
+      "evidence": "status=500 unchanged=true"
+    },
+    {
+      "id": "t13u.rejectedWithEnvelope",
+      "label": "被拒绝时必须返回契约错误信封 {error:{code,message,requestId}}（而不是空体 500）",
+      "pass": false,
+      "evidence": "status=500 contentType=(none) bodyLen=0 body=\"\""
+    },
+    {
+      "id": "t13u.failureLogged",
+      "label": "失败请求必须留下 request.failed（或 request.completed）日志，便于运维定位",
+      "pass": false,
+      "evidence": "apiLogLines 289->289 lastLines=[{\"timestamp\":\"2026-11-04T18:36:28.208Z\",\"event\":\"request.com | {\"timestamp\":\"2026-11-04T18:36:28.211Z\",\"event\":\"request.com | {\"timestamp\":\"2026-11-04T18:36:28.217Z\",\"event\":\"request.com]"
+    },
+    {
+      "id": "t13u.rootCauseNotError",
+      "label": "根因：不带 ctx 调用时 assertCheckinWindowInsideActivity 抛出非 Error 的 ZodError，Hono 直接重抛而不进 onError",
+      "pass": true,
+      "evidence": "ctor=ZodError instanceofError=false protoChain=ZodError->Object"
+    },
+    {
+      "id": "t13u.explicitPathIsClean",
+      "label": "对照：显式携带 rewardPlan 的同一条规则走 schema.parse，正确返回 400 + 错误信封",
+      "pass": true,
+      "evidence": "status=400 code=invalid_request"
+    }
+  ]
+}

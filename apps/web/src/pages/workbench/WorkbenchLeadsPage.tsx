@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router'
-import { ChevronRight, ClipboardList, Copy, ExternalLink, Phone, Plus, UserRoundCheck } from 'lucide-react'
+import { BadgeCheck, ChevronRight, ClipboardList, Copy, ExternalLink, Phone, Plus, UserRoundCheck } from 'lucide-react'
 import type { CrmLeadSourceType, CrmLeadStatus, CrmLeadSummary } from '@sanchuang-dev/local-life-contracts'
 import { useCrmApi, type LeadListFilters } from '../../hooks/useCrmApi'
 import { useAsyncResource } from '../../hooks/useAsyncResource'
@@ -222,13 +222,22 @@ function LeadsView() {
         <p className="min-w-0 text-[12px] leading-5 text-[#52786c]">
           只显示服务端授权社区内、你有权处理的线索。
         </p>
-        <Link
-          to="/workbench/orders"
-          className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-full bg-white px-3 text-[11px] font-semibold text-teal-700"
-        >
-          <ClipboardList size={13} aria-hidden="true" />
-          受理单
-        </Link>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Link
+            to="/workbench/verify"
+            className="inline-flex min-h-9 items-center gap-1 rounded-full bg-white px-3 text-[11px] font-semibold text-teal-700"
+          >
+            <BadgeCheck size={13} aria-hidden="true" />
+            核销核验
+          </Link>
+          <Link
+            to="/workbench/orders"
+            className="inline-flex min-h-9 items-center gap-1 rounded-full bg-white px-3 text-[11px] font-semibold text-teal-700"
+          >
+            <ClipboardList size={13} aria-hidden="true" />
+            受理单
+          </Link>
+        </div>
       </div>
 
       <section className="mt-4 rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm" aria-label="社区活动入口">

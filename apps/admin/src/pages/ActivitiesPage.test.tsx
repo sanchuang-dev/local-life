@@ -10,6 +10,7 @@ import type { AuthenticatedSession } from '../services/auth'
 import type {
   ActivityAuditEntry,
   ActivityCommunityRef,
+  ActivityRewardPlan,
   ActivityRuleVersion,
   AdminActivityDetail,
   AdminActivitySummary,
@@ -78,6 +79,7 @@ function detail(overrides: Partial<AdminActivityDetail> = {}): AdminActivityDeta
     description: '面向本社区 60 岁以上居民的线下活动',
     publicRules: PUBLIC_RULES,
     currentRuleVersionId: VERSION_ID,
+    rewardPlan: null,
     ...overrides,
   }
 }
@@ -486,5 +488,187 @@ describe('ActivitiesPage audit timeline deprecations', () => {
     const messages = errorSpy.mock.calls.map((call) => call.map(String).join(' '))
     expect(messages.some((message) => message.includes('items.children'))).toBe(false)
     errorSpy.mockRestore()
+  })
+})
+
+describe('ActivitiesPage reward plan form (LL-MVP-006)', () => {
+  const PLAN: ActivityRewardPlan = {
+    prizeName: '10 斤装东北大米',
+    prizeUnitCostCents: 4_500,
+    prizeQuantityPerTeam: 3,
+    totalPrizeQuantity: 60,
+    budgetCapCents: 270_000,
+    claimRecipient: 'leader',
+    checkinWindow: {
+      opensAt: '2026-12-01T02:00:00.000Z',
+      closesAt: '2026-12-01T06:00:00.000Z',
+    },
+    redemptionValidHours: 72,
+    notes: '社区仓库统一发放',
+  }
+
+  it('round-trips a stored plan through the form without changing it', () => {
+    const values = toFormValues(detail({ rewardPlan: PLAN }))
+    expect(values.rewardPlanEnabled).toBe(true)
+    expect(values.rewardPrizeName).toBe('10 斤装东北大米')
+    expect(values.rewardUnitCostYuan).toBe(45)
+    expect(values.rewardQuantityPerTeam).toBe(3)
+    expect(values.rewardTotalQuantity).toBe(60)
+    expect(values.rewardBudgetYuan).toBe(2700)
+    expect(values.rewardClaimRecipient).toBe('leader')
+    expect(values.rewardRedemptionHours).toBe(72)
+    // The pickers are Asia/Shanghai wall clocks, same as the activity window.
+    expect(values.rewardCheckinRange?.[0]?.format('YYYY-MM-DD HH:mm')).toBe('2026-12-01 10:00')
+    expect(values.rewardCheckinRange?.[1]?.format('YYYY-MM-DD HH:mm')).toBe('2026-12-01 14:00')
+
+    const result = keyRulesFromForm(values)
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.keyRules.rewardPlan).toEqual(PLAN)
+    }
+  })
+
+  it('keeps the plan out of the payload when the activity has no plan', () => {
+    const values = toFormValues(detail({ rewardPlan: null }))
+    expect(values.rewardPlanEnabled).toBe(false)
+
+    const result = keyRulesFromForm(values)
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      // Absent key: the server keeps whatever plan it holds (nothing here), and
+      // an ordinary location edit cannot silently clear a frozen plan.
+      expect('rewardPlan' in result.keyRules).toBe(false)
+    }
+  })
+
+  it('clears the plan only when the operator turns a stored plan off', () => {
+    const values = toFormValues(detail({ rewardPlan: PLAN }))
+    values.rewardPlanEnabled = false
+
+    const result = keyRulesFromForm(values)
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      // Explicit null is the destructive state; it must never come from a
+      // form that simply could not read the current plan.
+      expect(result.keyRules.rewardPlan).toBeNull()
+    }
+  })
+
+  it('omits the key for a plain edit that does not touch the plan', () => {
+    const values = toFormValues(detail({ rewardPlan: PLAN }))
+    values.location = '幸福社区文化广场'
+    const result = keyRulesFromForm(values)
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.keyRules.location).toBe('幸福社区文化广场')
+      expect(result.keyRules.rewardPlan).toEqual(PLAN)
+    }
+  })
+
+  it('rejects a plan whose budget cannot cover one team', () => {
+    const values = toFormValues(detail({ rewardPlan: PLAN }))
+    values.rewardBudgetYuan = 100 // 10000 cents < 4500 * 3
+    const result = keyRulesFromForm(values)
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.message).toMatch(/奖励计划不符合共享契约|budgetCapCents/)
+    }
+  })
+
+  it('rejects a plan whose stock cannot cover one team', () => {
+    const values = toFormValues(detail({ rewardPlan: PLAN }))
+    values.rewardTotalQuantity = 2
+    const result = keyRulesFromForm(values)
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.message).toMatch(/奖励计划不符合共享契约|totalPrizeQuantity/)
+    }
+  })
+
+  it('rejects a check-in window that ends before it starts', () => {
+    const values = toFormValues(detail({ rewardPlan: PLAN }))
+    const start = values.rewardCheckinRange?.[0]
+    values.rewardCheckinRange = [start ?? null, start ?? null]
+    const result = keyRulesFromForm(values)
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.message).toMatch(/签到窗口/)
+    }
+  })
+
+  it('requires a prize name when the plan is enabled', () => {
+    const values = toFormValues(detail({ rewardPlan: null }))
+    values.rewardPlanEnabled = true
+    const result = keyRulesFromForm(values)
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.message).toMatch(/奖品名称/)
+    }
+  })
+
+  it('shows the frozen plan in the rule-version drawer', async () => {
+    const version: ActivityRuleVersion = {
+      id: VERSION_ID,
+      activityId: ACTIVITY_ID,
+      version: 1,
+      snapshot: {
+        startsAt: '2026-12-01T02:00:00.000Z',
+        endsAt: '2026-12-01T10:00:00.000Z',
+        location: '幸福社区党群服务中心',
+        budgetCapCents: 987_654,
+        prizeQuantityCap: 4_321,
+        publicRules: PUBLIC_RULES,
+        rewardPlan: PLAN,
+      },
+      createdByUserId: USER_ID,
+      createdAt: '2026-11-02T02:00:00.000Z',
+    }
+    stubApi((url) => {
+      if (url.startsWith('/api/admin/communities')) return json({ items: [COMMUNITY_A] })
+      if (url.startsWith('/api/admin/activities?')) {
+        return json({ items: [summary()], total: 1, page: 1, pageSize: 20 })
+      }
+      if (url === `/api/admin/activities/${ACTIVITY_ID}/rule-versions`) {
+        return json({ items: [version] })
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+
+    renderPage(ADMIN_SESSION)
+    expect(await screen.findByText('银发社区欢乐季')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '规则版本' }))
+
+    expect(await screen.findByText('只读快照，不可编辑或删除')).toBeTruthy()
+    expect(screen.getByText(/10 斤装东北大米/)).toBeTruthy()
+    expect(screen.getByText(/总库存 60/)).toBeTruthy()
+  })
+
+  it('states that an activity without a plan cannot serve rewards', async () => {
+    stubApi((url) => {
+      if (url.startsWith('/api/admin/communities')) return json({ items: [COMMUNITY_A] })
+      if (url.startsWith('/api/admin/activities?')) {
+        return json({
+          items: [summary({ status: 'draft', ruleVersion: null, publishedAt: null })],
+          total: 1,
+          page: 1,
+          pageSize: 20,
+        })
+      }
+      // A draft has no rule version yet; the plan can only come from the
+      // admin detail, which is exactly why `rewardPlan` was added to it.
+      if (url === `/api/admin/activities/${ACTIVITY_ID}`) {
+        return json(
+          detail({ status: 'draft', ruleVersion: null, publishedAt: null, rewardPlan: null }),
+        )
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+
+    renderPage(ADMIN_SESSION)
+    expect(await screen.findByText('银发社区欢乐季')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '编辑' }))
+
+    expect(await screen.findByText('未配置奖励计划')).toBeTruthy()
+    expect(screen.getByText(/409 reward_unavailable/)).toBeTruthy()
   })
 })

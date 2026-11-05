@@ -68,7 +68,7 @@ export function StaffIdentityCard() {
           type="button"
           disabled={busy}
           onClick={() => void signOut()}
-          className="inline-flex min-h-10 shrink-0 items-center gap-1 rounded-full px-2.5 text-[11px] font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+          className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full px-3 text-[11px] font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50"
         >
           <LogOut size={13} aria-hidden="true" />
           {busy ? '退出中…' : '退出'}

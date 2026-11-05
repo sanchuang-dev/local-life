@@ -1,0 +1,307 @@
+{
+  "generatedAt": "2026-11-04T19:11:35.317Z",
+  "api": "http://127.0.0.1:4091",
+  "db": "/tmp/ll-mvp-006-r2/verify.sqlite",
+  "totals": {
+    "checks": 48,
+    "passed": 48,
+    "failed": 0
+  },
+  "failedIds": [],
+  "runs": [
+    {
+      "id": "env.db",
+      "label": "数据库文件存在且已迁移（33 张表）",
+      "pass": true,
+      "evidence": "/tmp/ll-mvp-006-r2/verify.sqlite",
+      "data": {
+        "tables": 33
+      }
+    },
+    {
+      "id": "env.fresh",
+      "label": "数据库为从零构建：无历史社区/活动/签到/奖励数据",
+      "pass": true,
+      "evidence": "communities=0 activities=0 grants=0"
+    },
+    {
+      "id": "setup.admin",
+      "label": "管理员真实密码登录（scrypt 校验）",
+      "pass": true,
+      "evidence": "role=admin"
+    },
+    {
+      "id": "setup.staff",
+      "label": "网格员账号仅被分配到社区甲（用于跨社区 403 反例）",
+      "pass": true,
+      "evidence": "role=grid_worker communities=[社区甲]"
+    },
+    {
+      "id": "setup.activities",
+      "label": "10 个真实活动已创建并发布（含 1 个未配置奖励计划、1 个属于社区乙、1 个 any_member 受领）",
+      "pass": true,
+      "evidence": "MAIN=98fd4513(published) STOCK=8b2ad88a(published) BUDGET=daf9b80e(published) PAUSE=1105d95e(published) REVOKE=aadfdf8e(published) RACE=2ecdeee4(published) EXPIRE=1e036184(published) NOPLAN=9fc43603(published) ANYMEM=e751ada0(published) C2=709f56e9(published)"
+    },
+    {
+      "id": "setup.snapshot",
+      "label": "奖励计划已冻结进 activity_rule_versions.snapshot_json（非可变 activities 列）",
+      "pass": true,
+      "evidence": "version=1 prizeName=社区小礼品",
+      "data": {
+        "rewardPlanJsonColumn": 1
+      }
+    },
+    {
+      "id": "setup.residents",
+      "label": "9 名居民通过 AUTH_DEV_ENABLED 真实登录，服务端签发不透明会话 Cookie",
+      "pass": true,
+      "evidence": "user_ids=0e63662c,8b2dcbf2,6223bbe5"
+    },
+    {
+      "id": "setup.teams",
+      "label": "三人团通过真实 participation API 组成（服务端席位 3/3、锁定后不再暴露邀请码）",
+      "pass": true,
+      "evidence": "MAIN team=a93f5278 seats=3 locked=true"
+    },
+    {
+      "id": "item1.pre",
+      "label": "未签到前：团队奖励状态 eligible=false、checkin_incomplete、3 席已满",
+      "pass": true,
+      "evidence": "eligible=false reason=checkin_incomplete seats=3/3 checkins=0/3"
+    },
+    {
+      "id": "item1.unverified",
+      "label": "三人自助签到后仍未核验：checkinsValid=0、eligible=false、SQL verified 行数=0",
+      "pass": true,
+      "evidence": "eligible=false checkinsValid=0 sqlVerified=0 countsForReward=false"
+    },
+    {
+      "id": "item1.verified",
+      "label": "工作人员逐一核验 3 条签到后达标：checkinsValid=3、eligible=true、后台计数一致",
+      "pass": true,
+      "evidence": "eligible=true checkinsValid=3 sqlVerified=3 overview verified=3 pending=0"
+    },
+    {
+      "id": "item1.claimable",
+      "label": "仅团队发起人 claimableByMe=true；普通成员 false（但看不到 claimable 之外的矛盾状态）",
+      "pass": true,
+      "evidence": "leader claimableByMe=true member claimableByMe=false member eligible=true"
+    },
+    {
+      "id": "item2.checkin",
+      "label": "重复签到/重复核验幂等：返回同一条签到，不新增行、不改首次核验人、不重复追加核验事件",
+      "pass": true,
+      "evidence": "sameId=true rows=3 verifiedAt=2026-11-04T19:11:34.531Z reverify=200 verifyEvents=3->3 verifierUnchanged=true"
+    },
+    {
+      "id": "mainline.claim",
+      "label": "第一份资格：grant 仅 1 行、stock claimed/committed 正确、明文码一次性下发",
+      "pass": true,
+      "evidence": "status=200 created=true grants=1 claimed=1 committed=2500 codeLen=10 masked=******RXNN"
+    },
+    {
+      "id": "mainline.grant",
+      "label": "grant 价格/数量/受领人/状态与冻结计划一致（totalCost=quantity*unitCost）",
+      "pass": true,
+      "evidence": "status=granted qty=1 unit=2500 total=2500 recipient=leader"
+    },
+    {
+      "id": "mainline.credentialMasked",
+      "label": "凭据读取只返回掩码 ******XXXX，明文不再出现（哈希存储）",
+      "pass": true,
+      "evidence": "masked=******RXNN plaintextLeak=false hashMatchesSha256=true"
+    },
+    {
+      "id": "item2.claim",
+      "label": "重复领取不重复发奖：grant 仍 1 行、stock 不再增长，旧码被 supersede、仅 1 个 active",
+      "pass": true,
+      "evidence": "created=false grants=1 claimed=1 oldCode=superseded activeCodes=1"
+    },
+    {
+      "id": "item5.notRecipient",
+      "label": "非受领人 re-claim 被拒 403 forbidden（reason=not_recipient 仅在文案中），受领人原码未被顶掉",
+      "pass": true,
+      "evidence": "status=403 code=forbidden msg=该奖励已由团队其他成员领取，凭据只发给受领人本人 recipientCodeStatus=active hashUnchanged=true"
+    },
+    {
+      "id": "item5.firstRedeem",
+      "label": "首次核销成功：码/资格/库存/预算四处同时落地",
+      "pass": true,
+      "evidence": "status=200 grant=redeemed cred=redeemed redeemedQty=1 redeemedBudget=2500"
+    },
+    {
+      "id": "item5.redeemAudit",
+      "label": "核销写入 append-only 事件与审计：grant.redeemed=1、reward.grant.redeemed=1",
+      "pass": true,
+      "evidence": "events.grant.redeemed=1 audit.reward.grant.redeemed=1"
+    },
+    {
+      "id": "item5.duplicate",
+      "label": "第二次核销被拒 409 reward_already_redeemed，库存/预算不二次扣减、不再追加事件",
+      "pass": true,
+      "evidence": "status=409 code=reward_already_redeemed redeemedQty=1 redeemedBudget=2500 events=1"
+    },
+    {
+      "id": "item5.superseded",
+      "label": "已换发的旧码核销返回 404 redemption_code_invalid（与未知码同形状）",
+      "pass": true,
+      "evidence": "status=404 code=redemption_code_invalid msg=核销码已失效，请使用最新凭据"
+    },
+    {
+      "id": "item5.forged",
+      "label": "伪造码与未知码同为 404 redemption_code_invalid（不泄露存在性）；格式非法为 400",
+      "pass": true,
+      "evidence": "forged=404/redemption_code_invalid unknown=404/redemption_code_invalid sameMessage=true malformed=400/invalid_request"
+    },
+    {
+      "id": "item5.anyMember",
+      "label": "any_member 受领：首个领取者成为受领人，队长随后领取被 403 拒绝且原码未被顶掉",
+      "pass": true,
+      "evidence": "firstClaimer=200/true recipientIsFirstClaimer=true leaderRetry=403/forbidden codeHashUnchanged=true grants=1"
+    },
+    {
+      "id": "item6.redeemedDisputed",
+      "label": "已核销后再撤销签到：grant 转 disputed + opened 争议，已核销库存/预算不回收、历史不删除",
+      "pass": true,
+      "evidence": "grant=disputed redeemedAt=true disputes=1/opened redeemedQty=1 claimed=1 checkinStatus=revoked"
+    },
+    {
+      "id": "item6.unredeemedRevoked",
+      "label": "未核销时撤销签到：grant 转 revoked、库存与预算释放归零、码被作废、行仍在",
+      "pass": true,
+      "evidence": "grant=revoked claimed=1->0 committed=2500->0 code=revoked"
+    },
+    {
+      "id": "item6.revokedCodeDead",
+      "label": "撤销后原凭据不可再核销（404），团队奖励状态同步为不可领",
+      "pass": true,
+      "evidence": "redeem=404/redemption_code_invalid eligible=false reason=checkin_incomplete"
+    },
+    {
+      "id": "item4.stockClaim",
+      "label": "库存仅 1 份：第二团 claim 被拒 409 prize_stock_exhausted，库存/预算/资格行无新增占用",
+      "pass": true,
+      "evidence": "team1=200 claimed=1/1 team2Claim=409/prize_stock_exhausted grants=1 claimedAfter=1"
+    },
+    {
+      "id": "item4.stockState",
+      "label": "（契约要求）第二团的奖励状态读取应 200 且 eligible=false / unavailableReason=stock_exhausted",
+      "pass": true,
+      "evidence": "GET /activities/:id/rewards => 200 eligible=false reason=stock_exhausted claimableByMe=false (raw: {\"activityId\":\"8b2ad88a-da18-44a8-871a-6fe2bad9cba2\",\"teamId\":\"9dcf6269-3126-41ae-9837-fb1)"
+    },
+    {
+      "id": "item4.budgetClaim",
+      "label": "预算仅够 1 份：第二团 claim 被拒 409 budget_exceeded，预算不被击穿且库存仍有余量",
+      "pass": true,
+      "evidence": "team1=200 committed=2500/2500 team2Claim=409/budget_exceeded claimed=1 committedAfter=2500"
+    },
+    {
+      "id": "item4.budgetState",
+      "label": "（契约要求）第二团的奖励状态读取应 200 且 unavailableReason=budget_exhausted",
+      "pass": true,
+      "evidence": "GET /activities/:id/rewards => 200 eligible=false reason=budget_exhausted (raw: {\"activityId\":\"daf9b80e-60a0-4f73-8317-9471d0c48c6f\",\"teamId\":\"11dd6ed7-dd97-47cf-9aee-7b1)"
+    },
+    {
+      "id": "item5.paused",
+      "label": "活动暂停时 claim 被拒 409 reward_unavailable(activity_not_published)，且库存台账零占用",
+      "pass": true,
+      "evidence": "pause=200 claim=409/reward_unavailable stockRows=0 grants=0"
+    },
+    {
+      "id": "item5.resumed",
+      "label": "恢复发布后 claim 成功，库存恰好占用 1 份（暂停期间未预占）",
+      "pass": true,
+      "evidence": "resume=200 claim=200 created=true claimed=1"
+    },
+    {
+      "id": "item3.concurrent",
+      "label": "两个真实 API 进程 × 6 个并发 claim 同一团队：恰好 1 份 grant、1 次库存占用、1 个明文码",
+      "pass": true,
+      "evidence": "200s=6 createdTrue=1 409s=0 codes=1 grants=1 claimed=1 committed=2500 statuses=200,200,200,200,200,200 createdFlags=true,false,false,false,false,false"
+    },
+    {
+      "id": "item5.crossCommunity",
+      "label": "跨社区核销：403 forbidden + 恰好 1 条 reward.access_denied 审计，社区乙的码仍 active",
+      "pass": true,
+      "evidence": "claim=200 cross=403/forbidden accessDeniedAudit=0->1 code=active"
+    },
+    {
+      "id": "item5.expired",
+      "label": "过期码：400 redemption_code_expired，行被持久标记 expired，重复调用给出同一结论",
+      "pass": true,
+      "evidence": "redeem=400/redemption_code_expired durableStatus=expired repeat=400/redemption_code_expired grant=granted"
+    },
+    {
+      "id": "item7.apiConsistency",
+      "label": "H5 与后台读取同一事实：grant 状态、掩码、库存/预算计数完全一致",
+      "pass": true,
+      "evidence": "h5.grant=disputed h5.masked=******0MP8 admin.masked=******0MP8 admin.grant=disputed openDispute=true stock claimed/redeemed=1/1 verified=2 revoked=1"
+    },
+    {
+      "id": "item7.relogin",
+      "label": "重新登录/新连接后状态与凭据掩码不变（服务端会话，不依赖前端内存）",
+      "pass": true,
+      "evidence": "adminReloginMasked=******0MP8 residentFreshConnMasked=******0MP8"
+    },
+    {
+      "id": "item6.disputeReversed",
+      "label": "争议裁定是追加式：新增一条 reversed 记录，grant 转 reversed，已核销库存/预算仍不回收，且不可重新开启",
+      "pass": true,
+      "evidence": "reverse=200 grant=reversed redeemedAt=true thread=opened>reversed redeemedQty=1 reopen=409/conflict"
+    },
+    {
+      "id": "item1.noPlan",
+      "label": "未配置奖励计划：签到/奖励入口明确不可用（reward_plan_not_configured），后台 plan=null 且 stock=null",
+      "pass": true,
+      "evidence": "checkin.reason=reward_plan_not_configured window=null rewardState=200/reward_plan_not_configured admin.planSource=none stock=null"
+    },
+    {
+      "id": "invariants.appendOnly",
+      "label": "数据库触发器兜底：发奖/库存行不可删除、凭据 TTL 不可改写",
+      "pass": true,
+      "evidence": "grantDeleteBlocked=true codeTtlImmutable=true stockDeleteBlocked=true"
+    },
+    {
+      "id": "invariants.eventSequence",
+      "label": "事件序列连续无洞（append-only 审计可重放）",
+      "pass": true,
+      "evidence": "events=11 seq=1,2,3,4,5,6,7,8,9,10,11"
+    },
+    {
+      "id": "invariants.noSecretInAudit",
+      "label": "审计日志不含明文核销码（只记 ID 与枚举）",
+      "pass": true,
+      "evidence": "auditRows=155 rowsWithCode=0"
+    },
+    {
+      "id": "t13.windowBeforeRejected",
+      "label": "签到窗口完全早于活动：写路径拒绝，且数据库不留活动行",
+      "pass": true,
+      "evidence": "status=400/invalid_request activities 10->10 msg=\"活动信息不正确\""
+    },
+    {
+      "id": "t13.opensAtFieldPath",
+      "label": "越界原因定位到 checkinWindow.opensAt，且读 schema 未被收紧（旧数据仍可解析）",
+      "pass": true,
+      "evidence": "writeSchemaPaths=[rewardPlan.checkinWindow.opensAt] readSchemaAcceptsSamePayload=true"
+    },
+    {
+      "id": "t13.windowEqualToActivityAccepted",
+      "label": "签到窗口恰好等于活动起止（闭区间边界）仍可创建，且计划原样落库",
+      "pass": true,
+      "evidence": "status=201 stored=2026-11-04T20:11:35.273Z..2026-11-05T02:11:35.273Z"
+    },
+    {
+      "id": "t13.updateWindowRejected",
+      "label": "编辑路径同样拒绝越界窗口，且被拒后数据库原值不变（不半途写入）",
+      "pass": true,
+      "evidence": "status=400/invalid_request unchanged=true"
+    },
+    {
+      "id": "t13.legacyRowStillRepairable",
+      "label": "修复前写入的越界计划仍可读取、且运营能把它改回合法值（读 schema 未收紧的实证）",
+      "pass": true,
+      "evidence": "read=200 storedPlanOutOfBounds=2026-11-04T16:11:35.273Z repair=200/null after=2026-11-04T20:11:35.273Z"
+    }
+  ]
+}

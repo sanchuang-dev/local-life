@@ -1,0 +1,864 @@
+{
+  "runTag": "2026-11-04T13-13-50-216Z",
+  "generatedAt": "2026-11-04T13:15:49.249Z",
+  "environment": {
+    "chrome": "Chrome/156.0.8078.80",
+    "api": "http://127.0.0.1:4082",
+    "web": "http://localhost:5224/local-life/",
+    "admin": "http://localhost:5225/",
+    "driver": "Chrome DevTools Protocol（裸 CDP over ws，无 puppeteer）",
+    "viewports": [
+      "375x812@2x",
+      "320x812@2x",
+      "1440x900@1x（管理台）"
+    ]
+  },
+  "setup": {
+    "communityId": "cc786bc5-0025-45c0-adea-0667e742138c",
+    "activities": {
+      "a": {
+        "id": "a7dcf85e-6d19-4452-b895-e3906579b477",
+        "title": "银发验收主活动 0-216Z",
+        "prizeName": "东北大米 10 斤装",
+        "plan": {
+          "prizeName": "东北大米 10 斤装",
+          "prizeUnitCostCents": 4500,
+          "prizeQuantityPerTeam": 3,
+          "totalPrizeQuantity": 30,
+          "budgetCapCents": 135000,
+          "claimRecipient": "leader",
+          "checkinWindow": {
+            "opensAt": "2026-11-03T13:13:50.000Z",
+            "closesAt": "2026-11-16T13:13:50.000Z"
+          },
+          "redemptionValidHours": 72,
+          "notes": "社区仓库统一发放"
+        }
+      },
+      "b": {
+        "id": "f421e9dd-c59d-4609-bd46-61e4b36f5ec9",
+        "title": "银发验收未核验对照 0-216Z",
+        "prizeName": "手工饺子礼盒",
+        "plan": {
+          "prizeName": "手工饺子礼盒",
+          "prizeUnitCostCents": 5500,
+          "prizeQuantityPerTeam": 2,
+          "totalPrizeQuantity": 24,
+          "budgetCapCents": 132000,
+          "claimRecipient": "any_member",
+          "checkinWindow": {
+            "opensAt": "2026-11-03T13:13:50.000Z",
+            "closesAt": "2026-11-16T13:13:50.000Z"
+          },
+          "redemptionValidHours": 24,
+          "notes": "现场领取"
+        }
+      },
+      "noPlan": {
+        "id": "94aff2ab-b25d-406c-bc22-37e641aa8e85",
+        "title": "银发验收无计划 0-216Z"
+      }
+    },
+    "teams": {
+      "a": [
+        {
+          "name": "张阿姨",
+          "userId": "bf7f8d05-1a3e-4323-b4c4-3cfbd1fa13f5",
+          "teamId": "994af1ef-38ed-48d5-875f-0256d6ec6d12"
+        },
+        {
+          "name": "李大叔",
+          "userId": "1dd09c27-a77e-4ec0-9aff-2b09a6a3e574",
+          "teamId": "994af1ef-38ed-48d5-875f-0256d6ec6d12"
+        },
+        {
+          "name": "王奶奶",
+          "userId": "b31d4fe2-833d-4f39-9ec2-7f22d39906f8",
+          "teamId": "994af1ef-38ed-48d5-875f-0256d6ec6d12"
+        }
+      ],
+      "b": [
+        {
+          "name": "周阿姨",
+          "userId": "4df4dd89-485d-4176-af33-5038f067597d",
+          "teamId": "18dda877-25e4-4c3b-bfb0-385e1c960b1d"
+        },
+        {
+          "name": "吴大爷",
+          "userId": "d1df0f26-2340-4ffb-b958-5d556c6770f9",
+          "teamId": "18dda877-25e4-4c3b-bfb0-385e1c960b1d"
+        },
+        {
+          "name": "郑奶奶",
+          "userId": "75bd36d9-927a-48c9-97cc-d6425eceb7d8",
+          "teamId": "18dda877-25e4-4c3b-bfb0-385e1c960b1d"
+        }
+      ]
+    },
+    "mintedPlaintextCodes": [
+      "DPRP**9E"
+    ],
+    "redeemedCode": "DPRP**9E"
+  },
+  "totals": {
+    "assertions": 35,
+    "passed": 35,
+    "failed": 0
+  },
+  "assertions": [
+    {
+      "id": "ui-375-campaign",
+      "seq": 1,
+      "label": "375 银发活动页（真实签到/团队奖励/凭据）无横向溢出",
+      "pass": true,
+      "evidence": {
+        "url": "http://localhost:5224/local-life/#/community/activity/silver-neighborhood?activityId=a7dcf85e-6d19-4452-b895-e3906579b477",
+        "viewport": "375x812",
+        "innerWidth": 375,
+        "documentClientWidth": 375,
+        "documentScrollWidth": 375,
+        "bodyScrollWidth": 375,
+        "hasHorizontalOverflow": false,
+        "overflowingElements": [],
+        "clippedByScroller": [],
+        "smallTapTargets": [],
+        "hash": "#/community/activity/silver-neighborhood?activityId=a7dcf85e-6d19-4452-b895-e3906579b477",
+        "screenshot": "screenshots/ui-375-campaign-375.png",
+        "textExcerpt": "9:41\n活动详情\n活动进行中\n2026.11.03 21:13 - 2026.11.16 21:13\n北京时间\n还剩\n11\n天\n23\n:\n59\n:\n55\n银发验收主活动 0-216Z\n银发验收社区-0-216Z\n·\n幸福社区党群服务中心\n已发布 · 规则第 1 版\n活动规则\n我的三人团\n真实业务\n已成团\n3 / 3\n已成团\n你是本团团长。席位与成员来自服务端实时状态，刷新或换设备后保持一致。\n我\n我\n团长 · 本人\n李\n李大叔\n成员\n王\n王奶奶\n成员\n已成团，本场不再接受新成员；邀请入口已关闭。\n演示与真实内容说明\n参与、三人团、邀请、真实签到与团队奖励领取/核销凭据已接入真实业务，状态来自服务端。以下内容仍为前端演示、不产生真实记录：今日抽奖、活动压轴大奖、社区里程碑与热力榜、消费组队。\n成团好礼\n示例奖品 · 非真实库存\n鸡蛋1盒\n到场礼\n纸巾1提\n到场礼\n100元体验券\n成团购\nTEAM QUEST\n成团任务\n签到为真实数据 · 消费仍为演示\n签到组队\n消费组队\n三人有效签到\n签到与奖励资格为真实数据；只有现场核验通过的签到计入进度。\n真实接入\n我的签到\n签到窗口 2026-11-03 21:13 至 2026-11-16 21:13\n已核验\n签到已由工作人员现场核验，计入团队奖励进度。\n签到时间 2026-11-04 21:13 · 核验时间 2026-11-04 21:13\n团队奖励\n东北大米 10 斤装 · 每团 3 份\n队长领取 · 凭据有效期 72 小时\n团队人数\n3/3\n有效签到\n3/3\n只有「现场核验通过」的签到计入进度；自行签到未核验前不计入。\n我的奖励凭据\n待领取\n凭据待现场核销，有效期至 2026-11-07 21:13。\n凭据尾号 ******A29E\n有效期至 2026-11-07 21:13\n待领取 · 发放于 2026-11-04 21:13\n团队已满足全部奖励条件。\n鸡蛋1盒\n到场礼\n纸巾1提\n到场礼\nCOMMUNITY GOAL\n社区一起解锁更多礼\n每团仍是 3 人；全社区累计成功团数，共同解锁里程碑奖励。\n20团\n50团\n100团\n鸡蛋加码礼\n已解锁\n体验券加码\n冲刺中\n惊喜礼加码\n待解锁\n已成团 36 团\n距离 50 团还差 14 团\n奖励规则\nDAILY LUCK\n今日抽奖\n我的奖励\n每日一次演示机会，看看今天有什么惊喜\n鸡蛋兑换券\n生活纸品\n本地体验券\n惊喜硬件礼包\n社区小礼物\n谢谢参与\n试试今日手气\n奖品与抽取均为前端演示，不代表真实发放\nCOMMUNITY RANK\n社区热力榜\n查看全部\n1\n悦和社区\n326人参与\n52\n有效团\n2\n示例社区\n我们社区\n228人参与\n36\n有效团\n3\n榕树湾社区\n196人参与\n31\n有效团\n当前榜单按“有效成团数”展示示例数据；正式活动需在规则发布时冻结统计口径。\nFINAL PRIZE\n活动压轴大奖\n示例：10月31日 20:00 截止\n广电智能硬件 · 魔镜体验设备\n奖品仅作活动示例，实际型号与数量待确定\n社区榜前 20 名，获得一次大奖抽取资格\n获得资格不等于直接中奖\n查看大奖规则\nLOCAL BENEFITS\n活动里还能逛什么\n本地商户、广电商品和魔镜都可以成为活动供给，但不要求在本页完成线上支付。\n本地商户\n老手艺体验券\n参考价值 ¥100 · 到店预约体验\n广电精选\n智能家居体验礼包\n查看现有广电服务与家庭场景展示\n魔镜体验\n银发焕新体验\n查看现有魔镜终端能力展示\n活动信息与参与状态来自真实服务，其余玩法仍是交互演示\n标题、社区、地点、时间、活动规则"
+      }
+    },
+    {
+      "id": "ui-375-campaign-real",
+      "seq": 2,
+      "label": "活动页展示真实签到与团队奖励数据",
+      "pass": true,
+      "evidence": {
+        "hasVerifiedCheckin": true,
+        "hasTeamReward": true,
+        "hasCredential": true,
+        "maskedCode": "******A29E"
+      }
+    },
+    {
+      "id": "ui-375-campaign-demo",
+      "seq": 3,
+      "label": "抽奖/大奖/阶梯仍明确标注为演示",
+      "pass": true,
+      "evidence": {
+        "lotteryDemo": true,
+        "finalPrizeDemo": true,
+        "giftDemo": true
+      }
+    },
+    {
+      "id": "ui-320-campaign",
+      "seq": 4,
+      "label": "320 银发活动页（真实签到/团队奖励/凭据）无横向溢出",
+      "pass": true,
+      "evidence": {
+        "url": "http://localhost:5224/local-life/#/community/activity/silver-neighborhood?activityId=a7dcf85e-6d19-4452-b895-e3906579b477",
+        "viewport": "320x812",
+        "innerWidth": 320,
+        "documentClientWidth": 320,
+        "documentScrollWidth": 320,
+        "bodyScrollWidth": 320,
+        "hasHorizontalOverflow": false,
+        "overflowingElements": [],
+        "clippedByScroller": [],
+        "smallTapTargets": [],
+        "hash": "#/community/activity/silver-neighborhood?activityId=a7dcf85e-6d19-4452-b895-e3906579b477",
+        "screenshot": "screenshots/ui-320-campaign-320.png",
+        "textExcerpt": "9:41\n活动详情\n活动进行中\n2026.11.03 21:13 - 2026.11.16 21:13\n北京时间\n还剩\n11\n天\n23\n:\n59\n:\n51\n银发验收主活动 0-216Z\n银发验收社区-0-216Z\n·\n幸福社区党群服务中心\n已发布 · 规则第 1 版\n活动规则\n我的三人团\n真实业务\n已成团\n3 / 3\n已成团\n你是本团团长。席位与成员来自服务端实时状态，刷新或换设备后保持一致。\n我\n我\n团长 · 本人\n李\n李大叔\n成员\n王\n王奶奶\n成员\n已成团，本场不再接受新成员；邀请入口已关闭。\n演示与真实内容说明\n参与、三人团、邀请、真实签到与团队奖励领取/核销凭据已接入真实业务，状态来自服务端。以下内容仍为前端演示、不产生真实记录：今日抽奖、活动压轴大奖、社区里程碑与热力榜、消费组队。\n成团好礼\n示例奖品 · 非真实库存\n鸡蛋1盒\n到场礼\n纸巾1提\n到场礼\n100元体验券\n成团购\nTEAM QUEST\n成团任务\n签到为真实数据 · 消费仍为演示\n签到组队\n消费组队\n三人有效签到\n签到与奖励资格为真实数据；只有现场核验通过的签到计入进度。\n真实接入\n我的签到\n签到窗口 2026-11-03 21:13 至 2026-11-16 21:13\n已核验\n签到已由工作人员现场核验，计入团队奖励进度。\n签到时间 2026-11-04 21:13 · 核验时间 2026-11-04 21:13\n团队奖励\n东北大米 10 斤装 · 每团 3 份\n队长领取 · 凭据有效期 72 小时\n团队人数\n3/3\n有效签到\n3/3\n只有「现场核验通过」的签到计入进度；自行签到未核验前不计入。\n我的奖励凭据\n待领取\n凭据待现场核销，有效期至 2026-11-07 21:13。\n凭据尾号 ******A29E\n有效期至 2026-11-07 21:13\n待领取 · 发放于 2026-11-04 21:13\n团队已满足全部奖励条件。\n鸡蛋1盒\n到场礼\n纸巾1提\n到场礼\nCOMMUNITY GOAL\n社区一起解锁更多礼\n每团仍是 3 人；全社区累计成功团数，共同解锁里程碑奖励。\n20团\n50团\n100团\n鸡蛋加码礼\n已解锁\n体验券加码\n冲刺中\n惊喜礼加码\n待解锁\n已成团 36 团\n距离 50 团还差 14 团\n奖励规则\nDAILY LUCK\n今日抽奖\n我的奖励\n每日一次演示机会，看看今天有什么惊喜\n鸡蛋兑换券\n生活纸品\n本地体验券\n惊喜硬件礼包\n社区小礼物\n谢谢参与\n试试今日手气\n奖品与抽取均为前端演示，不代表真实发放\nCOMMUNITY RANK\n社区热力榜\n查看全部\n1\n悦和社区\n326人参与\n52\n有效团\n2\n示例社区\n我们社区\n228人参与\n36\n有效团\n3\n榕树湾社区\n196人参与\n31\n有效团\n当前榜单按“有效成团数”展示示例数据；正式活动需在规则发布时冻结统计口径。\nFINAL PRIZE\n活动压轴大奖\n示例：10月31日 20:00 截止\n广电智能硬件 · 魔镜体验设备\n奖品仅作活动示例，实际型号与数量待确定\n社区榜前 20 名，获得一次大奖抽取资格\n获得资格不等于直接中奖\n查看大奖规则\nLOCAL BENEFITS\n活动里还能逛什么\n本地商户、广电商品和魔镜都可以成为活动供给，但不要求在本页完成线上支付。\n本地商户\n老手艺体验券\n参考价值 ¥100 · 到店预约体验\n广电精选\n智能家居体验礼包\n查看现有广电服务与家庭场景展示\n魔镜体验\n银发焕新体验\n查看现有魔镜终端能力展示\n活动信息与参与状态来自真实服务，其余玩法仍是交互演示\n标题、社区、地点、时间、活动规则"
+      }
+    },
+    {
+      "id": "ui-320-campaign-real",
+      "seq": 5,
+      "label": "活动页展示真实签到与团队奖励数据",
+      "pass": true,
+      "evidence": {
+        "hasVerifiedCheckin": true,
+        "hasTeamReward": true,
+        "hasCredential": true,
+        "maskedCode": "******A29E"
+      }
+    },
+    {
+      "id": "ui-320-campaign-demo",
+      "seq": 6,
+      "label": "抽奖/大奖/阶梯仍明确标注为演示",
+      "pass": true,
+      "evidence": {
+        "lotteryDemo": true,
+        "finalPrizeDemo": true,
+        "giftDemo": true
+      }
+    },
+    {
+      "id": "ui-375-rewards",
+      "seq": 7,
+      "label": "375 我的奖励页无横向溢出",
+      "pass": true,
+      "evidence": {
+        "url": "http://localhost:5224/local-life/#/me/rewards",
+        "viewport": "375x812",
+        "innerWidth": 375,
+        "documentClientWidth": 375,
+        "documentScrollWidth": 375,
+        "bodyScrollWidth": 375,
+        "hasHorizontalOverflow": false,
+        "overflowingElements": [],
+        "clippedByScroller": [
+          "BUTTON.min-h-11 shrink-0 whitespace-nowrap rounded-fu right=409",
+          "BUTTON.min-h-11 shrink-0 whitespace-nowrap rounded-fu right=494"
+        ],
+        "smallTapTargets": [],
+        "hash": "#/me/rewards",
+        "screenshot": "screenshots/ui-375-rewards-375.png",
+        "textExcerpt": "9:41\n我的奖励\n返回我的\n我的奖励\n真实活动奖励 · 核销凭据 · 核销状态\n本页奖励与凭据来自服务端\n仅展示你在已发布活动中真实获得的奖励。抽奖、压轴大奖与社区里程碑不在此列，它们仍在活动页明确标注为演示。\n奖励状态\n全部 1\n待领取 1\n待达成 0\n已核销 0\n争议 0\n已失效 0\n银发验收主活动 0-216Z\n银发验收社区-0-216Z\n待领取\n东北大米 10 斤装 · 每团 3 份\n凭据待现场核销，有效期至 2026-11-07 21:13。\n******A29E\n有效期至 2026-11-07 21:13\n奖励状态\n待领取\n领取人\n队长 张阿姨\n发放时间\n2026-11-04 21:13\n查看活动与团队进度\n凭据码明文只在领取当次显示一次，服务端仅保存哈希；本页只显示尾号，便于现场核对。核销记录由工作人员在活动现场写入。\n首页\n社区\n健康\n惠生活\n我的\n（当前）"
+      }
+    },
+    {
+      "id": "ui-375-rewards-buckets",
+      "seq": 8,
+      "label": "我的奖励按服务端状态分桶",
+      "pass": true,
+      "evidence": {
+        "hasRedeemed": true,
+        "hasClaimable": true,
+        "hasPending": true,
+        "maskedCode": "******A29E"
+      }
+    },
+    {
+      "id": "ui-320-rewards",
+      "seq": 9,
+      "label": "320 我的奖励页无横向溢出",
+      "pass": true,
+      "evidence": {
+        "url": "http://localhost:5224/local-life/#/me/rewards",
+        "viewport": "320x812",
+        "innerWidth": 320,
+        "documentClientWidth": 320,
+        "documentScrollWidth": 320,
+        "bodyScrollWidth": 320,
+        "hasHorizontalOverflow": false,
+        "overflowingElements": [],
+        "clippedByScroller": [
+          "BUTTON.min-h-11 shrink-0 whitespace-nowrap rounded-fu right=335",
+          "BUTTON.min-h-11 shrink-0 whitespace-nowrap rounded-fu right=409",
+          "BUTTON.min-h-11 shrink-0 whitespace-nowrap rounded-fu right=494"
+        ],
+        "smallTapTargets": [],
+        "hash": "#/me/rewards",
+        "screenshot": "screenshots/ui-320-rewards-320.png",
+        "textExcerpt": "9:41\n我的奖励\n返回我的\n我的奖励\n真实活动奖励 · 核销凭据 · 核销状态\n本页奖励与凭据来自服务端\n仅展示你在已发布活动中真实获得的奖励。抽奖、压轴大奖与社区里程碑不在此列，它们仍在活动页明确标注为演示。\n奖励状态\n全部 1\n待领取 1\n待达成 0\n已核销 0\n争议 0\n已失效 0\n银发验收主活动 0-216Z\n银发验收社区-0-216Z\n待领取\n东北大米 10 斤装 · 每团 3 份\n凭据待现场核销，有效期至 2026-11-07 21:13。\n******A29E\n有效期至 2026-11-07 21:13\n奖励状态\n待领取\n领取人\n队长 张阿姨\n发放时间\n2026-11-04 21:13\n查看活动与团队进度\n凭据码明文只在领取当次显示一次，服务端仅保存哈希；本页只显示尾号，便于现场核对。核销记录由工作人员在活动现场写入。\n首页\n社区\n健康\n惠生活\n我的\n（当前）"
+      }
+    },
+    {
+      "id": "ui-320-rewards-buckets",
+      "seq": 10,
+      "label": "我的奖励按服务端状态分桶",
+      "pass": true,
+      "evidence": {
+        "hasRedeemed": true,
+        "hasClaimable": true,
+        "hasPending": true,
+        "maskedCode": "******A29E"
+      }
+    },
+    {
+      "id": "ui-375-verify",
+      "seq": 11,
+      "label": "375 网格员现场核验页无横向溢出",
+      "pass": true,
+      "evidence": {
+        "url": "http://localhost:5224/local-life/#/workbench/verify",
+        "viewport": "375x812",
+        "innerWidth": 375,
+        "documentClientWidth": 375,
+        "documentScrollWidth": 375,
+        "bodyScrollWidth": 375,
+        "hasHorizontalOverflow": false,
+        "overflowingElements": [],
+        "clippedByScroller": [],
+        "smallTapTargets": [],
+        "hash": "#/workbench/verify",
+        "screenshot": "screenshots/ui-375-verify-375.png",
+        "textExcerpt": "9:41\n现场核验核销\n现场核验核销\n核销凭据码 · 核验参与者签到 · 权限来自服务端\n网格员甲\n网格员 · grid.0aa6e3\n授权社区：银发验收社区-0-216Z\n退出\n当前身份：网格员，可核销社区：银发验收社区-0-216Z。 网格员只能核销所属社区的凭据；跨社区的请求会被服务端拒绝并记录审计。\n核销凭据码\n参与者签到\n输入居民凭据码\n凭据码为 10 位（0-9 与 A-Z，不含 I、L、O、U）。核销成功后该码立即失效，不能重复使用。\n核销码*\n已输入 0/10 位\n备注\n可选，写入核销记录，便于后续核对。\n确认核销\n核销只在服务端执行一次：并发或重复提交都只会成功一次，不会多扣库存或重复发奖。\n返回我的线索\n首页\n社区\n健康\n惠生活\n我的\n（当前）"
+      }
+    },
+    {
+      "id": "ui-320-verify",
+      "seq": 12,
+      "label": "320 网格员现场核验页无横向溢出",
+      "pass": true,
+      "evidence": {
+        "url": "http://localhost:5224/local-life/#/workbench/verify",
+        "viewport": "320x812",
+        "innerWidth": 320,
+        "documentClientWidth": 320,
+        "documentScrollWidth": 320,
+        "bodyScrollWidth": 320,
+        "hasHorizontalOverflow": false,
+        "overflowingElements": [],
+        "clippedByScroller": [],
+        "smallTapTargets": [],
+        "hash": "#/workbench/verify",
+        "screenshot": "screenshots/ui-320-verify-320.png",
+        "textExcerpt": "9:41\n现场核验核销\n现场核验核销\n核销凭据码 · 核验参与者签到 · 权限来自服务端\n网格员甲\n网格员 · grid.0aa6e3\n授权社区：银发验收社区-0-216Z\n退出\n当前身份：网格员，可核销社区：银发验收社区-0-216Z。 网格员只能核销所属社区的凭据；跨社区的请求会被服务端拒绝并记录审计。\n核销凭据码\n参与者签到\n输入居民凭据码\n凭据码为 10 位（0-9 与 A-Z，不含 I、L、O、U）。核销成功后该码立即失效，不能重复使用。\n核销码*\n已输入 0/10 位\n备注\n可选，写入核销记录，便于后续核对。\n确认核销\n核销只在服务端执行一次：并发或重复提交都只会成功一次，不会多扣库存或重复发奖。\n返回我的线索\n首页\n社区\n健康\n惠生活\n我的\n（当前）"
+      }
+    },
+    {
+      "id": "ui-375-unverified",
+      "seq": 13,
+      "label": "375 未核验签到显示「待核验」",
+      "pass": true,
+      "evidence": {
+        "url": "http://localhost:5224/local-life/#/community/activity/silver-neighborhood?activityId=f421e9dd-c59d-4609-bd46-61e4b36f5ec9",
+        "viewport": "375x812",
+        "innerWidth": 375,
+        "documentClientWidth": 375,
+        "documentScrollWidth": 375,
+        "bodyScrollWidth": 375,
+        "hasHorizontalOverflow": false,
+        "overflowingElements": [],
+        "clippedByScroller": [],
+        "smallTapTargets": [],
+        "hash": "#/community/activity/silver-neighborhood?activityId=f421e9dd-c59d-4609-bd46-61e4b36f5ec9",
+        "screenshot": null,
+        "textExcerpt": "9:41\n活动详情\n活动进行中\n2026.11.03 21:13 - 2026.11.16 21:13\n北京时间\n还剩\n11\n天\n23\n:\n59\n:\n28\n银发验收未核验对照 0-216Z\n银发验收社区-0-216Z\n·\n幸福社区党群服务中心\n已发布 · 规则第 1 版\n活动规则\n我的三人团\n真实业务\n已成团\n3 / 3\n已成团\n你是本团团长。席位与成员来自服务端实时状态，刷新或换设备后保持一致。\n我\n我\n团长 · 本人\n吴\n吴大爷\n成员\n郑\n郑奶奶\n成员\n已成团，本场不再接受新成员；邀请入口已关闭。\n演示与真实内容说明\n参与、三人团、邀请、真实签到与团队奖励领取/核销凭据已接入真实业务，状态来自服务端。以下内容仍为前端演示、不产生真实记录：今日抽奖、活动压轴大奖、社区里程碑与热力榜、消费组队。\n成团好礼\n示例奖品 · 非真实库存\n鸡蛋1盒\n到场礼\n纸巾1提\n到场礼\n100元体验券\n成团购\nTEAM QUEST\n成团任务\n签到为真实数据 · 消费仍为演示\n签到组队\n消费组队\n三人有效签到\n签到与奖励资格为真实数据；只有现场核验通过的签到计入进度。\n真实接入\n我的签到\n签到窗口 2026-11-03 21:13 至 2026-11-16 21:13\n待核验\n签到成功，待现场核验。核验通过后才计入团队奖励进度。\n签到时间 2026-11-04 21:13\n团队奖励\n手工饺子礼盒 · 每团 2 份\n任一团员领取 · 凭据有效期 24 小时\n团队人数\n3/3\n有效签到\n2/3\n只有「现场核验通过」的签到计入进度；自行签到未核验前不计入。\n团队有效签到不足 3 条，暂不满足奖励条件。\n鸡蛋1盒\n到场礼\n纸巾1提\n到场礼\nCOMMUNITY GOAL\n社区一起解锁更多礼\n每团仍是 3 人；全社区累计成功团数，共同解锁里程碑奖励。\n20团\n50团\n100团\n鸡蛋加码礼\n已解锁\n体验券加码\n冲刺中\n惊喜礼加码\n待解锁\n已成团 36 团\n距离 50 团还差 14 团\n奖励规则\nDAILY LUCK\n今日抽奖\n我的奖励\n每日一次演示机会，看看今天有什么惊喜\n鸡蛋兑换券\n生活纸品\n本地体验券\n惊喜硬件礼包\n社区小礼物\n谢谢参与\n试试今日手气\n奖品与抽取均为前端演示，不代表真实发放\nCOMMUNITY RANK\n社区热力榜\n查看全部\n1\n悦和社区\n326人参与\n52\n有效团\n2\n示例社区\n我们社区\n228人参与\n36\n有效团\n3\n榕树湾社区\n196人参与\n31\n有效团\n当前榜单按“有效成团数”展示示例数据；正式活动需在规则发布时冻结统计口径。\nFINAL PRIZE\n活动压轴大奖\n示例：10月31日 20:00 截止\n广电智能硬件 · 魔镜体验设备\n奖品仅作活动示例，实际型号与数量待确定\n社区榜前 20 名，获得一次大奖抽取资格\n获得资格不等于直接中奖\n查看大奖规则\nLOCAL BENEFITS\n活动里还能逛什么\n本地商户、广电商品和魔镜都可以成为活动供给，但不要求在本页完成线上支付。\n本地商户\n老手艺体验券\n参考价值 ¥100 · 到店预约体验\n广电精选\n智能家居体验礼包\n查看现有广电服务与家庭场景展示\n魔镜体验\n银发焕新体验\n查看现有魔镜终端能力展示\n活动信息与参与状态来自真实服务，其余玩法仍是交互演示\n标题、社区、地点、时间、活动规则与你的参与/三人团状态读取自真实服务；登录、确认参与与邀请分享会调用真实 API。 签到、消费、抽奖、排行榜、大奖与社区统计仍为样例，不会写入签到、订单、库存或兑奖记录。\n三人成团 · 天天有奖 · 社区争榜 · 活动冲大奖\n首页\n社"
+      }
+    },
+    {
+      "id": "ui-375-unverified-copy",
+      "seq": 14,
+      "label": "未核验签到不得显示为已签到（截图内可见）",
+      "pass": true,
+      "evidence": {
+        "hasPendingLabel": true,
+        "claimsVerified": false,
+        "labelInViewport": "ok",
+        "labelRect": {
+          "top": 399,
+          "bottom": 423,
+          "left": 277,
+          "right": 331,
+          "viewport": {
+            "w": 375,
+            "h": 812
+          },
+          "inViewport": true
+        },
+        "progressLine": "有效签到\n2/3",
+        "excerpt": "我的签到\n\n签到窗口 2026-11-03 21:13 至 2026-11-16 21:13\n\n待核验\n\n签到成功，待现场核验。核验通过后才计入团队奖励进度。\n\n签到时间 2026-11-04 21:13\n\n团队奖励\n\n手工饺子礼盒 · 每团 2 份\n\n任一团员领取 · 凭据有效期 24 小时\n\n团队人数\n3/3\n有效签到\n2/3\n\n只有「现场核验通过」的签到计入进度；自行签到未核验前不计入。\n\n团队有效签到不足 3 条，暂不满足奖励条件。\n\n鸡蛋1盒\n到场礼\n纸巾1提\n到场礼\n\nCOMMUNITY GOAL\n\n社区一起解锁更多礼\n\n每团仍是 3 人；全社区累计成功团数，共同解锁里程碑奖励。\n\n20团\n50团\n100团\n\n鸡蛋加码礼\n\n已解锁\n\n体验券加码\n\n冲刺中\n\n惊喜礼加码\n\n待解锁\n\n已成团 36 团\n\n距离 50 团还差 14 团\n\n奖励规则\n\nDAILY LUCK\n\n今日抽奖\n我的奖励\n\n每日一次演示机会，看看今天有"
+      }
+    },
+    {
+      "id": "ui-375-verified",
+      "seq": 15,
+      "label": "375 已核验签到显示「已核验」并计入进度",
+      "pass": true,
+      "evidence": {
+        "url": "http://localhost:5224/local-life/#/community/activity/silver-neighborhood?activityId=f421e9dd-c59d-4609-bd46-61e4b36f5ec9",
+        "viewport": "375x812",
+        "innerWidth": 375,
+        "documentClientWidth": 375,
+        "documentScrollWidth": 375,
+        "bodyScrollWidth": 375,
+        "hasHorizontalOverflow": false,
+        "overflowingElements": [],
+        "clippedByScroller": [],
+        "smallTapTargets": [],
+        "hash": "#/community/activity/silver-neighborhood?activityId=f421e9dd-c59d-4609-bd46-61e4b36f5ec9",
+        "screenshot": null,
+        "textExcerpt": "9:41\n活动详情\n活动进行中\n2026.11.03 21:13 - 2026.11.16 21:13\n北京时间\n还剩\n11\n天\n23\n:\n59\n:\n23\n银发验收未核验对照 0-216Z\n银发验收社区-0-216Z\n·\n幸福社区党群服务中心\n已发布 · 规则第 1 版\n活动规则\n我的三人团\n真实业务\n已成团\n3 / 3\n已成团\n你是本团成员 · 由 周阿姨 邀请加入。席位与成员来自服务端实时状态，刷新或换设备后保持一致。\n周\n周阿姨\n团长\n我\n我\n成员 · 本人\n郑\n郑奶奶\n成员\n已成团，本场不再接受新成员；邀请入口已关闭。\n演示与真实内容说明\n参与、三人团、邀请、真实签到与团队奖励领取/核销凭据已接入真实业务，状态来自服务端。以下内容仍为前端演示、不产生真实记录：今日抽奖、活动压轴大奖、社区里程碑与热力榜、消费组队。\n成团好礼\n示例奖品 · 非真实库存\n鸡蛋1盒\n到场礼\n纸巾1提\n到场礼\n100元体验券\n成团购\nTEAM QUEST\n成团任务\n签到为真实数据 · 消费仍为演示\n签到组队\n消费组队\n三人有效签到\n签到与奖励资格为真实数据；只有现场核验通过的签到计入进度。\n真实接入\n我的签到\n签到窗口 2026-11-03 21:13 至 2026-11-16 21:13\n已核验\n签到已由工作人员现场核验，计入团队奖励进度。\n签到时间 2026-11-04 21:13 · 核验时间 2026-11-04 21:13\n团队奖励\n手工饺子礼盒 · 每团 2 份\n任一团员领取 · 凭据有效期 24 小时\n团队人数\n3/3\n有效签到\n2/3\n只有「现场核验通过」的签到计入进度；自行签到未核验前不计入。\n团队有效签到不足 3 条，暂不满足奖励条件。\n鸡蛋1盒\n到场礼\n纸巾1提\n到场礼\nCOMMUNITY GOAL\n社区一起解锁更多礼\n每团仍是 3 人；全社区累计成功团数，共同解锁里程碑奖励。\n20团\n50团\n100团\n鸡蛋加码礼\n已解锁\n体验券加码\n冲刺中\n惊喜礼加码\n待解锁\n已成团 36 团\n距离 50 团还差 14 团\n奖励规则\nDAILY LUCK\n今日抽奖\n我的奖励\n每日一次演示机会，看看今天有什么惊喜\n鸡蛋兑换券\n生活纸品\n本地体验券\n惊喜硬件礼包\n社区小礼物\n谢谢参与\n试试今日手气\n奖品与抽取均为前端演示，不代表真实发放\nCOMMUNITY RANK\n社区热力榜\n查看全部\n1\n悦和社区\n326人参与\n52\n有效团\n2\n示例社区\n我们社区\n228人参与\n36\n有效团\n3\n榕树湾社区\n196人参与\n31\n有效团\n当前榜单按“有效成团数”展示示例数据；正式活动需在规则发布时冻结统计口径。\nFINAL PRIZE\n活动压轴大奖\n示例：10月31日 20:00 截止\n广电智能硬件 · 魔镜体验设备\n奖品仅作活动示例，实际型号与数量待确定\n社区榜前 20 名，获得一次大奖抽取资格\n获得资格不等于直接中奖\n查看大奖规则\nLOCAL BENEFITS\n活动里还能逛什么\n本地商户、广电商品和魔镜都可以成为活动供给，但不要求在本页完成线上支付。\n本地商户\n老手艺体验券\n参考价值 ¥100 · 到店预约体验\n广电精选\n智能家居体验礼包\n查看现有广电服务与家庭场景展示\n魔镜体验\n银发焕新体验\n查看现有魔镜终端能力展示\n活动信息与参与状态来自真实服务，其余玩法仍是交互演示\n标题、社区、地点、时间、活动规则与你的参与/三人团状态读取自真实服务；登录、确认参与与邀请分享会调用真实 API。 签到、消费、抽奖、排行榜、大奖与社区统计仍为样例，不会写入签到、订单、库存或兑奖记录"
+      }
+    },
+    {
+      "id": "ui-375-verified-copy",
+      "seq": 16,
+      "label": "已核验签到文案与未核验不同",
+      "pass": true,
+      "evidence": {
+        "claimsVerified": true,
+        "labelInViewport": "ok",
+        "labelRect": {
+          "top": 391,
+          "bottom": 431,
+          "left": 56,
+          "right": 319,
+          "viewport": {
+            "w": 375,
+            "h": 812
+          },
+          "inViewport": true
+        },
+        "progressLine": "有效签到\n2/3",
+        "excerpt": "我的签到\n\n签到窗口 2026-11-03 21:13 至 2026-11-16 21:13\n\n已核验\n\n签到已由工作人员现场核验，计入团队奖励进度。\n\n签到时间 2026-11-04 21:13 · 核验时间 2026-11-04 21:13\n\n团队奖励\n\n手工饺子礼盒 · 每团 2 份\n\n任一团员领取 · 凭据有效期 24 小时\n\n团队人数\n3/3\n有效签到\n2/3\n\n只有「现场核验通过」的签到计入进度；自行签到未核验前不计入。\n\n团队有效签到不足 3 条，暂不满足奖励条件。\n\n鸡蛋1盒\n到场礼\n纸巾1提\n到场礼\n\nCOMMUNITY GOAL\n\n社区一起解锁更多礼\n\n每团仍是 3 人；全社区累计成功团数，共同解锁里程碑奖励。\n\n20团\n50团\n100团\n\n鸡蛋加码礼\n\n已解锁\n\n体验券加码\n\n冲刺中\n\n惊喜礼加码\n\n待解锁\n\n已成团 36 团\n\n距离 50 团还差 14 团\n\n奖励规则\n\nDAILY LUCK\n\n今日抽奖\n"
+      }
+    },
+    {
+      "id": "ui-375-progress-excludes-unverified",
+      "seq": 17,
+      "label": "未核验签到不计入团队奖励进度",
+      "pass": true,
+      "evidence": {
+        "unverifiedViewProgress": [
+          "2",
+          "3"
+        ],
+        "verifiedViewProgress": [
+          "2",
+          "3"
+        ]
+      }
+    },
+    {
+      "id": "ui-375-credential-after-reload",
+      "seq": 18,
+      "label": "375 刷新后凭据只显示尾号",
+      "pass": true,
+      "evidence": {
+        "url": "http://localhost:5224/local-life/#/community/activity/silver-neighborhood?activityId=a7dcf85e-6d19-4452-b895-e3906579b477",
+        "viewport": "375x812",
+        "innerWidth": 375,
+        "documentClientWidth": 375,
+        "documentScrollWidth": 375,
+        "bodyScrollWidth": 375,
+        "hasHorizontalOverflow": false,
+        "overflowingElements": [],
+        "clippedByScroller": [],
+        "smallTapTargets": [],
+        "hash": "#/community/activity/silver-neighborhood?activityId=a7dcf85e-6d19-4452-b895-e3906579b477",
+        "screenshot": "screenshots/ui-375-credential-after-reload-375.png",
+        "textExcerpt": "9:41\n活动详情\n活动进行中\n2026.11.03 21:13 - 2026.11.16 21:13\n北京时间\n还剩\n11\n天\n23\n:\n59\n:\n18\n银发验收主活动 0-216Z\n银发验收社区-0-216Z\n·\n幸福社区党群服务中心\n已发布 · 规则第 1 版\n活动规则\n我的三人团\n真实业务\n已成团\n3 / 3\n已成团\n你是本团团长。席位与成员来自服务端实时状态，刷新或换设备后保持一致。\n我\n我\n团长 · 本人\n李\n李大叔\n成员\n王\n王奶奶\n成员\n已成团，本场不再接受新成员；邀请入口已关闭。\n演示与真实内容说明\n参与、三人团、邀请、真实签到与团队奖励领取/核销凭据已接入真实业务，状态来自服务端。以下内容仍为前端演示、不产生真实记录：今日抽奖、活动压轴大奖、社区里程碑与热力榜、消费组队。\n成团好礼\n示例奖品 · 非真实库存\n鸡蛋1盒\n到场礼\n纸巾1提\n到场礼\n100元体验券\n成团购\nTEAM QUEST\n成团任务\n签到为真实数据 · 消费仍为演示\n签到组队\n消费组队\n三人有效签到\n签到与奖励资格为真实数据；只有现场核验通过的签到计入进度。\n真实接入\n我的签到\n签到窗口 2026-11-03 21:13 至 2026-11-16 21:13\n已核验\n签到已由工作人员现场核验，计入团队奖励进度。\n签到时间 2026-11-04 21:13 · 核验时间 2026-11-04 21:13\n团队奖励\n东北大米 10 斤装 · 每团 3 份\n队长领取 · 凭据有效期 72 小时\n团队人数\n3/3\n有效签到\n3/3\n只有「现场核验通过」的签到计入进度；自行签到未核验前不计入。\n我的奖励凭据\n待领取\n凭据待现场核销，有效期至 2026-11-07 21:13。\n凭据尾号 ******A29E\n有效期至 2026-11-07 21:13\n待领取 · 发放于 2026-11-04 21:13\n团队已满足全部奖励条件。\n鸡蛋1盒\n到场礼\n纸巾1提\n到场礼\nCOMMUNITY GOAL\n社区一起解锁更多礼\n每团仍是 3 人；全社区累计成功团数，共同解锁里程碑奖励。\n20团\n50团\n100团\n鸡蛋加码礼\n已解锁\n体验券加码\n冲刺中\n惊喜礼加码\n待解锁\n已成团 36 团\n距离 50 团还差 14 团\n奖励规则\nDAILY LUCK\n今日抽奖\n我的奖励\n每日一次演示机会，看看今天有什么惊喜\n鸡蛋兑换券\n生活纸品\n本地体验券\n惊喜硬件礼包\n社区小礼物\n谢谢参与\n试试今日手气\n奖品与抽取均为前端演示，不代表真实发放\nCOMMUNITY RANK\n社区热力榜\n查看全部\n1\n悦和社区\n326人参与\n52\n有效团\n2\n示例社区\n我们社区\n228人参与\n36\n有效团\n3\n榕树湾社区\n196人参与\n31\n有效团\n当前榜单按“有效成团数”展示示例数据；正式活动需在规则发布时冻结统计口径。\nFINAL PRIZE\n活动压轴大奖\n示例：10月31日 20:00 截止\n广电智能硬件 · 魔镜体验设备\n奖品仅作活动示例，实际型号与数量待确定\n社区榜前 20 名，获得一次大奖抽取资格\n获得资格不等于直接中奖\n查看大奖规则\nLOCAL BENEFITS\n活动里还能逛什么\n本地商户、广电商品和魔镜都可以成为活动供给，但不要求在本页完成线上支付。\n本地商户\n老手艺体验券\n参考价值 ¥100 · 到店预约体验\n广电精选\n智能家居体验礼包\n查看现有广电服务与家庭场景展示\n魔镜体验\n银发焕新体验\n查看现有魔镜终端能力展示\n活动信息与参与状态来自真实服务，其余玩法仍是交互演示\n标题、社区、地点、时间、活动规则"
+      }
+    },
+    {
+      "id": "ui-claim-code-shape",
+      "seq": 19,
+      "label": "领取当次返回 10 位凭据码（0-9/A-Z，无 I/L/O/U）",
+      "pass": true,
+      "evidence": {
+        "code": "DPRP**9E",
+        "length": 10
+      }
+    },
+    {
+      "id": "ui-credential-masked-after-reload",
+      "seq": 20,
+      "label": "刷新后明文码不再出现，只显示 ******尾号",
+      "pass": true,
+      "evidence": {
+        "plaintextStillVisible": false,
+        "maskedCodeInViewport": "ok",
+        "maskedCodeRect": {
+          "top": 402,
+          "bottom": 420,
+          "left": 57,
+          "right": 131,
+          "viewport": {
+            "w": 375,
+            "h": 812
+          },
+          "inViewport": true
+        },
+        "maskedCode": "******A29E",
+        "codeTail": "A29E",
+        "displayedTail": "A29E"
+      }
+    },
+    {
+      "id": "ui-claim-blocked-by-unverified",
+      "seq": 21,
+      "label": "团队仅 2/3 已核验时领奖被服务端拒绝（未核验不计入）",
+      "pass": true,
+      "evidence": {
+        "status": 409,
+        "errorCode": "reward_unavailable",
+        "message": "团队有效签到不足 3 条，暂不满足奖励条件",
+        "issuedCode": null
+      }
+    },
+    {
+      "id": "ui-375-redeem-success",
+      "seq": 22,
+      "label": "网格员输码核销成功并显示真实回执",
+      "pass": true,
+      "evidence": {
+        "excerpt": "核销成功后该码立即失效，不能重复使用。\n核销码*\n已输入 0/10 位\n备注\n可选，写入核销记录，便于后续核对。\n确认核销\n核销成功，奖品已交付。\n奖品\n东北大米 10 斤装 × 3\n领取人\n队长 张阿姨\n奖励状态\n已核销\n核销时间\n2026-11-04 21:14\n凭据尾号\n******A29E\n核销只在服务端执行一次：并发或重复提交都只会成功一次，不会多扣库存或重复发奖。\n返回我的线索\n首页\n社区\n健康\n惠生活\n我的\n（当前）",
+        "receiptInViewport": "ok",
+        "receiptRect": {
+          "top": 401,
+          "bottom": 421,
+          "left": 72,
+          "right": 327,
+          "viewport": {
+            "w": 375,
+            "h": 812
+          },
+          "inViewport": true
+        },
+        "screenshot": "screenshots/ui-375-redeem-success.png"
+      }
+    },
+    {
+      "id": "ui-375-redeem-duplicate",
+      "seq": 23,
+      "label": "重复核销被服务端拒绝并给出真实原因",
+      "pass": true,
+      "evidence": {
+        "excerpt": "核销凭据码 · 核验参与者签到 · 权限来自服务端\n网格员甲\n网格员 · grid.0aa6e3\n授权社区：银发验收社区-0-216Z\n退出\n当前身份：网格员，可核销社区：银发验收社区-0-216Z。 网格员只能核销所属社区的凭据；跨社区的请求会被服务端拒绝并记录审计。\n核销凭据码\n参与者签到\n输入居民凭据码\n凭据码为 10 位（0-9 与 A-Z，不含 I、L、O、U）。核销成功后该码立即失效，不能重复使用。\n核销码*\n已输入 10/10 位\n备注\n可选，写入核销记录，便于后续核对。\n确认核销\n该核销码已被核销\n该凭据已被核销过，不能重复发放。\n核销只在服务端执行一次：并发或重复提交都只会成功一次，不会多扣库存或重复发奖。\n返回我的线索\n首页\n社区\n健康\n惠生活\n我的\n（当前）",
+        "errorInViewport": "ok",
+        "errorRect": {
+          "top": 522,
+          "bottom": 542,
+          "left": 72,
+          "right": 327,
+          "viewport": {
+            "w": 375,
+            "h": 812
+          },
+          "inViewport": true
+        },
+        "screenshot": "screenshots/ui-375-redeem-duplicate.png"
+      }
+    },
+    {
+      "id": "ui-375-redeem-invalid",
+      "seq": 24,
+      "label": "未知码返回真实无效提示（不伪造成功）",
+      "pass": true,
+      "evidence": {
+        "excerpt": "核销凭据码 · 核验参与者签到 · 权限来自服务端\n网格员甲\n网格员 · grid.0aa6e3\n授权社区：银发验收社区-0-216Z\n退出\n当前身份：网格员，可核销社区：银发验收社区-0-216Z。 网格员只能核销所属社区的凭据；跨社区的请求会被服务端拒绝并记录审计。\n核销凭据码\n参与者签到\n输入居民凭据码\n凭据码为 10 位（0-9 与 A-Z，不含 I、L、O、U）。核销成功后该码立即失效，不能重复使用。\n核销码*\n已输入 10/10 位\n备注\n可选，写入核销记录，便于后续核对。\n确认核销\n核销码无效\n该码不存在、已被换新码或已被作废。请让居民在活动页重新查看凭据；撤销签到后的凭据同样返回此提示。\n核销只在服务端执行一次：并发或重复提交都只会成功一次，不会多扣库存或重复发奖。\n返回我的线索\n首页\n社区\n健康\n惠生活\n我的\n（当前）",
+        "errorInViewport": "ok",
+        "errorRect": {
+          "top": 502,
+          "bottom": 522,
+          "left": 72,
+          "right": 327,
+          "viewport": {
+            "w": 375,
+            "h": 812
+          },
+          "inViewport": true
+        },
+        "screenshot": "screenshots/ui-375-redeem-invalid.png"
+      }
+    },
+    {
+      "id": "admin-1440-checkin",
+      "seq": 25,
+      "label": "管理台 /activities/checkin 1440 无横向溢出",
+      "pass": true,
+      "evidence": {
+        "url": "http://localhost:5225/#/activities/checkin",
+        "viewport": "1440x900",
+        "innerWidth": 1440,
+        "documentClientWidth": 1440,
+        "documentScrollWidth": 1440,
+        "bodyScrollWidth": 1440,
+        "hasHorizontalOverflow": false,
+        "overflowingElements": [],
+        "clippedByScroller": [],
+        "smallTapTargets": [
+          "BUTTON h=28 ",
+          "BUTTON h=12 ",
+          "BUTTON h=24 退出登录",
+          "BUTTON h=24 ",
+          "BUTTON h=24 ",
+          "BUTTON h=31 ",
+          "BUTTON h=32 ",
+          "BUTTON h=32 刷 新"
+        ],
+        "hash": "#/activities/checkin",
+        "screenshot": "screenshots/admin-1440-checkin-1440.png",
+        "textExcerpt": "生\n本地生活\n管理台\n经营工作台\n活动运营\n活动管理\n报名与核销\n客户与网格\n客户与业务单\n账户与社区\n商品与订单\n商品管理\n订单管理\n业绩与对账\n业绩看板\n对账结算\n系统管理\n管理员与权限\n系统信息\n界面组件\n活动运营\n/\n报名与核销\n验收管理员\n管理员\n退出登录\n经营工作台\n报名与核销\n活动管理\n报名与核销\n真实数据\n真实签到核验、团队奖励资格、奖品库存与预算、一次性核销凭据与追加式争议审计。奖励计划来自发布时冻结的规则版本。\n选择活动\n银发验收无计划 0-216Z · 银发验收社区-0-216Z · 已发布 · v1\n刷 新\n该活动未配置奖励计划\n冻结快照里没有 rewardPlan，因此签到、达标、领奖与核销的正式入口都不可用（不会回退读取活动表里的可变字段）。请管理员在活动草稿阶段补齐奖励计划后重新发布。\n签到与奖励\n签到核验（0 待核验）\n奖励列表（0）\n核销记录\n异常处理\n居民\t签到时间\t状态\t核验 / 撤销信息\t操作\n居民\n\t\n签到时间\n\t\n状态\n\t\n核验 / 撤销信息\n\t\n操作\n还没有签到记录\n当前活动：银发验收无计划 0-216Z（银发验收社区-0-216Z）"
+      }
+    },
+    {
+      "id": "admin-checkin-page",
+      "seq": 26,
+      "label": "管理台核销台渲染真实数据（四个页签 + 冻结计划）",
+      "pass": true,
+      "evidence": {
+        "tabs": [
+          "签到核验",
+          "奖励列表",
+          "核销记录",
+          "异常处理"
+        ],
+        "hasPlanCardOrWarning": true,
+        "optionCountBeforeOpen": 0,
+        "textExcerpt": "生\n本地生活\n管理台\n经营工作台\n活动运营\n活动管理\n报名与核销\n客户与网格\n客户与业务单\n账户与社区\n商品与订单\n商品管理\n订单管理\n业绩与对账\n业绩看板\n对账结算\n系统管理\n管理员与权限\n系统信息\n界面组件\n活动运营\n/\n报名与核销\n验收管理员\n管理员\n退出登录\n经营工作台\n报名与核销\n活动管理\n报名与核销\n真实数据\n真实签到核验、团队奖励资格、奖品库存与预算、一次性核销凭据与追加式争议审计。奖励计划来自发布时冻结的规则版本。\n选择活动\n银发验收无计划 0-216Z · 银发验收社区-0-216Z · 已发布 · v1\n刷 新\n该活动未配置奖励计划\n冻结快照里没有 rewardPlan，因此签到、达标、领奖与核销的正式入口都不可用（不会回退读取活动表里的可变字段）。请管理员在活动草稿阶段补齐奖励计划后重新发布。\n签到与奖励\n签到核验（0 待核验）\n奖励列表（0）\n核销记录\n异常处理\n居民\t签到时间\t状态\t核验 / 撤销信息\t操作\n居民\n\t\n签到时间\n\t\n状态\n\t\n核验 / 撤销信息\n\t\n操作\n还没有签到记录\n当前活动：银发验收无计划 0-216Z（银发验收社区-0-216Z）"
+      }
+    },
+    {
+      "id": "admin-375-checkin",
+      "seq": 27,
+      "label": "管理台 /activities/checkin 375 无横向溢出",
+      "pass": true,
+      "evidence": {
+        "url": "http://localhost:5225/#/activities/checkin",
+        "viewport": "375x812",
+        "innerWidth": 375,
+        "documentClientWidth": 375,
+        "documentScrollWidth": 375,
+        "bodyScrollWidth": 375,
+        "hasHorizontalOverflow": false,
+        "overflowingElements": [],
+        "clippedByScroller": [
+          "DIV.ant-space css-dev-only-do-not-override-1y106cm right=450",
+          "DIV.ant-space-item right=450",
+          "DIV.ant-select ant-select-outlined css-var-_r_0_ a right=450",
+          "DIV.ant-select-content ant-select-content-has-valu right=420",
+          "INPUT.ant-select-input right=420",
+          "DIV.ant-select-suffix right=438",
+          "SPAN.anticon anticon-down right=438",
+          "svg.[object SVGAnimatedString] right=438"
+        ],
+        "smallTapTargets": [
+          "BUTTON h=32 ",
+          "BUTTON h=24 退出登录",
+          "BUTTON h=24 ",
+          "BUTTON h=24 ",
+          "BUTTON h=38 ",
+          "BUTTON h=32 ",
+          "BUTTON h=32 刷 新"
+        ],
+        "hash": "#/activities/checkin",
+        "screenshot": "screenshots/admin-375-checkin-375.png",
+        "textExcerpt": "活动运营\n/\n报名与核销\n验收管理员\n管理员\n退出登录\n经营工作台\n报名与核销\n活动管理\n报名与核销\n真实数据\n真实签到核验、团队奖励资格、奖品库存与预算、一次性核销凭据与追加式争议审计。奖励计划来自发布时冻结的规则版本。\n选择活动\n银发验收无计划 0-216Z · 银发验收社区-0-216Z · 已发布 · v1\n刷 新\n该活动未配置奖励计划\n冻结快照里没有 rewardPlan，因此签到、达标、领奖与核销的正式入口都不可用（不会回退读取活动表里的可变字段）。请管理员在活动草稿阶段补齐奖励计划后重新发布。\n签到与奖励\n签到核验（0 待核验）\n奖励列表（0）\n核销记录\n异常处理\n居民\t签到时间\t状态\t核验 / 撤销信息\t操作\n居民\n\t\n签到时间\n\t\n状态\n\t\n核验 / 撤销信息\n\t\n操作\n还没有签到记录\n当前活动：银发验收无计划 0-216Z（银发验收社区-0-216Z）"
+      }
+    },
+    {
+      "id": "admin-320-checkin",
+      "seq": 28,
+      "label": "管理台 /activities/checkin 320 无横向溢出",
+      "pass": true,
+      "evidence": {
+        "url": "http://localhost:5225/#/activities/checkin",
+        "viewport": "320x812",
+        "innerWidth": 320,
+        "documentClientWidth": 320,
+        "documentScrollWidth": 320,
+        "bodyScrollWidth": 320,
+        "hasHorizontalOverflow": false,
+        "overflowingElements": [],
+        "clippedByScroller": [
+          "DIV.ant-tabs-nav-list right=348",
+          "DIV.ant-tabs-tab ant-tabs-tab-with-remove right=345",
+          "BUTTON.ant-tabs-tab-remove right=335",
+          "SPAN.anticon anticon-close right=329",
+          "svg.[object SVGAnimatedString] right=329",
+          "path.[object SVGAnimatedString] right=327",
+          "DIV.ant-space css-dev-only-do-not-override-1y106cm right=450",
+          "DIV.ant-space-item right=450"
+        ],
+        "smallTapTargets": [
+          "BUTTON h=32 ",
+          "BUTTON h=24 退出登录",
+          "BUTTON h=24 ",
+          "BUTTON h=24 ",
+          "BUTTON h=38 ",
+          "BUTTON h=32 ",
+          "BUTTON h=32 刷 新"
+        ],
+        "hash": "#/activities/checkin",
+        "screenshot": "screenshots/admin-320-checkin-320.png",
+        "textExcerpt": "活动运营\n/\n报名与核销\n验收管理员\n管理员\n退出登录\n经营工作台\n报名与核销\n活动管理\n报名与核销\n真实数据\n真实签到核验、团队奖励资格、奖品库存与预算、一次性核销凭据与追加式争议审计。奖励计划来自发布时冻结的规则版本。\n选择活动\n银发验收无计划 0-216Z · 银发验收社区-0-216Z · 已发布 · v1\n刷 新\n该活动未配置奖励计划\n冻结快照里没有 rewardPlan，因此签到、达标、领奖与核销的正式入口都不可用（不会回退读取活动表里的可变字段）。请管理员在活动草稿阶段补齐奖励计划后重新发布。\n签到与奖励\n签到核验（0 待核验）\n奖励列表（0）\n核销记录\n异常处理\n居民\t签到时间\t状态\t核验 / 撤销信息\t操作\n居民\n\t\n签到时间\n\t\n状态\n\t\n核验 / 撤销信息\n\t\n操作\n还没有签到记录\n当前活动：银发验收无计划 0-216Z（银发验收社区-0-216Z）"
+      }
+    },
+    {
+      "id": "admin-375-tabs-reachable",
+      "seq": 29,
+      "label": "375 管理台被裁剪的页签都能从「更多」下拉进入",
+      "pass": true,
+      "evidence": {
+        "hiddenTabs": [
+          "核销记录",
+          "异常处理"
+        ],
+        "dropdownItems": [
+          "核销记录",
+          "异常处理"
+        ],
+        "covered": true,
+        "detail": {
+          "ok": true,
+          "hidden": [
+            "核销记录",
+            "异常处理"
+          ],
+          "moreRight": 350
+        }
+      }
+    },
+    {
+      "id": "admin-320-tabs-reachable",
+      "seq": 30,
+      "label": "320 管理台被裁剪的页签都能从「更多」下拉进入",
+      "pass": true,
+      "evidence": {
+        "hiddenTabs": [
+          "核销记录",
+          "异常处理"
+        ],
+        "dropdownItems": [
+          "奖励列表（0）",
+          "核销记录",
+          "异常处理"
+        ],
+        "covered": true,
+        "detail": {
+          "ok": true,
+          "hidden": [
+            "核销记录",
+            "异常处理"
+          ],
+          "moreRight": 295
+        }
+      }
+    },
+    {
+      "id": "admin-drawer-plan-backfill",
+      "seq": 31,
+      "label": "编辑抽屉从 detail.rewardPlan 回填全部字段（无只读降级）",
+      "pass": true,
+      "evidence": {
+        "switchOn": true,
+        "values": {
+          "活动标题": "银发验收主活动 0-216Z",
+          "所属社区": "",
+          "活动时间（Asia/Shanghai，UTC+08:00）": "2026-11-03 21:13 | 2026-11-16 21:13",
+          "举办地点": "幸福社区党群服务中心",
+          "预算上限（元）": "4000.00",
+          "奖品数量上限": "120",
+          "奖品名称": "东北大米 10 斤装",
+          "单件成本（元）": "45.00",
+          "每团奖品数量": "3",
+          "奖品总库存（份）": "30",
+          "奖励预算上限（元）": "1350.00",
+          "签到窗口（Asia/Shanghai，UTC+08:00）": "2026-11-03 21:13 | 2026-11-16 21:13",
+          "领取人": "",
+          "核销有效期（小时）": "72"
+        },
+        "textareas": [
+          "本社区 60 岁以上居民",
+          "到社区服务中心签到",
+          "现场购买指定套餐",
+          "凭 10 位核销码领取",
+          "",
+          "社区仓库统一发放"
+        ]
+      }
+    },
+    {
+      "id": "admin-noop-save-no-patch",
+      "seq": 32,
+      "label": "无修改直接保存不发 PATCH、不生成新规则版本",
+      "pass": true,
+      "evidence": {
+        "patchCount": 0,
+        "noticeShown": true,
+        "ruleVersionBeforeEdit": 1
+      }
+    },
+    {
+      "id": "admin-patch-echoes-plan",
+      "seq": 33,
+      "label": "仅改地点保存时 keyRules.rewardPlan 原样回传（绝不发 null）",
+      "pass": true,
+      "evidence": {
+        "confirmDialog": "修改已发布规则将生成新版本\n\n保存将生成新规则版本 v2；旧版本仍可在「规则版本」中查看，居民端读取最新版本。\n\n当前活动：银发验收主活动 0-216Z\n\n取 消\n生成 v2 并保存",
+        "patchBody": {
+          "expectedUpdatedAt": "2026-11-04T13:13:50.313Z",
+          "keyRules": {
+            "startsAt": "2026-11-03T13:13:50.000Z",
+            "endsAt": "2026-11-16T13:13:50.000Z",
+            "location": "幸福社区文化广场（证据采集）",
+            "budgetCapCents": 400000,
+            "prizeQuantityCap": 120,
+            "publicRules": {
+              "eligibility": "本社区 60 岁以上居民",
+              "checkin": "到社区服务中心签到",
+              "purchase": "现场购买指定套餐",
+              "prizeClaim": "凭 10 位核销码领取"
+            },
+            "rewardPlan": {
+              "prizeName": "东北大米 10 斤装",
+              "prizeUnitCostCents": 4500,
+              "prizeQuantityPerTeam": 3,
+              "totalPrizeQuantity": 30,
+              "budgetCapCents": 135000,
+              "claimRecipient": "leader",
+              "checkinWindow": {
+                "opensAt": "2026-11-03T13:13:50.000Z",
+                "closesAt": "2026-11-16T13:13:50.000Z"
+              },
+              "redemptionValidHours": 72,
+              "notes": "社区仓库统一发放"
+            }
+          }
+        },
+        "echoedPlan": {
+          "prizeName": "东北大米 10 斤装",
+          "prizeUnitCostCents": 4500,
+          "prizeQuantityPerTeam": 3,
+          "totalPrizeQuantity": 30,
+          "budgetCapCents": 135000,
+          "claimRecipient": "leader",
+          "checkinWindow": {
+            "opensAt": "2026-11-03T13:13:50.000Z",
+            "closesAt": "2026-11-16T13:13:50.000Z"
+          },
+          "redemptionValidHours": 72,
+          "notes": "社区仓库统一发放"
+        },
+        "screenshot": "screenshots/admin-drawer-with-plan.png"
+      }
+    },
+    {
+      "id": "admin-plan-survives-edit",
+      "seq": 34,
+      "label": "保存后服务端仍保有奖励计划与库存",
+      "pass": true,
+      "evidence": {
+        "ruleVersion": 2,
+        "rewardPlan": {
+          "prizeName": "东北大米 10 斤装",
+          "prizeUnitCostCents": 4500,
+          "prizeQuantityPerTeam": 3,
+          "totalPrizeQuantity": 30,
+          "budgetCapCents": 135000,
+          "claimRecipient": "leader",
+          "checkinWindow": {
+            "opensAt": "2026-11-03T13:13:50.000Z",
+            "closesAt": "2026-11-16T13:13:50.000Z"
+          },
+          "redemptionValidHours": 72,
+          "notes": "社区仓库统一发放"
+        },
+        "planConfigured": true,
+        "planSource": "rule_version_snapshot",
+        "stock": {
+          "totalQuantity": 30,
+          "claimedQuantity": 3,
+          "availableQuantity": 27
+        }
+      }
+    },
+    {
+      "id": "admin-drawer-no-plan",
+      "seq": 35,
+      "label": "无计划活动显示「未配置奖励计划」告警而不是空表单",
+      "pass": true,
+      "evidence": {
+        "switchOn": false,
+        "excerpt": "奖励履约计划（LL-MVP-006 · 发布后冻结为快照，居民签到与领奖依赖它）\n配置正式奖励计划\n已配置\n未配置\n关闭表示该活动没有正式奖品；居民端签到、达标与领取入口都会被服务端以 409 拒绝。只有打开并填写完整，才会计入奖励资格、库存与预算。\n未配置奖励计划\n未配置奖励计划时，发布后居民签到、达标与领奖入口不可用，服务端返回 409 reward_unavailable。\n取 消\n保存修改",
+        "screenshot": "screenshots/admin-drawer-no-plan.png"
+      }
+    }
+  ]
+}

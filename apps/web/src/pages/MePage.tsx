@@ -1,4 +1,4 @@
-import { ChevronRight, ClipboardList, LogOut, UserRound } from 'lucide-react'
+import { ChevronRight, ClipboardList, Gift, LogOut, UserRound } from 'lucide-react'
 import { Link } from 'react-router'
 import { DemoNote } from '../components/DemoNote'
 import { PendingNotice } from '../components/PendingNotice'
@@ -192,6 +192,26 @@ export function MePage() {
           })}
         </div>
       </article>
+
+      <Link
+        to="/me/rewards"
+        state={{ from: '/me' }}
+        className="mt-4 flex items-center gap-3 rounded-[18px] border border-slate-100 bg-white px-4 py-3.5 shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+      >
+        <span
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[#e8f6f0] text-[#388b77]"
+          aria-hidden="true"
+        >
+          <Gift size={20} strokeWidth={1.8} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[14px] font-semibold text-slate-800">我的奖励</span>
+          <span className="mt-0.5 block truncate text-[11px] leading-4 text-slate-400">
+            真实活动奖励 · 领取状态 · 核销凭据尾号
+          </span>
+        </span>
+        <ChevronRight size={17} className="shrink-0 text-slate-300" aria-hidden="true" />
+      </Link>
 
       {auth.session?.staff ? (
         <Link

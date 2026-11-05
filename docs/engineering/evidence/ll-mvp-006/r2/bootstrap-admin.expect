@@ -1,0 +1,20 @@
+#!/usr/bin/expect -f
+# R2 端到端验收：用仓库自带交互式 bootstrap-admin 创建管理员，不直写 staff_accounts。
+# 用法：expect -f bootstrap-admin.expect <db-path> <username> <displayName> <password> <repo>
+set db      [lindex $argv 0]
+set user    [lindex $argv 1]
+set display [lindex $argv 2]
+set pass    [lindex $argv 3]
+set repo    [lindex $argv 4]
+
+set env(NODE_ENV) development
+set env(DATABASE_PATH) $db
+cd $repo
+
+spawn pnpm --filter @sanchuang-dev/local-life-api bootstrap-admin
+expect "管理员登录名" { send "$user\r" }
+expect "管理员显示名称" { send "$display\r" }
+expect "初始密码" { send "$pass\r" }
+expect eof
+catch wait result
+exit [lindex $result 3]

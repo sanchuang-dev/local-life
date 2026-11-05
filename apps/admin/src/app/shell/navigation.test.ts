@@ -66,8 +66,11 @@ describe('activity console navigation', () => {
     expect(page?.status).toBe('ready')
     expect(page?.planned).toEqual([])
     expect(page?.roles).toEqual(['admin', 'operator'])
-    // The registration/check-in page stays explicitly planned.
-    expect(findNavPage('/activities/checkin')?.status).toBe('planned')
+    // LL-MVP-006 turned 报名与核销 into a real page: it must not stay planned.
+    const checkin = findNavPage('/activities/checkin')
+    expect(checkin?.status).toBe('ready')
+    expect(checkin?.planned).toEqual([])
+    expect(checkin?.roles).toEqual(['admin', 'operator'])
   })
 
   it('hides the activity console from grid workers but keeps it for staff who can operate', () => {

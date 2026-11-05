@@ -15,6 +15,7 @@ import { HealthPage } from './pages/HealthPage'
 import { HomePage } from './pages/HomePage'
 import { LifePage } from './pages/LifePage'
 import { MePage } from './pages/MePage'
+import { MyRewardsPage } from './pages/MyRewardsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { PointsPage } from './pages/PointsPage'
 import { ProductPage } from './pages/ProductPage'
@@ -28,6 +29,7 @@ import { WorkbenchLoginPage } from './pages/workbench/WorkbenchLoginPage'
 import { WorkbenchOrderDetailPage } from './pages/workbench/WorkbenchOrderDetailPage'
 import { WorkbenchOrderNewPage } from './pages/workbench/WorkbenchOrderNewPage'
 import { WorkbenchOrdersPage } from './pages/workbench/WorkbenchOrdersPage'
+import { WorkbenchVerifyPage } from './pages/workbench/WorkbenchVerifyPage'
 
 export default function App() {
   return (
@@ -56,6 +58,7 @@ export default function App() {
         <Route path="/life/product/:productId" element={<ProductPage />} />
         <Route path="/points" element={<PointsPage />} />
         <Route path="/me/devices" element={<HealthDevicesPage />} />
+        <Route path="/me/rewards" element={<MyRewardsPage />} />
         <Route path="/me" element={<MePage />} />
         <Route path="/workbench" element={<WorkbenchLayout />}>
           <Route index element={<WorkbenchLoginPage />} />
@@ -65,6 +68,7 @@ export default function App() {
           <Route path="leads/:leadId/orders/new" element={<WorkbenchOrderNewPage />} />
           <Route path="orders" element={<WorkbenchOrdersPage />} />
           <Route path="orders/:orderId" element={<WorkbenchOrderDetailPage />} />
+          <Route path="verify" element={<WorkbenchVerifyPage />} />
         </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
