@@ -20,12 +20,17 @@ export function DashboardPage() {
       <PageHeader
         title="经营工作台"
         description="从社区与账号管理开始；活动、订单及业绩将在对应业务功能接入后展示。"
-        status={<Tag color="green">已验证身份</Tag>}
+        status={<Tag color="success">已验证身份</Tag>}
       />
       <div className="page-stack">
-        <Row gutter={[16, 16]}>
+        {/*
+         * align="stretch" + Card height:100% keep same-row cards equal height
+         * with content top-aligned; on narrow screens each Col spans 24 and
+         * the cards stack at their natural height — no fixed heights.
+         */}
+        <Row gutter={[16, 16]} align="stretch">
           <Col xs={24} md={12}>
-            <Card size="small" title="当前工作身份">
+            <Card size="small" title="当前工作身份" style={{ height: '100%' }}>
               <Typography.Title level={4} style={{ marginTop: 0 }}>
                 {session.user.displayName || session.staff.username}
               </Typography.Title>
@@ -45,7 +50,7 @@ export function DashboardPage() {
             </Card>
           </Col>
           <Col xs={24} md={12}>
-            <Card size="small" title="开始工作">
+            <Card size="small" title="开始工作" style={{ height: '100%' }}>
               <Typography.Paragraph>
                 管理社区、网格员账户及授权范围内的居民信息。
               </Typography.Paragraph>
