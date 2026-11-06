@@ -1,5 +1,7 @@
 # 小程序风格界面框架（原型阶段）
 
+> **2026-11-05 状态说明（#94 LL-H5-003）**：居民 H5 已改为正式移动 Web 外壳。`apps/web/src/components/MiniProgramShell.tsx` 已删除，改由 `apps/web/src/components/shell/AppShell.tsx`、`BottomTabBar.tsx`、`navigation.ts`、`useKeyboardVisible.ts` 承担；主导航收敛为三入口——活动 `/`、惠生活 `/life`、我的 `/me`，路由是 Tab 高亮的唯一真相源（`/community/activity/**` 归活动、`/points` 归惠生活、`/workbench/**` 归我的），不再渲染模拟状态栏/时间/电池、微信胶囊与桌面手机框，桌面端直接显示 H5 内容。外壳不渲染顶部 AppBar，页面标题与返回由各页 `PageHeader` 承担。`apps/web/index.html` 已补 `viewport-fit=cover`，使 iOS Safari 的 `env(safe-area-inset-*)` 生效。下文（含“五 Tab”“模拟状态栏/胶囊”等描述）仅作 2026-10 迁移期历史核对记录，**不代表当前实现**，且保持原样未改写。
+
 这是基于 React + Vite + Tailwind CSS + React Router + Lucide React 的 **H5 可视化原型**，不是可直接提交微信审核的原生小程序。
 
 - `apps/web/src/components/MiniProgramShell.tsx`：顶栏、模拟微信胶囊、内容滚动容器、底部导航和安全区处理。

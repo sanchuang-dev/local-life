@@ -1,0 +1,1196 @@
+{
+  "startedAt": "2026-11-05T11:21:18.103Z",
+  "baseUrl": "http://localhost:5173",
+  "viewport": {},
+  "steps": [
+    {
+      "step": "empty-home",
+      "at": "2026-11-05T11:21:19.703Z",
+      "pathname": "/",
+      "title": "三创 · 本地生活",
+      "heading": "当前没有已发布的活动",
+      "textLength": 277,
+      "has": {
+        "empty": true,
+        "phase": false,
+        "demoProfile": false,
+        "demoPoints": false,
+        "demoStore": false,
+        "demoTagline": false,
+        "staffEntry": false,
+        "myRewards": true,
+        "signIn": false,
+        "notConfiguredShop": false,
+        "lifePointsRemoved": true,
+        "loggedOut": false,
+        "joined": false,
+        "team": true,
+        "inviteEntry": false
+      },
+      "errors": [],
+      "horizontalOverflow": false,
+      "bodyHeight": 812
+    },
+    {
+      "step": "seeded",
+      "at": "2026-11-05T11:21:19.856Z",
+      "communityId": "eb2c8b23-26f1-4d7e-bdd5-a04c9aecb7d7",
+      "activities": [
+        {
+          "id": "eacbc2e5-8ebd-42b2-8696-795c208e5b2d",
+          "title": "银发社区欢乐季",
+          "status": "published"
+        },
+        {
+          "id": "3478f26a-4c7a-42d4-8e2a-01f663d884c7",
+          "title": "社区便民市集（第二场）",
+          "status": "published"
+        }
+      ],
+      "publicListOrder": [
+        {
+          "id": "3478f26a-4c7a-42d4-8e2a-01f663d884c7",
+          "title": "社区便民市集（第二场）"
+        },
+        {
+          "id": "eacbc2e5-8ebd-42b2-8696-795c208e5b2d",
+          "title": "银发社区欢乐季"
+        }
+      ]
+    },
+    {
+      "step": "activity-home-375",
+      "at": "2026-11-05T11:21:21.528Z",
+      "pathname": "/",
+      "title": "三创 · 本地生活",
+      "heading": "社区便民市集（第二场）",
+      "textLength": 532,
+      "has": {
+        "empty": false,
+        "phase": true,
+        "demoProfile": false,
+        "demoPoints": false,
+        "demoStore": false,
+        "demoTagline": false,
+        "staffEntry": false,
+        "myRewards": true,
+        "signIn": true,
+        "notConfiguredShop": false,
+        "lifePointsRemoved": true,
+        "loggedOut": true,
+        "joined": false,
+        "team": true,
+        "inviteEntry": false
+      },
+      "errors": [],
+      "horizontalOverflow": false,
+      "bodyHeight": 812,
+      "expectedDefaultTitle": "社区便民市集（第二场）",
+      "showsDefaultTitle": true,
+      "showsOtherTitle": false,
+      "homeTitles": {
+        "first": "社区便民市集（第二场）",
+        "second": "银发社区欢乐季"
+      }
+    },
+    {
+      "step": "home-layout-375",
+      "at": "2026-11-05T11:21:21.529Z",
+      "h1Bottom": 160.53125,
+      "cardTop": 300.53125,
+      "cardWidth": 343,
+      "viewportWidth": 375,
+      "cardClearsTitle": true,
+      "cardWithinViewport": true,
+      "noHorizontalScroll": true,
+      "scrollHeight": 1056
+    },
+    {
+      "step": "activity-home-320",
+      "at": "2026-11-05T11:21:23.187Z",
+      "pathname": "/",
+      "title": "三创 · 本地生活",
+      "heading": "社区便民市集（第二场）",
+      "textLength": 532,
+      "has": {
+        "empty": false,
+        "phase": true,
+        "demoProfile": false,
+        "demoPoints": false,
+        "demoStore": false,
+        "demoTagline": false,
+        "staffEntry": false,
+        "myRewards": true,
+        "signIn": true,
+        "notConfiguredShop": false,
+        "lifePointsRemoved": true,
+        "loggedOut": true,
+        "joined": false,
+        "team": true,
+        "inviteEntry": false
+      },
+      "errors": [],
+      "horizontalOverflow": false,
+      "bodyHeight": 568
+    },
+    {
+      "step": "activity-home-desktop",
+      "at": "2026-11-05T11:21:24.896Z",
+      "pathname": "/",
+      "title": "三创 · 本地生活",
+      "heading": "社区便民市集（第二场）",
+      "textLength": 611,
+      "has": {
+        "empty": false,
+        "phase": true,
+        "demoProfile": false,
+        "demoPoints": false,
+        "demoStore": false,
+        "demoTagline": false,
+        "staffEntry": false,
+        "myRewards": true,
+        "signIn": true,
+        "notConfiguredShop": false,
+        "lifePointsRemoved": true,
+        "loggedOut": true,
+        "joined": false,
+        "team": true,
+        "inviteEntry": false
+      },
+      "errors": [],
+      "horizontalOverflow": false,
+      "bodyHeight": 900
+    },
+    {
+      "step": "deeplink-activity-b",
+      "at": "2026-11-05T11:21:27.724Z",
+      "requestedActivityId": "eacbc2e5-8ebd-42b2-8696-795c208e5b2d",
+      "defaultActivityId": "3478f26a-4c7a-42d4-8e2a-01f663d884c7",
+      "first": {
+        "pathname": "/?activityId=eacbc2e5-8ebd-42b2-8696-795c208e5b2d",
+        "title": "三创 · 本地生活",
+        "heading": "银发社区欢乐季",
+        "textLength": 528,
+        "has": {
+          "empty": false,
+          "phase": true,
+          "demoProfile": false,
+          "demoPoints": false,
+          "demoStore": false,
+          "demoTagline": false,
+          "staffEntry": false,
+          "myRewards": true,
+          "signIn": true,
+          "notConfiguredShop": false,
+          "lifePointsRemoved": true,
+          "loggedOut": true,
+          "joined": false,
+          "team": true,
+          "inviteEntry": false
+        },
+        "errors": [],
+        "horizontalOverflow": false,
+        "bodyHeight": 812
+      },
+      "refreshed": {
+        "pathname": "/?activityId=eacbc2e5-8ebd-42b2-8696-795c208e5b2d",
+        "title": "三创 · 本地生活",
+        "heading": "银发社区欢乐季",
+        "textLength": 528,
+        "has": {
+          "empty": false,
+          "phase": true,
+          "demoProfile": false,
+          "demoPoints": false,
+          "demoStore": false,
+          "demoTagline": false,
+          "staffEntry": false,
+          "myRewards": true,
+          "signIn": true,
+          "notConfiguredShop": false,
+          "lifePointsRemoved": true,
+          "loggedOut": true,
+          "joined": false,
+          "team": true,
+          "inviteEntry": false
+        },
+        "errors": [],
+        "horizontalOverflow": false,
+        "bodyHeight": 812
+      },
+      "sameHeading": true,
+      "noFallbackToDefault": true
+    },
+    {
+      "step": "life-375-logged-out",
+      "at": "2026-11-05T11:21:29.395Z",
+      "pathname": "/life",
+      "title": "三创 · 本地生活",
+      "heading": "惠生活",
+      "textLength": 404,
+      "has": {
+        "empty": false,
+        "phase": false,
+        "demoProfile": false,
+        "demoPoints": false,
+        "demoStore": false,
+        "demoTagline": false,
+        "staffEntry": false,
+        "myRewards": false,
+        "signIn": false,
+        "notConfiguredShop": true,
+        "lifePointsRemoved": true,
+        "loggedOut": false,
+        "joined": false,
+        "team": false,
+        "inviteEntry": false
+      },
+      "errors": [],
+      "horizontalOverflow": false,
+      "bodyHeight": 812
+    },
+    {
+      "step": "life-375-legacy-points-tab",
+      "at": "2026-11-05T11:21:30.522Z",
+      "pathname": "/life?tab=points",
+      "title": "三创 · 本地生活",
+      "heading": "惠生活",
+      "textLength": 455,
+      "has": {
+        "empty": false,
+        "phase": false,
+        "demoProfile": false,
+        "demoPoints": false,
+        "demoStore": false,
+        "demoTagline": false,
+        "staffEntry": false,
+        "myRewards": false,
+        "signIn": false,
+        "notConfiguredShop": true,
+        "lifePointsRemoved": true,
+        "loggedOut": false,
+        "joined": false,
+        "team": false,
+        "inviteEntry": false
+      },
+      "errors": [],
+      "horizontalOverflow": false,
+      "bodyHeight": 812,
+      "lifeUnavailableNotice": true
+    },
+    {
+      "step": "me-375-logged-out",
+      "at": "2026-11-05T11:21:32.139Z",
+      "pathname": "/me",
+      "title": "三创 · 本地生活",
+      "heading": "未登录",
+      "textLength": 248,
+      "has": {
+        "empty": false,
+        "phase": false,
+        "demoProfile": false,
+        "demoPoints": false,
+        "demoStore": false,
+        "demoTagline": false,
+        "staffEntry": true,
+        "myRewards": true,
+        "signIn": false,
+        "notConfiguredShop": false,
+        "lifePointsRemoved": true,
+        "loggedOut": true,
+        "joined": false,
+        "team": true,
+        "inviteEntry": false
+      },
+      "errors": [],
+      "horizontalOverflow": false,
+      "bodyHeight": 812,
+      "rewardsEntryAndStats": "1:false"
+    },
+    {
+      "step": "me-rewards-375-logged-out",
+      "at": "2026-11-05T11:21:33.763Z",
+      "pathname": "/me/rewards",
+      "title": "三创 · 本地生活",
+      "heading": "我的奖励",
+      "textLength": 254,
+      "has": {
+        "empty": false,
+        "phase": false,
+        "demoProfile": false,
+        "demoPoints": false,
+        "demoStore": false,
+        "demoTagline": false,
+        "staffEntry": false,
+        "myRewards": true,
+        "signIn": false,
+        "notConfiguredShop": false,
+        "lifePointsRemoved": true,
+        "loggedOut": false,
+        "joined": false,
+        "team": false,
+        "inviteEntry": false
+      },
+      "errors": [],
+      "horizontalOverflow": false,
+      "bodyHeight": 812
+    },
+    {
+      "step": "narrow-320-tabs",
+      "at": "2026-11-05T11:21:35.995Z",
+      "life": {
+        "pathname": "/life",
+        "title": "三创 · 本地生活",
+        "heading": "惠生活",
+        "textLength": 404,
+        "has": {
+          "empty": false,
+          "phase": false,
+          "demoProfile": false,
+          "demoPoints": false,
+          "demoStore": false,
+          "demoTagline": false,
+          "staffEntry": false,
+          "myRewards": false,
+          "signIn": false,
+          "notConfiguredShop": true,
+          "lifePointsRemoved": true,
+          "loggedOut": false,
+          "joined": false,
+          "team": false,
+          "inviteEntry": false
+        },
+        "errors": [],
+        "horizontalOverflow": false,
+        "bodyHeight": 568
+      },
+      "me": {
+        "pathname": "/me",
+        "title": "三创 · 本地生活",
+        "heading": "未登录",
+        "textLength": 248,
+        "has": {
+          "empty": false,
+          "phase": false,
+          "demoProfile": false,
+          "demoPoints": false,
+          "demoStore": false,
+          "demoTagline": false,
+          "staffEntry": true,
+          "myRewards": true,
+          "signIn": false,
+          "notConfiguredShop": false,
+          "lifePointsRemoved": true,
+          "loggedOut": true,
+          "joined": false,
+          "team": true,
+          "inviteEntry": false
+        },
+        "errors": [],
+        "horizontalOverflow": false,
+        "bodyHeight": 568
+      }
+    },
+    {
+      "step": "home-after-dev-login",
+      "at": "2026-11-05T11:21:37.841Z",
+      "loginClicked": true,
+      "pathname": "/?activityId=eacbc2e5-8ebd-42b2-8696-795c208e5b2d",
+      "title": "三创 · 本地生活",
+      "heading": "银发社区欢乐季",
+      "textLength": 610,
+      "has": {
+        "empty": false,
+        "phase": true,
+        "demoProfile": false,
+        "demoPoints": false,
+        "demoStore": false,
+        "demoTagline": false,
+        "staffEntry": false,
+        "myRewards": true,
+        "signIn": true,
+        "notConfiguredShop": false,
+        "lifePointsRemoved": true,
+        "loggedOut": false,
+        "joined": false,
+        "team": true,
+        "inviteEntry": false
+      },
+      "errors": [],
+      "horizontalOverflow": false,
+      "bodyHeight": 812
+    },
+    {
+      "step": "home-after-participation",
+      "at": "2026-11-05T11:21:39.521Z",
+      "joinClicked": true,
+      "joinOutcome": "member",
+      "joinButtons": [
+        "活动规则",
+        "确认参与本活动",
+        "我要签到"
+      ],
+      "joinDiagnostics": {
+        "alerts": [],
+        "statuses": [
+          "参与成功，已加入三人团。"
+        ],
+        "buttons": [
+          "活动规则",
+          "+\n\n邀请街坊\n\n还差 2 人",
+          "+\n\n邀请街坊\n\n还差 2 人",
+          "邀请 2 位街坊加入三人团",
+          "我要签到",
+          "打开邀请与二维码"
+        ]
+      },
+      "teamSeats": "1 / 3",
+      "pathname": "/?activityId=eacbc2e5-8ebd-42b2-8696-795c208e5b2d",
+      "title": "三创 · 本地生活",
+      "heading": "银发社区欢乐季",
+      "textLength": 712,
+      "has": {
+        "empty": false,
+        "phase": true,
+        "demoProfile": false,
+        "demoPoints": false,
+        "demoStore": false,
+        "demoTagline": false,
+        "staffEntry": false,
+        "myRewards": true,
+        "signIn": true,
+        "notConfiguredShop": false,
+        "lifePointsRemoved": true,
+        "loggedOut": false,
+        "joined": false,
+        "team": true,
+        "inviteEntry": true
+      },
+      "errors": [],
+      "horizontalOverflow": false,
+      "bodyHeight": 812
+    },
+    {
+      "step": "invite-sheet",
+      "at": "2026-11-05T11:21:40.830Z",
+      "inviteOpened": true,
+      "inviteSheetOpen": true,
+      "shareUrl": "http://localhost:5173/community/activity/silver-neighborhood?activityId=eacbc2e5-8ebd-42b2-8696-795c208e5b2d&invite=d9da8e0b24195a74dd284000858d18a7"
+    },
+    {
+      "step": "invite-link",
+      "at": "2026-11-05T11:21:43.712Z",
+      "url": "http://localhost:5173/community/activity/silver-neighborhood?activityId=eacbc2e5-8ebd-42b2-8696-795c208e5b2d&invite=d9da8e0b24195a74dd284000858d18a7",
+      "landing": {
+        "pathname": "/community/activity/silver-neighborhood?activityId=eacbc2e5-8ebd-42b2-8696-795c208e5b2d&invite=d9da8e0b24195a74dd284000858d18a7",
+        "title": "三创 · 本地生活",
+        "heading": "银发社区欢乐季",
+        "textLength": 1589,
+        "has": {
+          "empty": false,
+          "phase": true,
+          "demoProfile": false,
+          "demoPoints": false,
+          "demoStore": false,
+          "demoTagline": false,
+          "staffEntry": false,
+          "myRewards": true,
+          "signIn": false,
+          "notConfiguredShop": false,
+          "lifePointsRemoved": true,
+          "loggedOut": false,
+          "joined": false,
+          "team": true,
+          "inviteEntry": true
+        },
+        "errors": [],
+        "horizontalOverflow": false,
+        "bodyHeight": 812
+      },
+      "refreshed": {
+        "pathname": "/community/activity/silver-neighborhood?activityId=eacbc2e5-8ebd-42b2-8696-795c208e5b2d&invite=d9da8e0b24195a74dd284000858d18a7",
+        "title": "三创 · 本地生活",
+        "heading": "银发社区欢乐季",
+        "textLength": 1589,
+        "has": {
+          "empty": false,
+          "phase": true,
+          "demoProfile": false,
+          "demoPoints": false,
+          "demoStore": false,
+          "demoTagline": false,
+          "staffEntry": false,
+          "myRewards": true,
+          "signIn": false,
+          "notConfiguredShop": false,
+          "lifePointsRemoved": true,
+          "loggedOut": false,
+          "joined": false,
+          "team": true,
+          "inviteEntry": true
+        },
+        "errors": [],
+        "horizontalOverflow": false,
+        "bodyHeight": 812
+      },
+      "sameHeading": true,
+      "keepsActivityId": true
+    },
+    {
+      "step": "home-default-participation",
+      "at": "2026-11-05T11:21:46.071Z",
+      "defaultJoinClicked": true,
+      "defaultJoinOutcome": "member",
+      "heading": "社区便民市集（第二场）",
+      "seats": "1 / 3"
+    },
+    {
+      "step": "legacy-deeplink",
+      "at": "2026-11-05T11:21:48.406Z",
+      "pathname": "/community/activity/silver-neighborhood",
+      "title": "三创 · 本地生活",
+      "heading": "社区便民市集（第二场）",
+      "textLength": 1500,
+      "has": {
+        "empty": false,
+        "phase": true,
+        "demoProfile": false,
+        "demoPoints": false,
+        "demoStore": false,
+        "demoTagline": false,
+        "staffEntry": false,
+        "myRewards": true,
+        "signIn": false,
+        "notConfiguredShop": false,
+        "lifePointsRemoved": true,
+        "loggedOut": false,
+        "joined": false,
+        "team": true,
+        "inviteEntry": true
+      },
+      "errors": [],
+      "horizontalOverflow": false,
+      "bodyHeight": 812,
+      "backLink": "/?activityId=3478f26a-4c7a-42d4-8e2a-01f663d884c7",
+      "clickedBack": true,
+      "backHomePath": "/?activityId=3478f26a-4c7a-42d4-8e2a-01f663d884c7",
+      "backHomeHeading": "社区便民市集（第二场）"
+    },
+    {
+      "step": "me-375-logged-in",
+      "at": "2026-11-05T11:21:50.074Z",
+      "pathname": "/me",
+      "title": "三创 · 本地生活",
+      "heading": "本地测试居民",
+      "textLength": 364,
+      "has": {
+        "empty": false,
+        "phase": false,
+        "demoProfile": false,
+        "demoPoints": false,
+        "demoStore": false,
+        "demoTagline": false,
+        "staffEntry": true,
+        "myRewards": true,
+        "signIn": false,
+        "notConfiguredShop": false,
+        "lifePointsRemoved": true,
+        "loggedOut": false,
+        "joined": true,
+        "team": true,
+        "inviteEntry": true
+      },
+      "errors": [],
+      "horizontalOverflow": false,
+      "bodyHeight": 812,
+      "hasDisplayName": true,
+      "joinedLabel": true,
+      "teamStat": true,
+      "rewardCard": true,
+      "staffEntry": true,
+      "demoProfile": false,
+      "demoPoints": false
+    },
+    {
+      "step": "me-375-activity-scoped",
+      "at": "2026-11-05T11:21:51.172Z",
+      "heading": "本地测试居民",
+      "pathname": "/me?activityId=eacbc2e5-8ebd-42b2-8696-795c208e5b2d",
+      "mentionsScopedTitle": true,
+      "joined": true,
+      "teamStat": true
+    },
+    {
+      "step": "legacy-community-activity-route",
+      "at": "2026-11-05T11:21:52.028Z",
+      "pathname": "/community/activity/legacy-unknown-activity-id",
+      "title": "三创 · 本地生活",
+      "heading": null,
+      "textLength": 70,
+      "has": {
+        "empty": false,
+        "phase": false,
+        "demoProfile": false,
+        "demoPoints": false,
+        "demoStore": false,
+        "demoTagline": false,
+        "staffEntry": false,
+        "myRewards": false,
+        "signIn": false,
+        "notConfiguredShop": false,
+        "lifePointsRemoved": true,
+        "loggedOut": false,
+        "joined": false,
+        "team": false,
+        "inviteEntry": false
+      },
+      "errors": [],
+      "horizontalOverflow": false,
+      "bodyHeight": 812,
+      "showsMissingState": true
+    },
+    {
+      "step": "workbench-entry",
+      "at": "2026-11-05T11:21:54.604Z",
+      "staffClicked": true,
+      "staffLoginForm": true,
+      "pathname": "/workbench",
+      "title": "三创 · 本地生活",
+      "heading": "网格员工作台",
+      "textLength": 230,
+      "has": {
+        "empty": false,
+        "phase": false,
+        "demoProfile": false,
+        "demoPoints": false,
+        "demoStore": false,
+        "demoTagline": false,
+        "staffEntry": true,
+        "myRewards": false,
+        "signIn": false,
+        "notConfiguredShop": false,
+        "lifePointsRemoved": true,
+        "loggedOut": false,
+        "joined": false,
+        "team": false,
+        "inviteEntry": false
+      },
+      "errors": [],
+      "horizontalOverflow": false,
+      "bodyHeight": 812
+    },
+    {
+      "step": "me-rewards-375-logged-in",
+      "at": "2026-11-05T11:21:56.259Z",
+      "pathname": "/me/rewards",
+      "title": "三创 · 本地生活",
+      "heading": "我的奖励",
+      "textLength": 390,
+      "has": {
+        "empty": false,
+        "phase": false,
+        "demoProfile": false,
+        "demoPoints": false,
+        "demoStore": false,
+        "demoTagline": false,
+        "staffEntry": false,
+        "myRewards": true,
+        "signIn": false,
+        "notConfiguredShop": false,
+        "lifePointsRemoved": true,
+        "loggedOut": false,
+        "joined": false,
+        "team": false,
+        "inviteEntry": false
+      },
+      "errors": [],
+      "horizontalOverflow": false,
+      "bodyHeight": 812
+    }
+  ],
+  "consoleErrors": [],
+  "screenshots": [
+    "screenshots/h5-004-empty-375-home.png",
+    "screenshots/h5-004-home-375.png",
+    "screenshots/h5-004-home-375-scroll2.png",
+    "screenshots/h5-004-home-375-scroll3.png",
+    "screenshots/h5-004-home-320.png",
+    "screenshots/h5-004-home-320-scroll2.png",
+    "screenshots/h5-004-home-320-scroll3.png",
+    "screenshots/h5-004-home-desktop.png",
+    "screenshots/h5-004-home-desktop-scroll2.png",
+    "screenshots/h5-004-home-desktop-scroll3.png",
+    "screenshots/h5-004-deeplink-activity-b-375.png",
+    "screenshots/h5-004-deeplink-activity-b-375-scroll2.png",
+    "screenshots/h5-004-deeplink-activity-b-refresh-375.png",
+    "screenshots/h5-004-deeplink-activity-b-refresh-375-scroll2.png",
+    "screenshots/h5-004-life-375.png",
+    "screenshots/h5-004-life-375-scroll2.png",
+    "screenshots/h5-004-life-375-scroll3.png",
+    "screenshots/h5-004-life-375-legacy-points-tab.png",
+    "screenshots/h5-004-me-375-logged-out.png",
+    "screenshots/h5-004-me-375-logged-out-scroll2.png",
+    "screenshots/h5-004-me-375-logged-out-scroll3.png",
+    "screenshots/h5-004-me-rewards-375-logged-out.png",
+    "screenshots/h5-004-me-rewards-375-logged-out-scroll2.png",
+    "screenshots/h5-004-me-rewards-375-logged-out-scroll3.png",
+    "screenshots/h5-004-life-320.png",
+    "screenshots/h5-004-me-320-logged-out.png",
+    "screenshots/h5-004-home-375-logged-in.png",
+    "screenshots/h5-004-home-375-logged-in-scroll2.png",
+    "screenshots/h5-004-home-375-logged-in-scroll3.png",
+    "screenshots/h5-004-home-375-participated.png",
+    "screenshots/h5-004-home-375-participated-scroll2.png",
+    "screenshots/h5-004-home-375-participated-scroll3.png",
+    "screenshots/h5-004-invite-sheet-375.png",
+    "screenshots/h5-004-invite-link-375.png",
+    "screenshots/h5-004-invite-link-375-scroll2.png",
+    "screenshots/h5-004-invite-link-375-scroll3.png",
+    "screenshots/h5-004-home-default-participated-375.png",
+    "screenshots/h5-004-home-default-participated-375-scroll2.png",
+    "screenshots/h5-004-home-default-participated-375-scroll3.png",
+    "screenshots/h5-004-legacy-deeplink-375.png",
+    "screenshots/h5-004-legacy-deeplink-375-scroll2.png",
+    "screenshots/h5-004-me-375-logged-in.png",
+    "screenshots/h5-004-me-375-logged-in-scroll2.png",
+    "screenshots/h5-004-me-375-logged-in-scroll3.png",
+    "screenshots/h5-004-me-375-activity-scoped.png",
+    "screenshots/h5-004-workbench-entry-375.png",
+    "screenshots/h5-004-workbench-entry-375-scroll2.png",
+    "screenshots/h5-004-workbench-entry-375-scroll3.png",
+    "screenshots/h5-004-me-rewards-375-logged-in.png",
+    "screenshots/h5-004-me-rewards-375-logged-in-scroll2.png",
+    "screenshots/h5-004-me-rewards-375-logged-in-scroll3.png"
+  ],
+  "network": [
+    {
+      "url": "/api/activities/public",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public/3478f26a-4c7a-42d4-8e2a-01f663d884c7",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public/3478f26a-4c7a-42d4-8e2a-01f663d884c7",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public/3478f26a-4c7a-42d4-8e2a-01f663d884c7",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public/eacbc2e5-8ebd-42b2-8696-795c208e5b2d",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public/eacbc2e5-8ebd-42b2-8696-795c208e5b2d",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "url": "/api/integrations/crmeb/status",
+      "status": 200
+    },
+    {
+      "url": "/api/integrations/crmeb/status",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public/3478f26a-4c7a-42d4-8e2a-01f663d884c7",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "url": "/api/integrations/crmeb/status",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public/3478f26a-4c7a-42d4-8e2a-01f663d884c7",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public/eacbc2e5-8ebd-42b2-8696-795c208e5b2d",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/dev/login",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/eacbc2e5-8ebd-42b2-8696-795c208e5b2d/participation",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/eacbc2e5-8ebd-42b2-8696-795c208e5b2d/checkin",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/eacbc2e5-8ebd-42b2-8696-795c208e5b2d/rewards",
+      "status": 409
+    },
+    {
+      "url": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/eacbc2e5-8ebd-42b2-8696-795c208e5b2d/participation",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public/eacbc2e5-8ebd-42b2-8696-795c208e5b2d",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/eacbc2e5-8ebd-42b2-8696-795c208e5b2d/participation",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/eacbc2e5-8ebd-42b2-8696-795c208e5b2d/checkin",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/eacbc2e5-8ebd-42b2-8696-795c208e5b2d/rewards",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public/eacbc2e5-8ebd-42b2-8696-795c208e5b2d",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/eacbc2e5-8ebd-42b2-8696-795c208e5b2d/participation",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/eacbc2e5-8ebd-42b2-8696-795c208e5b2d/checkin",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/eacbc2e5-8ebd-42b2-8696-795c208e5b2d/rewards",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public/3478f26a-4c7a-42d4-8e2a-01f663d884c7",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/3478f26a-4c7a-42d4-8e2a-01f663d884c7/participation",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/3478f26a-4c7a-42d4-8e2a-01f663d884c7/checkin",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/3478f26a-4c7a-42d4-8e2a-01f663d884c7/rewards",
+      "status": 409
+    },
+    {
+      "url": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/3478f26a-4c7a-42d4-8e2a-01f663d884c7/participation",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public/3478f26a-4c7a-42d4-8e2a-01f663d884c7",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/3478f26a-4c7a-42d4-8e2a-01f663d884c7/participation",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/3478f26a-4c7a-42d4-8e2a-01f663d884c7/checkin",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/3478f26a-4c7a-42d4-8e2a-01f663d884c7/rewards",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public/3478f26a-4c7a-42d4-8e2a-01f663d884c7",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/3478f26a-4c7a-42d4-8e2a-01f663d884c7/participation",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/3478f26a-4c7a-42d4-8e2a-01f663d884c7/checkin",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/3478f26a-4c7a-42d4-8e2a-01f663d884c7/rewards",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public/3478f26a-4c7a-42d4-8e2a-01f663d884c7",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/3478f26a-4c7a-42d4-8e2a-01f663d884c7/participation",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/3478f26a-4c7a-42d4-8e2a-01f663d884c7/rewards",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/eacbc2e5-8ebd-42b2-8696-795c208e5b2d/rewards",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public/eacbc2e5-8ebd-42b2-8696-795c208e5b2d",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/eacbc2e5-8ebd-42b2-8696-795c208e5b2d/participation",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/3478f26a-4c7a-42d4-8e2a-01f663d884c7/rewards",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/eacbc2e5-8ebd-42b2-8696-795c208e5b2d/rewards",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public/3478f26a-4c7a-42d4-8e2a-01f663d884c7",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/3478f26a-4c7a-42d4-8e2a-01f663d884c7/participation",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/3478f26a-4c7a-42d4-8e2a-01f663d884c7/rewards",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/eacbc2e5-8ebd-42b2-8696-795c208e5b2d/rewards",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "url": "/api/auth/methods",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/public",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/3478f26a-4c7a-42d4-8e2a-01f663d884c7/rewards",
+      "status": 200
+    },
+    {
+      "url": "/api/activities/eacbc2e5-8ebd-42b2-8696-795c208e5b2d/rewards",
+      "status": 200
+    }
+  ],
+  "finishedAt": "2026-11-05T11:21:56.259Z"
+}

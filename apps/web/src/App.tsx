@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router'
-import { MiniProgramShell } from './components/MiniProgramShell'
+import { AppShell } from './components/shell/AppShell'
+import { ActivityHomePage } from './pages/ActivityHomePage'
 import { CommunityActivityPage } from './pages/CommunityActivityPage'
 import { CommunityBroadcastPage } from './pages/CommunityBroadcastPage'
 import { CommunityCulturePage } from './pages/CommunityCulturePage'
@@ -12,7 +13,6 @@ import { HealthDevicePage } from './pages/HealthDevicePage'
 import { HealthDevicesPage } from './pages/HealthDevicesPage'
 import { HealthLecturePage } from './pages/HealthLecturePage'
 import { HealthPage } from './pages/HealthPage'
-import { HomePage } from './pages/HomePage'
 import { LifePage } from './pages/LifePage'
 import { MePage } from './pages/MePage'
 import { MyRewardsPage } from './pages/MyRewardsPage'
@@ -33,9 +33,9 @@ import { WorkbenchVerifyPage } from './pages/workbench/WorkbenchVerifyPage'
 
 export default function App() {
   return (
-    <MiniProgramShell>
+    <AppShell>
       <Routes>
-        <Route path="/" element={<HomePage />} />
+        <Route path="/" element={<ActivityHomePage />} />
         <Route path="/gd" element={<GdPage />} />
         <Route path="/community" element={<CommunityPage />} />
         <Route path="/community/broadcast" element={<CommunityBroadcastPage />} />
@@ -72,6 +72,6 @@ export default function App() {
         </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
-    </MiniProgramShell>
+    </AppShell>
   )
 }

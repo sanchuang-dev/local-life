@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   AlertTriangle,
+  ArrowLeft,
   CheckCircle2,
   Check,
   LockKeyhole,
@@ -22,6 +23,8 @@ import type { PublicActivityDetail } from '@sanchuang-dev/local-life-contracts'
 import { CampaignSheet } from '../components/CampaignSheet'
 import { ParticipationTeamCard } from '../components/activity/ParticipationTeamCard'
 import { RewardProgressCard } from '../components/activity/RewardProgressCard'
+import { ActivityLoginMarkerCleanup } from '../components/activity/ActivityLoginResult'
+import { readActivityLoginResult, type ActivityLoginResult } from '../components/activity/loginReturn'
 import {
   credentialExpiryText,
   formatRewardDateTime,
@@ -345,7 +348,18 @@ export function SilverNeighborhoodCampaignPage() {
   const inviteParam = parseInviteParam(searchParams.get('invite'))
   const { state: activityState, retry: retryActivity } = usePublicActivity(requestedActivityId)
   const activity = activityState.status === 'ready' ? activityState.activity : null
+  // The resident root (`/`) is now the activity home; this page stays the full
+  // playbook sub-page reachable from old deep links and QR codes. The back link
+  // keeps the same real activity and invite parameters so both entries agree.
+  const homeParams = new URLSearchParams()
+  if (activity) homeParams.set('activityId', activity.id)
+  if (inviteParam.code) homeParams.set('invite', inviteParam.code)
+  const homeQuery = homeParams.toString()
+  const homeUrl = homeQuery ? `/?${homeQuery}` : '/'
   const auth = useResidentAuth()
+  // One-off `?auth=success` / `?auth_error=code` markers, read once before the
+  // page-level cleanup strips them from the address bar (#92).
+  const [loginResult] = useState<ActivityLoginResult>(() => readActivityLoginResult())
   const participation = useActivityParticipation({
     activityId: activity?.id ?? null,
     sessionKey: auth.session?.user.id ?? null,
@@ -488,6 +502,21 @@ export function SilverNeighborhoodCampaignPage() {
 
   return (
     <div className="pb-7">
+      {/* Remove callback markers regardless of the current session branch. */}
+      <ActivityLoginMarkerCleanup
+        authenticated={auth.session !== null}
+        loading={auth.loading}
+      />
+      <nav className="bg-[#eaf5e9] px-3 pt-2" aria-label="活动页导航">
+        <Link
+          to={homeUrl}
+          state={{ from: activityPath }}
+          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-1 text-[13px] font-medium text-[#27725b] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+        >
+          <ArrowLeft size={16} aria-hidden="true" />
+          返回活动首页
+        </Link>
+      </nav>
       <section className="relative overflow-hidden bg-[#eaf5e9]" aria-label="活动信息">
         <div className="relative">
           <img
@@ -554,6 +583,7 @@ export function SilverNeighborhoodCampaignPage() {
         participation={participation}
         inviteCode={inviteParam.code}
         inviteInvalid={inviteParam.invalid}
+        loginResult={loginResult}
         onShare={openShareSheet}
       />
 
@@ -656,7 +686,13 @@ export function SilverNeighborhoodCampaignPage() {
                   真实接入
                 </span>
               </div>
-              <RewardProgressCard auth={auth} progress={rewardProgress} />
+              <RewardProgressCard
+                auth={auth}
+                progress={rewardProgress}
+                activityId={activity?.id ?? null}
+                inviteCode={inviteParam.code}
+                inviteInvalid={inviteParam.invalid}
+              />
             </div>
           ) : (
             <div className="mt-4">
