@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { API_ROUTES } from '@sanchuang-dev/local-life-contracts'
+import { isWeChatBrowser } from '../components/auth/wechatEnvironment'
 import {
   API_PREFIX,
   browserLocation,
@@ -122,6 +123,10 @@ export function useActivityLoginReturn({
   }, [availabilityAttempt])
 
   const startWechatLogin = useCallback(() => {
+    if (typeof navigator === 'undefined' || !isWeChatBrowser(navigator.userAgent)) {
+      setAvailability({ status: 'error', message: '请在微信内打开页面授权登录，或使用手机号登录' })
+      return
+    }
     // The return target comes from the current route (never a client parameter),
     // is validated against the shared allowlist, and the API re-validates it.
     const request = buildWechatLoginRequest(browserLocation(), {

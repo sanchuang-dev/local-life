@@ -60,9 +60,11 @@ export function MePage() {
       value:
         participation.state.status === 'error'
           ? '读取失败'
-          : participation.state.status === 'loading' || participation.state.status === 'idle'
-            ? '读取中'
-            : joined
+          : participation.state.status === 'unauthenticated'
+            ? '登录失效'
+            : participation.state.status === 'loading' || participation.state.status === 'idle'
+              ? '读取中'
+              : joined
               ? '已报名'
               : '未报名',
       hint: activity ? activity.title : '暂无已发布活动',
@@ -75,9 +77,11 @@ export function MePage() {
       value:
         participation.state.status === 'error'
           ? '读取失败'
-          : participation.state.status === 'loading' || participation.state.status === 'idle'
-            ? '读取中'
-            : team
+          : participation.state.status === 'unauthenticated'
+            ? '登录失效'
+            : participation.state.status === 'loading' || participation.state.status === 'idle'
+              ? '读取中'
+              : team
               ? `${team.seatsFilled}/${team.seatsTotal}`
               : '未成团',
       hint: team?.status === 'locked' ? '已成团' : '可在活动页邀请街坊',
@@ -87,8 +91,22 @@ export function MePage() {
     {
       id: 'rewards',
       label: '我的奖励',
-      value: wallet.state.status === 'error' ? '读取失败' : rewardCount === null ? '—' : String(rewardCount),
-      hint: wallet.state.status === 'error' ? wallet.state.message : rewardCount === null ? '读取中' : '真实奖励条目',
+      value:
+        wallet.state.status === 'error'
+          ? '读取失败'
+          : wallet.state.status === 'unauthenticated'
+            ? '登录失效'
+            : rewardCount === null
+              ? '—'
+              : String(rewardCount),
+      hint:
+        wallet.state.status === 'error'
+          ? wallet.state.message
+          : wallet.state.status === 'unauthenticated'
+            ? '请重新登录'
+            : rewardCount === null
+              ? '读取中'
+              : '真实奖励条目',
       to: '/me/rewards',
       tone: 'mint' as const,
     },

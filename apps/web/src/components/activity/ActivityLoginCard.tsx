@@ -69,14 +69,16 @@ export function ActivityLoginCard({
             <span className="min-w-0 break-words">{errorMessage}</span>
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={login.startWechatLogin}
-              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-rose-700 px-4 text-[12px] font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-700"
-            >
-              <RefreshCw size={14} aria-hidden="true" />
-              重新发起微信登录
-            </button>
+            {availability.status === 'ready' && availability.wechat && wechatBrowser ? (
+              <button
+                type="button"
+                onClick={login.startWechatLogin}
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-rose-700 px-4 text-[12px] font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-700"
+              >
+                <RefreshCw size={14} aria-hidden="true" />
+                重新发起微信登录
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => setDismissed(true)}
