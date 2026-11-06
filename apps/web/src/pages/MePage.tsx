@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronRight, ClipboardList, Gift, LogOut, ShieldCheck, Smartphone, UserRound } from 'lucide-react'
+import { ChevronRight, ClipboardList, Gift, LogOut, ShieldCheck, ShoppingBasket, Smartphone, UserRound } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
 import { DemoNote } from '../components/DemoNote'
 import { PhoneVerificationForm } from '../components/auth/PhoneVerificationForm'
@@ -297,6 +297,26 @@ export function MePage() {
         <ChevronRight size={17} className="shrink-0 text-slate-300" aria-hidden="true" />
       </Link>
 
+      <Link
+        to="/me/orders"
+        state={{ from: '/me' }}
+        className="mt-4 flex items-center gap-3 rounded-[18px] border border-slate-100 bg-white px-4 py-3.5 shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+      >
+        <span
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[#fff3e6] text-[#c6925c]"
+          aria-hidden="true"
+        >
+          <ShoppingBasket size={20} strokeWidth={1.8} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[14px] font-semibold text-slate-800">我的订单</span>
+          <span className="mt-0.5 block truncate text-[11px] leading-4 text-slate-400">
+            本地商品登记记录 · 处理进度 · 运营人工核验结果
+          </span>
+        </span>
+        <ChevronRight size={17} className="shrink-0 text-slate-300" aria-hidden="true" />
+      </Link>
+
       {auth.session?.staff ? (
         <Link
           to="/workbench"
@@ -341,8 +361,8 @@ export function MePage() {
       )}
 
       <DemoNote tone="warn">
-        本页只展示真实账户、当前活动的报名与三人团状态、以及我的奖励。积分、优惠券、订单、收藏、
-        健康档案与地址管理等尚未接入真实服务的入口，已从本页移除示例资料与示例统计。
+        本页只展示真实账户、当前活动的报名与三人团状态、以及我的奖励；「我的订单」读取本社区本地商品的真实登记记录。
+        积分、优惠券、收藏、健康档案与地址管理等尚未接入真实服务的入口，已从本页移除示例资料与示例统计。
       </DemoNote>
     </div>
   )
