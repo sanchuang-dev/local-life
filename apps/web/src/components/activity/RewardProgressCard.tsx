@@ -13,6 +13,8 @@ import {
 import { Link } from 'react-router'
 import type { useResidentAuth } from '../../hooks/useResidentAuth'
 import type { useRewardProgress } from '../../hooks/useRewardProgress'
+import { browserLocation, buildWechatLoginRequest, saveActivityLoginContext } from './loginReturn'
+import { isWeChatBrowser } from '../auth/wechatEnvironment'
 import { SILVER_NEIGHBORHOOD_ACTIVITY_PATH } from './share'
 import {
   claimRecipientLabels,
@@ -88,11 +90,37 @@ function LoadingLine({ text }: { text: string }) {
  *
  * The demo panels (抽奖 / 大奖 / 里程碑) are deliberately not part of this card.
  */
-export function RewardProgressCard({ auth, progress }: { auth: ResidentAuth; progress: Progress }) {
+export function RewardProgressCard({
+  auth,
+  progress,
+  activityId,
+  inviteCode,
+  inviteInvalid,
+}: {
+  auth: ResidentAuth
+  progress: Progress
+  /** Return-to context for the WeChat login CTA (#92); login must come back here. */
+  activityId: string | null
+  inviteCode: string | null
+  inviteInvalid: boolean
+}) {
   const [feedback, setFeedback] = useState<Feedback>(null)
   const [issuedCode, setIssuedCode] = useState<{ code: string; prizeName: string } | null>(null)
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
   const state = progress.state
+
+  const startWechatLogin = () => {
+    // Same path as the participation card: save the pre-login activity context,
+    // then let the API return the resident to this exact activity link.
+    if (typeof navigator === 'undefined' || !isWeChatBrowser(navigator.userAgent)) return
+    const request = buildWechatLoginRequest(browserLocation(), {
+      activityId,
+      inviteCode,
+      inviteInvalid,
+    })
+    saveActivityLoginContext(request.context)
+    window.location.assign(request.url)
+  }
 
   const handleCheckIn = async () => {
     setFeedback(null)
@@ -146,10 +174,10 @@ export function RewardProgressCard({ auth, progress }: { auth: ResidentAuth; pro
             登录后可读取你在本活动的真实签到与团队奖励状态。签到需要先加入三人团。
           </p>
           <div className="mt-2.5 flex flex-wrap gap-2">
-            {auth.methods?.wechat ? (
+            {auth.methods?.wechat && typeof navigator !== 'undefined' && isWeChatBrowser(navigator.userAgent) ? (
               <button
                 type="button"
-                onClick={auth.startWechatLogin}
+                onClick={startWechatLogin}
                 className={secondaryButton}
               >
                 微信授权登录
@@ -166,6 +194,11 @@ export function RewardProgressCard({ auth, progress }: { auth: ResidentAuth; pro
               </button>
             ) : null}
           </div>
+          {auth.methods && !auth.methods.wechat && !auth.methods.developmentResidentLogin ? (
+            <p className="mt-2 rounded-[12px] bg-slate-50 px-3 py-2.5 text-[11px] leading-5 text-slate-500">
+              微信网页授权暂不可用：未配置公众号 AppID / AppSecret 或授权回调地址，请联系运营人员。
+            </p>
+          ) : null}
           {auth.error ? (
             <p role="alert" className="mt-2 break-words text-[11px] leading-5 text-rose-600">
               {auth.error}

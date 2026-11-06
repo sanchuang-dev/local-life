@@ -272,7 +272,8 @@ test('WeChat OAuth binds one stable resident identity, validates state/nonce and
       `/auth/wechat/callback?state=${state}&code=oauth-code`,
       { headers: { cookie: 'll_oauth_nonce=wrong-nonce' } },
     )
-    assert.equal(new URL(wrongNonce.headers.get('location')!).hash, '#/me?auth_error=wechat_state_invalid')
+    assert.equal(new URL(wrongNonce.headers.get('location')!).pathname, '/me')
+    assert.equal(new URL(wrongNonce.headers.get('location')!).search, '?auth_error=wechat_state_invalid')
     assert.equal(providerCalls, 0)
 
     const callback = await context.app.request(
@@ -280,7 +281,8 @@ test('WeChat OAuth binds one stable resident identity, validates state/nonce and
       { headers: { cookie: nonceCookie } },
     )
     assert.equal(callback.status, 302)
-    assert.equal(new URL(callback.headers.get('location')!).hash, '#/me?auth=success')
+    assert.equal(new URL(callback.headers.get('location')!).pathname, '/me')
+    assert.equal(new URL(callback.headers.get('location')!).search, '?auth=success')
     assert.match(callback.headers.get('set-cookie') ?? '', /ll_oauth_nonce=;/i)
     assert.equal(providerCalls, 1)
 
@@ -304,7 +306,8 @@ test('WeChat OAuth binds one stable resident identity, validates state/nonce and
       `/auth/wechat/callback?state=${state}&code=oauth-code`,
       { headers: { cookie: nonceCookie } },
     )
-    assert.equal(new URL(replay.headers.get('location')!).hash, '#/me?auth_error=wechat_state_invalid')
+    assert.equal(new URL(replay.headers.get('location')!).pathname, '/me')
+    assert.equal(new URL(replay.headers.get('location')!).search, '?auth_error=wechat_state_invalid')
     assert.equal(providerCalls, 1)
 
     const secondStart = await context.app.request(`/auth/wechat/start?communityId=${communityId}`)
