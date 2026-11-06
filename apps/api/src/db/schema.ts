@@ -27,7 +27,12 @@ import type {
   RewardEventKind,
   RewardGrantStatus,
   RewardRecipientRole,
+  LocalOrderEventType,
+  LocalOrderRecordSource,
+  LocalOrderStatus,
+  LocalProductStatus,
 } from '@sanchuang-dev/local-life-contracts'
+import { LOCAL_ORDER_EVENT_SOURCE_TYPE } from '@sanchuang-dev/local-life-contracts'
 
 export type StaffRole = 'admin' | 'operator' | 'grid_worker'
 export type StaffStatus = 'active' | 'disabled'
@@ -1277,6 +1282,167 @@ export const activityRewardDisputes = sqliteTable(
   ],
 )
 
+/* -------------------------------------------------------------------------- */
+/* Local product catalogue & resident orders (#109 LL-MVP-010)                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A *local* product: a real row owned by one community, priced in integer cents.
+ *
+ * This is not a CRMEB mirror row (`crmeb_orders` / `crmeb_identities` are
+ * pull-only reflections of an external shop) and it has nothing to do with the
+ * 广电 carrier orders in `crm_service_orders`. Taking a product off the shelf
+ * only blocks *new* registrations: `local_orders` keeps its own frozen snapshot.
+ */
+export const localProducts = sqliteTable(
+  'local_products',
+  {
+    id: text('id').primaryKey(),
+    communityId: text('community_id')
+      .notNull()
+      .references(() => communities.id, { onDelete: 'restrict' }),
+    name: text('name').notNull(),
+    summary: text('summary'),
+    description: text('description'),
+    category: text('category'),
+    unitPriceCents: integer('unit_price_cents').notNull(),
+    imageUrl: text('image_url'),
+    status: text('status').$type<LocalProductStatus>().notNull(),
+    createdByUserId: text('created_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    index('local_products_community_status_idx').on(table.communityId, table.status),
+    index('local_products_community_updated_idx').on(table.communityId, table.updatedAt),
+    check('local_products_price_check', sql`${table.unitPriceCents} >= 0`),
+    check(
+      'local_products_status_check',
+      sql`${table.status} IN ('on_shelf', 'off_shelf')`,
+    ),
+  ],
+)
+
+/**
+ * A resident's registration of intent for one local product.
+ *
+ * Every value the client could lie about is frozen here at insert time:
+ * `product_name` / `unit_price_cents` / `quantity` / `total_cents` are a
+ * server-computed snapshot, and `community_id` is the product's community, not
+ * whatever the caller sent. `(community_id, resident_user_id, idempotency_key)`
+ * is UNIQUE, so a replay — even a concurrent one — can only ever produce one row.
+ *
+ * `status = verified` means an operations human checked the fact. It is NOT
+ * payment and NOT activation: there is deliberately no payment/activation column.
+ */
+export const localOrders = sqliteTable(
+  'local_orders',
+  {
+    id: text('id').primaryKey(),
+    communityId: text('community_id')
+      .notNull()
+      .references(() => communities.id, { onDelete: 'restrict' }),
+    productId: text('product_id')
+      .notNull()
+      .references(() => localProducts.id, { onDelete: 'restrict' }),
+    residentUserId: text('resident_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    idempotencyKey: text('idempotency_key').notNull(),
+    status: text('status').$type<LocalOrderStatus>().notNull(),
+    recordSource: text('record_source').$type<LocalOrderRecordSource>().notNull(),
+    // Frozen product snapshot: later catalogue edits must not rewrite this order.
+    productName: text('product_name').notNull(),
+    unitPriceCents: integer('unit_price_cents').notNull(),
+    quantity: integer('quantity').notNull(),
+    totalCents: integer('total_cents').notNull(),
+    note: text('note'),
+    /** Staff member who recorded the order on behalf of the resident; null for self-service. */
+    createdByStaffId: text('created_by_staff_id').references(() => staffAccounts.id, {
+      onDelete: 'set null',
+    }),
+    /** Optional grid-worker attribution frozen at registration. */
+    attributedStaffId: text('attributed_staff_id').references(() => staffAccounts.id, {
+      onDelete: 'set null',
+    }),
+    sourceActivityId: text('source_activity_id').references(() => activities.id, {
+      onDelete: 'restrict',
+    }),
+    verifiedByUserId: text('verified_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    verifiedAt: integer('verified_at', { mode: 'timestamp_ms' }),
+    verificationNote: text('verification_note'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('local_orders_idempotency_uq').on(
+      table.communityId,
+      table.residentUserId,
+      table.idempotencyKey,
+    ),
+    index('local_orders_community_status_idx').on(table.communityId, table.status),
+    index('local_orders_resident_created_idx').on(table.residentUserId, table.createdAt),
+    index('local_orders_product_idx').on(table.productId),
+    index('local_orders_created_by_staff_idx').on(table.createdByStaffId),
+    check('local_orders_quantity_check', sql`${table.quantity} >= 1 AND ${table.quantity} <= 99`),
+    check(
+      'local_orders_total_check',
+      sql`${table.totalCents} = ${table.unitPriceCents} * ${table.quantity}`,
+    ),
+    check(
+      'local_orders_status_check',
+      sql`${table.status} IN ('registered', 'processing', 'pending_review', 'verified', 'cancelled', 'rejected')`,
+    ),
+    check(
+      'local_orders_record_source_check',
+      sql`${table.recordSource} IN ('resident', 'staff_on_behalf')`,
+    ),
+  ],
+)
+
+/**
+ * Append-only local-order timeline. `source_type` + `source_id` are the stable
+ * consumption contract for downstream work (#64): a consumer must be able to
+ * follow an order event without joining and guessing. UPDATE/DELETE are rejected
+ * by triggers in migration 0009, like every other event table in this schema.
+ */
+export const localOrderEvents = sqliteTable(
+  'local_order_events',
+  {
+    id: text('id').primaryKey(),
+    orderId: text('order_id')
+      .notNull()
+      .references(() => localOrders.id, { onDelete: 'restrict' }),
+    actorUserId: text('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
+    actorStaffId: text('actor_staff_id').references(() => staffAccounts.id, {
+      onDelete: 'set null',
+    }),
+    event: text('event').$type<LocalOrderEventType>().notNull(),
+    fromStatus: text('from_status').$type<LocalOrderStatus>(),
+    toStatus: text('to_status').$type<LocalOrderStatus>(),
+    note: text('note'),
+    sourceType: text('source_type').$type<typeof LOCAL_ORDER_EVENT_SOURCE_TYPE>().notNull(),
+    sourceId: text('source_id').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    index('local_order_events_order_created_idx').on(table.orderId, table.createdAt),
+    index('local_order_events_source_idx').on(table.sourceType, table.sourceId),
+    check(
+      'local_order_events_source_type_check',
+      sql`${table.sourceType} = 'local_order'`,
+    ),
+    check(
+      'local_order_events_event_check',
+      sql`${table.event} IN ('order.registered', 'order.created_on_behalf', 'order.status_changed', 'order.verified', 'order.rejected')`,
+    ),
+  ],
+)
+
 export const userRelations = relations(users, ({ many }) => ({
   wechatIdentities: many(wechatIdentities),
   phoneIdentities: many(residentPhoneIdentities),
@@ -1325,4 +1491,7 @@ export const schema = {
   activityPrizeStocks,
   activityRewardEvents,
   activityRewardDisputes,
+  localProducts,
+  localOrders,
+  localOrderEvents,
 }

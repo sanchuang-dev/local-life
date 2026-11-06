@@ -1,0 +1,153 @@
+{
+  "prefix": "t5",
+  "capturedAt": "2026-11-06T08:30:37.862Z",
+  "branch": "feat/ll-mvp-010-local-catalog-orders",
+  "head": "ac4c385eea884611f64fe1348ee3e5c96ffd76e5",
+  "headSubject": "feat(web,admin): local catalogue and resident order surfaces (R2)",
+  "baseCommit": "ae8441a",
+  "r2FileCount": 28,
+  "r2TreeSha256": "7f51d1c71fa43291e931582c346152d4043e244576aa6e4ac0018d2d5b553cf3",
+  "r2FilesDirtyNow": [],
+  "r2Files": [
+    {
+      "path": "apps/admin/src/app/routes.tsx",
+      "blob": "ea1db02289d12a3da097f373b25641fa72cddddf",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/admin/src/app/shell/navigation.ts",
+      "blob": "d44976e2e90271360980a9d0eaf98390cf7217a6",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/admin/src/pages/OrdersPage.test.tsx",
+      "blob": "5a1a038793629652c947bf986c5e4e1ccf2d1aab",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/admin/src/pages/OrdersPage.tsx",
+      "blob": "1978c907888666a456afc34988b83d29a7cba9f3",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/admin/src/pages/ProductsPage.test.tsx",
+      "blob": "58cfbc9ccd134b50afde6dec9611a23275a5cb09",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/admin/src/pages/ProductsPage.tsx",
+      "blob": "330df335780245a9d7dab039b5b28da741b4fc9c",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/admin/src/pages/local-console.css",
+      "blob": "c6b33a27c08a024293b7f49220042c82566dd00c",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/admin/src/services/localApi.ts",
+      "blob": "04c98c819369ee782401dd55a0a0112dba2ab42e",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/admin/src/services/localCatalog.ts",
+      "blob": "2c40112e4a64e8bb321b089850c7f782c0e2f839",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/admin/src/services/localOrders.ts",
+      "blob": "81a201f3491b8b8eac4e7da0eb709eca37575688",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/web/src/App.tsx",
+      "blob": "6dc0f70c112c1aba2cd0789517683d2bc4a1c9fa",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/web/src/components/life/LocalCatalogSection.tsx",
+      "blob": "08b551551581ea42d51f161a34ef9f0f81f2974b",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/web/src/components/life/LocalProductCard.tsx",
+      "blob": "0fabe9838bb8b3206bfe4315708e8e9c3abbc811",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/web/src/components/life/localOrderLabels.ts",
+      "blob": "1219990afd3564ecf4abf8112eded3ca3da4df19",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/web/src/hooks/useLocalCatalog.ts",
+      "blob": "304b5b0bb0901b8aa7d0b5812861bc9377fa73ac",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/web/src/hooks/useLocalOrders.ts",
+      "blob": "ceda70ab28417806a7c3cc8d25e196ba955ecf79",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/web/src/hooks/useStaffLocalOrders.ts",
+      "blob": "672737eb6e1e3133722275e2a417557dffcfc0f2",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/web/src/pages/LifePage.tsx",
+      "blob": "cb04956dd2eefc72f3766fc1c9f31fcd5ec24000",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/web/src/pages/LocalProductPage.tsx",
+      "blob": "b11b5f799a5d5254a14a63820ad2639aa97fd3ba",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/web/src/pages/MePage.tsx",
+      "blob": "8302a96b7354699948c5b345c5b8da105e713f2e",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/web/src/pages/MyOrderDetailPage.tsx",
+      "blob": "58c97d5486094538b0f2883e275fc7bfc5619d8b",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/web/src/pages/MyOrdersPage.tsx",
+      "blob": "9816885d1af48af2b086d33c877ed1018c7c0ceb",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/web/src/pages/workbench/WorkbenchLeadsPage.tsx",
+      "blob": "ab607db8af5fc9be9b077ab71d0055548168c06c",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/web/src/pages/workbench/WorkbenchLocalOrderDetailPage.tsx",
+      "blob": "85ff8ca4f029a56a08c829c2288353bb8ae89245",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/web/src/pages/workbench/WorkbenchLocalOrdersPage.tsx",
+      "blob": "a33c8fe67a3435454eb2a5ca58598384c745eb31",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/web/src/services/localApi.ts",
+      "blob": "9cbf15bb882d62da3c455d7a5f5014beeae51456",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/web/src/services/localCatalog.ts",
+      "blob": "4b81e2485a9c2a1b1765450584651313e66520bc",
+      "dirtyNow": false
+    },
+    {
+      "path": "apps/web/src/services/localOrders.ts",
+      "blob": "1f5256f68fc22be8dc83f3c5321318fc13b35379",
+      "dirtyNow": false
+    }
+  ]
+}

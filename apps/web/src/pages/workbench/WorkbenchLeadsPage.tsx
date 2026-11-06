@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router'
-import { BadgeCheck, ChevronRight, ClipboardList, Copy, ExternalLink, Phone, Plus, UserRoundCheck } from 'lucide-react'
+import { BadgeCheck, ChevronRight, ClipboardList, Copy, ExternalLink, PackageSearch, Phone, Plus, UserRoundCheck } from 'lucide-react'
 import type { CrmLeadSourceType, CrmLeadStatus, CrmLeadSummary } from '@sanchuang-dev/local-life-contracts'
 import { useCrmApi, type LeadListFilters } from '../../hooks/useCrmApi'
 import { useAsyncResource } from '../../hooks/useAsyncResource'
@@ -236,6 +236,13 @@ function LeadsView() {
           >
             <ClipboardList size={13} aria-hidden="true" />
             受理单
+          </Link>
+          <Link
+            to="/workbench/local-orders"
+            className="inline-flex min-h-9 items-center gap-1 rounded-full bg-white px-3 text-[11px] font-semibold text-teal-700"
+          >
+            <PackageSearch size={13} aria-hidden="true" />
+            社区订单
           </Link>
         </div>
       </div>
