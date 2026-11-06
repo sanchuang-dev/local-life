@@ -1,0 +1,2539 @@
+{
+  "generatedAt": "2026-11-06T08:25:12.020Z",
+  "chrome": "C:/Program Files/Google/Chrome/Application/chrome.exe",
+  "stack": {
+    "web": "http://localhost:5173",
+    "admin": "http://localhost:5174",
+    "api": "http://localhost:5173/api"
+  },
+  "fixtures": {
+    "productId": "3329057e-f199-4ca2-870e-6e101bd4b92d",
+    "productName": "社区助农蔬菜包 r2e2e",
+    "catalogTotal": 4
+  },
+  "fixtureOrder": {
+    "orderId": "f77344b3-8f2a-4493-9091-b6d18057b02d",
+    "staffOrderId": "f77344b3-8f2a-4493-9091-b6d18057b02d",
+    "adminOrderId": "f77344b3-8f2a-4493-9091-b6d18057b02d"
+  },
+  "belowFold": [
+    "t5-life-320 cta \"我的订单\" top=917 (page height 1747, viewport 720)",
+    "t5-life-375 cta \"我的订单\" top=938 (page height 1768, viewport 812)",
+    "t5-life-1440 cta \"我的订单\" top=1059 (page height 1830, viewport 900)",
+    "t5-life-product-320 cta \"登记订单\" top=1006 (page height 1225, viewport 720)",
+    "t5-life-product-375 cta \"登记订单\" top=1047 (page height 1266, viewport 812)",
+    "t5-life-product-1440 cta \"登记订单\" top=1242 (page height 1461, viewport 900)",
+    "t5-life-product-guest-320 cta \"去登录\" top=1089 (page height 1317, viewport 720)",
+    "t5-life-product-guest-375 cta \"去登录\" top=1130 (page height 1358, viewport 812)",
+    "t5-life-product-guest-1440 cta \"去登录\" top=1305 (page height 1533, viewport 900)",
+    "t5-workbench-local-order-detail-320 cta \"取消订单\" top=861 (page height 1246, viewport 720)",
+    "t5-workbench-local-order-detail-375 cta \"取消订单\" top=841 (page height 1226, viewport 812)"
+  ],
+  "preExistingConsole": [
+    {
+      "label": "t5-admin-products-320",
+      "text": "Warning: [antd: Spin] `tip` is deprecated. Please use `description` instead.",
+      "attribution": "pre-existing",
+      "note": "apps/admin/src/App.tsx:75 <Spin tip> — that file is unmodified by this branch (git diff HEAD is empty)"
+    },
+    {
+      "label": "t5-admin-products-375",
+      "text": "Warning: [antd: Spin] `tip` is deprecated. Please use `description` instead.",
+      "attribution": "pre-existing",
+      "note": "apps/admin/src/App.tsx:75 <Spin tip> — that file is unmodified by this branch (git diff HEAD is empty)"
+    },
+    {
+      "label": "t5-admin-products-1440",
+      "text": "Warning: [antd: Spin] `tip` is deprecated. Please use `description` instead.",
+      "attribution": "pre-existing",
+      "note": "apps/admin/src/App.tsx:75 <Spin tip> — that file is unmodified by this branch (git diff HEAD is empty)"
+    },
+    {
+      "label": "t5-admin-orders-320",
+      "text": "Warning: [antd: Spin] `tip` is deprecated. Please use `description` instead.",
+      "attribution": "pre-existing",
+      "note": "apps/admin/src/App.tsx:75 <Spin tip> — that file is unmodified by this branch (git diff HEAD is empty)"
+    },
+    {
+      "label": "t5-admin-orders-375",
+      "text": "Warning: [antd: Spin] `tip` is deprecated. Please use `description` instead.",
+      "attribution": "pre-existing",
+      "note": "apps/admin/src/App.tsx:75 <Spin tip> — that file is unmodified by this branch (git diff HEAD is empty)"
+    },
+    {
+      "label": "t5-admin-orders-1440",
+      "text": "Warning: [antd: Spin] `tip` is deprecated. Please use `description` instead.",
+      "attribution": "pre-existing",
+      "note": "apps/admin/src/App.tsx:75 <Spin tip> — that file is unmodified by this branch (git diff HEAD is empty)"
+    }
+  ],
+  "blindSpots": [
+    "未做逐像素比对、全量交互回归、无障碍深挖、多浏览器矩阵（维护者明确要求视觉验收暂缓）。",
+    "只测 Chrome 桌面版 headless=new；未测 iOS Safari、微信内置浏览器、Android WebView。",
+    "只测 320/375/1440 三档；未测横屏、平板、字体缩放、系统级大字号。",
+    "长页面的 CTA 可能落在首屏之外（见 belowFold），未滚动逐屏截图，因此「首屏可见性」只对列出的元素成立。",
+    "未验证颜色对比度、焦点环、屏幕阅读器输出。",
+    "数据依赖本地 dev 库（.data/local-life-dev.sqlite）中已存在的商品与订单；不同库内容会改变文案与高度。"
+  ],
+  "viewports": [
+    "320x720",
+    "375x812",
+    "1440x900"
+  ],
+  "pages": [
+    {
+      "name": "life",
+      "url": "http://localhost:5173/local-life/#/life",
+      "session": "resident",
+      "viewport": "320x720",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-life-320.png",
+      "href": "http://localhost:5173/local-life/#/life",
+      "title": "三创 · 本地生活",
+      "innerWidth": 320,
+      "innerHeight": 720,
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "bodyScrollWidth": 320,
+      "documentHeight": 1747,
+      "textLength": 771,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "惠生活",
+          "found": true,
+          "text": "惠生活",
+          "tag": "h1",
+          "width": 154,
+          "height": 33,
+          "top": 16,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 9
+        },
+        {
+          "label": "cta",
+          "expected": "我的订单",
+          "found": true,
+          "text": "我的订单",
+          "tag": "a",
+          "width": 44,
+          "height": 15,
+          "top": 917,
+          "rendered": true,
+          "inViewport": false,
+          "alternatives": 1
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\n惠生活\n\n社区本地商品 · 登记办理意向\n\n本地好物来自社区自己维护的上架商品，登记订单只提交办理意向（平台不收款、不代下单）。 优惠购保留为只读商城渠道，未配置时如实提示，不展示模拟商品。\n\n本地好物\n社区上架商品\n\n本地好物：社区上架的本地商品目录\n\n水果\n阳光社区时令水果箱 r2e2e\n邻社区商品，用于验证跨社区隔离\n¥45.00\n登记后由工作人员办理\n阳光社区\n蔬菜\n社区助农"
+    },
+    {
+      "name": "life",
+      "url": "http://localhost:5173/local-life/#/life",
+      "session": "resident",
+      "viewport": "375x812",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-life-375.png",
+      "href": "http://localhost:5173/local-life/#/life",
+      "title": "三创 · 本地生活",
+      "innerWidth": 375,
+      "innerHeight": 812,
+      "scrollWidth": 375,
+      "clientWidth": 375,
+      "bodyScrollWidth": 375,
+      "documentHeight": 1768,
+      "textLength": 771,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "惠生活",
+          "found": true,
+          "text": "惠生活",
+          "tag": "h1",
+          "width": 154,
+          "height": 33,
+          "top": 16,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 9
+        },
+        {
+          "label": "cta",
+          "expected": "我的订单",
+          "found": true,
+          "text": "我的订单",
+          "tag": "a",
+          "width": 44,
+          "height": 15,
+          "top": 938,
+          "rendered": true,
+          "inViewport": false,
+          "alternatives": 1
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\n惠生活\n\n社区本地商品 · 登记办理意向\n\n本地好物来自社区自己维护的上架商品，登记订单只提交办理意向（平台不收款、不代下单）。 优惠购保留为只读商城渠道，未配置时如实提示，不展示模拟商品。\n\n本地好物\n社区上架商品\n\n本地好物：社区上架的本地商品目录\n\n水果\n阳光社区时令水果箱 r2e2e\n邻社区商品，用于验证跨社区隔离\n¥45.00\n登记后由工作人员办理\n阳光社区\n蔬菜\n社区助农"
+    },
+    {
+      "name": "life",
+      "url": "http://localhost:5173/local-life/#/life",
+      "session": "resident",
+      "viewport": "1440x900",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-life-1440.png",
+      "href": "http://localhost:5173/local-life/#/life",
+      "title": "三创 · 本地生活",
+      "innerWidth": 1440,
+      "innerHeight": 900,
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "documentHeight": 1830,
+      "textLength": 771,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "惠生活",
+          "found": true,
+          "text": "惠生活",
+          "tag": "h1",
+          "width": 154,
+          "height": 33,
+          "top": 16,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 9
+        },
+        {
+          "label": "cta",
+          "expected": "我的订单",
+          "found": true,
+          "text": "我的订单",
+          "tag": "a",
+          "width": 44,
+          "height": 15,
+          "top": 1059,
+          "rendered": true,
+          "inViewport": false,
+          "alternatives": 1
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\n惠生活\n\n社区本地商品 · 登记办理意向\n\n本地好物来自社区自己维护的上架商品，登记订单只提交办理意向（平台不收款、不代下单）。 优惠购保留为只读商城渠道，未配置时如实提示，不展示模拟商品。\n\n本地好物\n社区上架商品\n\n本地好物：社区上架的本地商品目录\n\n水果\n阳光社区时令水果箱 r2e2e\n邻社区商品，用于验证跨社区隔离\n¥45.00\n登记后由工作人员办理\n阳光社区\n蔬菜\n社区助农"
+    },
+    {
+      "name": "life-product",
+      "url": "http://localhost:5173/local-life/#/life/local-products/3329057e-f199-4ca2-870e-6e101bd4b92d",
+      "session": "resident",
+      "viewport": "320x720",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-life-product-320.png",
+      "href": "http://localhost:5173/local-life/#/life/local-products/3329057e-f199-4ca2-870e-6e101bd4b92d",
+      "title": "三创 · 本地生活",
+      "innerWidth": 320,
+      "innerHeight": 720,
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "bodyScrollWidth": 320,
+      "documentHeight": 1225,
+      "textLength": 317,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "社区助农蔬菜包 r2e2e",
+          "found": true,
+          "text": "社区助农蔬菜包 r2e2e",
+          "tag": "h1",
+          "width": 215,
+          "height": 33,
+          "top": 60,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 9
+        },
+        {
+          "label": "cta",
+          "expected": "登记订单",
+          "found": true,
+          "text": "登记订单 / 提交办理意向",
+          "tag": "button",
+          "width": 254,
+          "height": 48,
+          "top": 1006,
+          "rendered": true,
+          "inViewport": false,
+          "alternatives": 1
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\n返回惠生活\n社区助农蔬菜包 r2e2e\n\n蔬菜 · 幸福社区\n\n蔬菜\n幸福社区\n登记办理意向\n\n社区助农蔬菜包 r2e2e\n\n当日采摘，社区服务点自提\n\n¥19.90\n/ 件 · 参考单价\n\n本页价格由社区维护，登记订单时由服务端冻结商品名称与单价快照。\n\n商品说明\n\n包含 5 种时令蔬菜，约 3 公斤。登记后由社区工作人员电话确认自提时间。\n\n登记订单 / 提交办理意向\n\n只登记办"
+    },
+    {
+      "name": "life-product",
+      "url": "http://localhost:5173/local-life/#/life/local-products/3329057e-f199-4ca2-870e-6e101bd4b92d",
+      "session": "resident",
+      "viewport": "375x812",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-life-product-375.png",
+      "href": "http://localhost:5173/local-life/#/life/local-products/3329057e-f199-4ca2-870e-6e101bd4b92d",
+      "title": "三创 · 本地生活",
+      "innerWidth": 375,
+      "innerHeight": 812,
+      "scrollWidth": 375,
+      "clientWidth": 375,
+      "bodyScrollWidth": 375,
+      "documentHeight": 1266,
+      "textLength": 317,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "社区助农蔬菜包 r2e2e",
+          "found": true,
+          "text": "社区助农蔬菜包 r2e2e",
+          "tag": "h1",
+          "width": 215,
+          "height": 33,
+          "top": 60,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 9
+        },
+        {
+          "label": "cta",
+          "expected": "登记订单",
+          "found": true,
+          "text": "登记订单 / 提交办理意向",
+          "tag": "button",
+          "width": 309,
+          "height": 48,
+          "top": 1047,
+          "rendered": true,
+          "inViewport": false,
+          "alternatives": 1
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\n返回惠生活\n社区助农蔬菜包 r2e2e\n\n蔬菜 · 幸福社区\n\n蔬菜\n幸福社区\n登记办理意向\n\n社区助农蔬菜包 r2e2e\n\n当日采摘，社区服务点自提\n\n¥19.90\n/ 件 · 参考单价\n\n本页价格由社区维护，登记订单时由服务端冻结商品名称与单价快照。\n\n商品说明\n\n包含 5 种时令蔬菜，约 3 公斤。登记后由社区工作人员电话确认自提时间。\n\n登记订单 / 提交办理意向\n\n只登记办"
+    },
+    {
+      "name": "life-product",
+      "url": "http://localhost:5173/local-life/#/life/local-products/3329057e-f199-4ca2-870e-6e101bd4b92d",
+      "session": "resident",
+      "viewport": "1440x900",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-life-product-1440.png",
+      "href": "http://localhost:5173/local-life/#/life/local-products/3329057e-f199-4ca2-870e-6e101bd4b92d",
+      "title": "三创 · 本地生活",
+      "innerWidth": 1440,
+      "innerHeight": 900,
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "documentHeight": 1461,
+      "textLength": 317,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "社区助农蔬菜包 r2e2e",
+          "found": true,
+          "text": "社区助农蔬菜包 r2e2e",
+          "tag": "h1",
+          "width": 215,
+          "height": 33,
+          "top": 60,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 9
+        },
+        {
+          "label": "cta",
+          "expected": "登记订单",
+          "found": true,
+          "text": "登记订单 / 提交办理意向",
+          "tag": "button",
+          "width": 654,
+          "height": 48,
+          "top": 1242,
+          "rendered": true,
+          "inViewport": false,
+          "alternatives": 1
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\n返回惠生活\n社区助农蔬菜包 r2e2e\n\n蔬菜 · 幸福社区\n\n蔬菜\n幸福社区\n登记办理意向\n\n社区助农蔬菜包 r2e2e\n\n当日采摘，社区服务点自提\n\n¥19.90\n/ 件 · 参考单价\n\n本页价格由社区维护，登记订单时由服务端冻结商品名称与单价快照。\n\n商品说明\n\n包含 5 种时令蔬菜，约 3 公斤。登记后由社区工作人员电话确认自提时间。\n\n登记订单 / 提交办理意向\n\n只登记办"
+    },
+    {
+      "name": "life-product-guest",
+      "url": "http://localhost:5173/local-life/#/life/local-products/3329057e-f199-4ca2-870e-6e101bd4b92d",
+      "session": "guest",
+      "viewport": "320x720",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-life-product-guest-320.png",
+      "href": "http://localhost:5173/local-life/#/life/local-products/3329057e-f199-4ca2-870e-6e101bd4b92d",
+      "title": "三创 · 本地生活",
+      "innerWidth": 320,
+      "innerHeight": 720,
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "bodyScrollWidth": 320,
+      "documentHeight": 1317,
+      "textLength": 360,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "社区助农蔬菜包 r2e2e",
+          "found": true,
+          "text": "社区助农蔬菜包 r2e2e",
+          "tag": "h1",
+          "width": 215,
+          "height": 33,
+          "top": 60,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 9
+        },
+        {
+          "label": "cta",
+          "expected": "去登录",
+          "found": true,
+          "text": "去登录 / 查看登录方式",
+          "tag": "a",
+          "width": 163,
+          "height": 44,
+          "top": 1089,
+          "rendered": true,
+          "inViewport": false,
+          "alternatives": 1
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\n返回惠生活\n社区助农蔬菜包 r2e2e\n\n蔬菜 · 幸福社区\n\n蔬菜\n幸福社区\n登记办理意向\n\n社区助农蔬菜包 r2e2e\n\n当日采摘，社区服务点自提\n\n¥19.90\n/ 件 · 参考单价\n\n本页价格由社区维护，登记订单时由服务端冻结商品名称与单价快照。\n\n商品说明\n\n包含 5 种时令蔬菜，约 3 公斤。登记后由社区工作人员电话确认自提时间。\n\n登记订单 / 提交办理意向\n\n只登记办"
+    },
+    {
+      "name": "life-product-guest",
+      "url": "http://localhost:5173/local-life/#/life/local-products/3329057e-f199-4ca2-870e-6e101bd4b92d",
+      "session": "guest",
+      "viewport": "375x812",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-life-product-guest-375.png",
+      "href": "http://localhost:5173/local-life/#/life/local-products/3329057e-f199-4ca2-870e-6e101bd4b92d",
+      "title": "三创 · 本地生活",
+      "innerWidth": 375,
+      "innerHeight": 812,
+      "scrollWidth": 375,
+      "clientWidth": 375,
+      "bodyScrollWidth": 375,
+      "documentHeight": 1358,
+      "textLength": 360,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "社区助农蔬菜包 r2e2e",
+          "found": true,
+          "text": "社区助农蔬菜包 r2e2e",
+          "tag": "h1",
+          "width": 215,
+          "height": 33,
+          "top": 60,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 9
+        },
+        {
+          "label": "cta",
+          "expected": "去登录",
+          "found": true,
+          "text": "去登录 / 查看登录方式",
+          "tag": "a",
+          "width": 163,
+          "height": 44,
+          "top": 1130,
+          "rendered": true,
+          "inViewport": false,
+          "alternatives": 1
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\n返回惠生活\n社区助农蔬菜包 r2e2e\n\n蔬菜 · 幸福社区\n\n蔬菜\n幸福社区\n登记办理意向\n\n社区助农蔬菜包 r2e2e\n\n当日采摘，社区服务点自提\n\n¥19.90\n/ 件 · 参考单价\n\n本页价格由社区维护，登记订单时由服务端冻结商品名称与单价快照。\n\n商品说明\n\n包含 5 种时令蔬菜，约 3 公斤。登记后由社区工作人员电话确认自提时间。\n\n登记订单 / 提交办理意向\n\n只登记办"
+    },
+    {
+      "name": "life-product-guest",
+      "url": "http://localhost:5173/local-life/#/life/local-products/3329057e-f199-4ca2-870e-6e101bd4b92d",
+      "session": "guest",
+      "viewport": "1440x900",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-life-product-guest-1440.png",
+      "href": "http://localhost:5173/local-life/#/life/local-products/3329057e-f199-4ca2-870e-6e101bd4b92d",
+      "title": "三创 · 本地生活",
+      "innerWidth": 1440,
+      "innerHeight": 900,
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "documentHeight": 1533,
+      "textLength": 360,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "社区助农蔬菜包 r2e2e",
+          "found": true,
+          "text": "社区助农蔬菜包 r2e2e",
+          "tag": "h1",
+          "width": 215,
+          "height": 33,
+          "top": 60,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 9
+        },
+        {
+          "label": "cta",
+          "expected": "去登录",
+          "found": true,
+          "text": "去登录 / 查看登录方式",
+          "tag": "a",
+          "width": 163,
+          "height": 44,
+          "top": 1305,
+          "rendered": true,
+          "inViewport": false,
+          "alternatives": 1
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\n返回惠生活\n社区助农蔬菜包 r2e2e\n\n蔬菜 · 幸福社区\n\n蔬菜\n幸福社区\n登记办理意向\n\n社区助农蔬菜包 r2e2e\n\n当日采摘，社区服务点自提\n\n¥19.90\n/ 件 · 参考单价\n\n本页价格由社区维护，登记订单时由服务端冻结商品名称与单价快照。\n\n商品说明\n\n包含 5 种时令蔬菜，约 3 公斤。登记后由社区工作人员电话确认自提时间。\n\n登记订单 / 提交办理意向\n\n只登记办"
+    },
+    {
+      "name": "my-orders",
+      "url": "http://localhost:5173/local-life/#/me/orders",
+      "session": "resident",
+      "viewport": "320x720",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-my-orders-320.png",
+      "href": "http://localhost:5173/local-life/#/me/orders",
+      "title": "三创 · 本地生活",
+      "innerWidth": 320,
+      "innerHeight": 720,
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "bodyScrollWidth": 320,
+      "documentHeight": 720,
+      "textLength": 283,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "我的订单",
+          "found": true,
+          "text": "我的订单",
+          "tag": "h1",
+          "width": 188,
+          "height": 33,
+          "top": 60,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 7
+        },
+        {
+          "label": "row",
+          "expected": "社区助农蔬菜包 r2e2e",
+          "found": true,
+          "text": "社区助农蔬菜包 r2e2e\n\n已登记\n\n幸福社区 · 登记 2026-11-06 16:24\n\n2 件 × ¥19.90合计 ¥39.80\n\n办理意向已登记，等待工作人员处理。本平台不收款。",
+          "tag": "a",
+          "width": 288,
+          "height": 134,
+          "top": 384,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 9
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\n返回我的\n我的订单\n\n本地商品 · 办理意向登记 · 处理进度\n\n本页只登记办理意向\n\n平台不收款、不代下单。「人工核验通过」是运营人员对订单事实的人工确认，不代表已收款或业务办理已完成。\n\n订单状态\n\n全部 1\n已登记\n处理中\n待人工核验\n人工核验通过\n已取消\n未通过\n\n共 1 条订单\n\n刷新\n\n社区助农蔬菜包 r2e2e\n\n已登记\n\n幸福社区 · 登记 2026-11-06 16"
+    },
+    {
+      "name": "my-orders",
+      "url": "http://localhost:5173/local-life/#/me/orders",
+      "session": "resident",
+      "viewport": "375x812",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-my-orders-375.png",
+      "href": "http://localhost:5173/local-life/#/me/orders",
+      "title": "三创 · 本地生活",
+      "innerWidth": 375,
+      "innerHeight": 812,
+      "scrollWidth": 375,
+      "clientWidth": 375,
+      "bodyScrollWidth": 375,
+      "documentHeight": 812,
+      "textLength": 283,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "我的订单",
+          "found": true,
+          "text": "我的订单",
+          "tag": "h1",
+          "width": 188,
+          "height": 33,
+          "top": 60,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 7
+        },
+        {
+          "label": "row",
+          "expected": "社区助农蔬菜包 r2e2e",
+          "found": true,
+          "text": "社区助农蔬菜包 r2e2e\n\n已登记\n\n幸福社区 · 登记 2026-11-06 16:24\n\n2 件 × ¥19.90合计 ¥39.80\n\n办理意向已登记，等待工作人员处理。本平台不收款。",
+          "tag": "a",
+          "width": 343,
+          "height": 118,
+          "top": 365,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 9
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\n返回我的\n我的订单\n\n本地商品 · 办理意向登记 · 处理进度\n\n本页只登记办理意向\n\n平台不收款、不代下单。「人工核验通过」是运营人员对订单事实的人工确认，不代表已收款或业务办理已完成。\n\n订单状态\n\n全部 1\n已登记\n处理中\n待人工核验\n人工核验通过\n已取消\n未通过\n\n共 1 条订单\n\n刷新\n\n社区助农蔬菜包 r2e2e\n\n已登记\n\n幸福社区 · 登记 2026-11-06 16"
+    },
+    {
+      "name": "my-orders",
+      "url": "http://localhost:5173/local-life/#/me/orders",
+      "session": "resident",
+      "viewport": "1440x900",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-my-orders-1440.png",
+      "href": "http://localhost:5173/local-life/#/me/orders",
+      "title": "三创 · 本地生活",
+      "innerWidth": 1440,
+      "innerHeight": 900,
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "documentHeight": 900,
+      "textLength": 283,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "我的订单",
+          "found": true,
+          "text": "我的订单",
+          "tag": "h1",
+          "width": 188,
+          "height": 33,
+          "top": 60,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 7
+        },
+        {
+          "label": "row",
+          "expected": "社区助农蔬菜包 r2e2e",
+          "found": true,
+          "text": "社区助农蔬菜包 r2e2e\n\n已登记\n\n幸福社区 · 登记 2026-11-06 16:24\n\n2 件 × ¥19.90合计 ¥39.80\n\n办理意向已登记，等待工作人员处理。本平台不收款。",
+          "tag": "a",
+          "width": 688,
+          "height": 118,
+          "top": 346,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 9
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\n返回我的\n我的订单\n\n本地商品 · 办理意向登记 · 处理进度\n\n本页只登记办理意向\n\n平台不收款、不代下单。「人工核验通过」是运营人员对订单事实的人工确认，不代表已收款或业务办理已完成。\n\n订单状态\n\n全部 1\n已登记\n处理中\n待人工核验\n人工核验通过\n已取消\n未通过\n\n共 1 条订单\n\n刷新\n\n社区助农蔬菜包 r2e2e\n\n已登记\n\n幸福社区 · 登记 2026-11-06 16"
+    },
+    {
+      "name": "my-order-detail",
+      "url": "http://localhost:5173/local-life/#/me/orders/f77344b3-8f2a-4493-9091-b6d18057b02d",
+      "session": "resident",
+      "viewport": "320x720",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-my-order-detail-320.png",
+      "href": "http://localhost:5173/local-life/#/me/orders/f77344b3-8f2a-4493-9091-b6d18057b02d",
+      "title": "三创 · 本地生活",
+      "innerWidth": 320,
+      "innerHeight": 720,
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "bodyScrollWidth": 320,
+      "documentHeight": 1056,
+      "textLength": 344,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "订单详情",
+          "found": true,
+          "text": "订单详情",
+          "tag": "h1",
+          "width": 130,
+          "height": 33,
+          "top": 60,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 7
+        },
+        {
+          "label": "cta",
+          "expected": "返回我的订单",
+          "found": true,
+          "text": "返回我的订单",
+          "tag": "a",
+          "width": 100,
+          "height": 44,
+          "top": 12,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 1
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\n返回我的订单\n订单详情\n\n本地商品登记 · 处理进度\n\n订单状态\n已登记\n\n办理意向已登记，等待工作人员处理。本平台不收款。\n\n订单编号 f77344b3…（完整编号仅用于工作人员核对）\n\n商品快照\n\n快照在登记时冻结，商品后续改价或下架都不会改写这笔订单。\n\n商品\n社区助农蔬菜包 r2e2e\n单价\n¥19.90\n数量\n2 件\n参考合计\n¥39.80\n社区\n幸福社区\n登记时间\n202"
+    },
+    {
+      "name": "my-order-detail",
+      "url": "http://localhost:5173/local-life/#/me/orders/f77344b3-8f2a-4493-9091-b6d18057b02d",
+      "session": "resident",
+      "viewport": "375x812",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-my-order-detail-375.png",
+      "href": "http://localhost:5173/local-life/#/me/orders/f77344b3-8f2a-4493-9091-b6d18057b02d",
+      "title": "三创 · 本地生活",
+      "innerWidth": 375,
+      "innerHeight": 812,
+      "scrollWidth": 375,
+      "clientWidth": 375,
+      "bodyScrollWidth": 375,
+      "documentHeight": 996,
+      "textLength": 344,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "订单详情",
+          "found": true,
+          "text": "订单详情",
+          "tag": "h1",
+          "width": 130,
+          "height": 33,
+          "top": 60,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 7
+        },
+        {
+          "label": "cta",
+          "expected": "返回我的订单",
+          "found": true,
+          "text": "返回我的订单",
+          "tag": "a",
+          "width": 100,
+          "height": 44,
+          "top": 12,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 1
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\n返回我的订单\n订单详情\n\n本地商品登记 · 处理进度\n\n订单状态\n已登记\n\n办理意向已登记，等待工作人员处理。本平台不收款。\n\n订单编号 f77344b3…（完整编号仅用于工作人员核对）\n\n商品快照\n\n快照在登记时冻结，商品后续改价或下架都不会改写这笔订单。\n\n商品\n社区助农蔬菜包 r2e2e\n单价\n¥19.90\n数量\n2 件\n参考合计\n¥39.80\n社区\n幸福社区\n登记时间\n202"
+    },
+    {
+      "name": "my-order-detail",
+      "url": "http://localhost:5173/local-life/#/me/orders/f77344b3-8f2a-4493-9091-b6d18057b02d",
+      "session": "resident",
+      "viewport": "1440x900",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-my-order-detail-1440.png",
+      "href": "http://localhost:5173/local-life/#/me/orders/f77344b3-8f2a-4493-9091-b6d18057b02d",
+      "title": "三创 · 本地生活",
+      "innerWidth": 1440,
+      "innerHeight": 900,
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "documentHeight": 996,
+      "textLength": 344,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "订单详情",
+          "found": true,
+          "text": "订单详情",
+          "tag": "h1",
+          "width": 130,
+          "height": 33,
+          "top": 60,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 7
+        },
+        {
+          "label": "cta",
+          "expected": "返回我的订单",
+          "found": true,
+          "text": "返回我的订单",
+          "tag": "a",
+          "width": 100,
+          "height": 44,
+          "top": 12,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 1
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\n返回我的订单\n订单详情\n\n本地商品登记 · 处理进度\n\n订单状态\n已登记\n\n办理意向已登记，等待工作人员处理。本平台不收款。\n\n订单编号 f77344b3…（完整编号仅用于工作人员核对）\n\n商品快照\n\n快照在登记时冻结，商品后续改价或下架都不会改写这笔订单。\n\n商品\n社区助农蔬菜包 r2e2e\n单价\n¥19.90\n数量\n2 件\n参考合计\n¥39.80\n社区\n幸福社区\n登记时间\n202"
+    },
+    {
+      "name": "me",
+      "url": "http://localhost:5173/local-life/#/me",
+      "session": "resident",
+      "viewport": "320x720",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-me-320.png",
+      "href": "http://localhost:5173/local-life/#/me",
+      "title": "三创 · 本地生活",
+      "innerWidth": 320,
+      "innerHeight": 720,
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "bodyScrollWidth": 320,
+      "documentHeight": 958,
+      "textLength": 424,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "我的订单",
+          "found": true,
+          "text": "我的订单\n本地商品登记记录 · 处理进度 · 运营人工核验结果",
+          "tag": "a",
+          "width": 288,
+          "height": 70,
+          "top": 531,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 9
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\nt5 冒烟居民 54248\n\n居民账户 · 已登录\n\n已登录\n平台居民 ID：11e8a2f3…\n退出登录\n\n手机号\n\n短信服务未启用，当前不可绑定。\n\n读取中\n当前活动报名\n暂无已发布活动\n读取中\n三人团\n可在活动页邀请街坊\n0\n我的奖励\n真实奖励条目\n\n以上状态读取自真实服务，展示当前活动的报名与三人团；其他活动的报名记录请在对应活动页查看。 活动暂无发布时不会显示示例报名或虚构"
+    },
+    {
+      "name": "me",
+      "url": "http://localhost:5173/local-life/#/me",
+      "session": "resident",
+      "viewport": "375x812",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-me-375.png",
+      "href": "http://localhost:5173/local-life/#/me",
+      "title": "三创 · 本地生活",
+      "innerWidth": 375,
+      "innerHeight": 812,
+      "scrollWidth": 375,
+      "clientWidth": 375,
+      "bodyScrollWidth": 375,
+      "documentHeight": 903,
+      "textLength": 424,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "我的订单",
+          "found": true,
+          "text": "我的订单\n本地商品登记记录 · 处理进度 · 运营人工核验结果",
+          "tag": "a",
+          "width": 343,
+          "height": 70,
+          "top": 496,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 9
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\nt5 冒烟居民 54248\n\n居民账户 · 已登录\n\n已登录\n平台居民 ID：11e8a2f3…\n退出登录\n\n手机号\n\n短信服务未启用，当前不可绑定。\n\n读取中\n当前活动报名\n暂无已发布活动\n读取中\n三人团\n可在活动页邀请街坊\n0\n我的奖励\n真实奖励条目\n\n以上状态读取自真实服务，展示当前活动的报名与三人团；其他活动的报名记录请在对应活动页查看。 活动暂无发布时不会显示示例报名或虚构"
+    },
+    {
+      "name": "me",
+      "url": "http://localhost:5173/local-life/#/me",
+      "session": "resident",
+      "viewport": "1440x900",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-me-1440.png",
+      "href": "http://localhost:5173/local-life/#/me",
+      "title": "三创 · 本地生活",
+      "innerWidth": 1440,
+      "innerHeight": 900,
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "documentHeight": 900,
+      "textLength": 424,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "我的订单",
+          "found": true,
+          "text": "我的订单\n本地商品登记记录 · 处理进度 · 运营人工核验结果",
+          "tag": "a",
+          "width": 688,
+          "height": 70,
+          "top": 480,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 9
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\nt5 冒烟居民 54248\n\n居民账户 · 已登录\n\n已登录\n平台居民 ID：11e8a2f3…\n退出登录\n\n手机号\n\n短信服务未启用，当前不可绑定。\n\n读取中\n当前活动报名\n暂无已发布活动\n读取中\n三人团\n可在活动页邀请街坊\n0\n我的奖励\n真实奖励条目\n\n以上状态读取自真实服务，展示当前活动的报名与三人团；其他活动的报名记录请在对应活动页查看。 活动暂无发布时不会显示示例报名或虚构"
+    },
+    {
+      "name": "workbench-local-orders",
+      "url": "http://localhost:5173/local-life/#/workbench/local-orders",
+      "session": "grid_worker",
+      "viewport": "320x720",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-workbench-local-orders-320.png",
+      "href": "http://localhost:5173/local-life/#/workbench/local-orders",
+      "title": "三创 · 本地生活",
+      "innerWidth": 320,
+      "innerHeight": 720,
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "bodyScrollWidth": 320,
+      "documentHeight": 2995,
+      "textLength": 1871,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "社区订单",
+          "found": true,
+          "text": "社区订单",
+          "tag": "h1",
+          "width": 78,
+          "height": 30,
+          "top": 121,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 7
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\n\nR2 网格员\n\n网格员 · r2grid\n\n授权社区：幸福社区\n\n退出\n社区订单\n\n共 15 条\n\n刷新\n\n只显示服务端授权社区内的居民登记订单。人工核验通过由运营后台完成，工作台不能把订单改成「人工核验通过」。\n\n订单状态\n\n全部\n已登记\n处理中\n待人工核验\n人工核验通过\n已取消\n未通过\n\n社区助农蔬菜包 r2e2e\n\n已登记\n\n幸福社区 · t5 冒烟居民 54248 · 登记"
+    },
+    {
+      "name": "workbench-local-orders",
+      "url": "http://localhost:5173/local-life/#/workbench/local-orders",
+      "session": "grid_worker",
+      "viewport": "375x812",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-workbench-local-orders-375.png",
+      "href": "http://localhost:5173/local-life/#/workbench/local-orders",
+      "title": "三创 · 本地生活",
+      "innerWidth": 375,
+      "innerHeight": 812,
+      "scrollWidth": 375,
+      "clientWidth": 375,
+      "bodyScrollWidth": 375,
+      "documentHeight": 2909,
+      "textLength": 1871,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "社区订单",
+          "found": true,
+          "text": "社区订单",
+          "tag": "h1",
+          "width": 78,
+          "height": 30,
+          "top": 121,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 7
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\n\nR2 网格员\n\n网格员 · r2grid\n\n授权社区：幸福社区\n\n退出\n社区订单\n\n共 15 条\n\n刷新\n\n只显示服务端授权社区内的居民登记订单。人工核验通过由运营后台完成，工作台不能把订单改成「人工核验通过」。\n\n订单状态\n\n全部\n已登记\n处理中\n待人工核验\n人工核验通过\n已取消\n未通过\n\n社区助农蔬菜包 r2e2e\n\n已登记\n\n幸福社区 · t5 冒烟居民 54248 · 登记"
+    },
+    {
+      "name": "workbench-local-orders",
+      "url": "http://localhost:5173/local-life/#/workbench/local-orders",
+      "session": "grid_worker",
+      "viewport": "1440x900",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-workbench-local-orders-1440.png",
+      "href": "http://localhost:5173/local-life/#/workbench/local-orders",
+      "title": "三创 · 本地生活",
+      "innerWidth": 1440,
+      "innerHeight": 900,
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "documentHeight": 2482,
+      "textLength": 1871,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "社区订单",
+          "found": true,
+          "text": "社区订单",
+          "tag": "h1",
+          "width": 78,
+          "height": 30,
+          "top": 121,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 7
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\n\nR2 网格员\n\n网格员 · r2grid\n\n授权社区：幸福社区\n\n退出\n社区订单\n\n共 15 条\n\n刷新\n\n只显示服务端授权社区内的居民登记订单。人工核验通过由运营后台完成，工作台不能把订单改成「人工核验通过」。\n\n订单状态\n\n全部\n已登记\n处理中\n待人工核验\n人工核验通过\n已取消\n未通过\n\n社区助农蔬菜包 r2e2e\n\n已登记\n\n幸福社区 · t5 冒烟居民 54248 · 登记"
+    },
+    {
+      "name": "workbench-local-order-detail",
+      "url": "http://localhost:5173/local-life/#/workbench/local-orders/f77344b3-8f2a-4493-9091-b6d18057b02d",
+      "session": "grid_worker",
+      "viewport": "320x720",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-workbench-local-order-detail-320.png",
+      "href": "http://localhost:5173/local-life/#/workbench/local-orders/f77344b3-8f2a-4493-9091-b6d18057b02d",
+      "title": "三创 · 本地生活",
+      "innerWidth": 320,
+      "innerHeight": 720,
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "bodyScrollWidth": 320,
+      "documentHeight": 1246,
+      "textLength": 443,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "社区助农蔬菜包 r2e2e",
+          "found": true,
+          "text": "社区助农蔬菜包 r2e2e",
+          "tag": "h1",
+          "width": 196,
+          "height": 30,
+          "top": 50,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 8
+        },
+        {
+          "label": "cta",
+          "expected": "取消订单",
+          "found": true,
+          "text": "取消订单",
+          "tag": "button",
+          "width": 80,
+          "height": 44,
+          "top": 861,
+          "rendered": true,
+          "inViewport": false,
+          "alternatives": 1
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\n\n本地商品订单\n\n社区助农蔬菜包 r2e2e\n\n幸福社区 · 订单 f77344b3…\n\n已登记\n\n办理意向已登记，等待工作人员处理。本平台不收款。\n\n本平台只登记办理意向，不收款、不开通业务。「人工核验通过」只能由运营人员在后台完成，工作台不可直接设置。\n\n登记居民\nt5 冒烟居民 54248\n登记方式\n居民自助登记\n登记时间\n2026-11-06 16:24\n最后更新\n2026-"
+    },
+    {
+      "name": "workbench-local-order-detail",
+      "url": "http://localhost:5173/local-life/#/workbench/local-orders/f77344b3-8f2a-4493-9091-b6d18057b02d",
+      "session": "grid_worker",
+      "viewport": "375x812",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-workbench-local-order-detail-375.png",
+      "href": "http://localhost:5173/local-life/#/workbench/local-orders/f77344b3-8f2a-4493-9091-b6d18057b02d",
+      "title": "三创 · 本地生活",
+      "innerWidth": 375,
+      "innerHeight": 812,
+      "scrollWidth": 375,
+      "clientWidth": 375,
+      "bodyScrollWidth": 375,
+      "documentHeight": 1226,
+      "textLength": 443,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "社区助农蔬菜包 r2e2e",
+          "found": true,
+          "text": "社区助农蔬菜包 r2e2e",
+          "tag": "h1",
+          "width": 196,
+          "height": 30,
+          "top": 50,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 8
+        },
+        {
+          "label": "cta",
+          "expected": "取消订单",
+          "found": true,
+          "text": "取消订单",
+          "tag": "button",
+          "width": 98,
+          "height": 44,
+          "top": 841,
+          "rendered": true,
+          "inViewport": false,
+          "alternatives": 1
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\n\n本地商品订单\n\n社区助农蔬菜包 r2e2e\n\n幸福社区 · 订单 f77344b3…\n\n已登记\n\n办理意向已登记，等待工作人员处理。本平台不收款。\n\n本平台只登记办理意向，不收款、不开通业务。「人工核验通过」只能由运营人员在后台完成，工作台不可直接设置。\n\n登记居民\nt5 冒烟居民 54248\n登记方式\n居民自助登记\n登记时间\n2026-11-06 16:24\n最后更新\n2026-"
+    },
+    {
+      "name": "workbench-local-order-detail",
+      "url": "http://localhost:5173/local-life/#/workbench/local-orders/f77344b3-8f2a-4493-9091-b6d18057b02d",
+      "session": "grid_worker",
+      "viewport": "1440x900",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-workbench-local-order-detail-1440.png",
+      "href": "http://localhost:5173/local-life/#/workbench/local-orders/f77344b3-8f2a-4493-9091-b6d18057b02d",
+      "title": "三创 · 本地生活",
+      "innerWidth": 1440,
+      "innerHeight": 900,
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "documentHeight": 1146,
+      "textLength": 443,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "社区助农蔬菜包 r2e2e",
+          "found": true,
+          "text": "社区助农蔬菜包 r2e2e",
+          "tag": "h1",
+          "width": 196,
+          "height": 30,
+          "top": 50,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 8
+        },
+        {
+          "label": "cta",
+          "expected": "取消订单",
+          "found": true,
+          "text": "取消订单",
+          "tag": "button",
+          "width": 213,
+          "height": 44,
+          "top": 761,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 1
+        }
+      ],
+      "forbidden": [],
+      "firstText": "跳到主要内容\n\n本地商品订单\n\n社区助农蔬菜包 r2e2e\n\n幸福社区 · 订单 f77344b3…\n\n已登记\n\n办理意向已登记，等待工作人员处理。本平台不收款。\n\n本平台只登记办理意向，不收款、不开通业务。「人工核验通过」只能由运营人员在后台完成，工作台不可直接设置。\n\n登记居民\nt5 冒烟居民 54248\n登记方式\n居民自助登记\n登记时间\n2026-11-06 16:24\n最后更新\n2026-"
+    },
+    {
+      "name": "admin-products",
+      "url": "http://localhost:5174/products",
+      "session": "operator",
+      "viewport": "320x720",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-admin-products-320.png",
+      "href": "http://localhost:5174/products",
+      "title": "三创 · 本地生活管理台",
+      "innerWidth": 320,
+      "innerHeight": 720,
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "bodyScrollWidth": 320,
+      "documentHeight": 720,
+      "textLength": 758,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "商品管理",
+          "found": true,
+          "text": "商品管理",
+          "tag": "h2",
+          "width": 72,
+          "height": 25,
+          "top": 104,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 16
+        },
+        {
+          "label": "cta",
+          "expected": "新建商品",
+          "found": true,
+          "text": "新建商品",
+          "tag": "button",
+          "width": 110,
+          "height": 32,
+          "top": 208,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 1
+        }
+      ],
+      "forbidden": [],
+      "firstText": "商品与订单\n/\n商品管理\nR2 运营员\n运营员\n退出登录\n经营工作台\n商品管理\n商品管理\n真实数据\n维护本社区本地商品：创建、编辑、上架与下架。居民 H5「惠生活」读取同一份上架目录，价格以整数分保存并在居民登记订单时冻结快照。\n新建商品\n运营员视图\n仅能查看与操作管理员分配的社区（幸福社区）；服务端同样会校验社区范围。\n关键词\n社区\n幸福社区\n状态\n查询\n重置\n刷 新\n表格\n卡片\n商品名称\t社区"
+    },
+    {
+      "name": "admin-products",
+      "url": "http://localhost:5174/products",
+      "session": "operator",
+      "viewport": "375x812",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-admin-products-375.png",
+      "href": "http://localhost:5174/products",
+      "title": "三创 · 本地生活管理台",
+      "innerWidth": 375,
+      "innerHeight": 812,
+      "scrollWidth": 375,
+      "clientWidth": 375,
+      "bodyScrollWidth": 375,
+      "documentHeight": 812,
+      "textLength": 758,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "商品管理",
+          "found": true,
+          "text": "商品管理",
+          "tag": "h2",
+          "width": 72,
+          "height": 25,
+          "top": 104,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 16
+        },
+        {
+          "label": "cta",
+          "expected": "新建商品",
+          "found": true,
+          "text": "新建商品",
+          "tag": "button",
+          "width": 110,
+          "height": 32,
+          "top": 208,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 1
+        }
+      ],
+      "forbidden": [],
+      "firstText": "商品与订单\n/\n商品管理\nR2 运营员\n运营员\n退出登录\n经营工作台\n商品管理\n商品管理\n真实数据\n维护本社区本地商品：创建、编辑、上架与下架。居民 H5「惠生活」读取同一份上架目录，价格以整数分保存并在居民登记订单时冻结快照。\n新建商品\n运营员视图\n仅能查看与操作管理员分配的社区（幸福社区）；服务端同样会校验社区范围。\n关键词\n社区\n幸福社区\n状态\n查询\n重置\n刷 新\n表格\n卡片\n商品名称\t社区"
+    },
+    {
+      "name": "admin-products",
+      "url": "http://localhost:5174/products",
+      "session": "operator",
+      "viewport": "1440x900",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-admin-products-1440.png",
+      "href": "http://localhost:5174/products",
+      "title": "三创 · 本地生活管理台",
+      "innerWidth": 1440,
+      "innerHeight": 900,
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "documentHeight": 900,
+      "textLength": 871,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "商品管理",
+          "found": true,
+          "text": "商品管理",
+          "tag": "h2",
+          "width": 72,
+          "height": 25,
+          "top": 104,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 19
+        },
+        {
+          "label": "cta",
+          "expected": "新建商品",
+          "found": true,
+          "text": "新建商品",
+          "tag": "button",
+          "width": 110,
+          "height": 32,
+          "top": 104,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 1
+        }
+      ],
+      "forbidden": [],
+      "firstText": "生\n本地生活\n管理台\n经营工作台\n活动运营\n活动管理\n报名与核销\n客户与网格\n客户与业务单\n账户与社区\n商品与订单\n商品管理\n订单管理\n业绩与对账\n业绩看板\n对账结算\n系统管理\n管理员与权限\n系统信息\n界面组件\n商品与订单\n/\n商品管理\nR2 运营员\n运营员\n退出登录\n经营工作台\n商品管理\n商品管理\n真实数据\n维护本社区本地商品：创建、编辑、上架与下架。居民 H5「惠生活」读取同一份上架目录，价格"
+    },
+    {
+      "name": "admin-orders",
+      "url": "http://localhost:5174/orders",
+      "session": "operator",
+      "viewport": "320x720",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-admin-orders-320.png",
+      "href": "http://localhost:5174/orders",
+      "title": "三创 · 本地生活管理台",
+      "innerWidth": 320,
+      "innerHeight": 720,
+      "scrollWidth": 320,
+      "clientWidth": 320,
+      "bodyScrollWidth": 320,
+      "documentHeight": 720,
+      "textLength": 1884,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "订单管理",
+          "found": true,
+          "text": "订单管理",
+          "tag": "h2",
+          "width": 72,
+          "height": 25,
+          "top": 104,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 16
+        }
+      ],
+      "forbidden": [],
+      "firstText": "商品与订单\n/\n订单管理\nR2 运营员\n运营员\n退出登录\n经营工作台\n订单管理\n订单管理\n真实数据\n查询居民登记的本地商品订单、处理状态并做运营人工核验。价格与商品名称以登记时冻结的快照为准；「人工核验通过」只是运营员对订单事实的人工确认，不代表收款或业务办理已完成。\n运营员视图\n仅能查看与处理管理员分配的社区（幸福社区）订单；服务端同样会校验社区范围。\n关键词\n社区\n幸福社区\n状态\n全部状态\n查"
+    },
+    {
+      "name": "admin-orders",
+      "url": "http://localhost:5174/orders",
+      "session": "operator",
+      "viewport": "375x812",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-admin-orders-375.png",
+      "href": "http://localhost:5174/orders",
+      "title": "三创 · 本地生活管理台",
+      "innerWidth": 375,
+      "innerHeight": 812,
+      "scrollWidth": 375,
+      "clientWidth": 375,
+      "bodyScrollWidth": 375,
+      "documentHeight": 812,
+      "textLength": 1884,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "订单管理",
+          "found": true,
+          "text": "订单管理",
+          "tag": "h2",
+          "width": 72,
+          "height": 25,
+          "top": 104,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 16
+        }
+      ],
+      "forbidden": [],
+      "firstText": "商品与订单\n/\n订单管理\nR2 运营员\n运营员\n退出登录\n经营工作台\n订单管理\n订单管理\n真实数据\n查询居民登记的本地商品订单、处理状态并做运营人工核验。价格与商品名称以登记时冻结的快照为准；「人工核验通过」只是运营员对订单事实的人工确认，不代表收款或业务办理已完成。\n运营员视图\n仅能查看与处理管理员分配的社区（幸福社区）订单；服务端同样会校验社区范围。\n关键词\n社区\n幸福社区\n状态\n全部状态\n查"
+    },
+    {
+      "name": "admin-orders",
+      "url": "http://localhost:5174/orders",
+      "session": "operator",
+      "viewport": "1440x900",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-admin-orders-1440.png",
+      "href": "http://localhost:5174/orders",
+      "title": "三创 · 本地生活管理台",
+      "innerWidth": 1440,
+      "innerHeight": 900,
+      "scrollWidth": 1440,
+      "clientWidth": 1440,
+      "bodyScrollWidth": 1440,
+      "documentHeight": 900,
+      "textLength": 1997,
+      "expectations": [
+        {
+          "label": "heading",
+          "expected": "订单管理",
+          "found": true,
+          "text": "订单管理",
+          "tag": "h2",
+          "width": 72,
+          "height": 25,
+          "top": 104,
+          "rendered": true,
+          "inViewport": true,
+          "alternatives": 19
+        }
+      ],
+      "forbidden": [],
+      "firstText": "生\n本地生活\n管理台\n经营工作台\n活动运营\n活动管理\n报名与核销\n客户与网格\n客户与业务单\n账户与社区\n商品与订单\n商品管理\n订单管理\n业绩与对账\n业绩看板\n对账结算\n系统管理\n管理员与权限\n系统信息\n界面组件\n商品与订单\n/\n订单管理\nR2 运营员\n运营员\n退出登录\n经营工作台\n订单管理\n订单管理\n真实数据\n查询居民登记的本地商品订单、处理状态并做运营人工核验。价格与商品名称以登记时冻结的快照为"
+    }
+  ],
+  "checks": [
+    {
+      "name": "t5-life-320 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=320 innerWidth=320"
+    },
+    {
+      "name": "t5-life-320 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=320"
+    },
+    {
+      "name": "t5-life-320 heading \"惠生活\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"惠生活\",\"found\":true,\"text\":\"惠生活\",\"tag\":\"h1\",\"width\":154,\"height\":33,\"top\":16,\"rendered\":true,\"inViewport\":true,\"alternatives\":9}"
+    },
+    {
+      "name": "t5-life-320 cta \"我的订单\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"cta\",\"expected\":\"我的订单\",\"found\":true,\"text\":\"我的订单\",\"tag\":\"a\",\"width\":44,\"height\":15,\"top\":917,\"rendered\":true,\"inViewport\":false,\"alternatives\":1}"
+    },
+    {
+      "name": "t5-life-320 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-life-320 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-life-320 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-life-320 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-life-375 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=375 innerWidth=375"
+    },
+    {
+      "name": "t5-life-375 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=375"
+    },
+    {
+      "name": "t5-life-375 heading \"惠生活\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"惠生活\",\"found\":true,\"text\":\"惠生活\",\"tag\":\"h1\",\"width\":154,\"height\":33,\"top\":16,\"rendered\":true,\"inViewport\":true,\"alternatives\":9}"
+    },
+    {
+      "name": "t5-life-375 cta \"我的订单\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"cta\",\"expected\":\"我的订单\",\"found\":true,\"text\":\"我的订单\",\"tag\":\"a\",\"width\":44,\"height\":15,\"top\":938,\"rendered\":true,\"inViewport\":false,\"alternatives\":1}"
+    },
+    {
+      "name": "t5-life-375 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-life-375 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-life-375 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-life-375 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-life-1440 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=1440 innerWidth=1440"
+    },
+    {
+      "name": "t5-life-1440 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=1440"
+    },
+    {
+      "name": "t5-life-1440 heading \"惠生活\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"惠生活\",\"found\":true,\"text\":\"惠生活\",\"tag\":\"h1\",\"width\":154,\"height\":33,\"top\":16,\"rendered\":true,\"inViewport\":true,\"alternatives\":9}"
+    },
+    {
+      "name": "t5-life-1440 cta \"我的订单\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"cta\",\"expected\":\"我的订单\",\"found\":true,\"text\":\"我的订单\",\"tag\":\"a\",\"width\":44,\"height\":15,\"top\":1059,\"rendered\":true,\"inViewport\":false,\"alternatives\":1}"
+    },
+    {
+      "name": "t5-life-1440 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-life-1440 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-life-1440 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-life-1440 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-life-product-320 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=320 innerWidth=320"
+    },
+    {
+      "name": "t5-life-product-320 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=320"
+    },
+    {
+      "name": "t5-life-product-320 heading \"社区助农蔬菜包 r2e2e\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"社区助农蔬菜包 r2e2e\",\"found\":true,\"text\":\"社区助农蔬菜包 r2e2e\",\"tag\":\"h1\",\"width\":215,\"height\":33,\"top\":60,\"rendered\":true,\"inViewport\":true,\"alternatives\":9}"
+    },
+    {
+      "name": "t5-life-product-320 cta \"登记订单\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"cta\",\"expected\":\"登记订单\",\"found\":true,\"text\":\"登记订单 / 提交办理意向\",\"tag\":\"button\",\"width\":254,\"height\":48,\"top\":1006,\"rendered\":true,\"inViewport\":false,\"alternatives\":1}"
+    },
+    {
+      "name": "t5-life-product-320 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-life-product-320 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-life-product-320 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-life-product-320 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-life-product-375 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=375 innerWidth=375"
+    },
+    {
+      "name": "t5-life-product-375 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=375"
+    },
+    {
+      "name": "t5-life-product-375 heading \"社区助农蔬菜包 r2e2e\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"社区助农蔬菜包 r2e2e\",\"found\":true,\"text\":\"社区助农蔬菜包 r2e2e\",\"tag\":\"h1\",\"width\":215,\"height\":33,\"top\":60,\"rendered\":true,\"inViewport\":true,\"alternatives\":9}"
+    },
+    {
+      "name": "t5-life-product-375 cta \"登记订单\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"cta\",\"expected\":\"登记订单\",\"found\":true,\"text\":\"登记订单 / 提交办理意向\",\"tag\":\"button\",\"width\":309,\"height\":48,\"top\":1047,\"rendered\":true,\"inViewport\":false,\"alternatives\":1}"
+    },
+    {
+      "name": "t5-life-product-375 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-life-product-375 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-life-product-375 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-life-product-375 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-life-product-1440 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=1440 innerWidth=1440"
+    },
+    {
+      "name": "t5-life-product-1440 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=1440"
+    },
+    {
+      "name": "t5-life-product-1440 heading \"社区助农蔬菜包 r2e2e\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"社区助农蔬菜包 r2e2e\",\"found\":true,\"text\":\"社区助农蔬菜包 r2e2e\",\"tag\":\"h1\",\"width\":215,\"height\":33,\"top\":60,\"rendered\":true,\"inViewport\":true,\"alternatives\":9}"
+    },
+    {
+      "name": "t5-life-product-1440 cta \"登记订单\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"cta\",\"expected\":\"登记订单\",\"found\":true,\"text\":\"登记订单 / 提交办理意向\",\"tag\":\"button\",\"width\":654,\"height\":48,\"top\":1242,\"rendered\":true,\"inViewport\":false,\"alternatives\":1}"
+    },
+    {
+      "name": "t5-life-product-1440 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-life-product-1440 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-life-product-1440 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-life-product-1440 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-life-product-guest-320 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=320 innerWidth=320"
+    },
+    {
+      "name": "t5-life-product-guest-320 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=320"
+    },
+    {
+      "name": "t5-life-product-guest-320 heading \"社区助农蔬菜包 r2e2e\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"社区助农蔬菜包 r2e2e\",\"found\":true,\"text\":\"社区助农蔬菜包 r2e2e\",\"tag\":\"h1\",\"width\":215,\"height\":33,\"top\":60,\"rendered\":true,\"inViewport\":true,\"alternatives\":9}"
+    },
+    {
+      "name": "t5-life-product-guest-320 cta \"去登录\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"cta\",\"expected\":\"去登录\",\"found\":true,\"text\":\"去登录 / 查看登录方式\",\"tag\":\"a\",\"width\":163,\"height\":44,\"top\":1089,\"rendered\":true,\"inViewport\":false,\"alternatives\":1}"
+    },
+    {
+      "name": "t5-life-product-guest-320 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-life-product-guest-320 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-life-product-guest-320 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-life-product-guest-320 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-life-product-guest-375 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=375 innerWidth=375"
+    },
+    {
+      "name": "t5-life-product-guest-375 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=375"
+    },
+    {
+      "name": "t5-life-product-guest-375 heading \"社区助农蔬菜包 r2e2e\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"社区助农蔬菜包 r2e2e\",\"found\":true,\"text\":\"社区助农蔬菜包 r2e2e\",\"tag\":\"h1\",\"width\":215,\"height\":33,\"top\":60,\"rendered\":true,\"inViewport\":true,\"alternatives\":9}"
+    },
+    {
+      "name": "t5-life-product-guest-375 cta \"去登录\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"cta\",\"expected\":\"去登录\",\"found\":true,\"text\":\"去登录 / 查看登录方式\",\"tag\":\"a\",\"width\":163,\"height\":44,\"top\":1130,\"rendered\":true,\"inViewport\":false,\"alternatives\":1}"
+    },
+    {
+      "name": "t5-life-product-guest-375 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-life-product-guest-375 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-life-product-guest-375 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-life-product-guest-375 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-life-product-guest-1440 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=1440 innerWidth=1440"
+    },
+    {
+      "name": "t5-life-product-guest-1440 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=1440"
+    },
+    {
+      "name": "t5-life-product-guest-1440 heading \"社区助农蔬菜包 r2e2e\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"社区助农蔬菜包 r2e2e\",\"found\":true,\"text\":\"社区助农蔬菜包 r2e2e\",\"tag\":\"h1\",\"width\":215,\"height\":33,\"top\":60,\"rendered\":true,\"inViewport\":true,\"alternatives\":9}"
+    },
+    {
+      "name": "t5-life-product-guest-1440 cta \"去登录\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"cta\",\"expected\":\"去登录\",\"found\":true,\"text\":\"去登录 / 查看登录方式\",\"tag\":\"a\",\"width\":163,\"height\":44,\"top\":1305,\"rendered\":true,\"inViewport\":false,\"alternatives\":1}"
+    },
+    {
+      "name": "t5-life-product-guest-1440 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-life-product-guest-1440 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-life-product-guest-1440 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-life-product-guest-1440 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-my-orders-320 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=320 innerWidth=320"
+    },
+    {
+      "name": "t5-my-orders-320 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=320"
+    },
+    {
+      "name": "t5-my-orders-320 heading \"我的订单\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"我的订单\",\"found\":true,\"text\":\"我的订单\",\"tag\":\"h1\",\"width\":188,\"height\":33,\"top\":60,\"rendered\":true,\"inViewport\":true,\"alternatives\":7}"
+    },
+    {
+      "name": "t5-my-orders-320 row \"社区助农蔬菜包 r2e2e\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"row\",\"expected\":\"社区助农蔬菜包 r2e2e\",\"found\":true,\"text\":\"社区助农蔬菜包 r2e2e\\n\\n已登记\\n\\n幸福社区 · 登记 2026-11-06 16:24\\n\\n2 件 × ¥19.90合计 ¥39.80\\n\\n办理意向已登记，等待工作人员处理。本平台不收款。\",\"tag\":\"a\",\"width\":288,\"height\":134,\"top\":384,\"rendered\":true,\"inViewport\":true,\"alternatives\":9}"
+    },
+    {
+      "name": "t5-my-orders-320 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-my-orders-320 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-my-orders-320 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-my-orders-320 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-my-orders-375 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=375 innerWidth=375"
+    },
+    {
+      "name": "t5-my-orders-375 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=375"
+    },
+    {
+      "name": "t5-my-orders-375 heading \"我的订单\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"我的订单\",\"found\":true,\"text\":\"我的订单\",\"tag\":\"h1\",\"width\":188,\"height\":33,\"top\":60,\"rendered\":true,\"inViewport\":true,\"alternatives\":7}"
+    },
+    {
+      "name": "t5-my-orders-375 row \"社区助农蔬菜包 r2e2e\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"row\",\"expected\":\"社区助农蔬菜包 r2e2e\",\"found\":true,\"text\":\"社区助农蔬菜包 r2e2e\\n\\n已登记\\n\\n幸福社区 · 登记 2026-11-06 16:24\\n\\n2 件 × ¥19.90合计 ¥39.80\\n\\n办理意向已登记，等待工作人员处理。本平台不收款。\",\"tag\":\"a\",\"width\":343,\"height\":118,\"top\":365,\"rendered\":true,\"inViewport\":true,\"alternatives\":9}"
+    },
+    {
+      "name": "t5-my-orders-375 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-my-orders-375 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-my-orders-375 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-my-orders-375 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-my-orders-1440 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=1440 innerWidth=1440"
+    },
+    {
+      "name": "t5-my-orders-1440 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=1440"
+    },
+    {
+      "name": "t5-my-orders-1440 heading \"我的订单\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"我的订单\",\"found\":true,\"text\":\"我的订单\",\"tag\":\"h1\",\"width\":188,\"height\":33,\"top\":60,\"rendered\":true,\"inViewport\":true,\"alternatives\":7}"
+    },
+    {
+      "name": "t5-my-orders-1440 row \"社区助农蔬菜包 r2e2e\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"row\",\"expected\":\"社区助农蔬菜包 r2e2e\",\"found\":true,\"text\":\"社区助农蔬菜包 r2e2e\\n\\n已登记\\n\\n幸福社区 · 登记 2026-11-06 16:24\\n\\n2 件 × ¥19.90合计 ¥39.80\\n\\n办理意向已登记，等待工作人员处理。本平台不收款。\",\"tag\":\"a\",\"width\":688,\"height\":118,\"top\":346,\"rendered\":true,\"inViewport\":true,\"alternatives\":9}"
+    },
+    {
+      "name": "t5-my-orders-1440 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-my-orders-1440 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-my-orders-1440 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-my-orders-1440 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-my-order-detail-320 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=320 innerWidth=320"
+    },
+    {
+      "name": "t5-my-order-detail-320 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=320"
+    },
+    {
+      "name": "t5-my-order-detail-320 heading \"订单详情\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"订单详情\",\"found\":true,\"text\":\"订单详情\",\"tag\":\"h1\",\"width\":130,\"height\":33,\"top\":60,\"rendered\":true,\"inViewport\":true,\"alternatives\":7}"
+    },
+    {
+      "name": "t5-my-order-detail-320 cta \"返回我的订单\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"cta\",\"expected\":\"返回我的订单\",\"found\":true,\"text\":\"返回我的订单\",\"tag\":\"a\",\"width\":100,\"height\":44,\"top\":12,\"rendered\":true,\"inViewport\":true,\"alternatives\":1}"
+    },
+    {
+      "name": "t5-my-order-detail-320 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-my-order-detail-320 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-my-order-detail-320 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-my-order-detail-320 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-my-order-detail-375 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=375 innerWidth=375"
+    },
+    {
+      "name": "t5-my-order-detail-375 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=375"
+    },
+    {
+      "name": "t5-my-order-detail-375 heading \"订单详情\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"订单详情\",\"found\":true,\"text\":\"订单详情\",\"tag\":\"h1\",\"width\":130,\"height\":33,\"top\":60,\"rendered\":true,\"inViewport\":true,\"alternatives\":7}"
+    },
+    {
+      "name": "t5-my-order-detail-375 cta \"返回我的订单\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"cta\",\"expected\":\"返回我的订单\",\"found\":true,\"text\":\"返回我的订单\",\"tag\":\"a\",\"width\":100,\"height\":44,\"top\":12,\"rendered\":true,\"inViewport\":true,\"alternatives\":1}"
+    },
+    {
+      "name": "t5-my-order-detail-375 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-my-order-detail-375 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-my-order-detail-375 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-my-order-detail-375 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-my-order-detail-1440 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=1440 innerWidth=1440"
+    },
+    {
+      "name": "t5-my-order-detail-1440 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=1440"
+    },
+    {
+      "name": "t5-my-order-detail-1440 heading \"订单详情\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"订单详情\",\"found\":true,\"text\":\"订单详情\",\"tag\":\"h1\",\"width\":130,\"height\":33,\"top\":60,\"rendered\":true,\"inViewport\":true,\"alternatives\":7}"
+    },
+    {
+      "name": "t5-my-order-detail-1440 cta \"返回我的订单\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"cta\",\"expected\":\"返回我的订单\",\"found\":true,\"text\":\"返回我的订单\",\"tag\":\"a\",\"width\":100,\"height\":44,\"top\":12,\"rendered\":true,\"inViewport\":true,\"alternatives\":1}"
+    },
+    {
+      "name": "t5-my-order-detail-1440 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-my-order-detail-1440 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-my-order-detail-1440 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-my-order-detail-1440 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-me-320 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=320 innerWidth=320"
+    },
+    {
+      "name": "t5-me-320 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=320"
+    },
+    {
+      "name": "t5-me-320 heading \"我的订单\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"我的订单\",\"found\":true,\"text\":\"我的订单\\n本地商品登记记录 · 处理进度 · 运营人工核验结果\",\"tag\":\"a\",\"width\":288,\"height\":70,\"top\":531,\"rendered\":true,\"inViewport\":true,\"alternatives\":9}"
+    },
+    {
+      "name": "t5-me-320 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-me-320 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-me-320 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-me-320 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-me-375 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=375 innerWidth=375"
+    },
+    {
+      "name": "t5-me-375 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=375"
+    },
+    {
+      "name": "t5-me-375 heading \"我的订单\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"我的订单\",\"found\":true,\"text\":\"我的订单\\n本地商品登记记录 · 处理进度 · 运营人工核验结果\",\"tag\":\"a\",\"width\":343,\"height\":70,\"top\":496,\"rendered\":true,\"inViewport\":true,\"alternatives\":9}"
+    },
+    {
+      "name": "t5-me-375 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-me-375 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-me-375 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-me-375 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-me-1440 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=1440 innerWidth=1440"
+    },
+    {
+      "name": "t5-me-1440 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=1440"
+    },
+    {
+      "name": "t5-me-1440 heading \"我的订单\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"我的订单\",\"found\":true,\"text\":\"我的订单\\n本地商品登记记录 · 处理进度 · 运营人工核验结果\",\"tag\":\"a\",\"width\":688,\"height\":70,\"top\":480,\"rendered\":true,\"inViewport\":true,\"alternatives\":9}"
+    },
+    {
+      "name": "t5-me-1440 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-me-1440 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-me-1440 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-me-1440 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-workbench-local-orders-320 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=320 innerWidth=320"
+    },
+    {
+      "name": "t5-workbench-local-orders-320 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=320"
+    },
+    {
+      "name": "t5-workbench-local-orders-320 heading \"社区订单\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"社区订单\",\"found\":true,\"text\":\"社区订单\",\"tag\":\"h1\",\"width\":78,\"height\":30,\"top\":121,\"rendered\":true,\"inViewport\":true,\"alternatives\":7}"
+    },
+    {
+      "name": "t5-workbench-local-orders-320 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-workbench-local-orders-320 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-workbench-local-orders-320 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-workbench-local-orders-320 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-workbench-local-orders-375 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=375 innerWidth=375"
+    },
+    {
+      "name": "t5-workbench-local-orders-375 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=375"
+    },
+    {
+      "name": "t5-workbench-local-orders-375 heading \"社区订单\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"社区订单\",\"found\":true,\"text\":\"社区订单\",\"tag\":\"h1\",\"width\":78,\"height\":30,\"top\":121,\"rendered\":true,\"inViewport\":true,\"alternatives\":7}"
+    },
+    {
+      "name": "t5-workbench-local-orders-375 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-workbench-local-orders-375 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-workbench-local-orders-375 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-workbench-local-orders-375 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-workbench-local-orders-1440 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=1440 innerWidth=1440"
+    },
+    {
+      "name": "t5-workbench-local-orders-1440 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=1440"
+    },
+    {
+      "name": "t5-workbench-local-orders-1440 heading \"社区订单\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"社区订单\",\"found\":true,\"text\":\"社区订单\",\"tag\":\"h1\",\"width\":78,\"height\":30,\"top\":121,\"rendered\":true,\"inViewport\":true,\"alternatives\":7}"
+    },
+    {
+      "name": "t5-workbench-local-orders-1440 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-workbench-local-orders-1440 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-workbench-local-orders-1440 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-workbench-local-orders-1440 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-workbench-local-order-detail-320 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=320 innerWidth=320"
+    },
+    {
+      "name": "t5-workbench-local-order-detail-320 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=320"
+    },
+    {
+      "name": "t5-workbench-local-order-detail-320 heading \"社区助农蔬菜包 r2e2e\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"社区助农蔬菜包 r2e2e\",\"found\":true,\"text\":\"社区助农蔬菜包 r2e2e\",\"tag\":\"h1\",\"width\":196,\"height\":30,\"top\":50,\"rendered\":true,\"inViewport\":true,\"alternatives\":8}"
+    },
+    {
+      "name": "t5-workbench-local-order-detail-320 cta \"取消订单\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"cta\",\"expected\":\"取消订单\",\"found\":true,\"text\":\"取消订单\",\"tag\":\"button\",\"width\":80,\"height\":44,\"top\":861,\"rendered\":true,\"inViewport\":false,\"alternatives\":1}"
+    },
+    {
+      "name": "t5-workbench-local-order-detail-320 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-workbench-local-order-detail-320 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-workbench-local-order-detail-320 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-workbench-local-order-detail-320 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-workbench-local-order-detail-375 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=375 innerWidth=375"
+    },
+    {
+      "name": "t5-workbench-local-order-detail-375 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=375"
+    },
+    {
+      "name": "t5-workbench-local-order-detail-375 heading \"社区助农蔬菜包 r2e2e\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"社区助农蔬菜包 r2e2e\",\"found\":true,\"text\":\"社区助农蔬菜包 r2e2e\",\"tag\":\"h1\",\"width\":196,\"height\":30,\"top\":50,\"rendered\":true,\"inViewport\":true,\"alternatives\":8}"
+    },
+    {
+      "name": "t5-workbench-local-order-detail-375 cta \"取消订单\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"cta\",\"expected\":\"取消订单\",\"found\":true,\"text\":\"取消订单\",\"tag\":\"button\",\"width\":98,\"height\":44,\"top\":841,\"rendered\":true,\"inViewport\":false,\"alternatives\":1}"
+    },
+    {
+      "name": "t5-workbench-local-order-detail-375 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-workbench-local-order-detail-375 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-workbench-local-order-detail-375 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-workbench-local-order-detail-375 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-workbench-local-order-detail-1440 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=1440 innerWidth=1440"
+    },
+    {
+      "name": "t5-workbench-local-order-detail-1440 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=1440"
+    },
+    {
+      "name": "t5-workbench-local-order-detail-1440 heading \"社区助农蔬菜包 r2e2e\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"社区助农蔬菜包 r2e2e\",\"found\":true,\"text\":\"社区助农蔬菜包 r2e2e\",\"tag\":\"h1\",\"width\":196,\"height\":30,\"top\":50,\"rendered\":true,\"inViewport\":true,\"alternatives\":8}"
+    },
+    {
+      "name": "t5-workbench-local-order-detail-1440 cta \"取消订单\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"cta\",\"expected\":\"取消订单\",\"found\":true,\"text\":\"取消订单\",\"tag\":\"button\",\"width\":213,\"height\":44,\"top\":761,\"rendered\":true,\"inViewport\":true,\"alternatives\":1}"
+    },
+    {
+      "name": "t5-workbench-local-order-detail-1440 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-workbench-local-order-detail-1440 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[]}"
+    },
+    {
+      "name": "t5-workbench-local-order-detail-1440 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-workbench-local-order-detail-1440 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-admin-products-320 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=320 innerWidth=320"
+    },
+    {
+      "name": "t5-admin-products-320 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=320"
+    },
+    {
+      "name": "t5-admin-products-320 heading \"商品管理\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"商品管理\",\"found\":true,\"text\":\"商品管理\",\"tag\":\"h2\",\"width\":72,\"height\":25,\"top\":104,\"rendered\":true,\"inViewport\":true,\"alternatives\":16}"
+    },
+    {
+      "name": "t5-admin-products-320 cta \"新建商品\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"cta\",\"expected\":\"新建商品\",\"found\":true,\"text\":\"新建商品\",\"tag\":\"button\",\"width\":110,\"height\":32,\"top\":208,\"rendered\":true,\"inViewport\":true,\"alternatives\":1}"
+    },
+    {
+      "name": "t5-admin-products-320 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-admin-products-320 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[\"Warning: [antd: Spin] `tip` is deprecated. Please use `description` instead.\"]}"
+    },
+    {
+      "name": "t5-admin-products-320 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-admin-products-320 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-admin-products-375 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=375 innerWidth=375"
+    },
+    {
+      "name": "t5-admin-products-375 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=375"
+    },
+    {
+      "name": "t5-admin-products-375 heading \"商品管理\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"商品管理\",\"found\":true,\"text\":\"商品管理\",\"tag\":\"h2\",\"width\":72,\"height\":25,\"top\":104,\"rendered\":true,\"inViewport\":true,\"alternatives\":16}"
+    },
+    {
+      "name": "t5-admin-products-375 cta \"新建商品\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"cta\",\"expected\":\"新建商品\",\"found\":true,\"text\":\"新建商品\",\"tag\":\"button\",\"width\":110,\"height\":32,\"top\":208,\"rendered\":true,\"inViewport\":true,\"alternatives\":1}"
+    },
+    {
+      "name": "t5-admin-products-375 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-admin-products-375 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[\"Warning: [antd: Spin] `tip` is deprecated. Please use `description` instead.\"]}"
+    },
+    {
+      "name": "t5-admin-products-375 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-admin-products-375 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-admin-products-1440 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=1440 innerWidth=1440"
+    },
+    {
+      "name": "t5-admin-products-1440 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=1440"
+    },
+    {
+      "name": "t5-admin-products-1440 heading \"商品管理\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"商品管理\",\"found\":true,\"text\":\"商品管理\",\"tag\":\"h2\",\"width\":72,\"height\":25,\"top\":104,\"rendered\":true,\"inViewport\":true,\"alternatives\":19}"
+    },
+    {
+      "name": "t5-admin-products-1440 cta \"新建商品\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"cta\",\"expected\":\"新建商品\",\"found\":true,\"text\":\"新建商品\",\"tag\":\"button\",\"width\":110,\"height\":32,\"top\":104,\"rendered\":true,\"inViewport\":true,\"alternatives\":1}"
+    },
+    {
+      "name": "t5-admin-products-1440 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-admin-products-1440 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[\"Warning: [antd: Spin] `tip` is deprecated. Please use `description` instead.\"]}"
+    },
+    {
+      "name": "t5-admin-products-1440 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-admin-products-1440 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-admin-orders-320 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=320 innerWidth=320"
+    },
+    {
+      "name": "t5-admin-orders-320 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=320"
+    },
+    {
+      "name": "t5-admin-orders-320 heading \"订单管理\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"订单管理\",\"found\":true,\"text\":\"订单管理\",\"tag\":\"h2\",\"width\":72,\"height\":25,\"top\":104,\"rendered\":true,\"inViewport\":true,\"alternatives\":16}"
+    },
+    {
+      "name": "t5-admin-orders-320 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-admin-orders-320 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[\"Warning: [antd: Spin] `tip` is deprecated. Please use `description` instead.\"]}"
+    },
+    {
+      "name": "t5-admin-orders-320 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-admin-orders-320 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-admin-orders-375 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=375 innerWidth=375"
+    },
+    {
+      "name": "t5-admin-orders-375 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=375"
+    },
+    {
+      "name": "t5-admin-orders-375 heading \"订单管理\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"订单管理\",\"found\":true,\"text\":\"订单管理\",\"tag\":\"h2\",\"width\":72,\"height\":25,\"top\":104,\"rendered\":true,\"inViewport\":true,\"alternatives\":16}"
+    },
+    {
+      "name": "t5-admin-orders-375 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-admin-orders-375 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[\"Warning: [antd: Spin] `tip` is deprecated. Please use `description` instead.\"]}"
+    },
+    {
+      "name": "t5-admin-orders-375 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-admin-orders-375 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    },
+    {
+      "name": "t5-admin-orders-1440 scrollWidth <= innerWidth (no horizontal overflow)",
+      "ok": true,
+      "detail": "scrollWidth=1440 innerWidth=1440"
+    },
+    {
+      "name": "t5-admin-orders-1440 body does not overflow",
+      "ok": true,
+      "detail": "bodyScrollWidth=1440"
+    },
+    {
+      "name": "t5-admin-orders-1440 heading \"订单管理\" is rendered",
+      "ok": true,
+      "detail": "{\"label\":\"heading\",\"expected\":\"订单管理\",\"found\":true,\"text\":\"订单管理\",\"tag\":\"h2\",\"width\":72,\"height\":25,\"top\":104,\"rendered\":true,\"inViewport\":true,\"alternatives\":19}"
+    },
+    {
+      "name": "t5-admin-orders-1440 no payment/closed-deal copy",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "t5-admin-orders-1440 no console errors from this branch (pre-existing antd deprecations excluded)",
+      "ok": true,
+      "detail": "{\"newErrors\":[],\"preExisting\":[\"Warning: [antd: Spin] `tip` is deprecated. Please use `description` instead.\"]}"
+    },
+    {
+      "name": "t5-admin-orders-1440 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "t5-admin-orders-1440 no failed network requests",
+      "ok": true,
+      "detail": "{\"failures\":[],\"non2xx\":[]}"
+    }
+  ],
+  "screenshots": [
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-life-320.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-life-375.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-life-1440.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-life-product-320.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-life-product-375.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-life-product-1440.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-life-product-guest-320.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-life-product-guest-375.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-life-product-guest-1440.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-my-orders-320.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-my-orders-375.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-my-orders-1440.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-my-order-detail-320.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-my-order-detail-375.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-my-order-detail-1440.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-me-320.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-me-375.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-me-1440.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-workbench-local-orders-320.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-workbench-local-orders-375.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-workbench-local-orders-1440.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-workbench-local-order-detail-320.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-workbench-local-order-detail-375.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-workbench-local-order-detail-1440.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-admin-products-320.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-admin-products-375.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-admin-products-1440.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-admin-orders-320.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-admin-orders-375.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-admin-orders-1440.png"
+  ],
+  "passed": 231,
+  "failed": 0
+}

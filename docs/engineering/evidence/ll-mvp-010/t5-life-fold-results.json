@@ -1,0 +1,48 @@
+{
+  "generatedAt": "2026-11-06T08:26:09.815Z",
+  "question": "is the R2 local catalogue inside the first screen of /life at 320/375?",
+  "rows": [
+    {
+      "viewport": "320x720",
+      "viewportHeight": 720,
+      "headingText": "本地好物",
+      "headingTop": 216,
+      "cardTop": 259,
+      "cardText": "水果 / 阳光社区时令水果箱 r2e2e / 邻社区商品，用于验证跨社区隔离 / ¥45.00 / 登记后由工作人员办理 / 阳光社区",
+      "firstOrderLinkTop": 917,
+      "sectionsBefore": [],
+      "documentHeight": 1747,
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-life-fold-320.png"
+    },
+    {
+      "viewport": "375x812",
+      "viewportHeight": 812,
+      "headingText": "本地好物",
+      "headingTop": 216,
+      "cardTop": 259,
+      "cardText": "水果 / 阳光社区时令水果箱 r2e2e / 邻社区商品，用于验证跨社区隔离 / ¥45.00 / 登记后由工作人员办理 / 阳光社区",
+      "firstOrderLinkTop": 938,
+      "sectionsBefore": [],
+      "documentHeight": 1768,
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-life-fold-375.png"
+    }
+  ],
+  "summary": [
+    {
+      "viewport": "320x720",
+      "catalogueAboveFold": true,
+      "firstCardAboveFold": true,
+      "headingTop": 216,
+      "cardTop": 259,
+      "viewportHeight": 720
+    },
+    {
+      "viewport": "375x812",
+      "catalogueAboveFold": true,
+      "firstCardAboveFold": true,
+      "headingTop": 216,
+      "cardTop": 259,
+      "viewportHeight": 812
+    }
+  ]
+}
