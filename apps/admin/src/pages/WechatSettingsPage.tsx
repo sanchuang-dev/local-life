@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Descriptions,
+  Drawer,
   Form,
   Input,
   Radio,
@@ -148,13 +149,7 @@ function StatusTag({ status }: { status: WechatConfigStatus }) {
   return <Tag color={meta.color}>{meta.label}</Tag>
 }
 
-function SummaryDetails({
-  summary,
-  scope,
-}: {
-  summary: WechatConfigSummary
-  scope: 'active' | 'candidate'
-}) {
+function SummaryDetails({ summary }: { summary: WechatConfigSummary }) {
   return (
     <Descriptions
       size="small"
@@ -179,7 +174,7 @@ function SummaryDetails({
           key: 'verifiedAt',
           label: '验证时间',
           children: (
-            <span data-testid={`wechat-${scope}-verified-at`}>{formatTime(summary.verifiedAt)}</span>
+            <span>{formatTime(summary.verifiedAt)}</span>
           ),
         },
         {
@@ -275,6 +270,8 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
   const [verifying, setVerifying] = useState(false)
   const [activating, setActivating] = useState(false)
   const [actionNotice, setActionNotice] = useState<ActionNotice | null>(null)
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
 
   const refresh = () => {
     setLoading(true)
@@ -315,7 +312,9 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
         appSecret: values.appSecret,
         accountType: values.accountType,
       })
-      form.setFieldValue('appSecret', '')
+      // The editor must never retain a saved AppSecret in React form state.
+      form.resetFields()
+      setEditorOpen(false)
       message.success(`已保存候选配置 ${result.config.appId}；尚未启用，请先测试连接。`)
       refresh()
     } catch (cause) {
@@ -404,6 +403,19 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
     } catch {
       message.warning('复制失败，请手动选择回调地址复制。')
     }
+  }
+
+  function openEditor() {
+    form.resetFields()
+    setSaveError(null)
+    setEditorOpen(true)
+  }
+
+  function closeEditor() {
+    if (saving) return
+    form.resetFields()
+    setSaveError(null)
+    setEditorOpen(false)
   }
 
   const recentColumns: ColumnsType<WechatConfigSummary> = [
@@ -520,7 +532,19 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
               />
             ) : null}
 
-            <Card size="small" className="wechat-primary-card" title="公众号接入">
+            <Card
+              size="small"
+              className="wechat-primary-card"
+              title="公众号接入"
+              extra={
+                <Space size={8} wrap>
+                  <Button onClick={() => setDetailsOpen(true)}>查看详情</Button>
+                  <Button type={candidate ? 'default' : 'primary'} onClick={openEditor} disabled={!masterKeyAvailable}>
+                    新增公众号
+                  </Button>
+                </Space>
+              }
+            >
               <div className="wechat-current" data-testid="wechat-active-card">
                 {active ? (
                   <div className="wechat-state-line">
@@ -529,7 +553,7 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
                     <span>{ACCOUNT_TYPE_LABELS[active.accountType]}</span>
                     <StatusTag status={active.status} />
                     <span className="wechat-quiet">
-                      最近验证：{formatTime(active.verifiedAt)}
+                      最近验证：<span data-testid="wechat-active-verified-at">{formatTime(active.verifiedAt)}</span>
                     </span>
                   </div>
                 ) : (
@@ -546,7 +570,7 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
                       <span>{ACCOUNT_TYPE_LABELS[candidate.accountType]}</span>
                       <StatusTag status={candidate.status} />
                       <span className="wechat-quiet">
-                        最近验证：{formatTime(candidate.verifiedAt)}
+                        最近验证：<span data-testid="wechat-candidate-verified-at">{formatTime(candidate.verifiedAt)}</span>
                       </span>
                     </div>
                     {candidate.lastErrorCode ? (
@@ -579,6 +603,19 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
                 ) : null}
               </div>
 
+            </Card>
+
+            <Drawer
+              title={active ? '新增 / 更换公众号' : '新增公众号'}
+              open={editorOpen}
+              onClose={closeEditor}
+              width="min(480px, 100vw)"
+              maskClosable={!saving}
+              keyboard={!saving}
+              closable={!saving}
+              destroyOnHidden
+              className="wechat-editor-drawer"
+            >
               <div className="wechat-form-head">
                 <Typography.Title level={5}>{active ? '更换公众号' : '添加公众号'}</Typography.Title>
                 <Typography.Text type="secondary">
@@ -642,19 +679,28 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
                     placeholder="输入公众号 AppSecret"
                   />
                 </Form.Item>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  loading={saving}
-                  disabled={!masterKeyAvailable}
-                >
-                  保存凭证
-                </Button>
+                <Space>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    loading={saving}
+                    disabled={!masterKeyAvailable}
+                  >
+                    保存凭证
+                  </Button>
+                  <Button onClick={closeEditor} disabled={saving}>取消</Button>
+                </Space>
               </Form>
-            </Card>
+            </Drawer>
 
-            <details className="wechat-advanced">
-              <summary>高级信息与配置历史</summary>
+            <Drawer
+              title="公众号详情"
+              open={detailsOpen}
+              onClose={() => setDetailsOpen(false)}
+              width="min(520px, 100vw)"
+              destroyOnHidden
+              className="wechat-details-drawer"
+            >
               <div className="wechat-advanced-content">
                 <div className="wechat-advanced-section">
                   <Typography.Text strong>微信授权回调地址</Typography.Text>
@@ -685,13 +731,13 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
                 {active ? (
                   <div className="wechat-advanced-section">
                     <Typography.Text strong>当前配置详情</Typography.Text>
-                    <SummaryDetails summary={active} scope="active" />
+                    <SummaryDetails summary={active} />
                   </div>
                 ) : null}
                 {candidate ? (
                   <div className="wechat-advanced-section">
                     <Typography.Text strong>候选配置详情</Typography.Text>
-                    <SummaryDetails summary={candidate} scope="candidate" />
+                    <SummaryDetails summary={candidate} />
                   </div>
                 ) : null}
                 {data.recent.length > 0 ? (
@@ -708,7 +754,7 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
                   </div>
                 ) : null}
               </div>
-            </details>
+            </Drawer>
           </>
         ) : null}
       </div>
