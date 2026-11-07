@@ -55,7 +55,17 @@
 node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 ```
 
-把输出写入受控文件（如 `/run/secrets/wechat-config-master-key`），权限 0400，**不要提交仓库**，并离线备份一份。
+把输出写入受控文件（如 `/run/secrets/wechat-config-master-key`），权限 0400，**不要提交仓库**，并离线备份一份。**注意：文件路径必须是 API 容器内部可读取的路径，且文件对容器运行用户可读；仅把文件创建在主机上并设置 `WECHAT_CONFIG_MASTER_KEY_FILE` 不会自动挂载进去。**
+
+### 3.2 现有在线 MVP 部署器接线（上线前必读）
+
+当前 `sanchuang-dev/proto-infra@prod/scripts/install-local-life-mvp-app.sh` 用 `docker run --user 1000:1000 --read-only --env-file /srv/proto/local-life-mvp/config/api.env` 启动 API，只挂载 `/srv/proto/local-life-mvp/data → /data`；**没有挂载 `/run/secrets` 或 `/srv/proto/local-life-mvp/config`**。
+
+因此在尚未为该部署器增补受控只读 secret mount 之前，不能把主机 `/run/secrets/...` 直接写成 `WECHAT_CONFIG_MASTER_KEY_FILE`，否则容器启动时会因文件不存在/不可读而失败。也不能把主密钥放在与 SQLite 同一份数据备份中以绕过挂载限制。
+
+当前部署器已经支持的**一次性引导路径**是：由获授权的运维人员在主机上保留权限 0600 的 `/srv/proto/local-life-mvp/config/api.env` 内安全设置 `WECHAT_CONFIG_MASTER_KEY`（32 随机字节的 base64）和 `WECHAT_CONFIG_KEY_ID=v1`，并通过既有受控发布流程重建 API 容器使环境生效。**勿把真实值写进 Git、Issue、PR、聊天、Actions 输入或日志**；env-file 中存在此主密钥只是一种经宿主机权限保护的部署方式，不等于已启用 Docker secrets。完成这一**一次性的**初始化之后，管理员日常保存/验证/切换公众号凭证不再需要重启 API。
+
+如要采用更推荐的文件方式，必须另行在 `proto-infra` 审核并实现**只读文件挂载**，确认容器 UID 1000 可读、主机文件权限受控、备份密钥与 SQLite 分离，并在隔离环境实际跑过容器读取检查。该 infra 变更不属于 #113 应用 PR，本 PR 不得假称已经支持主机直接挂载。
 
 - 备份：备份 SQLite 的同时必须备份对应 key 与 `key_id`；只有密文无法恢复。
 - 恢复：同一份 SQLite + 同一个 key/key_id 即可解密；key 丢失则所有密文永久不可用（fail closed，不会尝试猜测）。
