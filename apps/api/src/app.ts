@@ -50,6 +50,8 @@ import { registerActivityRoutes } from './activities/routes.js'
 import { registerCrmRoutes } from './crm/routes.js'
 import { registerLocalCatalogRoutes } from './local/routes.js'
 import { registerLocalOrderRoutes } from './local/order-routes.js'
+import { registerLedgerRoutes } from './ledger/routes.js'
+import { registerReconciliationRoutes } from './ledger/reconciliation-routes.js'
 import { registerParticipationRoutes } from './participation/routes.js'
 import { registerRewardRoutes } from './rewards/routes.js'
 import { registerCrmebRoutes } from './crmeb/routes.js'
@@ -1055,6 +1057,30 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     fail,
     validCsrf,
     bodySchemaError,
+  })
+
+  // Reconciliation and export (LL-MVP-008, R3b-1b) is registered **before** the
+  // ledger skeleton on purpose: Hono matches in registration order, and the
+  // skeleton owns read-only GETs of some of the same paths. Registering the
+  // concrete module first means its derivation wins instead of being shadowed.
+  registerReconciliationRoutes(app, {
+    db,
+    config,
+    fail,
+    validCsrf,
+    bodySchemaError,
+    now: options.now,
+  })
+
+  // Ledger (LL-MVP-008, Issue #64): read-only skeleton registered after the
+  // local order routes, since its facts are derived from them.
+  registerLedgerRoutes(app, {
+    db,
+    config,
+    fail,
+    validCsrf,
+    bodySchemaError,
+    now: options.now,
   })
 
   registerRewardRoutes(app, {
