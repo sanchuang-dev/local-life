@@ -456,7 +456,7 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
     <div className="page wechat-page">
       <PageHeader
         title="微信公众号"
-        description="加密保存公众号 AppID/AppSecret，真实测试连接后启用或切换 OAuth 运行时配置；AppSecret 永不回显。"
+        description="设置居民微信登录使用的公众号。凭证仅在服务器加密保存。"
         status={
           stateMeta ? (
             <span data-testid="wechat-state-tag">
@@ -464,20 +464,11 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
             </span>
           ) : undefined
         }
-        extra={
-          <Button onClick={refresh} loading={loading && data !== null}>
-            刷新状态
-          </Button>
-        }
+        extra={<Button onClick={refresh} loading={loading && data !== null}>刷新状态</Button>}
       />
-      <div className="page-stack">
+      <div className="page-stack wechat-layout">
         {!data && loading ? (
-          <Card size="small">
-            <Space>
-              <Spin size="small" />
-              正在读取公众号配置状态…
-            </Space>
-          </Card>
+          <div className="wechat-loading"><Spin size="small" /> 正在读取公众号配置状态…</div>
         ) : null}
 
         {!data && !loading && loadError ? (
@@ -486,11 +477,7 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
             showIcon
             title="无法读取公众号配置"
             description={loadError}
-            action={
-              <Button size="small" onClick={refresh}>
-                重试
-              </Button>
-            }
+            action={<Button size="small" onClick={refresh}>重试</Button>}
           />
         ) : null}
 
@@ -502,31 +489,25 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
                 showIcon
                 title="刷新状态失败，当前展示的是上一次成功读取的结果"
                 description={loadError}
-                action={
-                  <Button size="small" onClick={refresh}>
-                    重试
-                  </Button>
-                }
+                action={<Button size="small" onClick={refresh}>重试</Button>}
               />
             ) : null}
 
-            <Alert type="info" showIcon title={stateMeta?.label ?? data.state} description={stateMeta?.hint ?? ''} />
-
-            {!data.masterKeyAvailable ? (
+            {!masterKeyAvailable ? (
               <Alert
                 type="error"
                 showIcon
                 title="凭证加密主密钥不可用"
-                description="服务端未加载 WECHAT_CONFIG_MASTER_KEY 或 WECHAT_CONFIG_MASTER_KEY_FILE，无法加密保存或解密验证公众号凭证。保存、测试连接与启用已禁用，已保存的配置也无法用于居民微信登录。请联系运维配置主密钥后刷新本页。"
+                description="服务器尚未完成公众号凭证加密初始化。保存、测试连接和启用暂时不可操作；请联系运维初始化主密钥后刷新页面。"
               />
             ) : null}
 
-            {activeUnusable ? (
+            {activeUnusable && masterKeyAvailable ? (
               <Alert
                 type="error"
                 showIcon
                 title="已启用配置当前不可用"
-                description={`${active?.appId ?? ''} 虽标记为已启用，但${activeUnusableReason}。居民微信登录会按不可用处理；请先修复主密钥或重新保存并验证凭证，再切换配置。`}
+                description={(active?.appId ?? '') + ' 虽标记为已启用，但' + activeUnusableReason + '。居民微信登录会按不可用处理；请修复凭证后重新验证并切换。'}
               />
             ) : null}
 
@@ -539,78 +520,42 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
               />
             ) : null}
 
-            <div className="wechat-grid">
-              <Card size="small" title="凭证加密">
-                <Space wrap>
-                  <Tag color={data.masterKeyAvailable ? 'green' : 'red'}>
-                    {data.masterKeyAvailable ? '加密已就绪' : '主密钥不可用'}
-                  </Tag>
-                  <Typography.Text type="secondary">
-                    主密钥版本（keyId）：
-                    <Typography.Text code>
-                      <span data-testid="wechat-key-id">{data.keyId}</span>
-                    </Typography.Text>
-                  </Typography.Text>
-                </Space>
-                <Typography.Paragraph type="secondary" className="wechat-hint">
-                  AppSecret 在服务端使用 AES-256-GCM 加密后写入数据库；接口响应、页面与浏览器存储都不会包含明文
-                  AppSecret。
-                </Typography.Paragraph>
-              </Card>
-
-              <Card size="small" title="微信授权回调地址">
-                <div className="wechat-callback-row">
-                  <Typography.Text code className="wechat-callback-url">
-                    <span data-testid="wechat-callback-url">{data.redirectUri}</span>
-                  </Typography.Text>
-                  <Button size="small" aria-label="复制回调地址" onClick={() => void copyCallbackUrl()}>
-                    复制
-                  </Button>
-                </div>
-                <Typography.Paragraph type="secondary" className="wechat-hint">
-                  此完整 URL 由服务端推导，用于微信授权跳转；微信公众平台的「网页授权域名」配置框只填写域名 local.proto.3cgroup.cn，不包含 https:// 或回调路径。
-                </Typography.Paragraph>
-              </Card>
-            </div>
-
-            <Card
-              size="small"
-              title="当前启用的配置"
-              extra={active ? <StatusTag status={active.status} /> : <Tag>未启用</Tag>}
-            >
-              <div data-testid="wechat-active-card">
+            <Card size="small" className="wechat-primary-card" title="公众号接入">
+              <div className="wechat-current" data-testid="wechat-active-card">
                 {active ? (
-                  <SummaryDetails summary={active} scope="active" />
+                  <div className="wechat-state-line">
+                    <span className="wechat-eyebrow">当前使用</span>
+                    <Typography.Text code>{active.appId}</Typography.Text>
+                    <span>{ACCOUNT_TYPE_LABELS[active.accountType]}</span>
+                    <StatusTag status={active.status} />
+                    <span className="wechat-quiet">
+                      最近验证：<span data-testid="wechat-active-verified-at">{formatTime(active.verifiedAt)}</span>
+                    </span>
+                  </div>
                 ) : (
-                  <Typography.Text type="secondary">
-                    当前没有已启用的公众号配置；居民微信登录会明确返回不可用，不会模拟成功。
-                  </Typography.Text>
+                  <span className="wechat-quiet">尚未启用公众号</span>
                 )}
               </div>
-            </Card>
 
-            <Card
-              size="small"
-              title="待启用 / 最近候选配置"
-              extra={candidate ? <StatusTag status={candidate.status} /> : <Tag>无候选</Tag>}
-            >
               <div data-testid="wechat-candidate-card">
                 {candidate ? (
-                  <Space orientation="vertical" size={12} style={{ width: '100%' }}>
-                    <SummaryDetails summary={candidate} scope="candidate" />
-                    <Typography.Paragraph type="secondary" className="wechat-hint">
-                      「测试连接」会由服务端真实调用微信 token 接口，只验证 AppID/AppSecret 能换取
-                      access_token；不等于微信内真机 OAuth 授权验收。
-                    </Typography.Paragraph>
-                    {candidate.status !== 'verified' ? (
-                      <Alert
-                        type="info"
-                        showIcon
-                        title="启用前需先通过测试连接"
-                        description="只有「已验证」的候选配置可以启用；验证失败不会影响当前已启用的配置。"
-                      />
+                  <div className="wechat-candidate">
+                    <div className="wechat-state-line">
+                      <span className="wechat-eyebrow">待处理</span>
+                      <Typography.Text code>{candidate.appId}</Typography.Text>
+                      <span>{ACCOUNT_TYPE_LABELS[candidate.accountType]}</span>
+                      <StatusTag status={candidate.status} />
+                      <span className="wechat-quiet">
+                        最近验证：<span data-testid="wechat-candidate-verified-at">{formatTime(candidate.verifiedAt)}</span>
+                      </span>
+                    </div>
+                    {candidate.lastErrorCode ? (
+                      <div className="wechat-candidate-error">
+                        {FAILURE_LABELS[candidate.lastErrorCode]}
+                        <Typography.Text code>{candidate.lastErrorCode}</Typography.Text>
+                      </div>
                     ) : null}
-                    <Space wrap>
+                    <div className="wechat-actions">
                       <Button
                         onClick={() => void handleVerify(candidate)}
                         loading={verifying}
@@ -627,33 +572,20 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
                         {active ? '更换配置' : '启用配置'}
                       </Button>
                       {candidate.status !== 'verified' ? (
-                        <Typography.Text type="secondary">
-                          仅「已验证」的配置可以启用。
-                        </Typography.Text>
+                        <Typography.Text type="secondary">启用前需先通过测试连接</Typography.Text>
                       ) : null}
-                    </Space>
-                  </Space>
-                ) : (
-                  <Typography.Text type="secondary">
-                    没有待验证或已验证的候选配置；保存一份新凭证后会出现在这里。
-                  </Typography.Text>
-                )}
+                    </div>
+                  </div>
+                ) : null}
               </div>
-            </Card>
 
-            <Card
-              size="small"
-              title="保存新的公众号凭证"
-              extra={
+              <div className="wechat-form-head">
+                <Typography.Title level={5}>{active ? '更换公众号' : '添加公众号'}</Typography.Title>
                 <Typography.Text type="secondary">
-                  保存只生成候选版本，不会替换当前启用配置
+                  填写 AppID 和 AppSecret。保存后先测试连接，再确认启用；保存不会自动切换当前配置。
                 </Typography.Text>
-              }
-            >
-              <Typography.Paragraph type="secondary">
-                填写公众号后台的 AppID 与 AppSecret。保存后状态为「待验证」，必须通过测试连接才能启用。
-                AppSecret 不会预填，保存成功后立即清空。
-              </Typography.Paragraph>
+              </div>
+
               {saveError ? (
                 <Alert
                   type="error"
@@ -663,12 +595,13 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
                   className="wechat-form-error"
                 />
               ) : null}
+
               <Form<SaveFormValues>
                 form={form}
                 layout="vertical"
-                initialValues={{ accountType: 'official' }}
+                initialValues={{ accountType: 'test' }}
                 onFinish={handleSave}
-                disabled={!data.masterKeyAvailable}
+                disabled={!masterKeyAvailable}
               >
                 <div className="wechat-form-grid">
                   <Form.Item
@@ -676,10 +609,7 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
                     label="AppID"
                     rules={[
                       { required: true, whitespace: true, message: '请填写公众号 AppID' },
-                      {
-                        pattern: /^wx[A-Za-z0-9]{16}$/u,
-                        message: 'AppID 应为 wx 开头的 18 位字母数字',
-                      },
+                      { pattern: /^wx[A-Za-z0-9]{16}$/u, message: 'AppID 应为 wx 开头的 18 位字母数字' },
                     ]}
                   >
                     <Input placeholder="wx1234567890abcdef" autoComplete="off" maxLength={64} />
@@ -704,42 +634,81 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
                     { required: true, message: '请填写 AppSecret' },
                     { min: 8, max: 128, message: 'AppSecret 长度需为 8-128 位' },
                   ]}
-                  extra="仅在保存时提交给服务端加密存储；不会写入 URL、localStorage/sessionStorage 或页面文本。"
+                  extra="保存后不会回显，请妥善保管原始密钥。"
                 >
                   <Input.Password
                     visibilityToggle={false}
                     autoComplete="new-password"
-                    placeholder="输入公众号后台的 AppSecret（保存后不会回显）"
+                    placeholder="输入公众号 AppSecret"
                   />
                 </Form.Item>
-                <Space wrap>
-                  <Button
-                    type="primary"
-                    htmlType="submit"
-                    loading={saving}
-                    disabled={!data.masterKeyAvailable}
-                  >
-                    保存为待验证配置
-                  </Button>
-                  <Typography.Text type="secondary">
-                    AppID 格式：wx 开头的 18 位字母数字；账号类型仅用于展示，不改变 OAuth 协议。
-                  </Typography.Text>
-                </Space>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={saving}
+                  disabled={!masterKeyAvailable}
+                >
+                  保存凭证
+                </Button>
               </Form>
             </Card>
 
-            {data.recent.length > 0 ? (
-              <Card size="small" title="最近配置历史（含已停用）">
-                <Table<WechatConfigSummary>
-                  rowKey="id"
-                  size="small"
-                  columns={recentColumns}
-                  dataSource={data.recent}
-                  pagination={false}
-                  scroll={{ x: 720 }}
-                />
-              </Card>
-            ) : null}
+            <details className="wechat-advanced">
+              <summary>高级信息与配置历史</summary>
+              <div className="wechat-advanced-content">
+                <div className="wechat-advanced-section">
+                  <Typography.Text strong>微信授权回调地址</Typography.Text>
+                  <div className="wechat-callback-row">
+                    <Typography.Text code className="wechat-callback-url">
+                      <span data-testid="wechat-callback-url">{data.redirectUri}</span>
+                    </Typography.Text>
+                    <Button size="small" aria-label="复制回调地址" onClick={() => void copyCallbackUrl()}>
+                      复制
+                    </Button>
+                  </div>
+                  <Typography.Text type="secondary">
+                    微信公众平台的「网页授权域名」只填写域名，不包含 https:// 或回调路径。
+                  </Typography.Text>
+                </div>
+
+                <div className="wechat-advanced-section">
+                  <Typography.Text strong>凭证加密</Typography.Text>
+                  <div className="wechat-state-line">
+                    <Tag color={masterKeyAvailable ? 'green' : 'red'}>
+                      {masterKeyAvailable ? '加密已就绪' : '主密钥不可用'}
+                    </Tag>
+                    <Typography.Text type="secondary">主密钥版本（keyId）：</Typography.Text>
+                    <Typography.Text code><span data-testid="wechat-key-id">{data.keyId}</span></Typography.Text>
+                  </div>
+                </div>
+
+                {active ? (
+                  <div className="wechat-advanced-section">
+                    <Typography.Text strong>当前配置详情</Typography.Text>
+                    <SummaryDetails summary={active} scope="active" />
+                  </div>
+                ) : null}
+                {candidate ? (
+                  <div className="wechat-advanced-section">
+                    <Typography.Text strong>候选配置详情</Typography.Text>
+                    <SummaryDetails summary={candidate} scope="candidate" />
+                  </div>
+                ) : null}
+                {data.recent.length > 0 ? (
+                  <div className="wechat-advanced-section">
+                    <Typography.Text strong>最近配置历史</Typography.Text>
+                    <Table<WechatConfigSummary>
+                      rowKey="id"
+                      size="small"
+                      columns={recentColumns}
+                      dataSource={data.recent}
+                      pagination={false}
+                      scroll={{ x: 720 }}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            </details>
           </>
         ) : null}
       </div>
