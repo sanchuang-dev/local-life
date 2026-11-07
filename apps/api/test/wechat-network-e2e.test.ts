@@ -276,8 +276,8 @@ test('real TCP admin HTTP, credential switch, in-flight OAuth and SQLite backup 
     assert.doesNotMatch(replay.headers.get('location') ?? '', /auth=success/)
     assert.equal(oauthRequests.length, 1)
 
-    const raw = sqlite.prepare('SELECT app_secret_ciphertext FROM wechat_oauth_configs').all()
-      as Array<{ app_secret_ciphertext: string }>
+    const raw = sqlite.prepare('SELECT app_secret_ciphertext FROM wechat_oauth_configs').all() as
+      Array<{ app_secret_ciphertext: string }>
     assert.equal(raw.length >= 2, true)
     for (const row of raw) {
       assert.equal(row.app_secret_ciphertext.includes(SECRET_A), false)
