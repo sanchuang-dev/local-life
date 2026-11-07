@@ -84,7 +84,7 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 
 - 失败统一 `{ error: { code, message, requestId } }`；错误消息不含 secret、请求 URL、raw errmsg。
 - 未登录 401、非 admin 403、错误 CSRF / 不可信 Origin 403。
-- `redirectUri` 不是配置项：由 `WEB_BASE_URL` 的 origin + `WECHAT_OAUTH_CALLBACK_PATH` 推导，页面只读展示；需在微信公众平台把同一 URL 配为网页授权回调域名/URL。
+- `redirectUri` 不是配置项：由 `WEB_BASE_URL` 的 origin + `WECHAT_OAUTH_CALLBACK_PATH` 推导，页面只读展示。**微信公众平台「网页授权域名」配置框只填写完整 hostname（本环境为 `local.proto.3cgroup.cn`），不带 `https://` 和 `/api/auth/wechat/callback` 路径**。完整回调 URL 是 OAuth 请求中由服务端传给微信的 `redirect_uri`，仅供运维核对，两者不可混填。测试号与正式号分别配置对应的授权域名。
 
 ## 5. 连接验证 ≠ 微信登录
 
@@ -121,7 +121,7 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 1. 生成主密钥并挂载/注入；设置 `WECHAT_CONFIG_MASTER_KEY_FILE`（或内联）与 `WECHAT_CONFIG_KEY_ID`；不要配置旧 env。
 2. 部署 API，确认启动日志没有 `config.invalid`，且（若遗留旧变量）出现一次不含值的 `config.wechat_env_ignored`。
 3. 管理员登录管理台 → 系统管理 → 微信公众号：保存 AppID/AppSecret → 点击连接验证 → 成功后才允许启用。
-4. 把页面展示的只读回调 URL 登记到微信公众平台的网页授权域名/回调配置。
+4. 在微信公众平台对应公众号的「网页授权域名」填 `local.proto.3cgroup.cn`（**只填域名，不是整条 URL**），并核对后台只读展示的完整回调 URL 为 `https://local.proto.3cgroup.cn/api/auth/wechat/callback`。
 5. 启用后访问 `/auth/methods` 应为 `wechat:true`；在真实微信客户端内完成一次授权，才算真机验收。
 6. 备份 SQLite 与主密钥（含 key_id），记录版本。
 
