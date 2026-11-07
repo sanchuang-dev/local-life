@@ -18,6 +18,7 @@ import {
 import type { AppDatabase } from '../db/client.js'
 import {
   communities,
+  auditLogs,
   ledgerAnomalies,
   ledgerEntries,
   reconciliationBatches,
@@ -25,6 +26,7 @@ import {
   users,
 } from '../db/schema.js'
 import {
+  LEDGER_ATTRIBUTION_CONFIRMED_EVENT,
   LocalError,
   assertCommunityAccess,
   assertExpectedUpdatedAt,
@@ -206,7 +208,10 @@ export function maskPhoneNumbers(value: string): string {
 /** RFC 4180 cell: quote only when needed, double the quotes. */
 function csvCell(value: string): string {
   const masked = maskPhoneNumbers(value)
-  return /[",\r\n]/u.test(masked) ? `"${masked.replace(/"/gu, '""')}"` : masked
+  // Quoting CSV is not sufficient to stop Excel interpreting formula cells.
+  // Prefix a text marker even when whitespace/control characters precede it.
+  const safe = /^[\u0000-\u0020]*[=+\-@]/u.test(masked) ? `'${masked}` : masked
+  return /[",\r\n]/u.test(safe) ? `"${safe.replace(/"/gu, '""')}"` : safe
 }
 
 /**
@@ -495,7 +500,7 @@ function collectEntryViews(db: AppDatabase, filter: EntryViewFilter): CollectedE
     )
     .all()
 
-  const identity = { batchId, batchNo, reconciliationState }
+  const identity = { batchId, batchNo, reconciliationState, attributionCutoffMs: cutoffMs }
   const entries = mapEntryRows(db, rows, identity)
 
   // Late-recorded facts: same business period, but they entered the ledger after
@@ -525,6 +530,7 @@ function collectEntryViews(db: AppDatabase, filter: EntryViewFilter): CollectedE
       batchId: null,
       batchNo: null,
       reconciliationState: 'unreconciled',
+      attributionCutoffMs: null,
     })
   }
 
@@ -586,6 +592,8 @@ interface EntryViewIdentity {
   batchId: string | null
   batchNo: string | null
   reconciliationState: ReconciliationEntryView['reconciliationState']
+  /** Locked statements freeze the attribution known at their lock instant. */
+  attributionCutoffMs: number | null
 }
 
 /**
@@ -609,8 +617,44 @@ function mapEntryRows(
     for (const row of communityRows) communityNames.set(row.id, row.name)
   }
 
+  // Confirmation is an appended audit fact, not a mutation of ledger_entries.
+  // Apply the same projection as the main ledger list, with an as-of cutoff for
+  // immutable locked statements. Read all confirmations in one query, not N+1.
+  const entryIds = rows.map((row) => row.entryId)
+  const confirmedByEntry = new Map<string, string>()
+  if (entryIds.length > 0) {
+    const confirmations = db
+      .select({
+        entryId: auditLogs.targetId,
+        metadata: auditLogs.metadata,
+      })
+      .from(auditLogs)
+      .where(and(
+        eq(auditLogs.event, LEDGER_ATTRIBUTION_CONFIRMED_EVENT),
+        inArray(auditLogs.targetId, entryIds),
+        ...(identity.attributionCutoffMs === null
+          ? []
+          : [lte(auditLogs.createdAt, new Date(identity.attributionCutoffMs))]),
+      ))
+      .orderBy(sql`${auditLogs.createdAt} DESC`, sql`${auditLogs.id} DESC`)
+      .all()
+    for (const confirmation of confirmations) {
+      if (!confirmation.entryId || confirmedByEntry.has(confirmation.entryId) || !confirmation.metadata) continue
+      try {
+        const parsed: unknown = JSON.parse(confirmation.metadata)
+        if (typeof parsed === 'object' && parsed !== null && 'staffId' in parsed &&
+            typeof parsed.staffId === 'string') {
+          confirmedByEntry.set(confirmation.entryId, parsed.staffId)
+        }
+      } catch {
+        // An invalid legacy audit record does not fabricate an attribution.
+      }
+    }
+  }
+
   const staffIds = [
-    ...new Set(rows.map((row) => row.attributedStaffId).filter((id): id is string => id !== null)),
+    ...new Set(rows.map((row) => confirmedByEntry.get(row.entryId) ?? row.attributedStaffId)
+      .filter((id): id is string => id !== null)),
   ]
   const staffNames = new Map<string, string>()
   if (staffIds.length > 0) {
@@ -627,7 +671,6 @@ function mapEntryRows(
     }
   }
 
-  const entryIds = rows.map((row) => row.entryId)
   const anomalyByEntry = new Map<string, ReconciliationEntryView['anomalies']>()
   if (entryIds.length > 0) {
     const anomalyRows = db
@@ -654,7 +697,10 @@ function mapEntryRows(
     }
   }
 
-  return rows.map((row) => ({
+  return rows.map((row) => {
+    const confirmedStaff = confirmedByEntry.get(row.entryId)
+    const staffId = confirmedStaff ?? row.attributedStaffId
+    return {
     entryId: row.entryId,
     factKind: row.factKind,
     sourceSystem: row.sourceSystem,
@@ -662,12 +708,10 @@ function mapEntryRows(
     sourceDisplayNo: row.sourceDisplayNo,
     communityId: row.communityId,
     communityName: communityNames.get(row.communityId) ?? null,
-    attributedStaffId: row.attributedStaffId,
-    attributedStaffName: row.attributedStaffId
-      ? (staffNames.get(row.attributedStaffId) ?? null)
-      : null,
-    attributionState: row.attributionState,
-    attributionBasis: row.attributionBasis,
+    attributedStaffId: staffId,
+    attributedStaffName: staffId ? (staffNames.get(staffId) ?? null) : null,
+    attributionState: confirmedStaff ? 'attributed' : row.attributionState,
+    attributionBasis: confirmedStaff ? 'explicit_attribution' : row.attributionBasis,
     amountCents: row.amountCents,
     settlementAmountStatus: row.settlementAmountStatus,
     occurredAt: iso(row.occurredAt),
@@ -680,7 +724,8 @@ function mapEntryRows(
     batchNo: identity.batchNo,
     reconciliationState: identity.reconciliationState,
     anomalies: anomalyByEntry.get(row.entryId) ?? [],
-  }))
+    }
+  })
 }
 
 /* -------------------------------------------------------------------------- */
