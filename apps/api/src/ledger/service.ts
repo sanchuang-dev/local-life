@@ -6,6 +6,9 @@ import {
   ledgerAnomalyKindSchema,
   ledgerAnomalySchema,
   ledgerAnomalySeveritySchema,
+  ledgerSyncRequestSchema,
+  type LedgerSyncRequest,
+  type LedgerSyncResponse,
   type LedgerAnomalyListResponse,
   type LedgerAttributionBasis,
   type LedgerEntry,
@@ -75,7 +78,6 @@ const uuid = z.string().uuid()
 const isoTimestamp = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/, 'must be an ISO-8601 UTC timestamp')
-const businessDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be a YYYY-MM-DD business date')
 
 /**
  * A manual receipt. Every field of the 凭据 is required: an amount without a
@@ -150,42 +152,16 @@ export const listAnomaliesQuerySchema = z.strictObject({
 
 export type ListAnomaliesQuery = z.infer<typeof listAnomaliesQuerySchema>
 
-/** Ingestion window: inclusive business dates, interpreted in Asia/Shanghai. */
-export const syncLedgerFactsRequestSchema = z
-  .strictObject({
-    from: businessDate.optional(),
-    to: businessDate.optional(),
-  })
-  .superRefine((value, ctx) => {
-    if (value.from && value.to && value.to < value.from) {
-      ctx.addIssue({ code: 'custom', message: 'to must not be earlier than from', path: ['to'] })
-    }
-  })
-
-export type SyncLedgerFactsRequest = z.infer<typeof syncLedgerFactsRequestSchema>
+/** Public ingestion route and backend share the identical request schema. */
+export const syncLedgerFactsRequestSchema = ledgerSyncRequestSchema
+export type SyncLedgerFactsRequest = LedgerSyncRequest
 
 /* -------------------------------------------------------------------------- */
 /* Shared helpers                                                             */
 /* -------------------------------------------------------------------------- */
 
-interface SourceCounter {
-  scanned: number
-  created: number
-  skipped: number
-}
-
-export interface LedgerSyncResult {
-  /** Faces the scan visited, after the caller's community scope. */
-  scanned: number
-  created: number
-  skipped: number
-  /** Per-source breakdown, so a caller can see which producer was empty. */
-  sources: {
-    localOrder: SourceCounter
-    crmServiceOrder: SourceCounter
-    activityRewardGrant: SourceCounter
-  }
-}
+type SourceCounter = LedgerSyncResponse['sources']['localOrder']
+export type LedgerSyncResult = LedgerSyncResponse
 
 /** Everything needed to append one fact. `createdAt` is stamped by the caller. */
 interface FactInput {
