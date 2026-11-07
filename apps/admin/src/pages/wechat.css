@@ -61,7 +61,7 @@
   margin-top: 12px;
 }
 
-.wechat-page .wechat-form-head {
+.wechat-editor-drawer .wechat-form-head {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -70,45 +70,25 @@
   border-top: 1px solid #e9ecea;
 }
 
-.wechat-page .wechat-form-head h5.ant-typography {
+.wechat-editor-drawer .wechat-form-head h5.ant-typography {
   margin: 0;
 }
 
-.wechat-page .wechat-form-grid {
+.wechat-editor-drawer .wechat-form-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(170px, 230px);
   column-gap: 16px;
 }
 
-.wechat-page .wechat-form-error {
+.wechat-editor-drawer .wechat-form-error {
   margin-bottom: 16px;
 }
 
-.wechat-page .wechat-advanced {
-  border: 1px solid #e9ecea;
-  border-radius: 8px;
-  background: #fff;
+.wechat-details-drawer .wechat-advanced-content {
+  padding: 0 8px;
 }
 
-.wechat-page .wechat-advanced > summary {
-  padding: 13px 16px;
-  cursor: pointer;
-  color: #52635d;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.wechat-page .wechat-advanced > summary:focus-visible {
-  outline: 2px solid #287d6e;
-  outline-offset: 2px;
-}
-
-.wechat-page .wechat-advanced-content {
-  border-top: 1px solid #e9ecea;
-  padding: 0 16px 14px;
-}
-
-.wechat-page .wechat-advanced-section {
+.wechat-details-drawer .wechat-advanced-section {
   display: flex;
   flex-direction: column;
   gap: 9px;
@@ -116,18 +96,18 @@
   min-width: 0;
 }
 
-.wechat-page .wechat-advanced-section + .wechat-advanced-section {
+.wechat-details-drawer .wechat-advanced-section + .wechat-advanced-section {
   border-top: 1px solid #e9ecea;
 }
 
-.wechat-page .wechat-callback-row {
+.wechat-details-drawer .wechat-callback-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
 
-.wechat-page .wechat-callback-url {
+.wechat-details-drawer .wechat-callback-url {
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -154,7 +134,7 @@
     padding: 16px;
   }
 
-  .wechat-page .wechat-form-grid {
+  .wechat-editor-drawer .wechat-form-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
