@@ -27,20 +27,20 @@
 }
 
 .wechat-page .wechat-eyebrow {
-  color: #697671;
+  color: var(--ant-color-text-description, #64748b);
   font-size: 13px;
   min-width: 58px;
 }
 
 .wechat-page .wechat-quiet {
-  color: #6a7772;
+  color: var(--ant-color-text-description, #64748b);
   font-size: 13px;
 }
 
 .wechat-page .wechat-candidate {
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid #e9ecea;
+  border-top: 1px solid var(--ant-color-border-secondary, #e9ecea);
 }
 
 .wechat-page .wechat-candidate-error {
@@ -50,7 +50,7 @@
   gap: 8px;
   margin-top: 8px;
   font-size: 13px;
-  color: #b54137;
+  color: var(--ant-color-error, #b54137);
 }
 
 .wechat-page .wechat-actions {
@@ -67,7 +67,7 @@
   gap: 2px;
   margin: 20px 0 18px;
   padding-top: 20px;
-  border-top: 1px solid #e9ecea;
+  border-top: 1px solid var(--ant-color-border-secondary, #e9ecea);
 }
 
 .wechat-editor-drawer .wechat-form-head h5.ant-typography {
@@ -97,7 +97,7 @@
 }
 
 .wechat-details-drawer .wechat-advanced-section + .wechat-advanced-section {
-  border-top: 1px solid #e9ecea;
+  border-top: 1px solid var(--ant-color-border-secondary, #e9ecea);
 }
 
 .wechat-details-drawer .wechat-callback-row {
@@ -122,7 +122,7 @@
 .wechat-page .wechat-confirm-list {
   margin: 8px 0 0;
   padding-left: 18px;
-  color: #4b5b56;
+  color: var(--ant-color-text-secondary, #4b5b56);
 }
 
 .wechat-page .wechat-confirm-list li + li {
