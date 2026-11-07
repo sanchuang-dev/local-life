@@ -82,6 +82,8 @@ export const LEDGER_ROUTES = {
   adminEntries: '/admin/ledger/entries',
   /** Back office: anomaly inbox. */
   adminAnomalies: '/admin/ledger/anomalies',
+  /** Explicit projection of existing business facts; a CSRF-protected POST. */
+  adminSync: '/admin/ledger/sync',
   /** Back office: one reconciliation batch by id. */
   adminBatchDetail: '/admin/reconciliation/batches/:batchId',
   /** Back office: list / create reconciliation batches. */
@@ -543,6 +545,34 @@ export const ledgerOverviewSchema = z
   })
 
 export type LedgerOverview = z.infer<typeof ledgerOverviewSchema>
+
+/** Explicit, authorized source projection; read-only GETs never ingest facts. */
+export const ledgerSyncRequestSchema = z.strictObject({
+  from: businessDate.optional(),
+  to: businessDate.optional(),
+}).superRefine((value, ctx) => {
+  if (value.from && value.to && value.to < value.from) {
+    ctx.addIssue({ code: 'custom', message: 'to must not be earlier than from', path: ['to'] })
+  }
+})
+export type LedgerSyncRequest = z.infer<typeof ledgerSyncRequestSchema>
+
+const ledgerSyncSourceSchema = z.strictObject({
+  scanned: count,
+  created: count,
+  skipped: count,
+})
+export const ledgerSyncResponseSchema = z.strictObject({
+  scanned: count,
+  created: count,
+  skipped: count,
+  sources: z.strictObject({
+    localOrder: ledgerSyncSourceSchema,
+    crmServiceOrder: ledgerSyncSourceSchema,
+    activityRewardGrant: ledgerSyncSourceSchema,
+  }),
+})
+export type LedgerSyncResponse = z.infer<typeof ledgerSyncResponseSchema>
 
 /* -------------------------------------------------------------------------- */
 /* List                                                                      */
