@@ -529,7 +529,7 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
                     <span>{ACCOUNT_TYPE_LABELS[active.accountType]}</span>
                     <StatusTag status={active.status} />
                     <span className="wechat-quiet">
-                      最近验证：<span data-testid="wechat-active-verified-at">{formatTime(active.verifiedAt)}</span>
+                      最近验证：{formatTime(active.verifiedAt)}
                     </span>
                   </div>
                 ) : (
@@ -546,7 +546,7 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
                       <span>{ACCOUNT_TYPE_LABELS[candidate.accountType]}</span>
                       <StatusTag status={candidate.status} />
                       <span className="wechat-quiet">
-                        最近验证：<span data-testid="wechat-candidate-verified-at">{formatTime(candidate.verifiedAt)}</span>
+                        最近验证：{formatTime(candidate.verifiedAt)}
                       </span>
                     </div>
                     {candidate.lastErrorCode ? (
@@ -599,7 +599,7 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
               <Form<SaveFormValues>
                 form={form}
                 layout="vertical"
-                initialValues={{ accountType: 'test' }}
+                initialValues={{ accountType: 'official' }}
                 onFinish={handleSave}
                 disabled={!masterKeyAvailable}
               >
