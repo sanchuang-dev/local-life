@@ -7,7 +7,9 @@ import { ComponentPreviewPage } from '../pages/ComponentPreviewPage'
 import { CrmPage } from '../pages/CrmPage'
 import { DashboardPage } from '../pages/DashboardPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
+import { OrdersPage } from '../pages/OrdersPage'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
+import { ProductsPage } from '../pages/ProductsPage'
 import { UsersPage } from '../pages/UsersPage'
 import { SystemInfoPage } from '../pages/SystemInfoPage'
 import { NAV_PAGES } from './shell/navigation'
@@ -32,6 +34,8 @@ export const routes: RouteObject[] = [
       { path: 'activities', element: <ActivitiesPage /> },
       { path: 'activities/checkin', element: <ActivityCheckinPage /> },
       { path: 'customers', element: <CrmPage /> },
+      { path: 'products', element: <ProductsPage /> },
+      { path: 'orders', element: <OrdersPage /> },
       { path: 'communities', element: <CommunityAccountsRoute /> },
       { path: 'system/runtime', element: <SystemInfoPage /> },
       { path: 'users', element: <Navigate to='/communities' replace /> },

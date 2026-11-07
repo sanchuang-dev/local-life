@@ -57,6 +57,20 @@
       "when": 1793817686289,
       "tag": "0007_dispute_dismissed_restores_grant",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1793873021636,
+      "tag": "0008_motionless_chat",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1793944464509,
+      "tag": "0009_local_catalog_orders",
+      "breakpoints": true
     }
   ]
 }

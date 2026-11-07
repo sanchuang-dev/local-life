@@ -1,0 +1,61 @@
+{
+  "generatedAt": "2026-11-06T08:30:36.877Z",
+  "homeCommunity": "59d5c573-d683-4854-98e7-7890dbcfe1f3",
+  "foreignProduct": {
+    "id": "540ca12d-fd34-440e-b005-70282962060e",
+    "name": "阳光社区时令水果箱 r2e2e",
+    "community": {
+      "id": "9fe20967-5545-43cc-8b36-22d9f3ab27b7",
+      "name": "阳光社区"
+    }
+  },
+  "ownProductPresent": true,
+  "server": {
+    "registerStatus": 403,
+    "errorCode": "forbidden",
+    "errorMessage": "居民不属于该社区，无法登记该商品"
+  },
+  "ui": {
+    "productId": "540ca12d-fd34-440e-b005-70282962060e",
+    "productName": "阳光社区时令水果箱 r2e2e",
+    "community": {
+      "id": "9fe20967-5545-43cc-8b36-22d9f3ab27b7",
+      "name": "阳光社区"
+    },
+    "before": {
+      "communityLine": "阳光社区时令水果箱 r2e2e",
+      "registerButton": {
+        "text": "登记订单 / 提交办理意向",
+        "disabled": false
+      },
+      "buttons": [
+        {
+          "text": "跳到主要内容",
+          "disabled": false
+        },
+        {
+          "text": "登记订单 / 提交办理意向",
+          "disabled": false
+        },
+        {
+          "text": "返回上一页",
+          "disabled": false
+        }
+      ],
+      "warnsCrossCommunity": false,
+      "text": "跳到主要内容\n返回惠生活\n阳光社区时令水果箱 r2e2e\n\n水果 · 阳光社区\n\n水果\n阳光社区\n登记办理意向\n\n阳光社区时令水果箱 r2e2e\n\n邻社区商品，用于验证跨社区隔离\n\n¥45.00\n/ 件 · 参考单价\n\n本页价格由社区维护，登记订单时由服务端冻结商品名称与单价快照。\n\n商品说明\n\n包含 5 种时令蔬菜，约 3 公斤。登记后由社区工作人员电话确认自提时间。\n\n登记订单 / 提交办理意向\n\n只登记办理意向，平台不收款、不代下单；工作人员会按登记信息联系你。\n\n数量\n1\n\n参考合计 ¥45.00（以服务端快照为准）\n\n备注（选填，会随登记一并保存）\n登记订单 / 提交办理意向\n我的订单\n返回上一页\n活动\n惠生活\n（当前页面）\n我的"
+    },
+    "clicked": true,
+    "after": {
+      "alert": "没有权限：居民不属于该社区，无法登记该商品",
+      "text": "跳到主要内容\n返回惠生活\n阳光社区时令水果箱 r2e2e\n\n水果 · 阳光社区\n\n水果\n阳光社区\n登记办理意向\n\n阳光社区时令水果箱 r2e2e\n\n邻社区商品，用于验证跨社区隔离\n\n¥45.00\n/ 件 · 参考单价\n\n本页价格由社区维护，登记订单时由服务端冻结商品名称与单价快照。\n\n商品说明\n\n包含 5 种时令蔬菜，约 3 公斤。登记后由社区工作人员电话确认自提时间。\n\n登记订单 / 提交办理意向\n\n只登记办理意向，平台不收款、不代下单；工作人员会按登记信息联系你。\n\n数量\n1\n\n参考合计 ¥45.00（以服务端快照为准）\n\n备注（选填，会随登记一并保存）\n\n没有权限：居民不属于该社区，无法登记该商品\n\n登记订单 / 提交办理意向\n我的订单\n返回上一页\n活动\n惠生活\n（当前页面）\n我的"
+    },
+    "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-cross-community-375.png"
+  },
+  "interpretation": {
+    "serverRefuses": true,
+    "uiWarnsBeforeClick": false,
+    "uiOffersEnabledButton": true,
+    "uiShowsServerErrorAfterClick": true
+  }
+}

@@ -1,0 +1,721 @@
+{
+  "runTag": "r2e2e",
+  "executedAt": "2026-11-06T08:01:19.843Z",
+  "webOrigin": "http://localhost:5173",
+  "adminOrigin": "http://localhost:5174",
+  "passed": 117,
+  "failed": 0,
+  "checks": [
+    {
+      "label": "admin login",
+      "ok": true,
+      "evidence": "admin"
+    },
+    {
+      "label": "two communities exist",
+      "ok": true
+    },
+    {
+      "label": "operator login",
+      "ok": true
+    },
+    {
+      "label": "grid worker login",
+      "ok": true
+    },
+    {
+      "label": "products created through the admin API",
+      "ok": true
+    },
+    {
+      "label": "public catalogue only returns on-shelf products",
+      "ok": true
+    },
+    {
+      "label": "the off-shelf product is hidden from the catalogue",
+      "ok": true
+    },
+    {
+      "label": "the other community product is listed but scoped",
+      "ok": true
+    },
+    {
+      "label": "product detail is readable",
+      "ok": true
+    },
+    {
+      "label": "registration answers 201 with created=true",
+      "ok": true
+    },
+    {
+      "label": "price snapshot is frozen server-side",
+      "ok": true,
+      "evidence": {
+        "productId": "3329057e-f199-4ca2-870e-6e101bd4b92d",
+        "productName": "社区助农蔬菜包 r2e2e",
+        "unitPriceCents": 1990,
+        "quantity": 2,
+        "totalCents": 3980
+      }
+    },
+    {
+      "label": "a new registration starts as registered",
+      "ok": true
+    },
+    {
+      "label": "my orders list contains this registration",
+      "ok": true
+    },
+    {
+      "label": "my order detail carries the event timeline",
+      "ok": true
+    },
+    {
+      "label": "another resident cannot read this order (404, no enumeration)",
+      "ok": true
+    },
+    {
+      "label": "another resident's list never shows this order",
+      "ok": true
+    },
+    {
+      "label": "a resident cannot use the staff status route",
+      "ok": true,
+      "evidence": 401
+    },
+    {
+      "label": "an unauthenticated visitor cannot register",
+      "ok": true,
+      "evidence": 401
+    },
+    {
+      "label": "grid worker reads staff orders",
+      "ok": true
+    },
+    {
+      "label": "grid worker only sees orders inside the authorised community",
+      "ok": true,
+      "evidence": [
+        "幸福社区"
+      ]
+    },
+    {
+      "label": "grid worker never sees the other community order",
+      "ok": true
+    },
+    {
+      "label": "grid worker is rejected from /admin/local-orders",
+      "ok": true
+    },
+    {
+      "label": "grid worker is rejected from product management",
+      "ok": true
+    },
+    {
+      "label": "operator reads the admin order list",
+      "ok": true
+    },
+    {
+      "label": "operator can move the order to processing",
+      "ok": true
+    },
+    {
+      "label": "a stale expectedUpdatedAt answers 409",
+      "ok": true,
+      "evidence": "conflict"
+    },
+    {
+      "label": "operator submits the order for manual review",
+      "ok": true
+    },
+    {
+      "label": "the status route refuses verified",
+      "ok": true
+    },
+    {
+      "label": "operator verifies manually",
+      "ok": true
+    },
+    {
+      "label": "the verification block records reviewer and note",
+      "ok": true
+    },
+    {
+      "label": "a second verification answers 409",
+      "ok": true
+    },
+    {
+      "label": "the audit timeline records every transition",
+      "ok": true,
+      "evidence": [
+        "order.registered",
+        "order.status_changed",
+        "order.status_changed",
+        "order.verified"
+      ]
+    },
+    {
+      "label": "operator takes a product off the shelf",
+      "ok": true
+    },
+    {
+      "label": "existing order snapshots survive the shelf change",
+      "ok": true
+    },
+    {
+      "label": "an off-shelf product refuses new registrations",
+      "ok": true,
+      "evidence": "product_off_shelf"
+    },
+    {
+      "label": "01-life-320: no horizontal overflow at 320px",
+      "ok": true,
+      "evidence": "scrollWidth=320 clientWidth=320"
+    },
+    {
+      "label": "01-life-320: shows 「本地好物」",
+      "ok": true
+    },
+    {
+      "label": "01-life-320: shows 「社区助农蔬菜包 r2e2e」",
+      "ok": true
+    },
+    {
+      "label": "01-life-320: shows 「优惠购」",
+      "ok": true
+    },
+    {
+      "label": "02-life-375: no horizontal overflow at 375px",
+      "ok": true,
+      "evidence": "scrollWidth=375 clientWidth=375"
+    },
+    {
+      "label": "02-life-375: shows 「社区本地商品 · 登记办理意向」",
+      "ok": true
+    },
+    {
+      "label": "02-life-375: shows 「社区助农蔬菜包 r2e2e」",
+      "ok": true
+    },
+    {
+      "label": "03-life-1440: no horizontal overflow at 1440px",
+      "ok": true,
+      "evidence": "scrollWidth=1440 clientWidth=1440"
+    },
+    {
+      "label": "03-life-1440: shows 「本地好物」",
+      "ok": true
+    },
+    {
+      "label": "04-product-320: no horizontal overflow at 320px",
+      "ok": true,
+      "evidence": "scrollWidth=320 clientWidth=320"
+    },
+    {
+      "label": "04-product-320: shows 「登记订单 / 提交办理意向」",
+      "ok": true
+    },
+    {
+      "label": "04-product-320: shows 「¥19.90」",
+      "ok": true
+    },
+    {
+      "label": "04-product-320: shows 「社区助农蔬菜包 r2e2e」",
+      "ok": true
+    },
+    {
+      "label": "05-product-375: no horizontal overflow at 375px",
+      "ok": true,
+      "evidence": "scrollWidth=375 clientWidth=375"
+    },
+    {
+      "label": "05-product-375: shows 「登记订单 / 提交办理意向」",
+      "ok": true
+    },
+    {
+      "label": "05-product-375: shows 「参考合计」",
+      "ok": true
+    },
+    {
+      "label": "06-product-guest-375: no horizontal overflow at 375px",
+      "ok": true,
+      "evidence": "scrollWidth=375 clientWidth=375"
+    },
+    {
+      "label": "06-product-guest-375: shows 「登录后登记订单」",
+      "ok": true
+    },
+    {
+      "label": "06-product-guest-375: shows 「去登录 / 查看登录方式」",
+      "ok": true
+    },
+    {
+      "label": "07-my-orders-320: no horizontal overflow at 320px",
+      "ok": true,
+      "evidence": "scrollWidth=320 clientWidth=320"
+    },
+    {
+      "label": "07-my-orders-320: shows 「社区助农蔬菜包 r2e2e」",
+      "ok": true
+    },
+    {
+      "label": "07-my-orders-320: shows 「已登记」",
+      "ok": true
+    },
+    {
+      "label": "08-my-orders-375: no horizontal overflow at 375px",
+      "ok": true,
+      "evidence": "scrollWidth=375 clientWidth=375"
+    },
+    {
+      "label": "08-my-orders-375: shows 「我的订单」",
+      "ok": true
+    },
+    {
+      "label": "08-my-orders-375: shows 「本页只登记办理意向」",
+      "ok": true
+    },
+    {
+      "label": "09-my-orders-guest-375: no horizontal overflow at 375px",
+      "ok": true,
+      "evidence": "scrollWidth=375 clientWidth=375"
+    },
+    {
+      "label": "09-my-orders-guest-375: shows 「登录后查看我的订单」",
+      "ok": true
+    },
+    {
+      "label": "10-my-orders-empty-375: no horizontal overflow at 375px",
+      "ok": true,
+      "evidence": "scrollWidth=375 clientWidth=375"
+    },
+    {
+      "label": "10-my-orders-empty-375: shows 「还没有登记过订单」",
+      "ok": true
+    },
+    {
+      "label": "11-my-order-detail-375: no horizontal overflow at 375px",
+      "ok": true,
+      "evidence": "scrollWidth=375 clientWidth=375"
+    },
+    {
+      "label": "11-my-order-detail-375: shows 「订单详情」",
+      "ok": true
+    },
+    {
+      "label": "11-my-order-detail-375: shows 「商品快照」",
+      "ok": true
+    },
+    {
+      "label": "11-my-order-detail-375: shows 「处理时间线」",
+      "ok": true
+    },
+    {
+      "label": "11-my-order-detail-375: never claims 「已成交」",
+      "ok": true,
+      "evidence": "only appears in a negated sentence"
+    },
+    {
+      "label": "11-my-order-detail-375: never claims 「已开通」",
+      "ok": true,
+      "evidence": "only appears in a negated sentence"
+    },
+    {
+      "label": "12-my-order-detail-320: no horizontal overflow at 320px",
+      "ok": true,
+      "evidence": "scrollWidth=320 clientWidth=320"
+    },
+    {
+      "label": "12-my-order-detail-320: shows 「参考合计」",
+      "ok": true
+    },
+    {
+      "label": "12-my-order-detail-320: never claims 「已成交」",
+      "ok": true,
+      "evidence": "only appears in a negated sentence"
+    },
+    {
+      "label": "12-my-order-detail-320: never claims 「已开通」",
+      "ok": true,
+      "evidence": "only appears in a negated sentence"
+    },
+    {
+      "label": "13-me-320: no horizontal overflow at 320px",
+      "ok": true,
+      "evidence": "scrollWidth=320 clientWidth=320"
+    },
+    {
+      "label": "13-me-320: shows 「我的订单」",
+      "ok": true
+    },
+    {
+      "label": "14-me-375: no horizontal overflow at 375px",
+      "ok": true,
+      "evidence": "scrollWidth=375 clientWidth=375"
+    },
+    {
+      "label": "14-me-375: shows 「我的订单」",
+      "ok": true
+    },
+    {
+      "label": "14-me-375: shows 「本地商品登记记录」",
+      "ok": true
+    },
+    {
+      "label": "15-me-1440: no horizontal overflow at 1440px",
+      "ok": true,
+      "evidence": "scrollWidth=1440 clientWidth=1440"
+    },
+    {
+      "label": "15-me-1440: shows 「我的订单」",
+      "ok": true
+    },
+    {
+      "label": "16-workbench-orders-375: no horizontal overflow at 375px",
+      "ok": true,
+      "evidence": "scrollWidth=375 clientWidth=375"
+    },
+    {
+      "label": "16-workbench-orders-375: shows 「社区订单」",
+      "ok": true
+    },
+    {
+      "label": "16-workbench-orders-375: shows 「只显示服务端授权社区内的居民登记订单」",
+      "ok": true
+    },
+    {
+      "label": "17-workbench-orders-320: no horizontal overflow at 320px",
+      "ok": true,
+      "evidence": "scrollWidth=320 clientWidth=320"
+    },
+    {
+      "label": "17-workbench-orders-320: shows 「授权社区」",
+      "ok": true
+    },
+    {
+      "label": "18-workbench-order-detail-375: no horizontal overflow at 375px",
+      "ok": true,
+      "evidence": "scrollWidth=375 clientWidth=375"
+    },
+    {
+      "label": "18-workbench-order-detail-375: shows 「商品快照」",
+      "ok": true
+    },
+    {
+      "label": "18-workbench-order-detail-375: shows 「订单时间线」",
+      "ok": true
+    },
+    {
+      "label": "18-workbench-order-detail-375: shows 「人工核验通过」",
+      "ok": true
+    },
+    {
+      "label": "19-workbench-out-of-scope-375: no horizontal overflow at 375px",
+      "ok": true,
+      "evidence": "scrollWidth=375 clientWidth=375"
+    },
+    {
+      "label": "19-workbench-out-of-scope-375: shows 「订单不存在或不在授权社区」",
+      "ok": true
+    },
+    {
+      "label": "20-workbench-resident-visitor-375: no horizontal overflow at 375px",
+      "ok": true,
+      "evidence": "scrollWidth=375 clientWidth=375"
+    },
+    {
+      "label": "20-workbench-resident-visitor-375: shows 「网格员工作台」",
+      "ok": true
+    },
+    {
+      "label": "20-workbench-resident-visitor-375: shows 「当前浏览器登录的是居民账户」",
+      "ok": true
+    },
+    {
+      "label": "21-admin-products-1440: no horizontal overflow at 1440px",
+      "ok": true,
+      "evidence": "scrollWidth=1440 clientWidth=1440"
+    },
+    {
+      "label": "21-admin-products-1440: shows 「商品管理」",
+      "ok": true
+    },
+    {
+      "label": "21-admin-products-1440: shows 「新建商品」",
+      "ok": true
+    },
+    {
+      "label": "21-admin-products-1440: shows 「社区助农蔬菜包 r2e2e」",
+      "ok": true
+    },
+    {
+      "label": "22-admin-products-375: no horizontal overflow at 375px",
+      "ok": true,
+      "evidence": "scrollWidth=375 clientWidth=375"
+    },
+    {
+      "label": "22-admin-products-375: shows 「运营员视图」",
+      "ok": true
+    },
+    {
+      "label": "22-admin-products-375: shows 「仅能查看与操作管理员分配的社区」",
+      "ok": true
+    },
+    {
+      "label": "23-admin-product-form-375: no horizontal overflow at 375px",
+      "ok": true,
+      "evidence": "scrollWidth=375 clientWidth=375"
+    },
+    {
+      "label": "23-admin-product-form-375: shows 「新建本地商品」",
+      "ok": true
+    },
+    {
+      "label": "23-admin-product-form-375: shows 「单价（元）」",
+      "ok": true
+    },
+    {
+      "label": "23-admin-product-form-375: shows 「创建商品」",
+      "ok": true
+    },
+    {
+      "label": "24-admin-orders-1440: no horizontal overflow at 1440px",
+      "ok": true,
+      "evidence": "scrollWidth=1440 clientWidth=1440"
+    },
+    {
+      "label": "24-admin-orders-1440: shows 「订单管理」",
+      "ok": true
+    },
+    {
+      "label": "24-admin-orders-1440: shows 「社区助农蔬菜包 r2e2e」",
+      "ok": true
+    },
+    {
+      "label": "25-admin-orders-375: no horizontal overflow at 375px",
+      "ok": true,
+      "evidence": "scrollWidth=375 clientWidth=375"
+    },
+    {
+      "label": "25-admin-orders-375: shows 「登记快照」",
+      "ok": true
+    },
+    {
+      "label": "26-admin-order-detail-375: no horizontal overflow at 375px",
+      "ok": true,
+      "evidence": "scrollWidth=375 clientWidth=375"
+    },
+    {
+      "label": "26-admin-order-detail-375: shows 「订单详情」",
+      "ok": true
+    },
+    {
+      "label": "26-admin-order-detail-375: shows 「商品快照」",
+      "ok": true
+    },
+    {
+      "label": "26-admin-order-detail-375: shows 「订单时间线」",
+      "ok": true
+    },
+    {
+      "label": "27-admin-orders-grid-worker-1440: no horizontal overflow at 1440px",
+      "ok": true,
+      "evidence": "scrollWidth=1440 clientWidth=1440"
+    },
+    {
+      "label": "27-admin-orders-grid-worker-1440: shows 「网格员没有后台订单核验权限」",
+      "ok": true
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "01-life-320",
+      "width": 320,
+      "height": 900,
+      "overflow": false,
+      "scrollWidth": 320
+    },
+    {
+      "name": "02-life-375",
+      "width": 375,
+      "height": 900,
+      "overflow": false,
+      "scrollWidth": 375
+    },
+    {
+      "name": "03-life-1440",
+      "width": 1440,
+      "height": 900,
+      "overflow": false,
+      "scrollWidth": 1440
+    },
+    {
+      "name": "04-product-320",
+      "width": 320,
+      "height": 1100,
+      "overflow": false,
+      "scrollWidth": 320
+    },
+    {
+      "name": "05-product-375",
+      "width": 375,
+      "height": 1100,
+      "overflow": false,
+      "scrollWidth": 375
+    },
+    {
+      "name": "06-product-guest-375",
+      "width": 375,
+      "height": 1100,
+      "overflow": false,
+      "scrollWidth": 375
+    },
+    {
+      "name": "07-my-orders-320",
+      "width": 320,
+      "height": 900,
+      "overflow": false,
+      "scrollWidth": 320
+    },
+    {
+      "name": "08-my-orders-375",
+      "width": 375,
+      "height": 900,
+      "overflow": false,
+      "scrollWidth": 375
+    },
+    {
+      "name": "09-my-orders-guest-375",
+      "width": 375,
+      "height": 900,
+      "overflow": false,
+      "scrollWidth": 375
+    },
+    {
+      "name": "10-my-orders-empty-375",
+      "width": 375,
+      "height": 900,
+      "overflow": false,
+      "scrollWidth": 375
+    },
+    {
+      "name": "11-my-order-detail-375",
+      "width": 375,
+      "height": 1200,
+      "overflow": false,
+      "scrollWidth": 375
+    },
+    {
+      "name": "12-my-order-detail-320",
+      "width": 320,
+      "height": 1200,
+      "overflow": false,
+      "scrollWidth": 320
+    },
+    {
+      "name": "13-me-320",
+      "width": 320,
+      "height": 900,
+      "overflow": false,
+      "scrollWidth": 320
+    },
+    {
+      "name": "14-me-375",
+      "width": 375,
+      "height": 900,
+      "overflow": false,
+      "scrollWidth": 375
+    },
+    {
+      "name": "15-me-1440",
+      "width": 1440,
+      "height": 900,
+      "overflow": false,
+      "scrollWidth": 1440
+    },
+    {
+      "name": "16-workbench-orders-375",
+      "width": 375,
+      "height": 1000,
+      "overflow": false,
+      "scrollWidth": 375
+    },
+    {
+      "name": "17-workbench-orders-320",
+      "width": 320,
+      "height": 1000,
+      "overflow": false,
+      "scrollWidth": 320
+    },
+    {
+      "name": "18-workbench-order-detail-375",
+      "width": 375,
+      "height": 1400,
+      "overflow": false,
+      "scrollWidth": 375
+    },
+    {
+      "name": "19-workbench-out-of-scope-375",
+      "width": 375,
+      "height": 900,
+      "overflow": false,
+      "scrollWidth": 375
+    },
+    {
+      "name": "20-workbench-resident-visitor-375",
+      "width": 375,
+      "height": 900,
+      "overflow": false,
+      "scrollWidth": 375
+    },
+    {
+      "name": "21-admin-products-1440",
+      "width": 1440,
+      "height": 1000,
+      "overflow": false,
+      "scrollWidth": 1440
+    },
+    {
+      "name": "22-admin-products-375",
+      "width": 375,
+      "height": 1000,
+      "overflow": false,
+      "scrollWidth": 375
+    },
+    {
+      "name": "23-admin-product-form-375",
+      "width": 375,
+      "height": 1200,
+      "overflow": false,
+      "scrollWidth": 375
+    },
+    {
+      "name": "24-admin-orders-1440",
+      "width": 1440,
+      "height": 1000,
+      "overflow": false,
+      "scrollWidth": 1440
+    },
+    {
+      "name": "25-admin-orders-375",
+      "width": 375,
+      "height": 1000,
+      "overflow": false,
+      "scrollWidth": 375
+    },
+    {
+      "name": "26-admin-order-detail-375",
+      "width": 375,
+      "height": 1400,
+      "overflow": false,
+      "scrollWidth": 375
+    },
+    {
+      "name": "27-admin-orders-grid-worker-1440",
+      "width": 1440,
+      "height": 900,
+      "overflow": false,
+      "scrollWidth": 1440
+    }
+  ]
+}

@@ -33,9 +33,22 @@ import {
   wechatIdentities,
 } from './db/schema.js'
 import { constantTimeTextEqual, hashPassword, hashToken, randomToken, verifyPassword } from './auth/security.js'
+import {
+  OAUTH_RETURN_COOKIE,
+  OAUTH_RETURN_COOKIE_PATH,
+  OAUTH_STATE_TTL_SECONDS,
+  bindReturnToCookie,
+  oauthResultDestination,
+  readBoundReturnTo,
+  resolveReturnTo,
+} from './auth/oauth-return.js'
+import { registerPhoneAuthRoutes } from './auth/phone-routes.js'
+import type { SmsSender } from './auth/phone.js'
 import { logEvent } from './log.js'
 import { registerActivityRoutes } from './activities/routes.js'
 import { registerCrmRoutes } from './crm/routes.js'
+import { registerLocalCatalogRoutes } from './local/routes.js'
+import { registerLocalOrderRoutes } from './local/order-routes.js'
 import { registerParticipationRoutes } from './participation/routes.js'
 import { registerRewardRoutes } from './rewards/routes.js'
 import { registerCrmebRoutes } from './crmeb/routes.js'
@@ -48,6 +61,14 @@ export interface AppOptions {
   db?: AppDatabase
   config?: ApiConfig
   fetcher?: typeof fetch
+  /**
+   * SMS delivery for phone verification codes (#93). No provider is bundled:
+   * without an injected sender the phone endpoints answer 503 `not_configured`.
+   * The test suite injects a capturing fake; production passes nothing.
+   */
+  smsSender?: SmsSender
+  /** Injectable clock so OTP expiry/throttle windows are testable. */
+  now?: () => Date
 }
 
 const SESSION_COOKIE = 'll_session'
@@ -291,14 +312,36 @@ function clearFailedLogins(db: AppDatabase, key: string) {
   db.delete(rateLimits).where(eq(rateLimits.key, key)).run()
 }
 
+function oauthCookieOptions(config: ApiConfig, maxAge: number) {
+  return {
+    ...cookieOptions(config, maxAge),
+    path: OAUTH_NONCE_COOKIE_PATH,
+  }
+}
+
+/**
+ * Drop both OAuth-attempt cookies. Called on every terminal callback path, so a
+ * failed attempt cannot leave a nonce or a bound return target behind for a
+ * later replay.
+ */
+function clearOauthCookies(c: AppContext, config: ApiConfig) {
+  const options = {
+    path: OAUTH_NONCE_COOKIE_PATH,
+    secure: config.cookieSecure,
+    sameSite: 'Lax' as const,
+    ...(config.cookieDomain ? { domain: config.cookieDomain } : {}),
+  }
+  deleteCookie(c, OAUTH_NONCE_COOKIE, options)
+  deleteCookie(c, OAUTH_RETURN_COOKIE, options)
+}
+
 function redirectToWeb(
   c: AppContext,
   config: ApiConfig,
   result: string,
+  returnTo: string | null = null,
 ) {
-  const destination = new URL(config.webBaseUrl)
-  destination.hash = result === 'success' ? '/me?auth=success' : `/me?auth_error=${encodeURIComponent(result)}`
-  return c.redirect(destination.toString(), 302)
+  return c.redirect(oauthResultDestination(config.webBaseUrl, result, returnTo), 302)
 }
 
 function bodySchemaError<T>(
@@ -355,6 +398,10 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
   app.get('/auth/methods', (c) =>
     c.json({
       wechat: Boolean(config.wechat),
+      // Additive, untyped field: the H5 renders an explicit "unavailable plus
+      // reason" state instead of a button that can never work. `null` when the
+      // WeChat account credentials are configured.
+      wechatUnavailableReason: config.wechat ? null : API_ERROR_CODES.notConfigured,
       developmentResidentLogin: config.nodeEnv !== 'production' && config.authDevEnabled,
     }),
   )
@@ -513,6 +560,13 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
       !db.select().from(communities).where(eq(communities.id, communityId)).get())) {
       return fail(c, 400, API_ERROR_CODES.invalidRequest, '社区参数无效')
     }
+    // A target that is present but not a same-origin resident path is a caller
+    // bug or an attack, never something to silently ignore: fail before a state
+    // is minted so no OAuth attempt exists that could land anywhere unexpected.
+    const returnToCheck = resolveReturnTo(c.req.query('returnTo'), config.webBaseUrl)
+    if (!returnToCheck.ok) {
+      return fail(c, 400, API_ERROR_CODES.invalidRequest, '回跳地址无效，只能回到本站居民页面')
+    }
 
     const state = randomToken()
     const nonce = randomToken()
@@ -524,16 +578,30 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
         stateHash: hashToken(state),
         nonceHash: hashToken(nonce),
         communityId: communityId ?? null,
-        expiresAt: new Date(now.getTime() + 10 * 60 * 1000),
+        expiresAt: new Date(now.getTime() + OAUTH_STATE_TTL_SECONDS * 1000),
         consumedAt: null,
         createdAt: now,
       })
       .run()
 
-    setCookie(c, OAUTH_NONCE_COOKIE, nonce, {
-      ...cookieOptions(config, 10 * 60),
-      path: OAUTH_NONCE_COOKIE_PATH,
-    })
+    setCookie(c, OAUTH_NONCE_COOKIE, nonce, oauthCookieOptions(config, OAUTH_STATE_TTL_SECONDS))
+    const boundReturnTo = bindReturnToCookie(state, returnToCheck.returnTo)
+    if (boundReturnTo) {
+      setCookie(
+        c,
+        OAUTH_RETURN_COOKIE,
+        boundReturnTo,
+        oauthCookieOptions(config, OAUTH_STATE_TTL_SECONDS),
+      )
+    } else {
+      // A fresh attempt without a target must not inherit an older target.
+      deleteCookie(c, OAUTH_RETURN_COOKIE, {
+        path: OAUTH_RETURN_COOKIE_PATH,
+        secure: config.cookieSecure,
+        sameSite: 'Lax',
+        ...(config.cookieDomain ? { domain: config.cookieDomain } : {}),
+      })
+    }
     const authorizeUrl = new URL('https://open.weixin.qq.com/connect/oauth2/authorize')
     authorizeUrl.search = new URLSearchParams({
       appid: config.wechat.appId,
@@ -548,11 +616,29 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
 
   app.get('/auth/wechat/callback', async (c) => {
     const nonce = getCookie(c, OAUTH_NONCE_COOKIE)
-    const state = c.req.query('state')
+    const state = c.req.query('state') ?? null
     const code = c.req.query('code')
     const oauthError = c.req.query('errcode')
     if (!config.wechat) return redirectToWeb(c, config, 'wechat_not_configured')
-    if (oauthError || !state || !code || !nonce) return redirectToWeb(c, config, 'wechat_authorization_failed')
+
+    // Only the target minted together with this attempt is honoured, and only
+    // after re-validating it. Anything else falls back to the default page.
+    const boundReturnTo = readBoundReturnTo(
+      getCookie(c, OAUTH_RETURN_COOKIE),
+      state,
+      config.webBaseUrl,
+    )
+
+    if (oauthError || !code) {
+      clearOauthCookies(c, config)
+      return redirectToWeb(c, config, 'wechat_authorization_failed', boundReturnTo)
+    }
+    if (!state || !nonce) {
+      // Without the attempt's state (or the nonce cookie it is bound to) nothing
+      // proves this callback belongs to a login this browser started.
+      clearOauthCookies(c, config)
+      return redirectToWeb(c, config, 'wechat_state_invalid', boundReturnTo)
+    }
 
     const now = new Date()
     const stateRecord = db
@@ -566,7 +652,8 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
       stateRecord.expiresAt.getTime() <= now.getTime() ||
       !constantTimeTextEqual(stateRecord.nonceHash, hashToken(nonce))
     ) {
-      return redirectToWeb(c, config, 'wechat_state_invalid')
+      clearOauthCookies(c, config)
+      return redirectToWeb(c, config, 'wechat_state_invalid', boundReturnTo)
     }
 
     const consumed = db
@@ -580,7 +667,10 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
         ),
       )
       .run()
-    if (consumed.changes !== 1) return redirectToWeb(c, config, 'wechat_state_replayed')
+    if (consumed.changes !== 1) {
+      clearOauthCookies(c, config)
+      return redirectToWeb(c, config, 'wechat_state_replayed', boundReturnTo)
+    }
 
     try {
       const tokenUrl = new URL('https://api.weixin.qq.com/sns/oauth2/access_token')
@@ -591,14 +681,18 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
         grant_type: 'authorization_code',
       }).toString()
       const response = await fetcher(tokenUrl, { signal: AbortSignal.timeout(10_000) })
-      if (!response.ok) return redirectToWeb(c, config, 'wechat_provider_unavailable')
+      if (!response.ok) {
+        clearOauthCookies(c, config)
+        return redirectToWeb(c, config, 'wechat_provider_unavailable', boundReturnTo)
+      }
       const tokenPayload = (await response.json()) as {
         openid?: string
         unionid?: string
         errcode?: number
       }
       if (!tokenPayload.openid || tokenPayload.errcode) {
-        return redirectToWeb(c, config, 'wechat_identity_unavailable')
+        clearOauthCookies(c, config)
+        return redirectToWeb(c, config, 'wechat_identity_unavailable', boundReturnTo)
       }
 
       const userId = db.transaction((tx) => {
@@ -641,24 +735,24 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
             .onConflictDoNothing()
             .run()
         }
+        // Deliberately no participation write here: logging in only establishes
+        // identity. Joining an activity (and its invite attribution) stays an
+        // explicit `POST /activities/:activityId/participation` confirmed by the
+        // resident, so opening an invite link never auto-enrols anyone.
         return resolvedUserId
       })
 
       const created = createSession(db, config, userId, null)
       setSessionCookies(c, config, created.token, created.csrfToken)
-      deleteCookie(c, OAUTH_NONCE_COOKIE, {
-        path: OAUTH_NONCE_COOKIE_PATH,
-        secure: config.cookieSecure,
-        sameSite: 'Lax',
-        ...(config.cookieDomain ? { domain: config.cookieDomain } : {}),
-      })
-      return redirectToWeb(c, config, 'success')
+      clearOauthCookies(c, config)
+      return redirectToWeb(c, config, 'success', boundReturnTo)
     } catch (error) {
       logEvent('wechat.oauth.failed', {
         requestId: c.get('requestId'),
         errorType: error instanceof Error ? error.name : 'unknown',
       })
-      return redirectToWeb(c, config, 'wechat_provider_unavailable')
+      clearOauthCookies(c, config)
+      return redirectToWeb(c, config, 'wechat_provider_unavailable', boundReturnTo)
     }
   })
 
@@ -878,6 +972,22 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     bodySchemaError,
   })
 
+  registerLocalCatalogRoutes(app, {
+    db,
+    config,
+    fail,
+    validCsrf,
+    bodySchemaError,
+  })
+
+  registerLocalOrderRoutes(app, {
+    db,
+    config,
+    fail,
+    validCsrf,
+    bodySchemaError,
+  })
+
   registerRewardRoutes(app, {
     db,
     config,
@@ -893,6 +1003,18 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     fail,
     validCsrf,
     bodySchemaError,
+  })
+
+  registerPhoneAuthRoutes(app, {
+    db,
+    config,
+    fail,
+    validCsrf,
+    bodySchemaError,
+    createSession,
+    setSessionCookies,
+    smsSender: options.smsSender,
+    now: options.now ?? (() => new Date()),
   })
 
   app.notFound((c) =>

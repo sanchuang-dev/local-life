@@ -1,0 +1,76 @@
+{
+  "generatedAt": "2026-11-06T07:09:58.954Z",
+  "port": 4391,
+  "results": [
+    {
+      "name": "P1 the real API entrypoint starts and answers /healthz on a TCP port",
+      "ok": true,
+      "detail": "http://127.0.0.1:4391/healthz -> local-life-api"
+    },
+    {
+      "name": "P2 admin login works over the network with the CSRF double-submit pair",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "P3 the product is created and put on sale through the running server",
+      "ok": true,
+      "detail": "shelf=on_shelf"
+    },
+    {
+      "name": "P4 registration over the network freezes the snapshot server-side (1280 x 3)",
+      "ok": true,
+      "detail": "{\"productId\":\"a64bf27a-1083-4944-941b-2078445113f9\",\"productName\":\"进程验证商品\",\"unitPriceCents\":1280,\"quantity\":3,\"totalCents\":3840}"
+    },
+    {
+      "name": "P5 the order reaches verified over the network before the restart",
+      "ok": true,
+      "detail": "status=verified"
+    },
+    {
+      "name": "P6 the first API process is terminated and leaves the database reopenable",
+      "ok": true,
+      "detail": "code=null signal=SIGTERM"
+    },
+    {
+      "name": "P7 a second, independent API process starts against the same database file",
+      "ok": true,
+      "detail": "port=4391"
+    },
+    {
+      "name": "P8 the resident session cookie still authenticates on the new process",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "P9 the order, its snapshot and the verification record survive the process restart",
+      "ok": true,
+      "detail": "verified 3840 进程内核对完成"
+    },
+    {
+      "name": "P10 the whole append-only timeline survives the process restart",
+      "ok": true,
+      "detail": "registered,processing,pending_review,verified"
+    },
+    {
+      "name": "P11 the idempotency key replays into the same order on the NEW process (no second row)",
+      "ok": true,
+      "detail": "status=200 created=false"
+    },
+    {
+      "name": "P12 the public catalogue still serves the product after the restart",
+      "ok": true,
+      "detail": "total=1"
+    },
+    {
+      "name": "P13 the second API process is terminated as well",
+      "ok": true,
+      "detail": "code=null signal=SIGTERM"
+    },
+    {
+      "name": "P14 the process-restart temp directory was removed without EPERM",
+      "ok": true,
+      "detail": "database existed before cleanup=true"
+    }
+  ]
+}

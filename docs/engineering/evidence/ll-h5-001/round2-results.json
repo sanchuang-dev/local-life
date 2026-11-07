@@ -1,0 +1,38 @@
+[
+  {
+    "case": "no session + ?auth=success",
+    "href": "http://127.0.0.1:5191/community/activity/silver-neighborhood?activityId=bc2bfa7a-25bb-4023-ad37-94f5eb1d499c&invite=a1b2c3d4e5f60718293a4b5c6d7e8f90",
+    "authParamStripped": true,
+    "successTextShown": false,
+    "loginEntryShown": true,
+    "unauthHeadingShown": true
+  },
+  {
+    "case": "no session + ?auth=success#wechat_redirect",
+    "href": "http://127.0.0.1:5191/community/activity/silver-neighborhood?activityId=bc2bfa7a-25bb-4023-ad37-94f5eb1d499c&invite=a1b2c3d4e5f60718293a4b5c6d7e8f90",
+    "authParamStripped": true,
+    "fragmentStripped": true,
+    "successTextShown": false
+  },
+  {
+    "case": "no session + ?auth_error=wechat_authorization_failed",
+    "href": "http://127.0.0.1:5191/community/activity/silver-neighborhood?activityId=bc2bfa7a-25bb-4023-ad37-94f5eb1d499c&invite=a1b2c3d4e5f60718293a4b5c6d7e8f90",
+    "authParamStripped": true,
+    "retryShown": true,
+    "explicitReasonShown": true,
+    "successTextShown": false
+  },
+  {
+    "case": "authenticated session + ?auth=success",
+    "href": "http://127.0.0.1:5191/community/activity/silver-neighborhood?activityId=bc2bfa7a-25bb-4023-ad37-94f5eb1d499c&invite=a1b2c3d4e5f60718293a4b5c6d7e8f90",
+    "authParamStripped": true,
+    "successTextShown": true,
+    "noAutoJoinClaim": true,
+    "sessionAuthenticated": true
+  },
+  {
+    "case": "authenticated session + reload (no replay)",
+    "href": "http://127.0.0.1:5191/community/activity/silver-neighborhood?activityId=bc2bfa7a-25bb-4023-ad37-94f5eb1d499c&invite=a1b2c3d4e5f60718293a4b5c6d7e8f90",
+    "successTextShown": false
+  }
+]

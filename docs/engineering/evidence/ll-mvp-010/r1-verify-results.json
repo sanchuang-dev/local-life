@@ -1,0 +1,651 @@
+{
+  "generatedAt": "2026-11-06T07:14:25.431Z",
+  "databasePath": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\ll-r1-verify-VdhuFd\\r1.sqlite",
+  "results": [
+    {
+      "name": "A1 create product -> 201, starts off_shelf, price in integer cents",
+      "ok": true,
+      "detail": "status=off_shelf priceCents=450"
+    },
+    {
+      "name": "A2 off-shelf product is invisible in the public catalogue",
+      "ok": true,
+      "detail": "total=0"
+    },
+    {
+      "name": "A3 shelf endpoint puts it on sale",
+      "ok": true,
+      "detail": "status=on_shelf"
+    },
+    {
+      "name": "A4 public catalogue now lists it with the product price",
+      "ok": true,
+      "detail": "total=1 price=450"
+    },
+    {
+      "name": "A5 public detail is session-free and carries the description",
+      "ok": true,
+      "detail": "description=本地农户直供，按份登记"
+    },
+    {
+      "name": "A6 resident registration -> 201 created:true, status registered",
+      "ok": true,
+      "detail": "status=201 created=true order.status=registered"
+    },
+    {
+      "name": "A7 snapshot is computed server-side: 450 x 3 = 1350",
+      "ok": true,
+      "detail": "{\"productId\":\"0a50aee2-6a9b-439e-b301-501fffe62eb0\",\"productName\":\"社区直供青菜\",\"unitPriceCents\":450,\"quantity\":3,\"totalCents\":1350}"
+    },
+    {
+      "name": "A8 order community comes from the product, not the body",
+      "ok": true,
+      "detail": "community=8cbb9e25-b1a1-43c3-a061-10b17d04eb86"
+    },
+    {
+      "name": "A9 a resident-recorded order has no staff attribution",
+      "ok": true,
+      "detail": "resident"
+    },
+    {
+      "name": "A10 resident \"my orders\" lists exactly this order",
+      "ok": true,
+      "detail": "total=1"
+    },
+    {
+      "name": "A11 resident can read own order detail",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "A12 grid worker sees the order of their assigned community",
+      "ok": true,
+      "detail": "total=1"
+    },
+    {
+      "name": "A13 grid worker moves registered -> processing",
+      "ok": true,
+      "detail": "status=processing"
+    },
+    {
+      "name": "A14 operator moves processing -> pending_review",
+      "ok": true,
+      "detail": "status=pending_review"
+    },
+    {
+      "name": "A15 operations verification -> verified with reviewer + note",
+      "ok": true,
+      "detail": "status=verified note=现场核对已登记"
+    },
+    {
+      "name": "A16 the contract has no payment / activation concept",
+      "ok": true,
+      "detail": "id,community,resident,snapshot,status,recordSource,createdByStaff,attributedStaff,sourceActivity,note,createdAt,updatedAt,verification,statusNote,events"
+    },
+    {
+      "name": "A17 append-only timeline has the four expected events in order",
+      "ok": true,
+      "detail": "order.registered -> order.status_changed -> order.status_changed -> order.verified"
+    },
+    {
+      "name": "A18 every event carries the stable local_order source pair",
+      "ok": true,
+      "detail": "local_order:true,local_order:true,local_order:true,local_order:true"
+    },
+    {
+      "name": "A19 local audits are written with a local_ prefix only (no crm./crmeb. leakage)",
+      "ok": true,
+      "detail": "local_catalog.product.created,local_catalog.product.shelf_changed,local_order.registered,local_order.status_changed,local_order.status_changed,local_order.verified"
+    },
+    {
+      "name": "B1 the same idempotency key twice -> 201 then 200 created:false, one row, same id",
+      "ok": true,
+      "detail": "first=201 second=200 rows=1"
+    },
+    {
+      "name": "B2 the same key with different content -> 409 order_idempotency_conflict, still one row",
+      "ok": true,
+      "detail": "status=409"
+    },
+    {
+      "name": "B3 all 12 local routes answer 401 unauthorized without a session",
+      "ok": true,
+      "detail": "12/12"
+    },
+    {
+      "name": "B4 the public catalogue stays readable without a session (by design)",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "B5 a write without the CSRF double-submit pair -> 403 forbidden",
+      "ok": true,
+      "detail": "status=403"
+    },
+    {
+      "name": "B6 a write from an untrusted Origin -> 403",
+      "ok": true,
+      "detail": "status=403"
+    },
+    {
+      "name": "B7 admin writes are CSRF-guarded too",
+      "ok": true,
+      "detail": "status=403"
+    },
+    {
+      "name": "B8 grid_worker cannot manage the catalogue (403 on both create and list)",
+      "ok": true,
+      "detail": "create=403 list=403"
+    },
+    {
+      "name": "B9 operator (non-admin role) may manage the catalogue",
+      "ok": true,
+      "detail": "status=off_shelf"
+    },
+    {
+      "name": "B10 grid worker reading another community's order -> 403 forbidden",
+      "ok": true,
+      "detail": "status=403"
+    },
+    {
+      "name": "B11 operator of another community reading it -> 403",
+      "ok": true,
+      "detail": "status=403"
+    },
+    {
+      "name": "B12 lists are scope-filtered at query level (grid/operator cannot see the other community)",
+      "ok": true,
+      "detail": "grid=2 operator=2 admin=3"
+    },
+    {
+      "name": "B13 an explicit ?communityId= outside the scope -> 403, not an empty page",
+      "ok": true,
+      "detail": "status=403"
+    },
+    {
+      "name": "B14 grid worker transitioning another community's order -> 403",
+      "ok": true,
+      "detail": "status=403"
+    },
+    {
+      "name": "B15 another resident's order -> 404 (not 403, so it is not enumerable)",
+      "ok": true,
+      "detail": "status=404"
+    },
+    {
+      "name": "B16 a resident cannot register a product of a community they do not belong to -> 403",
+      "ok": true,
+      "detail": "status=403"
+    },
+    {
+      "name": "B17 on-behalf recording outside the assigned community -> 403",
+      "ok": true,
+      "detail": "status=403"
+    },
+    {
+      "name": "B18 a resident of another community cannot be recorded against this product -> 403",
+      "ok": true,
+      "detail": "grid=403 admin=403"
+    },
+    {
+      "name": "B19 a non-existent resident account on behalf -> 404 (no ghost order)",
+      "ok": true,
+      "detail": "status=404"
+    },
+    {
+      "name": "B20 an off-shelf product refuses new registrations with 409 product_off_shelf",
+      "ok": true,
+      "detail": "status=409"
+    },
+    {
+      "name": "B21 the off-shelf product is a 404 on the public detail route",
+      "ok": true,
+      "detail": "status=404"
+    },
+    {
+      "name": "B22 an existing order keeps its frozen snapshot after the product goes off shelf",
+      "ok": true,
+      "detail": "{\"productId\":\"0de15175-068c-4916-b051-fd883b25f666\",\"productName\":\"限时团购米\",\"unitPriceCents\":2999,\"quantity\":2,\"totalCents\":5998}"
+    },
+    {
+      "name": "B23 re-shelving works through the same endpoint (both directions idempotent)",
+      "ok": true,
+      "detail": "status=on_shelf"
+    },
+    {
+      "name": "B24 seven client-injected fields are rejected with 400 (strict body, not silently dropped)",
+      "ok": true,
+      "detail": "priceCents=400 unitPriceCents=400 totalCents=400 communityId=400 residentUserId=400 status=400 recordSource=400"
+    },
+    {
+      "name": "B25 a legitimate registration uses the server price (500 x 1)",
+      "ok": true,
+      "detail": "{\"productId\":\"75cb52b4-aeb7-4dd5-af77-ebcc78fda6fe\",\"productName\":\"防篡改商品\",\"unitPriceCents\":500,\"quantity\":1,\"totalCents\":500}"
+    },
+    {
+      "name": "B26 a later price/name edit does NOT rewrite the existing order snapshot",
+      "ok": true,
+      "detail": "edited=900 snapshot=500/防篡改商品"
+    },
+    {
+      "name": "B27 a NEW order for the same product uses the new price",
+      "ok": true,
+      "detail": "{\"productId\":\"75cb52b4-aeb7-4dd5-af77-ebcc78fda6fe\",\"productName\":\"涨价后的商品\",\"unitPriceCents\":900,\"quantity\":1,\"totalCents\":900}"
+    },
+    {
+      "name": "B28 a resident cannot drive the staff state machine (401 on the staff route)",
+      "ok": true,
+      "detail": "status=401"
+    },
+    {
+      "name": "B29 staff cancel works and a cancelled order is final (409 on the next transition)",
+      "ok": true,
+      "detail": "cancelled=cancelled retry=409"
+    },
+    {
+      "name": "B30 the cancellation reason stays readable in the timeline",
+      "ok": true,
+      "detail": "statusNote=居民来电取消"
+    },
+    {
+      "name": "B31 only pending_review orders may be verified (409 before that)",
+      "ok": true,
+      "detail": "status=409"
+    },
+    {
+      "name": "B32 a grid worker may NOT verify (403)",
+      "ok": true,
+      "detail": "status=403"
+    },
+    {
+      "name": "B33 a resident session is not a staff session (401 on verify)",
+      "ok": true,
+      "detail": "status=401"
+    },
+    {
+      "name": "B34 a second verification -> 409 order_already_verified (never a silent second success)",
+      "ok": true,
+      "detail": "status=409"
+    },
+    {
+      "name": "B35 a verified order cannot be moved back through the status endpoint -> 409 order_already_verified",
+      "ok": true,
+      "detail": "status=409"
+    },
+    {
+      "name": "B36 verification reject -> rejected, no verification block, reason in the timeline",
+      "ok": true,
+      "detail": "status=rejected statusNote=商品当日缺货，请居民改日再登记"
+    },
+    {
+      "name": "B37 out-of-range quantities (0, -1, 100, 1.5) -> 400",
+      "ok": true,
+      "detail": "0=400 -1=400 100=400 1.5=400"
+    },
+    {
+      "name": "B38 skipping a state (registered -> pending_review) -> 409",
+      "ok": true,
+      "detail": "status=409"
+    },
+    {
+      "name": "B39 rejecting without a reason -> 400",
+      "ok": true,
+      "detail": "status=400"
+    },
+    {
+      "name": "B40 a stale optimistic token -> 409, never a silent overwrite",
+      "ok": true,
+      "detail": "status=409"
+    },
+    {
+      "name": "B41 a stale optimistic token on the shelf endpoint -> 409 too",
+      "ok": true,
+      "detail": "status=409"
+    },
+    {
+      "name": "B42 staff on-behalf recording names both parties and the delegation source",
+      "ok": true,
+      "detail": "source=staff_on_behalf staff=d6cfe84f-471c-4ccc-bbbd-1cf2ff1cbcdc"
+    },
+    {
+      "name": "B43 the on-behalf order is visible to the resident it was recorded for",
+      "ok": true,
+      "detail": "e59ba450-b436-4ff5-9200-83967ffa2dba"
+    },
+    {
+      "name": "B44 another community's operator cannot verify this community's order (403)",
+      "ok": true,
+      "detail": "otherOperator"
+    },
+    {
+      "name": "H1 a non-UUID order id -> 404 (route-level id validation, no 500)",
+      "ok": true,
+      "detail": "status=404"
+    },
+    {
+      "name": "H2 a non-UUID product id -> 404 on both the public and the admin route",
+      "ok": true,
+      "detail": "public=404 admin=404"
+    },
+    {
+      "name": "H3 an idempotent replay still returns the existing order after the product went off shelf",
+      "ok": true,
+      "detail": "status=200 created=false"
+    },
+    {
+      "name": "H4 the resident list ignores ?residentUserId= and still returns only own orders",
+      "ok": true,
+      "detail": "total=11"
+    },
+    {
+      "name": "H5 pageSize above the documented cap -> 400",
+      "ok": true,
+      "detail": "status=400"
+    },
+    {
+      "name": "H6 the public catalogue never leaks an off-shelf product, even when asked for one",
+      "ok": true,
+      "detail": "statuses=on_shelf"
+    },
+    {
+      "name": "H7 the back office can still list off-shelf products (they must not disappear for staff)",
+      "ok": true,
+      "detail": "total=2"
+    },
+    {
+      "name": "H8 an unknown route still answers the standard error envelope (404, not 500)",
+      "ok": true,
+      "detail": "status=404 code=not_found"
+    },
+    {
+      "name": "H9 the status endpoint cannot be used to force `verified` (400: not a transition status)",
+      "ok": true,
+      "detail": "status=400"
+    },
+    {
+      "name": "H10 a resident cannot smuggle a status into the registration body (400)",
+      "ok": true,
+      "detail": "status=400"
+    },
+    {
+      "name": "I1 an activity from another community is refused as an attribution source (400)",
+      "ok": true,
+      "detail": "status=400"
+    },
+    {
+      "name": "I2 a non-existent activity source -> 404",
+      "ok": true,
+      "detail": "status=404"
+    },
+    {
+      "name": "I3 a same-community activity is accepted and frozen on the order",
+      "ok": true,
+      "detail": "status=201 activity=27cc0f4b-a5e6-403a-a340-35ce8a4455de"
+    },
+    {
+      "name": "I4 the resident status filter works and never crosses the resident boundary",
+      "ok": true,
+      "detail": "own=8 other=1"
+    },
+    {
+      "name": "I5 pagination returns the documented envelope with a stable total",
+      "ok": true,
+      "detail": "page=2 items=1 total=12 unfiltered=12"
+    },
+    {
+      "name": "J1 a literal \"%\" keyword matches only the product whose name contains \"%\"",
+      "ok": true,
+      "detail": "matched=100%纯菜籽油"
+    },
+    {
+      "name": "J2 a literal \"_\" keyword is escaped (A_B does not also match AXB)",
+      "ok": true,
+      "detail": "matched=A_B 特供"
+    },
+    {
+      "name": "J3 the category filter returns only that category",
+      "ok": true,
+      "detail": "matched=分类商品"
+    },
+    {
+      "name": "J4 the back-office keyword search works and stays inside the community scope",
+      "ok": true,
+      "detail": "total=2"
+    },
+    {
+      "name": "J5 the order keyword search matches the FROZEN product name snapshot, not the live product",
+      "ok": true,
+      "detail": "total=1"
+    },
+    {
+      "name": "K1 two parallel status changes with one token -> exactly one 200 and one 409",
+      "ok": true,
+      "detail": "statuses=200,409"
+    },
+    {
+      "name": "K2 the loser gets the shared `conflict` code (no 500, no double apply)",
+      "ok": true,
+      "detail": "code=conflict"
+    },
+    {
+      "name": "K3 only ONE status event was appended for the raced transition",
+      "ok": true,
+      "detail": "processing events=1, timeline=registered,processing"
+    },
+    {
+      "name": "K4 two parallel verifications -> one success and one 409, never two successes",
+      "ok": true,
+      "detail": "statuses=200,409"
+    },
+    {
+      "name": "K5 the losing verifier gets an explicit conflict code (verified / already-verified)",
+      "ok": true,
+      "detail": "code=order_already_verified"
+    },
+    {
+      "name": "K6 the order ends verified exactly once, with a single verification record",
+      "ok": true,
+      "detail": "status=verified verifiedEvents=1"
+    },
+    {
+      "name": "K7 two conflicting shelf toggles with one token -> one 200 and one 409",
+      "ok": true,
+      "detail": "statuses=200,409"
+    },
+    {
+      "name": "K8 the product ends in exactly one of the two requested states (no torn write)",
+      "ok": true,
+      "detail": "final=on_shelf"
+    },
+    {
+      "name": "C1 the three local tables exist after the real migration",
+      "ok": true,
+      "detail": "tables=39"
+    },
+    {
+      "name": "C2 the idempotency unique index and the documented indexes exist",
+      "ok": true,
+      "detail": "local_order_events_order_created_idx,local_order_events_source_idx,local_orders_idempotency_uq,local_orders_community_status_idx,local_orders_resident_created_idx,local_orders_product_idx,local_orders_created_by_staff_idx,local_products_community_status_idx,local_products_community_updated_idx"
+    },
+    {
+      "name": "C3 both append-only triggers are on disk",
+      "ok": true,
+      "detail": "activity_rule_versions_no_update,activity_rule_versions_no_delete,activity_participations_no_update,activity_participations_no_delete,activity_participations_team_consistency,activity_participations_invitation_scope,activity_teams_no_delete,activity_teams_identity_immutable,activity_teams_status_transition,activity_teams_locked_at_write_once,activity_invitations_no_update,activity_invitations_no_delete,crm_lead_events_no_update,crm_lead_events_no_delete,crm_follow_ups_no_update,crm_follow_ups_no_delete,crm_order_events_no_update,crm_order_events_no_delete,crmeb_order_events_no_delete,crmeb_order_events_no_update,crmeb_order_events_sequence_guard,activity_checkins_no_delete,activity_checkins_identity_immutable,activity_checkins_status_transition,activity_checkins_revocation_write_once,activity_checkins_verification_write_once,activity_checkins_team_scope,activity_checkins_window_guard,activity_reward_grants_no_delete,activity_reward_grants_identity_immutable,activity_reward_grants_redemption_write_once,activity_reward_grants_revocation_write_once,activity_reward_grants_frozen_plan_guard,activity_reward_codes_no_delete,activity_reward_codes_identity_immutable,activity_reward_codes_status_transition,activity_reward_codes_redemption_write_once,activity_reward_codes_supersede_write_once,activity_reward_codes_revocation_write_once,activity_reward_codes_grant_scope,activity_prize_stocks_no_delete,activity_prize_stocks_identity_immutable,activity_prize_stocks_redeemed_monotonic,activity_prize_stocks_frozen_plan_guard,activity_reward_events_no_update,activity_reward_events_no_delete,activity_reward_events_sequence_guard,activity_reward_events_activity_scope,activity_reward_disputes_no_update,activity_reward_disputes_no_delete,activity_reward_disputes_open_first,activity_reward_disputes_grant_scope,activity_reward_grants_status_transition,local_order_events_no_update,local_order_events_no_delete"
+    },
+    {
+      "name": "C4 a consistent raw order insert is accepted",
+      "ok": true,
+      "detail": "o1 100*2=200"
+    },
+    {
+      "name": "C5 raw total_cents != unit*qty is refused by the CHECK constraint",
+      "ok": true,
+      "detail": "CHECK constraint failed: local_orders_total_check"
+    },
+    {
+      "name": "C6 raw quantity 0 is refused by the CHECK constraint",
+      "ok": true,
+      "detail": "CHECK constraint failed: local_orders_quantity_check"
+    },
+    {
+      "name": "C7 raw quantity 100 is refused by the CHECK constraint",
+      "ok": true,
+      "detail": "CHECK constraint failed: local_orders_quantity_check"
+    },
+    {
+      "name": "C8 raw unknown status is refused by the CHECK constraint",
+      "ok": true,
+      "detail": "CHECK constraint failed: local_orders_status_check"
+    },
+    {
+      "name": "C9 raw record_source outside the enum is refused by the CHECK constraint",
+      "ok": true,
+      "detail": "CHECK constraint failed: local_orders_record_source_check"
+    },
+    {
+      "name": "C10 a duplicate (community, resident, idempotency_key) is refused by the UNIQUE index",
+      "ok": true,
+      "detail": "UNIQUE constraint failed: local_orders.community_id, local_orders.resident_user_id, local_"
+    },
+    {
+      "name": "C11 deleting a product that has orders is refused (FK RESTRICT)",
+      "ok": true,
+      "detail": "FOREIGN KEY constraint failed"
+    },
+    {
+      "name": "C12 UPDATE on local_order_events is refused by the trigger",
+      "ok": true,
+      "detail": "local_order_events rows are immutable"
+    },
+    {
+      "name": "C13 DELETE on local_order_events is refused by the trigger",
+      "ok": true,
+      "detail": "local_order_events rows are immutable"
+    },
+    {
+      "name": "C14 an event with a foreign source_type is refused by the CHECK constraint",
+      "ok": true,
+      "detail": "CHECK constraint failed: local_order_events_source_type_check"
+    },
+    {
+      "name": "C15 the throwaway raw database directory was removed without EPERM",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "D1 the migration journal declares exactly 10 entries (0000..0009)",
+      "ok": true,
+      "detail": "entries=10"
+    },
+    {
+      "name": "D2 the pre-0009 database has no local_* tables",
+      "ok": true,
+      "detail": "count=0"
+    },
+    {
+      "name": "D3 the pre-0009 database already has the 5 CRM (广电) tables",
+      "ok": true,
+      "detail": "crm_follow_ups,crm_lead_events,crm_leads,crm_order_events,crm_service_orders"
+    },
+    {
+      "name": "D4 the 0009 upgrade over real 0000-0008 data keeps the existing rows",
+      "ok": true,
+      "detail": "communities=1"
+    },
+    {
+      "name": "D5 after the upgrade the three local tables exist",
+      "ok": true,
+      "detail": "count=3"
+    },
+    {
+      "name": "D6 the upgraded database is immediately usable through the real HTTP stack",
+      "ok": true,
+      "detail": "total=2400"
+    },
+    {
+      "name": "D7 the upgrade temp directory was removed without EPERM (close-before-rmSync)",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "E1 the order is verified before the restart",
+      "ok": true,
+      "detail": "status=verified"
+    },
+    {
+      "name": "E2 the resident session itself survives the restart (cookie still authenticated)",
+      "ok": true,
+      "detail": "status=200 authenticated=true"
+    },
+    {
+      "name": "E3 the admin session survives the restart too",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "E4 the order row survives the restart with its frozen snapshot and status",
+      "ok": true,
+      "detail": "verified 640x4=2560"
+    },
+    {
+      "name": "E5 the whole append-only timeline survives the restart",
+      "ok": true,
+      "detail": "registered,processing,pending_review,verified"
+    },
+    {
+      "name": "E6 the verification record (reviewer + note + timestamp) survives",
+      "ok": true,
+      "detail": "note=重启前已核验 by=运营小王"
+    },
+    {
+      "name": "E7 the catalogue (all on-shelf products) survives the restart",
+      "ok": true,
+      "detail": "total=18"
+    },
+    {
+      "name": "E8 the local_* audit trail survives the restart",
+      "ok": true,
+      "detail": "76 local audit rows"
+    },
+    {
+      "name": "E9 the idempotency key still replays into the SAME order after the restart",
+      "ok": true,
+      "detail": "status=200 id=true"
+    },
+    {
+      "name": "E10 the post-restart replay did not add a second row",
+      "ok": true,
+      "detail": "rows=1"
+    },
+    {
+      "name": "F1 10 parallel same-key registrations over HTTP -> exactly one created, one row, one id",
+      "ok": true,
+      "detail": "statuses=201,200,200,200,200,200,200,200,200,200 created=1 rows=1"
+    },
+    {
+      "name": "F2 5 parallel registrations with distinct keys -> 5 distinct orders",
+      "ok": true,
+      "detail": "ids=5"
+    },
+    {
+      "name": "F3 five independent OS processes racing on one idempotency key -> exactly one order",
+      "ok": true,
+      "detail": "rows=1 createdFlags=1 exits=0,0,0,0,0 results=created:false|created:false|created:false|created:false|created:true"
+    },
+    {
+      "name": "F4 every racing process converges on the same surviving order id",
+      "ok": true,
+      "detail": "5/5"
+    },
+    {
+      "name": "F5 the race temp directory was removed without EPERM",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "G1 the main verification database directory was removed without EPERM",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}
