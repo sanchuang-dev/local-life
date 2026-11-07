@@ -284,7 +284,7 @@ describe('WechatSettingsPage drawer interaction', () => {
     expect(secret.type).toBe('password')
     expect(secret.getAttribute('autocomplete')).toBe('new-password')
     fireEvent.change(secret, { target: { value: APP_SECRET } })
-    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+    fireEvent.click(screen.getByRole('button', { name: /取\s*消/ }))
     await waitFor(() => expect(screen.queryByLabelText('AppSecret')).toBeNull())
 
     fireEvent.click(screen.getByRole('button', { name: '新增公众号' }))
