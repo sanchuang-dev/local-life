@@ -197,11 +197,8 @@ describe('WechatSettingsPage loading and read-only state', () => {
     )
     expect(screen.getByTestId('wechat-candidate-card').textContent).toBe('')
 
-    fireEvent.click(screen.getByRole('button', { name: '新增公众号' }))
-    const secret = screen.getByLabelText('AppSecret') as HTMLInputElement
-    expect(secret.value).toBe('')
-    expect(secret.type).toBe('password')
-    expect(secret.getAttribute('autocomplete')).toBe('new-password')
+    // Details are available without exposing the credential editor.
+    expect(screen.queryByLabelText('AppSecret')).toBeNull()
   })
 
   it('renders the active configuration with account type, verification time and no secret', async () => {
@@ -284,6 +281,8 @@ describe('WechatSettingsPage drawer interaction', () => {
     expect(screen.queryByLabelText('AppSecret')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '新增公众号' }))
     const secret = screen.getByLabelText('AppSecret') as HTMLInputElement
+    expect(secret.type).toBe('password')
+    expect(secret.getAttribute('autocomplete')).toBe('new-password')
     fireEvent.change(secret, { target: { value: APP_SECRET } })
     fireEvent.click(screen.getByRole('button', { name: '取消' }))
     await waitFor(() => expect(screen.queryByLabelText('AppSecret')).toBeNull())
