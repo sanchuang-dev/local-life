@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "7109edde-dd59-4c5b-97e2-d576916c52f1",
+  "id": "7d924763-0abf-4a4c-9429-8b1760bdaabd",
   "prevId": "57a9aabb-9ab9-4323-83a5-3cc7481046b8",
   "tables": {
     "activities": {
@@ -3802,561 +3802,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "ledger_anomalies": {
-      "name": "ledger_anomalies",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "entry_id": {
-          "name": "entry_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "severity": {
-          "name": "severity",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "note": {
-          "name": "note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "flagged_by_user_id": {
-          "name": "flagged_by_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "resolved_at": {
-          "name": "resolved_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "ledger_anomalies_entry_idx": {
-          "name": "ledger_anomalies_entry_idx",
-          "columns": [
-            "entry_id"
-          ],
-          "isUnique": false
-        },
-        "ledger_anomalies_open_idx": {
-          "name": "ledger_anomalies_open_idx",
-          "columns": [
-            "resolved_at",
-            "severity"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "ledger_anomalies_entry_id_ledger_entries_id_fk": {
-          "name": "ledger_anomalies_entry_id_ledger_entries_id_fk",
-          "tableFrom": "ledger_anomalies",
-          "tableTo": "ledger_entries",
-          "columnsFrom": [
-            "entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "ledger_anomalies_flagged_by_user_id_users_id_fk": {
-          "name": "ledger_anomalies_flagged_by_user_id_users_id_fk",
-          "tableFrom": "ledger_anomalies",
-          "tableTo": "users",
-          "columnsFrom": [
-            "flagged_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "ledger_anomalies_kind_check": {
-          "name": "ledger_anomalies_kind_check",
-          "value": "\"ledger_anomalies\".\"kind\" IN ('amount_mismatch', 'attribution_conflict',\n        'source_missing_evidence', 'duplicate_candidate', 'period_gap')"
-        },
-        "ledger_anomalies_severity_check": {
-          "name": "ledger_anomalies_severity_check",
-          "value": "\"ledger_anomalies\".\"severity\" IN ('low', 'medium', 'high')"
-        }
-      }
-    },
-    "ledger_entries": {
-      "name": "ledger_entries",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "fact_kind": {
-          "name": "fact_kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "source_system": {
-          "name": "source_system",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "source_id": {
-          "name": "source_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "source_display_no": {
-          "name": "source_display_no",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "community_id": {
-          "name": "community_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "product_id": {
-          "name": "product_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "attributed_staff_id": {
-          "name": "attributed_staff_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "attribution_state": {
-          "name": "attribution_state",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "attribution_basis": {
-          "name": "attribution_basis",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "amount_cents": {
-          "name": "amount_cents",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "settlement_amount_status": {
-          "name": "settlement_amount_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "occurred_at": {
-          "name": "occurred_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "verified_at": {
-          "name": "verified_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "recorded_by_user_id": {
-          "name": "recorded_by_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "recorded_by_staff_id": {
-          "name": "recorded_by_staff_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "counter_entry_id": {
-          "name": "counter_entry_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "evidence_ref": {
-          "name": "evidence_ref",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "evidence_kind": {
-          "name": "evidence_kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "batch_id": {
-          "name": "batch_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "ledger_entries_community_occurred_idx": {
-          "name": "ledger_entries_community_occurred_idx",
-          "columns": [
-            "community_id",
-            "occurred_at"
-          ],
-          "isUnique": false
-        },
-        "ledger_entries_attributed_occurred_idx": {
-          "name": "ledger_entries_attributed_occurred_idx",
-          "columns": [
-            "attributed_staff_id",
-            "occurred_at"
-          ],
-          "isUnique": false
-        },
-        "ledger_entries_fact_kind_occurred_idx": {
-          "name": "ledger_entries_fact_kind_occurred_idx",
-          "columns": [
-            "fact_kind",
-            "occurred_at"
-          ],
-          "isUnique": false
-        },
-        "ledger_entries_batch_idx": {
-          "name": "ledger_entries_batch_idx",
-          "columns": [
-            "batch_id"
-          ],
-          "isUnique": false
-        },
-        "ledger_entries_source_idx": {
-          "name": "ledger_entries_source_idx",
-          "columns": [
-            "source_system",
-            "source_id"
-          ],
-          "isUnique": false
-        },
-        "ledger_entries_product_idx": {
-          "name": "ledger_entries_product_idx",
-          "columns": [
-            "product_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "ledger_entries_community_id_communities_id_fk": {
-          "name": "ledger_entries_community_id_communities_id_fk",
-          "tableFrom": "ledger_entries",
-          "tableTo": "communities",
-          "columnsFrom": [
-            "community_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "ledger_entries_product_id_local_products_id_fk": {
-          "name": "ledger_entries_product_id_local_products_id_fk",
-          "tableFrom": "ledger_entries",
-          "tableTo": "local_products",
-          "columnsFrom": [
-            "product_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "ledger_entries_attributed_staff_id_staff_accounts_id_fk": {
-          "name": "ledger_entries_attributed_staff_id_staff_accounts_id_fk",
-          "tableFrom": "ledger_entries",
-          "tableTo": "staff_accounts",
-          "columnsFrom": [
-            "attributed_staff_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "ledger_entries_recorded_by_user_id_users_id_fk": {
-          "name": "ledger_entries_recorded_by_user_id_users_id_fk",
-          "tableFrom": "ledger_entries",
-          "tableTo": "users",
-          "columnsFrom": [
-            "recorded_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "ledger_entries_recorded_by_staff_id_staff_accounts_id_fk": {
-          "name": "ledger_entries_recorded_by_staff_id_staff_accounts_id_fk",
-          "tableFrom": "ledger_entries",
-          "tableTo": "staff_accounts",
-          "columnsFrom": [
-            "recorded_by_staff_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "ledger_entries_counter_entry_id_ledger_entries_id_fk": {
-          "name": "ledger_entries_counter_entry_id_ledger_entries_id_fk",
-          "tableFrom": "ledger_entries",
-          "tableTo": "ledger_entries",
-          "columnsFrom": [
-            "counter_entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "ledger_entries_batch_id_reconciliation_batches_id_fk": {
-          "name": "ledger_entries_batch_id_reconciliation_batches_id_fk",
-          "tableFrom": "ledger_entries",
-          "tableTo": "reconciliation_batches",
-          "columnsFrom": [
-            "batch_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "ledger_entries_fact_kind_check": {
-          "name": "ledger_entries_fact_kind_check",
-          "value": "\"ledger_entries\".\"fact_kind\" IN ('order_registered', 'order_verified', 'payment_received',\n        'payment_reversed', 'reward_cost', 'reward_reversed')"
-        },
-        "ledger_entries_source_system_check": {
-          "name": "ledger_entries_source_system_check",
-          "value": "\"ledger_entries\".\"source_system\" IN ('local_order', 'crm_service_order', 'activity_reward_grant', 'manual')"
-        },
-        "ledger_entries_source_kind_check": {
-          "name": "ledger_entries_source_kind_check",
-          "value": "(\"ledger_entries\".\"fact_kind\" = 'order_registered' AND \"ledger_entries\".\"source_system\" = 'local_order')\n        OR (\"ledger_entries\".\"fact_kind\" = 'order_verified'\n          AND \"ledger_entries\".\"source_system\" IN ('local_order', 'crm_service_order'))\n        OR (\"ledger_entries\".\"fact_kind\" IN ('payment_received', 'payment_reversed')\n          AND \"ledger_entries\".\"source_system\" = 'manual')\n        OR (\"ledger_entries\".\"fact_kind\" IN ('reward_cost', 'reward_reversed')\n          AND \"ledger_entries\".\"source_system\" = 'activity_reward_grant')"
-        },
-        "ledger_entries_attribution_state_check": {
-          "name": "ledger_entries_attribution_state_check",
-          "value": "\"ledger_entries\".\"attribution_state\" IN ('attributed', 'pending')"
-        },
-        "ledger_entries_attribution_basis_check": {
-          "name": "ledger_entries_attribution_basis_check",
-          "value": "\"ledger_entries\".\"attribution_basis\" IN ('explicit_attribution', 'confirmed_fact',\n        'no_explicit_attribution', 'source_missing')"
-        },
-        "ledger_entries_attribution_check": {
-          "name": "ledger_entries_attribution_check",
-          "value": "(\"ledger_entries\".\"attribution_state\" = 'attributed'\n          AND \"ledger_entries\".\"attributed_staff_id\" IS NOT NULL\n          AND \"ledger_entries\".\"attribution_basis\" IN ('explicit_attribution', 'confirmed_fact'))\n        OR (\"ledger_entries\".\"attribution_state\" = 'pending'\n          AND \"ledger_entries\".\"attributed_staff_id\" IS NULL\n          AND \"ledger_entries\".\"attribution_basis\" IN ('no_explicit_attribution', 'source_missing'))"
-        },
-        "ledger_entries_amount_check": {
-          "name": "ledger_entries_amount_check",
-          "value": "\"ledger_entries\".\"amount_cents\" >= 0"
-        },
-        "ledger_entries_settlement_status_check": {
-          "name": "ledger_entries_settlement_status_check",
-          "value": "\"ledger_entries\".\"settlement_amount_status\" IN ('pending_rule', 'estimated')"
-        },
-        "ledger_entries_evidence_kind_check": {
-          "name": "ledger_entries_evidence_kind_check",
-          "value": "\"ledger_entries\".\"evidence_kind\" IN ('manual_receipt', 'bank_transfer', 'crm_confirmation',\n        'order_verification', 'reward_grant', 'none')"
-        },
-        "ledger_entries_payment_evidence_check": {
-          "name": "ledger_entries_payment_evidence_check",
-          "value": "\"ledger_entries\".\"fact_kind\" NOT IN ('payment_received', 'payment_reversed')\n        OR (\"ledger_entries\".\"evidence_ref\" IS NOT NULL\n          AND \"ledger_entries\".\"recorded_by_staff_id\" IS NOT NULL\n          AND \"ledger_entries\".\"evidence_kind\" <> 'none')"
-        },
-        "ledger_entries_counter_entry_check": {
-          "name": "ledger_entries_counter_entry_check",
-          "value": "(\"ledger_entries\".\"fact_kind\" IN ('payment_reversed', 'reward_reversed')\n          AND \"ledger_entries\".\"counter_entry_id\" IS NOT NULL)\n        OR (\"ledger_entries\".\"fact_kind\" NOT IN ('payment_reversed', 'reward_reversed')\n          AND \"ledger_entries\".\"counter_entry_id\" IS NULL)"
-        },
-        "ledger_entries_verified_at_check": {
-          "name": "ledger_entries_verified_at_check",
-          "value": "(\"ledger_entries\".\"fact_kind\" = 'order_verified' AND \"ledger_entries\".\"verified_at\" IS NOT NULL)\n        OR (\"ledger_entries\".\"fact_kind\" <> 'order_verified' AND \"ledger_entries\".\"verified_at\" IS NULL)"
-        }
-      }
-    },
-    "ledger_entry_sources": {
-      "name": "ledger_entry_sources",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "source_system": {
-          "name": "source_system",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "source_id": {
-          "name": "source_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "fact_kind": {
-          "name": "fact_kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "entry_id": {
-          "name": "entry_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "ledger_entry_sources_dedupe_uq": {
-          "name": "ledger_entry_sources_dedupe_uq",
-          "columns": [
-            "source_system",
-            "source_id",
-            "fact_kind"
-          ],
-          "isUnique": true
-        },
-        "ledger_entry_sources_entry_idx": {
-          "name": "ledger_entry_sources_entry_idx",
-          "columns": [
-            "entry_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "ledger_entry_sources_entry_id_ledger_entries_id_fk": {
-          "name": "ledger_entry_sources_entry_id_ledger_entries_id_fk",
-          "tableFrom": "ledger_entry_sources",
-          "tableTo": "ledger_entries",
-          "columnsFrom": [
-            "entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "ledger_entry_sources_fact_kind_check": {
-          "name": "ledger_entry_sources_fact_kind_check",
-          "value": "\"ledger_entry_sources\".\"fact_kind\" IN ('order_registered', 'order_verified', 'payment_received',\n        'payment_reversed', 'reward_cost', 'reward_reversed')"
-        },
-        "ledger_entry_sources_source_system_check": {
-          "name": "ledger_entry_sources_source_system_check",
-          "value": "\"ledger_entry_sources\".\"source_system\" IN ('local_order', 'crm_service_order', 'activity_reward_grant', 'manual')"
-        }
-      }
-    },
     "local_order_events": {
       "name": "local_order_events",
       "columns": {
@@ -4987,6 +4432,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "config_id": {
+          "name": "config_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "expires_at": {
           "name": "expires_at",
           "type": "integer",
@@ -5023,6 +4475,13 @@
             "expires_at"
           ],
           "isUnique": false
+        },
+        "oauth_state_config_idx": {
+          "name": "oauth_state_config_idx",
+          "columns": [
+            "config_id"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -5032,6 +4491,19 @@
           "tableTo": "communities",
           "columnsFrom": [
             "community_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "oauth_states_config_id_wechat_oauth_configs_id_fk": {
+          "name": "oauth_states_config_id_wechat_oauth_configs_id_fk",
+          "tableFrom": "oauth_states",
+          "tableTo": "wechat_oauth_configs",
+          "columnsFrom": [
+            "config_id"
           ],
           "columnsTo": [
             "id"
@@ -5238,184 +4710,6 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
-    },
-    "reconciliation_batches": {
-      "name": "reconciliation_batches",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "batch_no": {
-          "name": "batch_no",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "period_from": {
-          "name": "period_from",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "period_to": {
-          "name": "period_to",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "locked_at": {
-          "name": "locked_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "locked_by_user_id": {
-          "name": "locked_by_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "locked_by_staff_id": {
-          "name": "locked_by_staff_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "entry_count": {
-          "name": "entry_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "total_cents": {
-          "name": "total_cents",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "note": {
-          "name": "note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "reconciliation_batches_no_uq": {
-          "name": "reconciliation_batches_no_uq",
-          "columns": [
-            "batch_no"
-          ],
-          "isUnique": true
-        },
-        "reconciliation_batches_open_period_uq": {
-          "name": "reconciliation_batches_open_period_uq",
-          "columns": [
-            "period_from",
-            "period_to"
-          ],
-          "isUnique": true,
-          "where": "\"reconciliation_batches\".\"status\" = 'open'"
-        },
-        "reconciliation_batches_period_idx": {
-          "name": "reconciliation_batches_period_idx",
-          "columns": [
-            "period_from",
-            "period_to"
-          ],
-          "isUnique": false
-        },
-        "reconciliation_batches_status_updated_idx": {
-          "name": "reconciliation_batches_status_updated_idx",
-          "columns": [
-            "status",
-            "updated_at"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "reconciliation_batches_locked_by_user_id_users_id_fk": {
-          "name": "reconciliation_batches_locked_by_user_id_users_id_fk",
-          "tableFrom": "reconciliation_batches",
-          "tableTo": "users",
-          "columnsFrom": [
-            "locked_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "reconciliation_batches_locked_by_staff_id_staff_accounts_id_fk": {
-          "name": "reconciliation_batches_locked_by_staff_id_staff_accounts_id_fk",
-          "tableFrom": "reconciliation_batches",
-          "tableTo": "staff_accounts",
-          "columnsFrom": [
-            "locked_by_staff_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "reconciliation_batches_status_check": {
-          "name": "reconciliation_batches_status_check",
-          "value": "\"reconciliation_batches\".\"status\" IN ('open', 'locked')"
-        },
-        "reconciliation_batches_period_check": {
-          "name": "reconciliation_batches_period_check",
-          "value": "\"reconciliation_batches\".\"period_from\" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'\n        AND \"reconciliation_batches\".\"period_to\" GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'\n        AND \"reconciliation_batches\".\"period_to\" >= \"reconciliation_batches\".\"period_from\""
-        },
-        "reconciliation_batches_counts_check": {
-          "name": "reconciliation_batches_counts_check",
-          "value": "\"reconciliation_batches\".\"entry_count\" >= 0 AND \"reconciliation_batches\".\"total_cents\" >= 0"
-        },
-        "reconciliation_batches_lock_check": {
-          "name": "reconciliation_batches_lock_check",
-          "value": "(\"reconciliation_batches\".\"status\" = 'locked'\n          AND \"reconciliation_batches\".\"locked_at\" IS NOT NULL\n          AND \"reconciliation_batches\".\"locked_by_user_id\" IS NOT NULL)\n        OR (\"reconciliation_batches\".\"status\" = 'open'\n          AND \"reconciliation_batches\".\"locked_at\" IS NULL\n          AND \"reconciliation_batches\".\"locked_by_user_id\" IS NULL\n          AND \"reconciliation_batches\".\"locked_by_staff_id\" IS NULL)"
-        }
-      }
     },
     "resident_community_assignments": {
       "name": "resident_community_assignments",
@@ -5980,6 +5274,192 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
+    },
+    "wechat_oauth_configs": {
+      "name": "wechat_oauth_configs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "app_id": {
+          "name": "app_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "account_type": {
+          "name": "account_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "app_secret_ciphertext": {
+          "name": "app_secret_ciphertext",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "app_secret_iv": {
+          "name": "app_secret_iv",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "app_secret_tag": {
+          "name": "app_secret_tag",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "key_id": {
+          "name": "key_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_error_code": {
+          "name": "last_error_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "verified_at": {
+          "name": "verified_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "activated_at": {
+          "name": "activated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "retired_at": {
+          "name": "retired_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "wechat_oauth_configs_active_uq": {
+          "name": "wechat_oauth_configs_active_uq",
+          "columns": [
+            "status"
+          ],
+          "isUnique": true,
+          "where": "\"wechat_oauth_configs\".\"status\" = 'active'"
+        },
+        "wechat_oauth_configs_status_created_idx": {
+          "name": "wechat_oauth_configs_status_created_idx",
+          "columns": [
+            "status",
+            "created_at"
+          ],
+          "isUnique": false
+        },
+        "wechat_oauth_configs_created_idx": {
+          "name": "wechat_oauth_configs_created_idx",
+          "columns": [
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "wechat_oauth_configs_created_by_user_id_users_id_fk": {
+          "name": "wechat_oauth_configs_created_by_user_id_users_id_fk",
+          "tableFrom": "wechat_oauth_configs",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "wechat_oauth_configs_account_type_check": {
+          "name": "wechat_oauth_configs_account_type_check",
+          "value": "\"wechat_oauth_configs\".\"account_type\" IN ('test', 'official')"
+        },
+        "wechat_oauth_configs_status_check": {
+          "name": "wechat_oauth_configs_status_check",
+          "value": "\"wechat_oauth_configs\".\"status\" IN ('draft', 'verified', 'failed', 'active', 'retired')"
+        },
+        "wechat_oauth_configs_app_id_check": {
+          "name": "wechat_oauth_configs_app_id_check",
+          "value": "length(\"wechat_oauth_configs\".\"app_id\") BETWEEN 6 AND 64\n        AND \"wechat_oauth_configs\".\"app_id\" NOT GLOB '*[^A-Za-z0-9]*'"
+        },
+        "wechat_oauth_configs_iv_check": {
+          "name": "wechat_oauth_configs_iv_check",
+          "value": "length(\"wechat_oauth_configs\".\"app_secret_iv\") = 16\n        AND \"wechat_oauth_configs\".\"app_secret_iv\" NOT GLOB '*[^A-Za-z0-9+/=]*'"
+        },
+        "wechat_oauth_configs_tag_check": {
+          "name": "wechat_oauth_configs_tag_check",
+          "value": "length(\"wechat_oauth_configs\".\"app_secret_tag\") = 24\n        AND \"wechat_oauth_configs\".\"app_secret_tag\" NOT GLOB '*[^A-Za-z0-9+/=]*'"
+        },
+        "wechat_oauth_configs_ciphertext_check": {
+          "name": "wechat_oauth_configs_ciphertext_check",
+          "value": "length(\"wechat_oauth_configs\".\"app_secret_ciphertext\") > 0\n        AND \"wechat_oauth_configs\".\"app_secret_ciphertext\" NOT GLOB '*[^A-Za-z0-9+/=]*'"
+        },
+        "wechat_oauth_configs_key_id_check": {
+          "name": "wechat_oauth_configs_key_id_check",
+          "value": "length(\"wechat_oauth_configs\".\"key_id\") BETWEEN 1 AND 32\n        AND \"wechat_oauth_configs\".\"key_id\" NOT GLOB '*[^A-Za-z0-9._-]*'"
+        },
+        "wechat_oauth_configs_lifecycle_check": {
+          "name": "wechat_oauth_configs_lifecycle_check",
+          "value": "(\"wechat_oauth_configs\".\"status\" = 'active'\n          AND \"wechat_oauth_configs\".\"verified_at\" IS NOT NULL\n          AND \"wechat_oauth_configs\".\"activated_at\" IS NOT NULL\n          AND \"wechat_oauth_configs\".\"retired_at\" IS NULL)\n        OR (\"wechat_oauth_configs\".\"status\" = 'retired'\n          AND \"wechat_oauth_configs\".\"retired_at\" IS NOT NULL)\n        OR (\"wechat_oauth_configs\".\"status\" = 'verified'\n          AND \"wechat_oauth_configs\".\"verified_at\" IS NOT NULL\n          AND \"wechat_oauth_configs\".\"activated_at\" IS NULL\n          AND \"wechat_oauth_configs\".\"retired_at\" IS NULL)\n        OR (\"wechat_oauth_configs\".\"status\" IN ('draft', 'failed')\n          AND \"wechat_oauth_configs\".\"verified_at\" IS NULL\n          AND \"wechat_oauth_configs\".\"activated_at\" IS NULL\n          AND \"wechat_oauth_configs\".\"retired_at\" IS NULL)"
+        }
+      }
     }
   },
   "views": {},

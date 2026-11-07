@@ -37,6 +37,7 @@ describe('filterNavigation', () => {
     expect(groups[0]?.pages.map((page) => page.label)).toEqual([
       '管理员与权限',
       '系统信息',
+      '微信公众号',
       '界面组件',
     ])
   })
@@ -177,6 +178,49 @@ describe('performance and reconciliation navigation', () => {
     )
     expect(operatorKeys).toContain('/performance')
     expect(operatorKeys).toContain('/settlements')
+  })
+})
+
+describe('WeChat public-account navigation', () => {
+  it('registers /system/wechat as a ready admin-only page inside 系统管理', () => {
+    const page = findNavPage('/system/wechat')
+
+    expect(page).toBeTruthy()
+    expect(page?.status).toBe('ready')
+    expect(page?.planned).toEqual([])
+    expect(page?.label).toBe('微信公众号')
+    expect(page?.roles).toEqual(['admin'])
+    // The description must state the real capability, not a vague placeholder.
+    expect(page?.description).toContain('加密保存')
+    expect(page?.description).toContain('测试连接')
+    expect(groupForPage('/system/wechat')?.label).toBe('系统管理')
+    expect(activeMenuKey('/system/wechat')).toBe('/system/wechat')
+  })
+
+  it('hides the WeChat settings from operators and grid workers', () => {
+    const page = findNavPage('/system/wechat')
+    expect(page).toBeTruthy()
+    expect(isPageVisible(page!, 'admin')).toBe(true)
+    expect(isPageVisible(page!, 'operator')).toBe(false)
+    expect(isPageVisible(page!, 'grid_worker')).toBe(false)
+    // No role means "not yet known"; the sidebar must not hide it early.
+    expect(isPageVisible(page!)).toBe(true)
+
+    const keysFor = (role: 'admin' | 'operator' | 'grid_worker') =>
+      filterNavigation('', role).groups.flatMap((group) => group.pages.map((item) => item.key))
+
+    expect(keysFor('admin')).toContain('/system/wechat')
+    expect(keysFor('operator')).not.toContain('/system/wechat')
+    expect(keysFor('grid_worker')).not.toContain('/system/wechat')
+
+    // Label search still respects the role filter.
+    expect(
+      filterNavigation('公众号', 'admin').groups.flatMap((group) =>
+        group.pages.map((item) => item.key),
+      ),
+    ).toContain('/system/wechat')
+    expect(filterNavigation('公众号', 'operator').groups).toEqual([])
+    expect(filterNavigation('公众号', 'grid_worker').groups).toEqual([])
   })
 })
 

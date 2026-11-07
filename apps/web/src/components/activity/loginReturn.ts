@@ -64,9 +64,31 @@ export type ActivityLoginResult =
   | { status: 'error'; code: string; message: string }
   | null
 
+/**
+ * Resident-readable text for the pre-login `/auth/methods` availability reason.
+ *
+ * `wechatUnavailableReason` is a machine reason, not user copy: rendering it
+ * directly would show `wechat_config_unavailable` to the resident. Known reasons
+ * get an actionable message; anything else (a future/unknown code) falls back to
+ * a generic sentence and never echoes the raw value, a secret, a token or an
+ * internal stack.
+ */
+export function wechatUnavailableMessage(reason: string | null | undefined): string {
+  switch (reason) {
+    case 'not_configured':
+      return '微信网页授权暂不可用：未配置公众号 AppID / AppSecret 或授权回调地址，请联系运营人员完成配置后重试。'
+    case 'wechat_config_unavailable':
+      return '微信登录配置当前不可用（主密钥未配置、配置无法解密或已停用），请联系管理员在后台「系统管理 → 微信公众号」重新保存并启用。'
+    default:
+      return '微信登录暂不可用，请稍后重试。'
+  }
+}
+
 /** Resident-readable reasons, keyed by the API's `auth_error` marker. */
 export const ACTIVITY_LOGIN_ERROR_MESSAGES: Record<string, string> = {
   wechat_not_configured: '微信网页授权尚未配置，当前无法登录。请联系运营人员。',
+  wechat_config_unavailable:
+    '微信登录配置当前不可用（凭证无法解密或主密钥缺失），请联系运营人员检查「系统管理 → 微信公众号」。',
   wechat_authorization_failed: '微信授权未完成（你取消或超时）。可以重新发起登录。',
   wechat_state_invalid: '本次登录已过期或无效，请重新发起登录。',
   wechat_state_replayed: '本次登录已经使用过，请重新发起登录。',

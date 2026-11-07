@@ -3,7 +3,11 @@ import { AlertTriangle, MessageCircle, RefreshCw, ShieldCheck } from 'lucide-rea
 import { presentLoginMarker } from '@sanchuang-dev/local-life-contracts'
 import { isWeChatBrowser } from '../auth/wechatEnvironment'
 import { useActivityLoginReturn } from '../../hooks/useActivityLoginReturn'
-import { activityLoginMarker, type ActivityLoginResult } from './loginReturn'
+import {
+  activityLoginMarker,
+  wechatUnavailableMessage,
+  type ActivityLoginResult,
+} from './loginReturn'
 
 type ActivityLoginCardProps = {
   activityId: string | null
@@ -141,10 +145,7 @@ export function ActivityLoginCard({
 
       {availability.status === 'ready' && !availability.wechat ? (
         <p className="rounded-[12px] bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-500">
-          微信网页授权暂不可用
-          {availability.unavailableReason === 'not_configured'
-            ? '：未配置公众号 AppID / AppSecret 或授权回调地址，请联系运营人员完成配置后重试。'
-            : `（${availability.unavailableReason ?? '原因未知'}）。`}
+          {wechatUnavailableMessage(availability.unavailableReason)}
         </p>
       ) : null}
 

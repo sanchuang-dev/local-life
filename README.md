@@ -72,7 +72,7 @@ pnpm --filter @sanchuang-dev/local-life-api bootstrap-admin
 
 ## API 配置
 
-首次本地开发先执行 `cp apps/api/.env.example apps/api/.env`。需要使用开发居民测试登录时，将本地 `.env` 中的 `AUTH_DEV_ENABLED` 改为 `true`；默认关闭。微信网页授权需要公众号 AppID、AppSecret、准确的 OAuth 回调 URL 和 H5 回跳地址；缺少任何必要配置时，H5 会明确显示当前不可用，不会伪造登录成功。
+首次本地开发先执行 `cp apps/api/.env.example apps/api/.env`。需要使用开发居民测试登录时，将本地 `.env` 中的 `AUTH_DEV_ENABLED` 改为 `true`；默认关闭。公众号 AppID/AppSecret 在管理台「系统管理 → 微信公众号」保存、验证并启用（服务端用 `WECHAT_CONFIG_MASTER_KEY[_FILE]` 加密）；OAuth 回调地址由 `WEB_BASE_URL` 的 origin + `/api/auth/wechat/callback` 推导。未启用配置或主密钥缺失时，H5 会明确显示当前不可用，不会伪造登录成功；真实微信真机授权仍需真实凭证单独验收。
 
 生产环境还需设置 `TRUSTED_ORIGINS`、HTTPS Cookie 与同源 `/api` 反向代理。开发居民测试登录默认关闭，只能在非生产环境显式设置 `AUTH_DEV_ENABLED=true`；配置校验会拒绝生产开启。
 

@@ -1181,7 +1181,7 @@ test('CSV export neutralizes formula-leading free-text evidence and source numbe
         communityId: world.communityId,
         amountCents: 1234,
         sourceDisplayNo: '=1+1',
-        evidenceRef: '   @SUM(A1:A3)',
+        evidenceRef: '@SUM(A1:A3)',
         evidenceKind: 'manual_receipt',
         receivedAt: '2026-11-06T10:00:00.000Z',
         staffId: world.operatorStaffId,
@@ -1193,10 +1193,12 @@ test('CSV export neutralizes formula-leading free-text evidence and source numbe
       { session: admin },
     )
     assert.equal(exported.status, 200)
+    const bytes = new Uint8Array(await exported.clone().arrayBuffer())
+    assert.deepEqual(Array.from(bytes.slice(0, 3)), [0xef, 0xbb, 0xbf], 'file bytes retain UTF-8 BOM')
     const text = await exported.text()
-    assert.ok(text.startsWith('\uFEFF流水号,'))
+    assert.ok(text.startsWith('流水号,'), 'Response.text() removes the BOM during decoding')
     assert.ok(text.includes(",'=1+1,"))
-    assert.ok(text.includes(",'   @SUM(A1:A3),"))
+    assert.ok(text.includes(",'@SUM(A1:A3),"))
   } finally {
     world.cleanup()
   }

@@ -14,6 +14,7 @@ import {
   users,
   wechatIdentities,
 } from '../src/db/schema.js'
+import { masterKeyEnv, seedWechatConfig, TEST_APP_ID } from './wechat-fixtures.js'
 
 /**
  * Real HTTP coverage for the resident WeChat login return path (#92).
@@ -58,20 +59,16 @@ function oauthContext(
   options: { withWechat?: boolean } = {},
 ) {
   const { db, sqlite } = createDatabase(':memory:', migrationsFolder)
-  const wechat =
-    options.withWechat === false
-      ? {}
-      : {
-          WECHAT_APP_ID: 'wx-test-app',
-          WECHAT_APP_SECRET: 'test-secret',
-          WECHAT_REDIRECT_URI: WECHAT_RETURN_URI,
-        }
+  const withWechat = options.withWechat !== false
   const config = loadConfig({
     NODE_ENV: 'test',
     WEB_BASE_URL: webBaseUrl,
     TRUSTED_ORIGINS: new URL(webBaseUrl).origin,
-    ...wechat,
+    ...(withWechat ? masterKeyEnv() : {}),
   })
+  // The provider is a database row now; seed one active encrypted version with
+  // the master key the config just loaded (except in the unconfigured case).
+  if (withWechat) seedWechatConfig(db, { appId: TEST_APP_ID })
   const app = createApp({ db, config, logRequests: false, fetcher })
   return { app, db, sqlite, config }
 }
@@ -113,6 +110,7 @@ test('WeChat login returns to the activity invite link and never auto-joins it',
     const state = authorizeUrl.searchParams.get('state')
     assert.ok(state)
     assert.equal(authorizeUrl.searchParams.get('scope'), 'snsapi_base')
+    assert.equal(authorizeUrl.searchParams.get('appid'), TEST_APP_ID)
     assert.equal(authorizeUrl.searchParams.get('redirect_uri'), WECHAT_RETURN_URI)
 
     // The attempt cookies are readable by the callback path only because they are
