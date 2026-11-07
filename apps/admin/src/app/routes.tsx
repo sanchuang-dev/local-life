@@ -8,8 +8,10 @@ import { CrmPage } from '../pages/CrmPage'
 import { DashboardPage } from '../pages/DashboardPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { OrdersPage } from '../pages/OrdersPage'
+import { PerformancePage } from '../pages/PerformancePage'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
 import { ProductsPage } from '../pages/ProductsPage'
+import { SettlementsPage } from '../pages/SettlementsPage'
 import { UsersPage } from '../pages/UsersPage'
 import { SystemInfoPage } from '../pages/SystemInfoPage'
 import { WechatSettingsPage } from '../pages/WechatSettingsPage'
@@ -37,6 +39,8 @@ export const routes: RouteObject[] = [
       { path: 'customers', element: <CrmPage /> },
       { path: 'products', element: <ProductsPage /> },
       { path: 'orders', element: <OrdersPage /> },
+      { path: 'performance', element: <PerformancePage /> },
+      { path: 'settlements', element: <SettlementsPage /> },
       { path: 'communities', element: <CommunityAccountsRoute /> },
       { path: 'system/runtime', element: <SystemInfoPage /> },
       { path: 'system/wechat', element: <WechatSettingsPage /> },
