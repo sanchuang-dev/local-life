@@ -7,6 +7,7 @@ import {
   sqliteTable,
   text,
   uniqueIndex,
+  type AnySQLiteColumn,
 } from 'drizzle-orm/sqlite-core'
 import type {
   ActivityStatus,
@@ -18,15 +19,24 @@ import type {
   CrmebIdentityVerificationMethod,
   CrmebOrderStatus,
   CheckinStatus,
+  LedgerAnomalyKind,
+  LedgerAnomalySeverity,
+  LedgerAttributionBasis,
+  LedgerAttributionState,
+  LedgerEvidenceKind,
+  LedgerFactKind,
+  LedgerSourceSystem,
   ParticipationInviteSource,
   ParticipationRole,
   ParticipationTeamStatus,
   PhoneOtpPurpose,
+  ReconciliationBatchStatus,
   RewardCredentialStatus,
   RewardDisputeDecision,
   RewardEventKind,
   RewardGrantStatus,
   RewardRecipientRole,
+  SettlementAmountStatus,
   LocalOrderEventType,
   LocalOrderRecordSource,
   LocalOrderStatus,
@@ -1564,6 +1574,294 @@ export const localOrderEvents = sqliteTable(
   ],
 )
 
+/* -------------------------------------------------------------------------- */
+/* Unified operating ledger, bookkeeping & reconciliation (#64 LL-MVP-008)     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A reconciliation batch over an inclusive business-day period.
+ *
+ * `status` moves `open -> locked` exactly once and never back. `total_cents` is
+ * the gross *recorded* amount of the batch, never a payable amount: this MVP has
+ * no settlement rule (`settlement_amount_status` stays `pending_rule`), so a
+ * batch can never produce a distribution figure. The one-way transition, the
+ * "one open batch per period" rule and the immutability of a locked period are
+ * enforced by triggers/partial unique index in migration 0010, not only here.
+ */
+export const reconciliationBatches = sqliteTable(
+  'reconciliation_batches',
+  {
+    id: text('id').primaryKey(),
+    batchNo: text('batch_no').notNull(),
+    /** Business dates (`YYYY-MM-DD`, Asia/Shanghai), both ends inclusive. */
+    periodFrom: text('period_from').notNull(),
+    periodTo: text('period_to').notNull(),
+    status: text('status').$type<ReconciliationBatchStatus>().notNull(),
+    lockedAt: integer('locked_at', { mode: 'timestamp_ms' }),
+    lockedByUserId: text('locked_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    lockedByStaffId: text('locked_by_staff_id').references(() => staffAccounts.id, {
+      onDelete: 'set null',
+    }),
+    entryCount: integer('entry_count').notNull(),
+    totalCents: integer('total_cents').notNull(),
+    note: text('note'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('reconciliation_batches_no_uq').on(table.batchNo),
+    // At most one OPEN batch per period: a period is either being reconciled or
+    // frozen, never both. Locked batches are excluded so history stays readable.
+    uniqueIndex('reconciliation_batches_open_period_uq')
+      .on(table.periodFrom, table.periodTo)
+      .where(sql`${table.status} = 'open'`),
+    index('reconciliation_batches_period_idx').on(table.periodFrom, table.periodTo),
+    index('reconciliation_batches_status_updated_idx').on(table.status, table.updatedAt),
+    check('reconciliation_batches_status_check', sql`${table.status} IN ('open', 'locked')`),
+    check(
+      'reconciliation_batches_period_check',
+      sql`${table.periodFrom} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+        AND ${table.periodTo} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+        AND ${table.periodTo} >= ${table.periodFrom}`,
+    ),
+    check(
+      'reconciliation_batches_counts_check',
+      sql`${table.entryCount} >= 0 AND ${table.totalCents} >= 0`,
+    ),
+    check(
+      'reconciliation_batches_lock_check',
+      sql`(${table.status} = 'locked'
+          AND ${table.lockedAt} IS NOT NULL
+          AND ${table.lockedByUserId} IS NOT NULL)
+        OR (${table.status} = 'open'
+          AND ${table.lockedAt} IS NULL
+          AND ${table.lockedByUserId} IS NULL
+          AND ${table.lockedByStaffId} IS NULL)`,
+    ),
+  ],
+)
+
+/**
+ * Append-only ledger fact rows ("统一经营流水").
+ *
+ * Four money definitions live side by side and are never merged:
+ * `order_registered` (订单登记金额), `order_verified` (已核验有效业绩),
+ * `payment_received` / `payment_reversed` (人工收款与冲正), `reward_cost` /
+ * `reward_reversed` (奖励成本与冲正).
+ *
+ * The CHECK constraints below are the part that must survive a service bug:
+ * - 没有凭据不得计入实收：`payment_*` requires `evidence_ref`, a concrete
+ *   `evidence_kind` and the handling `recorded_by_staff_id`;
+ * - `attribution_state = 'attributed' => attributed_staff_id IS NOT NULL`, and a
+ *   `pending` (待归属) row may not carry a staff id at all;
+ * - a reversal row always points at the entry it reverses (`counter_entry_id`);
+ * - `amount_cents >= 0`: a reversal is its own positive row, never a negative
+ *   amount that would let a corrected number silently disappear.
+ *
+ * UPDATE/DELETE are rejected by triggers in migration 0010 (append-only).
+ */
+export const ledgerEntries = sqliteTable(
+  'ledger_entries',
+  {
+    id: text('id').primaryKey(),
+    factKind: text('fact_kind').$type<LedgerFactKind>().notNull(),
+    sourceSystem: text('source_system').$type<LedgerSourceSystem>().notNull(),
+    /** Machine key of the source row; deduped per (source_system, source_id, fact_kind). */
+    sourceId: text('source_id').notNull(),
+    /** Human reference of the source (order no, grant id, receipt no). */
+    sourceDisplayNo: text('source_display_no').notNull(),
+    communityId: text('community_id')
+      .notNull()
+      .references(() => communities.id, { onDelete: 'restrict' }),
+    /** Local product of an order fact; `null` for CRM / reward / manual facts. */
+    productId: text('product_id').references(() => localProducts.id, {
+      onDelete: 'restrict',
+    }),
+    /** Only an explicit/confirmed attribution may fill this; never the recorder. */
+    attributedStaffId: text('attributed_staff_id').references(() => staffAccounts.id, {
+      onDelete: 'set null',
+    }),
+    attributionState: text('attribution_state').$type<LedgerAttributionState>().notNull(),
+    attributionBasis: text('attribution_basis').$type<LedgerAttributionBasis>().notNull(),
+    amountCents: integer('amount_cents').notNull(),
+    settlementAmountStatus: text('settlement_amount_status')
+      .$type<SettlementAmountStatus>()
+      .notNull(),
+    occurredAt: integer('occurred_at', { mode: 'timestamp_ms' }).notNull(),
+    verifiedAt: integer('verified_at', { mode: 'timestamp_ms' }),
+    recordedByUserId: text('recorded_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    /** Staff who handled the fact; mandatory for every `payment_*` row. */
+    recordedByStaffId: text('recorded_by_staff_id').references(() => staffAccounts.id, {
+      onDelete: 'set null',
+    }),
+    /** Reversal only: the entry this row reverses. */
+    counterEntryId: text('counter_entry_id').references((): AnySQLiteColumn => ledgerEntries.id, {
+      onDelete: 'restrict',
+    }),
+    evidenceRef: text('evidence_ref'),
+    evidenceKind: text('evidence_kind').$type<LedgerEvidenceKind>().notNull(),
+    batchId: text('batch_id').references(() => reconciliationBatches.id, {
+      onDelete: 'restrict',
+    }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    index('ledger_entries_community_occurred_idx').on(table.communityId, table.occurredAt),
+    index('ledger_entries_attributed_occurred_idx').on(
+      table.attributedStaffId,
+      table.occurredAt,
+    ),
+    index('ledger_entries_fact_kind_occurred_idx').on(table.factKind, table.occurredAt),
+    index('ledger_entries_batch_idx').on(table.batchId),
+    index('ledger_entries_source_idx').on(table.sourceSystem, table.sourceId),
+    index('ledger_entries_product_idx').on(table.productId),
+    check(
+      'ledger_entries_fact_kind_check',
+      sql`${table.factKind} IN ('order_registered', 'order_verified', 'payment_received',
+        'payment_reversed', 'reward_cost', 'reward_reversed')`,
+    ),
+    check(
+      'ledger_entries_source_system_check',
+      sql`${table.sourceSystem} IN ('local_order', 'crm_service_order', 'activity_reward_grant', 'manual')`,
+    ),
+    check(
+      'ledger_entries_source_kind_check',
+      sql`(${table.factKind} = 'order_registered' AND ${table.sourceSystem} = 'local_order')
+        OR (${table.factKind} = 'order_verified'
+          AND ${table.sourceSystem} IN ('local_order', 'crm_service_order'))
+        OR (${table.factKind} IN ('payment_received', 'payment_reversed')
+          AND ${table.sourceSystem} = 'manual')
+        OR (${table.factKind} IN ('reward_cost', 'reward_reversed')
+          AND ${table.sourceSystem} = 'activity_reward_grant')`,
+    ),
+    check(
+      'ledger_entries_attribution_state_check',
+      sql`${table.attributionState} IN ('attributed', 'pending')`,
+    ),
+    check(
+      'ledger_entries_attribution_basis_check',
+      sql`${table.attributionBasis} IN ('explicit_attribution', 'confirmed_fact',
+        'no_explicit_attribution', 'source_missing')`,
+    ),
+    check(
+      'ledger_entries_attribution_check',
+      sql`(${table.attributionState} = 'attributed'
+          AND ${table.attributedStaffId} IS NOT NULL
+          AND ${table.attributionBasis} IN ('explicit_attribution', 'confirmed_fact'))
+        OR (${table.attributionState} = 'pending'
+          AND ${table.attributedStaffId} IS NULL
+          AND ${table.attributionBasis} IN ('no_explicit_attribution', 'source_missing'))`,
+    ),
+    check('ledger_entries_amount_check', sql`${table.amountCents} >= 0`),
+    check(
+      'ledger_entries_settlement_status_check',
+      sql`${table.settlementAmountStatus} IN ('pending_rule', 'estimated')`,
+    ),
+    check(
+      'ledger_entries_evidence_kind_check',
+      sql`${table.evidenceKind} IN ('manual_receipt', 'bank_transfer', 'crm_confirmation',
+        'order_verification', 'reward_grant', 'none')`,
+    ),
+    // 没有凭据不得计入实收（DB 层硬拦）。
+    check(
+      'ledger_entries_payment_evidence_check',
+      sql`${table.factKind} NOT IN ('payment_received', 'payment_reversed')
+        OR (${table.evidenceRef} IS NOT NULL
+          AND ${table.recordedByStaffId} IS NOT NULL
+          AND ${table.evidenceKind} <> 'none')`,
+    ),
+    check(
+      'ledger_entries_counter_entry_check',
+      sql`(${table.factKind} IN ('payment_reversed', 'reward_reversed')
+          AND ${table.counterEntryId} IS NOT NULL)
+        OR (${table.factKind} NOT IN ('payment_reversed', 'reward_reversed')
+          AND ${table.counterEntryId} IS NULL)`,
+    ),
+    check(
+      'ledger_entries_verified_at_check',
+      sql`(${table.factKind} = 'order_verified' AND ${table.verifiedAt} IS NOT NULL)
+        OR (${table.factKind} <> 'order_verified' AND ${table.verifiedAt} IS NULL)`,
+    ),
+  ],
+)
+
+/**
+ * Dedupe key of the ledger: one source fact may enter the ledger at most once
+ * per fact kind. `(source_system, source_id, fact_kind)` is UNIQUE, so a
+ * duplicate notification, a replayed import or a concurrent consumer can only
+ * hit the existing entry — never produce a second row (and never a second SUM).
+ */
+export const ledgerEntrySources = sqliteTable(
+  'ledger_entry_sources',
+  {
+    id: text('id').primaryKey(),
+    sourceSystem: text('source_system').$type<LedgerSourceSystem>().notNull(),
+    sourceId: text('source_id').notNull(),
+    factKind: text('fact_kind').$type<LedgerFactKind>().notNull(),
+    entryId: text('entry_id')
+      .notNull()
+      .references(() => ledgerEntries.id, { onDelete: 'restrict' }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('ledger_entry_sources_dedupe_uq').on(
+      table.sourceSystem,
+      table.sourceId,
+      table.factKind,
+    ),
+    index('ledger_entry_sources_entry_idx').on(table.entryId),
+    check(
+      'ledger_entry_sources_fact_kind_check',
+      sql`${table.factKind} IN ('order_registered', 'order_verified', 'payment_received',
+        'payment_reversed', 'reward_cost', 'reward_reversed')`,
+    ),
+    check(
+      'ledger_entry_sources_source_system_check',
+      sql`${table.sourceSystem} IN ('local_order', 'crm_service_order', 'activity_reward_grant', 'manual')`,
+    ),
+  ],
+)
+
+/**
+ * Anomalies flagged against an entry. The fact row itself stays immutable: an
+ * anomaly can be resolved (a new observation) but never rewrites the money.
+ * DELETE is rejected by a trigger in migration 0010.
+ */
+export const ledgerAnomalies = sqliteTable(
+  'ledger_anomalies',
+  {
+    id: text('id').primaryKey(),
+    entryId: text('entry_id')
+      .notNull()
+      .references(() => ledgerEntries.id, { onDelete: 'restrict' }),
+    kind: text('kind').$type<LedgerAnomalyKind>().notNull(),
+    severity: text('severity').$type<LedgerAnomalySeverity>().notNull(),
+    note: text('note'),
+    flaggedByUserId: text('flagged_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    resolvedAt: integer('resolved_at', { mode: 'timestamp_ms' }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    index('ledger_anomalies_entry_idx').on(table.entryId),
+    index('ledger_anomalies_open_idx').on(table.resolvedAt, table.severity),
+    check(
+      'ledger_anomalies_kind_check',
+      sql`${table.kind} IN ('amount_mismatch', 'attribution_conflict',
+        'source_missing_evidence', 'duplicate_candidate', 'period_gap')`,
+    ),
+    check(
+      'ledger_anomalies_severity_check',
+      sql`${table.severity} IN ('low', 'medium', 'high')`,
+    ),
+  ],
+)
+
 export const userRelations = relations(users, ({ many }) => ({
   wechatIdentities: many(wechatIdentities),
   phoneIdentities: many(residentPhoneIdentities),
@@ -1616,4 +1914,8 @@ export const schema = {
   localProducts,
   localOrders,
   localOrderEvents,
+  reconciliationBatches,
+  ledgerEntries,
+  ledgerEntrySources,
+  ledgerAnomalies,
 }

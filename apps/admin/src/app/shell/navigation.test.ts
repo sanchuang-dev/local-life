@@ -126,6 +126,61 @@ describe('customer CRM navigation', () => {
   })
 })
 
+describe('performance and reconciliation navigation', () => {
+  it('marks both ledger pages as ready with no planned leftovers', () => {
+    for (const key of ['/performance', '/settlements']) {
+      const page = findNavPage(key)
+      expect(page, `${key} must exist in the navigation model`).toBeTruthy()
+      expect(page?.status).toBe('ready')
+      expect(page?.planned).toEqual([])
+      expect(page?.roles).toEqual(['admin', 'operator'])
+    }
+    expect(groupForPage('/performance')?.label).toBe('业绩与对账')
+    expect(groupForPage('/settlements')?.label).toBe('业绩与对账')
+  })
+
+  it('stops calling the ledger an unimplemented module', () => {
+    const performance = findNavPage('/performance')
+    const settlements = findNavPage('/settlements')
+    // The old placeholder copy promised 「网格员业绩」「结算单导出」; shipping a real
+    // page must not keep advertising a plan as if the page were still pending.
+    expect(performance?.description).toContain('账面')
+    expect(performance?.description).not.toContain('待建设')
+    expect(settlements?.description).toContain('对账批次')
+    expect(settlements?.description).toContain('CSV')
+    // Nothing in this group may still render the shared 待建设 state.
+    const plannedKeys = NAV_GROUPS.flatMap((group) => group.pages)
+      .filter((page) => page.status === 'planned')
+      .map((page) => page.key)
+    expect(plannedKeys).not.toContain('/performance')
+    expect(plannedKeys).not.toContain('/settlements')
+  })
+
+  it('hides the ledger pages from grid workers but keeps them for staff who can operate', () => {
+    for (const key of ['/performance', '/settlements']) {
+      const page = findNavPage(key)
+      expect(page).toBeTruthy()
+      expect(isPageVisible(page!, 'grid_worker')).toBe(false)
+      expect(isPageVisible(page!, 'admin')).toBe(true)
+      expect(isPageVisible(page!, 'operator')).toBe(true)
+      // No role means "not yet known"; the sidebar must not hide the entry early.
+      expect(isPageVisible(page!)).toBe(true)
+    }
+
+    const gridNavigation = filterNavigation('', 'grid_worker')
+    expect(
+      gridNavigation.groups.flatMap((group) => group.pages.map((page) => page.key)),
+    ).not.toContain('/performance')
+    expect(gridNavigation.groups.map((group) => group.key)).not.toContain('performance')
+
+    const operatorKeys = filterNavigation('', 'operator').groups.flatMap((group) =>
+      group.pages.map((page) => page.key),
+    )
+    expect(operatorKeys).toContain('/performance')
+    expect(operatorKeys).toContain('/settlements')
+  })
+})
+
 describe('WeChat public-account navigation', () => {
   it('registers /system/wechat as a ready admin-only page inside 系统管理', () => {
     const page = findNavPage('/system/wechat')
@@ -169,7 +224,8 @@ describe('WeChat public-account navigation', () => {
   })
 })
 
-describe('activeMenuKey', () => {  it('resolves the workbench only for the root path', () => {
+describe('activeMenuKey', () => {
+  it('resolves the workbench only for the root path', () => {
     expect(activeMenuKey('/')).toBe(HOME_PAGE.key)
     expect(activeMenuKey('/orders')).toBe('/orders')
   })
@@ -178,6 +234,8 @@ describe('activeMenuKey', () => {  it('resolves the workbench only for the root 
     expect(activeMenuKey('/activities/checkin')).toBe('/activities/checkin')
     expect(activeMenuKey('/activities')).toBe('/activities')
     expect(activeMenuKey('/system/runtime')).toBe('/system/runtime')
+    expect(activeMenuKey('/performance')).toBe('/performance')
+    expect(activeMenuKey('/settlements')).toBe('/settlements')
   })
 
   it('keeps unknown routes out of the navigation model', () => {

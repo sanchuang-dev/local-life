@@ -1,0 +1,177 @@
+/*
+ * 业绩看板 + 对账结算（LL-MVP-008 / Issue #64）。
+ *
+ * Page-local composition only: colours come from the antd theme tokens already
+ * mounted by the admin provider, and the shared `.local-*` primitives in
+ * `local-console.css` (drawer sections, snapshot rows, empty state) are reused
+ * rather than reimplemented. Nothing here introduces a second visual system.
+ */
+
+/* ------------------------------ 业绩看板 KPI ------------------------------ */
+
+.ledger-kpi {
+  height: 100%;
+}
+
+/* The note under a Statistic explains the 口径; it must never look like a value. */
+.ledger-kpi .ledger-kpi-note {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ant-color-text-description, #64748b);
+}
+
+/* Secondary numbers (reversal, pending attribution) stay visibly subordinate. */
+.ledger-kpi .ledger-kpi-secondary {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--ant-color-border-secondary, #e8f0ec);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ant-color-text-secondary, #475569);
+}
+
+.ledger-report-footnote {
+  margin: 16px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* --------------------------- 口径说明 (both pages) ------------------------- */
+
+.ledger-note {
+  border: 1px solid var(--ant-color-border-secondary, #e8f0ec);
+  border-left: 3px solid var(--ant-color-primary, #1677ff);
+  border-radius: 8px;
+  padding: 12px 16px;
+  background: var(--ant-color-fill-quaternary, #fafafa);
+}
+
+.ledger-note ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.ledger-note li {
+  margin: 4px 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ant-color-text-secondary, #475569);
+}
+
+.ledger-note code {
+  font-size: 12px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--ant-color-fill-secondary, #f1f5f9);
+}
+
+/* ------------------------------- cell helpers ----------------------------- */
+
+/* Monospace for machine identifiers (source no, entry id, evidence ref). */
+.ledger-cell-mono {
+  font-family: var(--ant-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+/* --------------------------- 对账结算: 批次 + 差异 ------------------------- */
+
+.ledger-diff-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+/*
+ * The two diff blocks are deliberately equal-weight: 未纳入 is a 待办, 锁后补录 is
+ * a 既成事实, and neither is "the real number" the other one should be measured
+ * against. They are never added together, so they never share a total row.
+ */
+.ledger-diff-block {
+  border: 1px solid var(--ant-color-border-secondary, #e8f0ec);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.ledger-diff-block[data-tone='todo'] {
+  border-left: 3px solid var(--ant-color-warning, #faad14);
+}
+
+.ledger-diff-block[data-tone='fact'] {
+  border-left: 3px solid var(--ant-color-info, #1677ff);
+}
+
+.ledger-diff-block-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.ledger-diff-numbers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-top: 8px;
+}
+
+.ledger-diff-number-label {
+  display: block;
+  font-size: 12px;
+  color: var(--ant-color-text-description, #64748b);
+}
+
+.ledger-diff-number-value {
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ledger-diff-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ant-color-text-description, #64748b);
+}
+
+/* 差异结论清单: one row per finding, severity first. */
+.ledger-diff-findings {
+  margin-top: 12px;
+}
+
+.ledger-diff-finding {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--ant-color-border-secondary, #e8f0ec);
+}
+
+.ledger-diff-finding:last-child {
+  border-bottom: none;
+}
+
+.ledger-diff-finding-detail {
+  flex: 1 1 240px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ant-color-text-secondary, #475569);
+  word-break: break-word;
+}
+
+/* Batch period + status line in the batch list. */
+.ledger-batch-period {
+  font-variant-numeric: tabular-nums;
+}
+
+.ledger-diff-period {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}

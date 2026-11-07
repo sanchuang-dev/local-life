@@ -115,16 +115,20 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       {
         key: '/performance',
         label: '业绩看板',
-        description: '网格员业绩、奖励成本与运营指标。',
-        status: 'planned',
-        planned: ['网格员业绩', '奖励成本', '运营指标'],
+        description:
+          '统一经营流水总览：登记金额、已核验业绩、人工实收与冲正、奖励成本与冲正分列展示账面毛额，附服务端聚合的明细筛选。',
+        status: 'ready',
+        planned: [],
+        roles: ['admin', 'operator'],
       },
       {
         key: '/settlements',
         label: '对账结算',
-        description: '结算单生成、导出与对账差异。',
-        status: 'planned',
-        planned: ['结算单导出', '对账差异', '操作留痕'],
+        description:
+          '按业务日期间创建并锁定对账批次、核对差异与锁后补录，导出带审计的账面明细 CSV。',
+        status: 'ready',
+        planned: [],
+        roles: ['admin', 'operator'],
       },
     ],
   },
