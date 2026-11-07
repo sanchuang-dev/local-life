@@ -5,6 +5,8 @@ import {
   ledgerAnomalyListResponseSchema,
   ledgerListResponseSchema,
   ledgerOverviewSchema,
+  ledgerSyncRequestSchema,
+  ledgerSyncResponseSchema,
   lockBatchRequestSchema,
   reconciliationBatchEntriesResponseSchema,
   reconciliationBatchListResponseSchema,
@@ -23,6 +25,8 @@ import {
   type LedgerListResponse,
   type LedgerOverview,
   type LedgerOverviewQuery,
+  type LedgerSyncRequest,
+  type LedgerSyncResponse,
   type LedgerReconciliationState,
   type LedgerSourceSystem,
   type LockBatchRequest,
@@ -145,6 +149,19 @@ export async function listLedgerAnomalies(signal?: AbortSignal): Promise<LedgerA
     '未解决异常',
   )
   return parsed.items
+}
+
+/** Explicitly project real source facts; retries are idempotent by source key. */
+export async function syncLedgerSourceFacts(
+  csrfToken: string,
+  request: LedgerSyncRequest = {},
+): Promise<LedgerSyncResponse> {
+  const payload = await requestLocalJson(`/api${LEDGER_ROUTES.adminSync}`, {
+    method: 'POST',
+    csrfToken,
+    body: ledgerSyncRequestSchema.parse(request),
+  })
+  return parsePayload(ledgerSyncResponseSchema, payload, '来源事实同步结果')
 }
 
 /* -------------------------------------------------------------------------- */
