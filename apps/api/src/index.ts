@@ -2,7 +2,7 @@ import 'dotenv/config'
 import { fileURLToPath } from 'node:url'
 import { serve } from '@hono/node-server'
 import { createApp } from './app.js'
-import { loadConfig, type ApiConfig } from './config.js'
+import { legacyWechatEnvVars, loadConfig, type ApiConfig } from './config.js'
 import { createDatabase } from './db/client.js'
 import { logEvent } from './log.js'
 
@@ -16,6 +16,17 @@ function start(): void {
     })
     process.exitCode = 1
     return
+  }
+
+  // The resident WeChat provider now comes from the database (#113). Warn once
+  // about leftover pre-#113 variables, naming them only: their values are never
+  // read, logged or rejected, so a deployment can migrate without downtime.
+  const legacyWechatVariables = legacyWechatEnvVars(process.env)
+  if (legacyWechatVariables.length > 0) {
+    logEvent('config.wechat_env_ignored', {
+      variables: legacyWechatVariables,
+      hint: 'remove them and configure/enable the account under 系统管理 → 微信公众号',
+    })
   }
 
   const migrationsFolder = fileURLToPath(new URL('../db/migrations', import.meta.url))
@@ -38,7 +49,7 @@ function start(): void {
         host: config.host,
         port: info.port,
         environment: config.nodeEnv,
-        wechatOAuthConfigured: Boolean(config.wechat),
+        wechatConfigMasterKeyConfigured: Boolean(config.wechatConfigMasterKey),
         developmentResidentLoginEnabled: config.authDevEnabled,
       })
     },

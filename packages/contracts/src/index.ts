@@ -78,6 +78,16 @@ export const API_ERROR_CODES = {
    * submission is a conflict, never an overwrite.
    */
   orderIdempotencyConflict: 'order_idempotency_conflict',
+  /**
+   * WeChat public-account admin config (#113). Every failure is explicit: an
+   * unreadable/absent master key or an undecryptable row must never be treated
+   * as a usable OAuth provider.
+   */
+  wechatConfigInvalid: 'wechat_config_invalid',
+  wechatConfigNotVerified: 'wechat_config_not_verified',
+  wechatConfigVerifyFailed: 'wechat_config_verify_failed',
+  wechatConfigMasterKeyUnavailable: 'wechat_config_master_key_unavailable',
+  wechatConfigDecryptFailed: 'wechat_config_decrypt_failed',
 } as const
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES]
@@ -1893,3 +1903,230 @@ export const phoneAuthStatusResponseSchema = z.object({
 })
 
 export type PhoneAuthStatusResponse = z.infer<typeof phoneAuthStatusResponseSchema>
+
+/* -------------------------------------------------------------------------- */
+/* WeChat public-account admin config (#113 LL-SYS-001)                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Route identifiers for the admin-only WeChat public-account configuration.
+ *
+ * This is the ONLY definition of these paths: the Hono routes, the admin client
+ * and the tests all build URLs from here, so a renamed endpoint cannot drift.
+ * Every endpoint reuses the existing staff session + Origin/CSRF checks and is
+ * restricted to `role = admin`; `/admin/wechat/*` is inside the back-office
+ * surface, so operators and grid workers must never reach it.
+ *
+ * - `GET  config`             current state + summaries (never an AppSecret)
+ * - `POST saveCandidate`      encrypt + store a new candidate version
+ * - `POST verify`             call the real WeChat API for one stored version
+ * - `POST activate`           switch the runtime provider with confirmation
+ */
+export const WECHAT_ADMIN_ROUTES = {
+  config: '/admin/wechat/config',
+  saveCandidate: '/admin/wechat/config/candidates',
+  verify: '/admin/wechat/config/:configId/verify',
+  activate: '/admin/wechat/config/:configId/activate',
+} as const
+
+/** The callback path the deployment exposes next to the resident H5. */
+export const WECHAT_OAUTH_CALLBACK_PATH = '/api/auth/wechat/callback'
+
+export function wechatAdminVerifyPath(configId: string): string {
+  return WECHAT_ADMIN_ROUTES.verify.replace(':configId', encodeURIComponent(configId))
+}
+
+export function wechatAdminActivatePath(configId: string): string {
+  return WECHAT_ADMIN_ROUTES.activate.replace(':configId', encodeURIComponent(configId))
+}
+
+/**
+ * Display-only distinction between the WeChat interface test account and the
+ * official public account. It never changes the OAuth protocol or the stored
+ * credentials; it only tells an operator which account a row belongs to.
+ */
+export const wechatAccountTypeSchema = z.enum(['test', 'official'])
+export type WechatAccountType = z.infer<typeof wechatAccountTypeSchema>
+
+/**
+ * Persisted lifecycle of one configuration version.
+ *
+ * `draft`     saved candidate, not verified yet
+ * `verified`  a real WeChat API call proved the credentials work
+ * `failed`    the latest verification failed; the row is unusable
+ * `active`    the single runtime provider (partial unique index on disk)
+ * `retired`   superseded by a newer candidate or by an activation switch
+ */
+export const wechatConfigStatusSchema = z.enum([
+  'draft',
+  'verified',
+  'failed',
+  'active',
+  'retired',
+])
+export type WechatConfigStatus = z.infer<typeof wechatConfigStatusSchema>
+
+/**
+ * The overall state the admin screen shows. It is derived from "is there an
+ * active row / a current candidate", not stored, so it cannot disagree with the
+ * rows the same response returns.
+ */
+export const wechatAdminConfigStateSchema = z.enum([
+  'unconfigured',
+  'draft',
+  'verified',
+  'failed',
+  'active',
+])
+export type WechatAdminConfigState = z.infer<typeof wechatAdminConfigStateSchema>
+
+/**
+ * One shared derivation for the API response and the admin UI. `active` wins:
+ * a working account stays reported as 已启用 even while an unverified candidate
+ * is being prepared. Without an active row the newest candidate decides.
+ */
+export function resolveWechatAdminConfigState(
+  active: Pick<WechatConfigSummary, 'status'> | null,
+  candidate: Pick<WechatConfigSummary, 'status'> | null,
+): WechatAdminConfigState {
+  if (active && active.status === 'active') return 'active'
+  switch (candidate?.status) {
+    case 'verified':
+      return 'verified'
+    case 'failed':
+      return 'failed'
+    case 'draft':
+      return 'draft'
+    default:
+      return 'unconfigured'
+  }
+}
+
+/**
+ * Redacted failure categories. A WeChat error code, HTTP status or transport
+ * error is mapped onto this closed set before it is stored or shown, so no raw
+ * upstream payload, access token or credential can leak through an error field.
+ */
+export const wechatConfigFailureCodeSchema = z.enum([
+  'invalid_app_id',
+  'invalid_app_secret',
+  'invalid_credential',
+  'api_forbidden',
+  'rate_limited',
+  'wechat_api_error',
+  'network_error',
+  'timeout',
+  'decrypt_failed',
+  'master_key_unavailable',
+  'unknown',
+])
+export type WechatConfigFailureCode = z.infer<typeof wechatConfigFailureCodeSchema>
+
+/**
+ * Admin-visible summary of one configuration version. It deliberately has no
+ * ciphertext/iv/tag/key field and no AppSecret field: the server never returns
+ * key material, and the admin client has no way to render it accidentally.
+ */
+export const wechatConfigSummarySchema = z.object({
+  id: z.string().uuid(),
+  appId: z.string().min(1),
+  accountType: wechatAccountTypeSchema,
+  status: wechatConfigStatusSchema,
+  /** Which master-key generation encrypted this row (never the key itself). */
+  keyId: z.string().min(1),
+  lastErrorCode: wechatConfigFailureCodeSchema.nullable(),
+  verifiedAt: isoTimestamp.nullable(),
+  activatedAt: isoTimestamp.nullable(),
+  retiredAt: isoTimestamp.nullable(),
+  createdByUserId: z.string().uuid().nullable(),
+  createdAt: isoTimestamp,
+  updatedAt: isoTimestamp,
+})
+
+export type WechatConfigSummary = z.infer<typeof wechatConfigSummarySchema>
+
+/**
+ * `GET /admin/wechat/config`. `masterKeyAvailable: false` means the server
+ * cannot decrypt or store credentials at all, so the UI must present the whole
+ * feature as unavailable instead of offering a button that can only fail.
+ */
+export const wechatAdminConfigResponseSchema = z.object({
+  state: wechatAdminConfigStateSchema,
+  /** The single runtime provider, or null when no version is active. */
+  active: wechatConfigSummarySchema.nullable(),
+  /** Newest `draft`/`verified`/`failed` version, or null. */
+  candidate: wechatConfigSummarySchema.nullable(),
+  /** Newest versions first, including retired history; never key material. */
+  recent: z.array(wechatConfigSummarySchema).max(50),
+  masterKeyAvailable: z.boolean(),
+  /** Configured master-key generation id; a non-secret label. */
+  keyId: z.string().min(1),
+  /** Read-only full callback URL derived from the approved resident web origin. */
+  redirectUri: z.string().min(1),
+})
+
+export type WechatAdminConfigResponse = z.infer<typeof wechatAdminConfigResponseSchema>
+
+/**
+ * Save a new candidate version. The AppSecret is accepted exactly as typed
+ * (never trimmed/reformatted) and is encrypted before it reaches SQLite; it is
+ * never echoed by any response. Storing a candidate never changes the active
+ * provider, so a typo cannot break a working OAuth deployment.
+ */
+export const saveWechatConfigRequestSchema = z.strictObject({
+  appId: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9]{6,64}$/, 'AppID 必须是 6-64 位字母或数字'),
+  appSecret: z
+    .string()
+    .min(8)
+    .max(128),
+  accountType: wechatAccountTypeSchema,
+})
+
+export type SaveWechatConfigRequest = z.infer<typeof saveWechatConfigRequestSchema>
+
+export const saveWechatConfigResponseSchema = z.object({
+  config: wechatConfigSummarySchema,
+})
+
+export type SaveWechatConfigResponse = z.infer<typeof saveWechatConfigResponseSchema>
+
+/**
+ * Verify one stored candidate. Verification is a real WeChat API call; a
+ * failure is reported as the standard `wechat_config_verify_failed` error
+ * envelope and the previous `active` provider is left untouched.
+ */
+export const verifyWechatConfigRequestSchema = z.strictObject({
+  expectedUpdatedAt: isoTimestamp,
+})
+
+export type VerifyWechatConfigRequest = z.infer<typeof verifyWechatConfigRequestSchema>
+
+/** Only a real successful call may produce this response. */
+export const verifyWechatConfigResponseSchema = z.object({
+  verified: z.literal(true),
+  config: wechatConfigSummarySchema,
+})
+
+export type VerifyWechatConfigResponse = z.infer<typeof verifyWechatConfigResponseSchema>
+
+/**
+ * Activate a verified version. `confirm: true` is required so a mis-click can
+ * never swap the live OAuth provider; the response reports the previous active
+ * version so the UI can show exactly what was retired.
+ */
+export const activateWechatConfigRequestSchema = z.strictObject({
+  expectedUpdatedAt: isoTimestamp,
+  confirm: z.literal(true),
+})
+
+export type ActivateWechatConfigRequest = z.infer<typeof activateWechatConfigRequestSchema>
+
+export const activateWechatConfigResponseSchema = z.object({
+  active: wechatConfigSummarySchema,
+  previous: wechatConfigSummarySchema.nullable(),
+})
+
+export type ActivateWechatConfigResponse = z.infer<typeof activateWechatConfigResponseSchema>

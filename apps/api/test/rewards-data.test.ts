@@ -242,8 +242,8 @@ function insertCheckin(
 
 test('a frozen reward plan survives the publish snapshot and a plan-less activity stays byte-identical', () => {
   const tempDir = mkdtempSync(join(tmpdir(), 'll-0006-plan-'))
+  const { db, sqlite } = createDatabase(join(tempDir, 'plan.sqlite'), migrationsFolder)
   try {
-    const { db } = createDatabase(join(tempDir, 'plan.sqlite'), migrationsFolder)
     const communityId = randomUUID()
     db.insert(communities).values({ id: communityId, name: '计划社区', createdAt: NOW }).run()
     const actorId = randomUUID()
@@ -339,6 +339,9 @@ test('a frozen reward plan survives the publish snapshot and a plan-less activit
     const afterEdit = listActivityRuleVersions(db, actor, planned.id)
     assert.deepEqual(afterEdit.items[0]!.snapshot.rewardPlan, PLAN)
   } finally {
+    // Windows cannot unlink an open SQLite file (EBUSY), so close first. Test
+    // hygiene only; no assertion or production path changes.
+    if (sqlite.open) sqlite.close()
     rmSync(tempDir, { recursive: true, force: true })
   }
 })

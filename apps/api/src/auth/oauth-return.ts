@@ -1,4 +1,7 @@
-import { validateReturnTo } from '@sanchuang-dev/local-life-contracts'
+import {
+  WECHAT_OAUTH_CALLBACK_PATH,
+  validateReturnTo,
+} from '@sanchuang-dev/local-life-contracts'
 import { constantTimeTextEqual } from './security.js'
 
 /**
@@ -28,6 +31,20 @@ export const OAUTH_RETURN_COOKIE_PATH = '/'
 
 /** One authorization attempt lives at most ten minutes. */
 export const OAUTH_STATE_TTL_SECONDS = 10 * 60
+
+/**
+ * The WeChat OAuth callback URL is derived, never configured (#113).
+ *
+ * The public-account admin page shows this exact value read-only, and the start
+ * request must send the same one to WeChat. Deriving it from `WEB_BASE_URL`'s
+ * origin keeps the API's own callback, the value registered in the WeChat
+ * console and the value shown to the administrator in sync; the path half is
+ * the shared `WECHAT_OAUTH_CALLBACK_PATH` constant. A legacy
+ * `WECHAT_REDIRECT_URI` is ignored, so the two can never disagree.
+ */
+export function wechatCallbackUrl(webBaseUrl: string): string {
+  return new URL(WECHAT_OAUTH_CALLBACK_PATH, new URL(webBaseUrl).origin).toString()
+}
 
 export type ResolvedReturnTo =
   | { ok: true; returnTo: string | null }

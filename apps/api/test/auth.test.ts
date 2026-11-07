@@ -14,6 +14,7 @@ import {
   wechatIdentities,
 } from '../src/db/schema.js'
 import { hashPassword } from '../src/auth/security.js'
+import { masterKeyEnv, seedWechatConfig, TEST_APP_ID } from './wechat-fixtures.js'
 
 const migrationsFolder = fileURLToPath(new URL('../db/migrations', import.meta.url))
 
@@ -61,13 +62,21 @@ async function login(app: ReturnType<typeof createApp>, username: string, passwo
   return { response, csrfToken: response.ok ? ((await response.clone().json()) as { csrfToken: string }).csrfToken : null }
 }
 
-function testContext(overrides: NodeJS.ProcessEnv = {}, fetcher?: typeof fetch) {
+function testContext(
+  overrides: NodeJS.ProcessEnv = {},
+  fetcher?: typeof fetch,
+  options: { seedWechat?: boolean } = {},
+) {
   const { db, sqlite } = createDatabase(':memory:', migrationsFolder)
   const config = loadConfig({
     NODE_ENV: 'test',
     AUTH_DEV_ENABLED: 'true',
+    ...(options.seedWechat ? masterKeyEnv() : {}),
     ...overrides,
   })
+  // The resident OAuth provider is now a database row, so the test seeds an
+  // encrypted active version with the same master key the app loaded.
+  if (options.seedWechat) seedWechatConfig(db, { appId: TEST_APP_ID })
   const app = createApp({ db, config, logRequests: false, fetcher })
   return { app, db, sqlite }
 }
@@ -237,13 +246,11 @@ test('WeChat OAuth binds one stable resident identity, validates state/nonce and
   }
   const context = testContext(
     {
-      WECHAT_APP_ID: 'wx-test-app',
-      WECHAT_APP_SECRET: 'test-secret',
-      WECHAT_REDIRECT_URI: 'https://local-life.example.test/api/auth/wechat/callback',
       WEB_BASE_URL: 'https://local-life.example.test',
       TRUSTED_ORIGINS: 'https://local-life.example.test',
     },
     fetcher,
+    { seedWechat: true },
   )
 
   try {
@@ -259,6 +266,13 @@ test('WeChat OAuth binds one stable resident identity, validates state/nonce and
     const state = authorizeUrl.searchParams.get('state')
     assert.ok(state)
     assert.equal(authorizeUrl.searchParams.get('scope'), 'snsapi_base')
+    // The AppID and callback URL come from the seeded database row and the
+    // derived callback rule, never from an env snapshot.
+    assert.equal(authorizeUrl.searchParams.get('appid'), TEST_APP_ID)
+    assert.equal(
+      authorizeUrl.searchParams.get('redirect_uri'),
+      'https://local-life.example.test/api/auth/wechat/callback',
+    )
     const nonceCookie = cookiePair(start, 'll_oauth_nonce')
     // The browser visits /api/auth/wechat/callback (proxy strips /api only on
     // the server). A cookie scoped to /auth/wechat would be silently omitted.
