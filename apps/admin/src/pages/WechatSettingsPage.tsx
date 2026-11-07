@@ -609,7 +609,7 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
               title={active ? '新增 / 更换公众号' : '新增公众号'}
               open={editorOpen}
               onClose={closeEditor}
-              width="min(480px, 100vw)"
+              size="min(480px, 100vw)"
               maskClosable={!saving}
               keyboard={!saving}
               closable={!saving}
@@ -697,7 +697,7 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
               title="公众号详情"
               open={detailsOpen}
               onClose={() => setDetailsOpen(false)}
-              width="min(520px, 100vw)"
+              size="min(520px, 100vw)"
               destroyOnHidden
               className="wechat-details-drawer"
             >
