@@ -78,6 +78,15 @@ export const API_ERROR_CODES = {
    * submission is a conflict, never an overwrite.
    */
   orderIdempotencyConflict: 'order_idempotency_conflict',
+  /**
+   * Ledger (LL-MVP-008, Issue #64). Every one of these is a *refusal*: the ledger
+   * prefers an explicit "cannot do that" over a silently corrected number.
+   */
+  ledgerBatchLocked: 'ledger_batch_locked',
+  ledgerEntryImmutable: 'ledger_entry_immutable',
+  ledgerPaymentEvidenceRequired: 'ledger_payment_evidence_required',
+  ledgerAttributionUnresolved: 'ledger_attribution_unresolved',
+  ledgerSourceDuplicate: 'ledger_source_duplicate',
 } as const
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES]
@@ -1770,6 +1779,7 @@ export type ActivityParticipationConfirmResponse = z.infer<
 
 export * from './crmeb.js'
 export * from './rewards.js'
+export * from './ledger.js'
 
 /* -------------------------------------------------------------------------- */
 /* Phone (SMS one-time code) resident identity (#93 LL-H5-002)                 */

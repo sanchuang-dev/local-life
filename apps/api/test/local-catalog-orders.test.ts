@@ -16,7 +16,9 @@ import { eq } from 'drizzle-orm'
 import test from 'node:test'
 import {
   API_ERROR_CODES,
+  LEDGER_ROUTES,
   LOCAL_ORDER_STATUS_TRANSITIONS,
+  ledgerOverviewSchema,
   localOrderDetailSchema,
   localOrderEventListResponseSchema,
   localOrderListResponseSchema,
@@ -1420,17 +1422,18 @@ test('0009 creates the three local tables with foreign keys, unique key and trig
   }
 })
 
-test('a pre-0009 database upgrades in place, keeps its rows and becomes usable', async () => {
+test('a pre-0010 database upgrades in place, keeps its rows and becomes usable', async () => {
   const temp = withTempDir('ll-local-upgrade-')
   try {
-    const stagingFolder = join(temp.dir, 'migrations-before-0009')
+    const stagingFolder = join(temp.dir, 'migrations-before-0010')
     mkdirSync(join(stagingFolder, 'meta'), { recursive: true })
     const journal = JSON.parse(
       readFileSync(join(migrationsFolder, 'meta', '_journal.json'), 'utf8'),
     ) as { version: string; dialect: string; entries: Array<{ tag: string }> }
-    assert.equal(journal.entries.length, 10, 'journal must describe exactly 0000..0009')
+    assert.equal(journal.entries.length, 11, 'journal must describe exactly 0000..0010')
 
-    for (const entry of journal.entries.slice(0, 9)) {
+    // Stage everything before 0010: the local tables exist, the ledger does not.
+    for (const entry of journal.entries.slice(0, 10)) {
       copyFileSync(
         join(migrationsFolder, `${entry.tag}.sql`),
         join(stagingFolder, `${entry.tag}.sql`),
@@ -1438,7 +1441,7 @@ test('a pre-0009 database upgrades in place, keeps its rows and becomes usable',
     }
     writeFileSync(
       join(stagingFolder, 'meta', '_journal.json'),
-      JSON.stringify({ ...journal, entries: journal.entries.slice(0, 9) }),
+      JSON.stringify({ ...journal, entries: journal.entries.slice(0, 10) }),
     )
 
     const databasePath = join(temp.dir, 'upgrade.sqlite')
@@ -1447,12 +1450,24 @@ test('a pre-0009 database upgrades in place, keeps its rows and becomes usable',
     const legacyUserId = randomUUID()
     const now = new Date()
     try {
-      const localTables = legacy.sqlite
-        .prepare(
-          "SELECT count(*) AS value FROM sqlite_master WHERE type = 'table' AND name GLOB 'local_*'",
-        )
-        .get() as { value: number }
-      assert.equal(localTables.value, 0, 'the pre-0009 database has no local tables')
+      const legacyTables = legacy.sqlite
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
+        .all()
+        .map((row) => (row as { name: string }).name)
+      assert.equal(
+        legacyTables.filter((name) => name.startsWith('local_')).length,
+        3,
+        'the pre-0010 database already has the three local tables',
+      )
+      assert.equal(
+        legacyTables.filter((name) => name.startsWith('ledger_')).length,
+        0,
+        'the pre-0010 database has no ledger tables',
+      )
+      assert.ok(
+        !legacyTables.includes('reconciliation_batches'),
+        'the pre-0010 database has no reconciliation batch table',
+      )
       legacy.db
         .insert(communities)
         .values({ id: legacyCommunityId, name: '升级前社区', createdAt: now })
@@ -1475,12 +1490,23 @@ test('a pre-0009 database upgrades in place, keeps its rows and becomes usable',
         .get()
       assert.equal(preserved?.name, '升级前社区')
 
-      const localTableCount = upgraded.sqlite
-        .prepare(
-          "SELECT count(*) AS value FROM sqlite_master WHERE type = 'table' AND name GLOB 'local_*'",
-        )
-        .get() as { value: number }
-      assert.equal(localTableCount.value, 3)
+      const upgradedTables = upgraded.sqlite
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
+        .all()
+        .map((row) => (row as { name: string }).name)
+      assert.equal(
+        upgradedTables.filter((name) => name.startsWith('local_')).length,
+        3,
+        'the local tables are untouched by 0010',
+      )
+      for (const table of [
+        'ledger_entries',
+        'ledger_entry_sources',
+        'ledger_anomalies',
+        'reconciliation_batches',
+      ]) {
+        assert.ok(upgradedTables.includes(table), `${table} must be created by 0010`)
+      }
 
       // And the upgraded database is immediately usable through real HTTP.
       await createAdmin(upgraded.db)
@@ -1509,6 +1535,13 @@ test('a pre-0009 database upgrades in place, keeps its rows and becomes usable',
       )
       assert.equal(order.status, 'registered')
       assert.equal(order.snapshot.totalCents, 2400)
+
+      // The freshly created ledger surface answers with a real (empty) report.
+      const overview = await api(app, 'GET', LEDGER_ROUTES.adminOverview, { session: operator })
+      assert.equal(overview.status, 200)
+      const report = ledgerOverviewSchema.parse(await overview.json())
+      assert.equal(report.totals.entryCount, 0)
+      assert.equal(report.amountStatus, 'pending_rule')
     } finally {
       upgraded.sqlite.close()
     }
