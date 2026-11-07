@@ -158,7 +158,13 @@ function createWorld(plan: ActivityRewardPlan = PLAN): World {
     operator,
     activityUserId: adminUser,
     makeTeam,
-    cleanup: () => rmSync(tempDir, { recursive: true, force: true }),
+    cleanup: () => {
+      // Windows cannot unlink an open SQLite file (EBUSY), so close the
+      // connection before removing the temp directory. This is test hygiene
+      // only: no assertion or production path is affected.
+      if (sqlite.open) sqlite.close()
+      rmSync(tempDir, { recursive: true, force: true })
+    },
   }
   return world
 }

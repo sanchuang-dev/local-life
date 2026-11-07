@@ -1428,7 +1428,13 @@ test('a pre-0009 database upgrades in place, keeps its rows and becomes usable',
     const journal = JSON.parse(
       readFileSync(join(migrationsFolder, 'meta', '_journal.json'), 'utf8'),
     ) as { version: string; dialect: string; entries: Array<{ tag: string }> }
-    assert.equal(journal.entries.length, 10, 'journal must describe exactly 0000..0009')
+    // The journal grows with every later migration (0010 added the encrypted
+    // WeChat config table in #113), so only the prefix this test stages is
+    // asserted. The slice below still stages exactly 0000..0008 (pre-0009).
+    assert.ok(
+      journal.entries.length >= 10,
+      'journal must describe at least the 0000..0009 migrations staged by this test',
+    )
 
     for (const entry of journal.entries.slice(0, 9)) {
       copyFileSync(

@@ -31,6 +31,8 @@ import type {
   LocalOrderRecordSource,
   LocalOrderStatus,
   LocalProductStatus,
+  WechatAccountType,
+  WechatConfigStatus,
 } from '@sanchuang-dev/local-life-contracts'
 import { LOCAL_ORDER_EVENT_SOURCE_TYPE } from '@sanchuang-dev/local-life-contracts'
 
@@ -130,6 +132,116 @@ export const sessions = sqliteTable(
   ],
 )
 
+/**
+ * Versioned WeChat public-account credentials for resident web OAuth (#113).
+ *
+ * Every save creates a new row; nothing is ever updated in place except the
+ * lifecycle columns. That is what makes an in-flight OAuth attempt bindable to
+ * the exact credentials it started with instead of silently consuming a code
+ * with a newer AppSecret.
+ *
+ * Storage rules enforced on disk:
+ * - the AppSecret exists only as AES-256-GCM `ciphertext`/`iv`/`tag` (base64).
+ *   There is deliberately no plaintext secret column, so a schema mistake
+ *   cannot quietly persist one.
+ * - the IV is 12 bytes (16 base64 chars) and the GCM tag 16 bytes (24 base64
+ *   chars); CHECK constraints reject any other shape.
+ * - `wechat_oauth_configs_active_uq` is a partial unique index on `status`
+ *   `WHERE status = 'active'`, so the database itself refuses a second active
+ *   provider even if application code is bypassed.
+ * - `key_id` names the master-key generation used to encrypt this row. Rotating
+ *   the key never rewrites history; a row whose key id no longer matches fails
+ *   closed at decryption time.
+ * - the lifecycle CHECK keeps status and its timestamps consistent: `active`
+ *   carries verified+activated stamps, `retired` always carries `retired_at`
+ *   (and keeps the earlier stamps as history).
+ */
+export const wechatOauthConfigs = sqliteTable(
+  'wechat_oauth_configs',
+  {
+    id: text('id').primaryKey(),
+    appId: text('app_id').notNull(),
+    accountType: text('account_type').$type<WechatAccountType>().notNull(),
+    /** AES-256-GCM ciphertext, base64. Never a plaintext AppSecret. */
+    appSecretCiphertext: text('app_secret_ciphertext').notNull(),
+    appSecretIv: text('app_secret_iv').notNull(),
+    appSecretTag: text('app_secret_tag').notNull(),
+    keyId: text('key_id').notNull(),
+    status: text('status').$type<WechatConfigStatus>().notNull(),
+    /**
+     * Redacted failure category (`wechatConfigFailureCodeSchema`). A raw WeChat
+     * error payload / access token is never stored here.
+     */
+    lastErrorCode: text('last_error_code'),
+    verifiedAt: integer('verified_at', { mode: 'timestamp_ms' }),
+    activatedAt: integer('activated_at', { mode: 'timestamp_ms' }),
+    retiredAt: integer('retired_at', { mode: 'timestamp_ms' }),
+    createdByUserId: text('created_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    // The single runtime provider: a partial unique index, not a convention.
+    uniqueIndex('wechat_oauth_configs_active_uq')
+      .on(table.status)
+      .where(sql`${table.status} = 'active'`),
+    index('wechat_oauth_configs_status_created_idx').on(table.status, table.createdAt),
+    index('wechat_oauth_configs_created_idx').on(table.createdAt),
+    check(
+      'wechat_oauth_configs_account_type_check',
+      sql`${table.accountType} IN ('test', 'official')`,
+    ),
+    check(
+      'wechat_oauth_configs_status_check',
+      sql`${table.status} IN ('draft', 'verified', 'failed', 'active', 'retired')`,
+    ),
+    check(
+      'wechat_oauth_configs_app_id_check',
+      sql`length(${table.appId}) BETWEEN 6 AND 64
+        AND ${table.appId} NOT GLOB '*[^A-Za-z0-9]*'`,
+    ),
+    check(
+      'wechat_oauth_configs_iv_check',
+      sql`length(${table.appSecretIv}) = 16
+        AND ${table.appSecretIv} NOT GLOB '*[^A-Za-z0-9+/=]*'`,
+    ),
+    check(
+      'wechat_oauth_configs_tag_check',
+      sql`length(${table.appSecretTag}) = 24
+        AND ${table.appSecretTag} NOT GLOB '*[^A-Za-z0-9+/=]*'`,
+    ),
+    check(
+      'wechat_oauth_configs_ciphertext_check',
+      sql`length(${table.appSecretCiphertext}) > 0
+        AND ${table.appSecretCiphertext} NOT GLOB '*[^A-Za-z0-9+/=]*'`,
+    ),
+    check(
+      'wechat_oauth_configs_key_id_check',
+      sql`length(${table.keyId}) BETWEEN 1 AND 32
+        AND ${table.keyId} NOT GLOB '*[^A-Za-z0-9._-]*'`,
+    ),
+    check(
+      'wechat_oauth_configs_lifecycle_check',
+      sql`(${table.status} = 'active'
+          AND ${table.verifiedAt} IS NOT NULL
+          AND ${table.activatedAt} IS NOT NULL
+          AND ${table.retiredAt} IS NULL)
+        OR (${table.status} = 'retired'
+          AND ${table.retiredAt} IS NOT NULL)
+        OR (${table.status} = 'verified'
+          AND ${table.verifiedAt} IS NOT NULL
+          AND ${table.activatedAt} IS NULL
+          AND ${table.retiredAt} IS NULL)
+        OR (${table.status} IN ('draft', 'failed')
+          AND ${table.verifiedAt} IS NULL
+          AND ${table.activatedAt} IS NULL
+          AND ${table.retiredAt} IS NULL)`,
+    ),
+  ],
+)
+
 export const oauthStates = sqliteTable(
   'oauth_states',
   {
@@ -137,6 +249,14 @@ export const oauthStates = sqliteTable(
     stateHash: text('state_hash').notNull(),
     nonceHash: text('nonce_hash').notNull(),
     communityId: text('community_id').references(() => communities.id, { onDelete: 'set null' }),
+    /**
+     * The exact WeChat config version this OAuth attempt started with (#113).
+     * Nullable so every row written before the feature keeps working; SET NULL
+     * so removing a version can never strand or mis-bind an in-flight attempt.
+     */
+    configId: text('config_id').references(() => wechatOauthConfigs.id, {
+      onDelete: 'set null',
+    }),
     expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
     consumedAt: integer('consumed_at', { mode: 'timestamp_ms' }),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
@@ -144,6 +264,7 @@ export const oauthStates = sqliteTable(
   (table) => [
     uniqueIndex('oauth_state_hash_uq').on(table.stateHash),
     index('oauth_state_expiry_idx').on(table.expiresAt),
+    index('oauth_state_config_idx').on(table.configId),
   ],
 )
 
@@ -1463,6 +1584,7 @@ export const schema = {
   staffCommunityAssignments,
   residentCommunityAssignments,
   sessions,
+  wechatOauthConfigs,
   oauthStates,
   rateLimits,
   auditLogs,

@@ -41,6 +41,7 @@ import {
   oauthResultDestination,
   readBoundReturnTo,
   resolveReturnTo,
+  wechatCallbackUrl,
 } from './auth/oauth-return.js'
 import { registerPhoneAuthRoutes } from './auth/phone-routes.js'
 import type { SmsSender } from './auth/phone.js'
@@ -52,6 +53,8 @@ import { registerLocalOrderRoutes } from './local/order-routes.js'
 import { registerParticipationRoutes } from './participation/routes.js'
 import { registerRewardRoutes } from './rewards/routes.js'
 import { registerCrmebRoutes } from './crmeb/routes.js'
+import { registerWechatAdminRoutes } from './wechat/routes.js'
+import { resolveWechatRuntimeConfig, type WechatRuntimeOptions } from './wechat/runtime.js'
 import type { AppBindings, AppContext, AuthSession, HttpErrorStatus } from './http.js'
 
 export interface AppOptions {
@@ -364,6 +367,14 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
   const startedAt = options.startedAt ?? Date.now()
   const logRequests = options.logRequests ?? true
   const fetcher = options.fetcher ?? fetch
+  /**
+   * The single runtime reader for the persisted WeChat provider, shared by the
+   * admin API and the resident OAuth flow (#113). It is built once per app
+   * instance but resolves from the database on every call — never from a
+   * startup snapshot — so an activation takes effect without a restart.
+   */
+  const wechatRuntime = (runtimeOptions: WechatRuntimeOptions = {}) =>
+    resolveWechatRuntimeConfig(db, config.wechatConfigMasterKey, runtimeOptions)
   const app = new Hono<AppBindings>()
 
   app.use('*', async (c, next) => {
@@ -395,16 +406,25 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     return c.json(healthResponseSchema.parse(payload))
   })
 
-  app.get('/auth/methods', (c) =>
-    c.json({
-      wechat: Boolean(config.wechat),
+  app.get('/auth/methods', (c) => {
+    // Same runtime reader as start/callback: the database active row, decrypted
+    // with the master key. `not_configured` means no row is enabled yet; any
+    // other failure means a row exists but cannot be used right now (missing or
+    // wrong key, tampered ciphertext), which the H5 must not present as a
+    // working login button. Neither branch leaks an id, key id or secret.
+    const resolution = wechatRuntime()
+    return c.json({
+      wechat: resolution.ok,
       // Additive, untyped field: the H5 renders an explicit "unavailable plus
-      // reason" state instead of a button that can never work. `null` when the
-      // WeChat account credentials are configured.
-      wechatUnavailableReason: config.wechat ? null : API_ERROR_CODES.notConfigured,
+      // reason" state instead of a button that can never work.
+      wechatUnavailableReason: resolution.ok
+        ? null
+        : resolution.reason === 'not_configured'
+          ? API_ERROR_CODES.notConfigured
+          : 'wechat_config_unavailable',
       developmentResidentLogin: config.nodeEnv !== 'production' && config.authDevEnabled,
-    }),
-  )
+    })
+  })
 
   app.get('/auth/csrf', (c) => {
     const session = c.get('authSession')
@@ -552,9 +572,25 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
   })
 
   app.get('/auth/wechat/start', (c) => {
-    if (!config.wechat) {
-      return fail(c, 503, API_ERROR_CODES.notConfigured, '微信网页授权未配置公众号 AppID、AppSecret 和回调地址')
+    // The provider is resolved from the database on every request (no startup
+    // snapshot), so activating a new version takes effect for the next start
+    // without a restart. An unusable row fails closed with 503; a legacy env
+    // provider can never silently take over.
+    const resolution = wechatRuntime()
+    if (!resolution.ok) {
+      const message =
+        resolution.reason === 'not_configured'
+          ? '微信网页授权未配置：请管理员在后台启用公众号配置'
+          : '微信网页授权配置当前不可用，请联系管理员'
+      const code =
+        resolution.reason === 'not_configured'
+          ? API_ERROR_CODES.notConfigured
+          : resolution.reason === 'master_key_unavailable'
+            ? API_ERROR_CODES.wechatConfigMasterKeyUnavailable
+            : API_ERROR_CODES.wechatConfigDecryptFailed
+      return fail(c, 503, code, message)
     }
+    const provider = resolution.config
     const communityId = c.req.query('communityId')
     if (communityId && (!/^[0-9a-f-]{36}$/i.test(communityId) ||
       !db.select().from(communities).where(eq(communities.id, communityId)).get())) {
@@ -578,6 +614,9 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
         stateHash: hashToken(state),
         nonceHash: hashToken(nonce),
         communityId: communityId ?? null,
+        // Pin the exact provider version this attempt started with. The callback
+        // must use this row even if a newer one became active meanwhile.
+        configId: provider.configId,
         expiresAt: new Date(now.getTime() + OAUTH_STATE_TTL_SECONDS * 1000),
         consumedAt: null,
         createdAt: now,
@@ -604,8 +643,10 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     }
     const authorizeUrl = new URL('https://open.weixin.qq.com/connect/oauth2/authorize')
     authorizeUrl.search = new URLSearchParams({
-      appid: config.wechat.appId,
-      redirect_uri: config.wechat.redirectUri,
+      appid: provider.appId,
+      // Derived, never configured: the same value the admin page shows as the
+      // read-only redirect URI and the one registered in the WeChat console.
+      redirect_uri: wechatCallbackUrl(config.webBaseUrl),
       response_type: 'code',
       scope: 'snsapi_base',
       state,
@@ -619,7 +660,14 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     const state = c.req.query('state') ?? null
     const code = c.req.query('code')
     const oauthError = c.req.query('errcode')
-    if (!config.wechat) return redirectToWeb(c, config, 'wechat_not_configured')
+    // No provider has ever been enabled: nothing can be exchanged, and the H5
+    // has a dedicated readable message for this case. This is the only early
+    // exit — once a provider exists the attempt itself decides, including when
+    // the currently active version has since become unusable.
+    const activeResolution = wechatRuntime()
+    if (!activeResolution.ok && activeResolution.reason === 'not_configured') {
+      return redirectToWeb(c, config, 'wechat_not_configured')
+    }
 
     // Only the target minted together with this attempt is honoured, and only
     // after re-validating it. Anything else falls back to the default page.
@@ -672,11 +720,32 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
       return redirectToWeb(c, config, 'wechat_state_replayed', boundReturnTo)
     }
 
+    // The state is consumed before any provider call, so a retry can never use
+    // the code twice. Resolve the EXACT version this attempt started with — an
+    // active or retired row — never whatever is active now. A pre-#113 state has
+    // no `configId`; a row that is gone or cannot be decrypted must fail closed
+    // instead of borrowing another account's secret.
+    const boundConfigId = stateRecord.configId
+    if (!boundConfigId) {
+      clearOauthCookies(c, config)
+      return redirectToWeb(c, config, 'wechat_state_invalid', boundReturnTo)
+    }
+    const boundResolution = wechatRuntime({ configId: boundConfigId })
+    if (
+      !boundResolution.ok ||
+      (boundResolution.config.status !== 'active' &&
+        boundResolution.config.status !== 'retired')
+    ) {
+      clearOauthCookies(c, config)
+      return redirectToWeb(c, config, 'wechat_config_unavailable', boundReturnTo)
+    }
+    const provider = boundResolution.config
+
     try {
       const tokenUrl = new URL('https://api.weixin.qq.com/sns/oauth2/access_token')
       tokenUrl.search = new URLSearchParams({
-        appid: config.wechat.appId,
-        secret: config.wechat.appSecret,
+        appid: provider.appId,
+        secret: provider.appSecret,
         code,
         grant_type: 'authorization_code',
       }).toString()
@@ -701,7 +770,7 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
           .from(wechatIdentities)
           .where(
             and(
-              eq(wechatIdentities.appId, config.wechat!.appId),
+              eq(wechatIdentities.appId, provider.appId),
               eq(wechatIdentities.openId, tokenPayload.openid!),
             ),
           )
@@ -722,7 +791,7 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
             .values({
               id: randomUUID(),
               userId: resolvedUserId,
-              appId: config.wechat!.appId,
+              appId: provider.appId,
               openId: tokenPayload.openid!,
               unionId: tokenPayload.unionid ?? null,
               createdAt: now,
@@ -1003,6 +1072,17 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     fail,
     validCsrf,
     bodySchemaError,
+  })
+
+  registerWechatAdminRoutes(app, {
+    db,
+    config,
+    fetcher,
+    resolveRuntime: wechatRuntime,
+    fail,
+    validCsrf,
+    bodySchemaError,
+    now: options.now ?? (() => new Date()),
   })
 
   registerPhoneAuthRoutes(app, {

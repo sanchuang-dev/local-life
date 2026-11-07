@@ -7,7 +7,12 @@ import {
   healthResponseSchema,
 } from '@sanchuang-dev/local-life-contracts'
 import { createApp } from '../src/app.js'
-import { ConfigError, loadConfig } from '../src/config.js'
+import {
+  ConfigError,
+  LEGACY_WECHAT_ENV_VARS,
+  legacyWechatEnvVars,
+  loadConfig,
+} from '../src/config.js'
 
 function testApp() {
   return createApp({ version: 'test-suite', logRequests: false })
@@ -43,11 +48,34 @@ test('loadConfig fails loudly on invalid input', () => {
     () => loadConfig({ NODE_ENV: 'production', AUTH_DEV_ENABLED: 'true' }),
     ConfigError,
   )
-  assert.throws(
-    () => loadConfig({ WECHAT_APP_ID: 'wx-app-id' }),
-    ConfigError,
-  )
   assert.throws(() => loadConfig({ TRUSTED_ORIGINS: 'not-a-url' }), ConfigError)
+})
+
+test('legacy WeChat env variables are ignored; only their names are reported', () => {
+  // #113: the resident provider is the database active row, so leftover pre-#113
+  // variables must neither fail startup nor be read into the config snapshot.
+  const config = loadConfig({
+    WECHAT_APP_ID: 'wx-app-id',
+    WECHAT_APP_SECRET: 'legacy-secret-must-not-be-read',
+    WECHAT_REDIRECT_URI: 'https://legacy.example.test/api/auth/wechat/callback',
+  })
+  assert.equal('wechat' in config, false)
+  assert.equal(config.wechatConfigMasterKey, undefined)
+
+  assert.deepEqual(
+    legacyWechatEnvVars({
+      WECHAT_APP_ID: 'present',
+      WECHAT_APP_SECRET: '   ',
+      WECHAT_REDIRECT_URI: 'present',
+    }),
+    ['WECHAT_APP_ID', 'WECHAT_REDIRECT_URI'],
+  )
+  assert.deepEqual(legacyWechatEnvVars({}), [])
+  assert.deepEqual([...LEGACY_WECHAT_ENV_VARS], [
+    'WECHAT_APP_ID',
+    'WECHAT_APP_SECRET',
+    'WECHAT_REDIRECT_URI',
+  ])
 })
 
 test('loadConfig applies explicit local defaults and keeps dev login disabled', () => {

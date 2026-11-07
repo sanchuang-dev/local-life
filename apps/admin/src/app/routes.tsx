@@ -12,6 +12,7 @@ import { PlaceholderPage } from '../pages/PlaceholderPage'
 import { ProductsPage } from '../pages/ProductsPage'
 import { UsersPage } from '../pages/UsersPage'
 import { SystemInfoPage } from '../pages/SystemInfoPage'
+import { WechatSettingsPage } from '../pages/WechatSettingsPage'
 import { NAV_PAGES } from './shell/navigation'
 
 const PLANNED_PAGES = NAV_PAGES.filter((page) => page.status === 'planned')
@@ -38,6 +39,7 @@ export const routes: RouteObject[] = [
       { path: 'orders', element: <OrdersPage /> },
       { path: 'communities', element: <CommunityAccountsRoute /> },
       { path: 'system/runtime', element: <SystemInfoPage /> },
+      { path: 'system/wechat', element: <WechatSettingsPage /> },
       { path: 'users', element: <Navigate to='/communities' replace /> },
       { path: 'system/components', element: <ComponentPreviewPage /> },
       ...PLANNED_PAGES.map((page) => ({
