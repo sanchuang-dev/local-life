@@ -1079,6 +1079,19 @@ test('an active row with no master key is reported as unusable, never as success
   assert.equal(status.masterKeyAvailable, false)
   assert.equal(status.active?.id, active.id)
   assert.equal(status.active?.lastErrorCode, 'master_key_unavailable')
+
+  // An idempotent "activate" is NOT successful when the active account cannot
+  // decrypt its AppSecret. Returning 200 here would hide a broken login path.
+  const repeat = await api(noKeyApp, 'POST', wechatAdminActivatePath(active.id), {
+    session: fixture.admin,
+    body: { expectedUpdatedAt: active.updatedAt, confirm: true },
+  })
+  await expectError(
+    repeat,
+    503,
+    API_ERROR_CODES.wechatConfigMasterKeyUnavailable,
+    'repeat activation of active provider without key',
+  )
 })
 
 test('an undecryptable active row is reported safely instead of crashing the status endpoint', async () => {
@@ -1096,6 +1109,17 @@ test('an undecryptable active row is reported safely instead of crashing the sta
   assert.equal(status.active?.id, active.id)
   assert.equal(status.active?.lastErrorCode, 'decrypt_failed')
   assert.equal(status.state, 'active')
+
+  const repeat = await call(fixture, 'POST', wechatAdminActivatePath(active.id), {
+    session: fixture.admin,
+    body: { expectedUpdatedAt: active.updatedAt, confirm: true },
+  })
+  await expectError(
+    repeat,
+    409,
+    API_ERROR_CODES.wechatConfigDecryptFailed,
+    'repeat activation of undecryptable active provider',
+  )
 
   // A verified-but-undecryptable candidate cannot be activated and the old
   // active row stays in place.
