@@ -48,6 +48,7 @@ import {
   getLedgerOverview,
   listLedgerAnomalies,
   listLedgerEntries,
+  syncLedgerSourceFacts,
 } from '../services/ledger'
 import './ledger.css'
 
@@ -210,6 +211,7 @@ function PerformanceConsole({ session }: { session: AuthenticatedSession }) {
 
   /* ------------------------------- the report ------------------------------ */
 
+  const [syncing, setSyncing] = useState(false)
   const [overview, setOverview] = useState<LedgerOverview | null>(null)
   const [overviewLoading, setOverviewLoading] = useState(true)
   const [overviewError, setOverviewError] = useState<Error | null>(null)
@@ -375,6 +377,20 @@ function PerformanceConsole({ session }: { session: AuthenticatedSession }) {
     setOverviewToken((value) => value + 1)
   }
 
+  const syncSources = async () => {
+    setSyncing(true)
+    try {
+      const result = await syncLedgerSourceFacts(session.csrfToken)
+      refresh()
+      setAnomaliesToken((value) => value + 1)
+      message.success(`同步完成：新增 ${result.created} 条，已存在 ${result.skipped} 条（扫描 ${result.scanned} 条）。`)
+    } catch (cause: unknown) {
+      message.error(describeLocalError(cause, '同步来源事实失败'))
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   const applyQuery = (next: PanelQuery<LedgerFilters, LedgerSortKey>): boolean => {
     const { range, communityId } = next.filters
     if (range?.start && range?.end && range.end < range.start) {
@@ -513,13 +529,15 @@ function PerformanceConsole({ session }: { session: AuthenticatedSession }) {
         description="统一经营流水的账面登记口径：登记金额、已核验业绩、人工实收与冲正、奖励成本与冲正分列呈现。本 MVP 没有结算规则，页面只报账面登记毛额，不计算应付、分账或打款。"
         status={<Tag color="green">真实数据</Tag>}
         extra={
-          <Button onClick={refresh} loading={listLoading || overviewLoading}>
-            刷新
-          </Button>
+          <Space wrap>
+            <Button onClick={syncSources} loading={syncing}>同步来源事实</Button>
+            <Button onClick={refresh} loading={listLoading || overviewLoading}>刷新</Button>
+          </Space>
         }
       />
 
       <div className="page-stack">
+        <Alert type="info" showIcon title="数据更新方式" description="经营台账读取已投影的真实订单、CRM 和奖励事实。来源发生变化后，请由运营人员点击「同步来源事实」再核对和锁定批次；当前不提供自动实时同步。" />
         {!isAdmin ? (
           <Alert
             type="info"
