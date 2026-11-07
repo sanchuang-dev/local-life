@@ -568,7 +568,7 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
                   </Button>
                 </div>
                 <Typography.Paragraph type="secondary" className="wechat-hint">
-                  由服务端根据居民 H5 站点地址与固定回调路径推导，管理台只读展示，不能改成其他域名或外站地址。
+                  此完整 URL 由服务端推导，用于微信授权跳转；微信公众平台的「网页授权域名」配置框只填写域名 local.proto.3cgroup.cn，不包含 https:// 或回调路径。
                 </Typography.Paragraph>
               </Card>
             </div>
