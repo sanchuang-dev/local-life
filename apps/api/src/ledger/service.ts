@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, eq, gte, inArray, lt, sql, type SQL } from 'drizzle-orm'
+import { and, eq, gte, inArray, lt, lte, sql, type SQL } from 'drizzle-orm'
 import { z } from 'zod'
 import {
   API_ERROR_CODES,
@@ -43,6 +43,7 @@ import {
   scopeCommunityIds,
   shanghaiDayEndExclusiveMs,
   shanghaiDayStartMs,
+  toShanghaiBusinessDate,
   toLedgerEntry,
   type LedgerActor,
   type LedgerEntryRow,
@@ -981,6 +982,24 @@ export function resolveAttribution(
       if (confirmed) {
         throw new LocalError(409, API_ERROR_CODES.conflict, '该流水已确认归属，不能重复确认')
       }
+      // A locked statement's ownership is part of its frozen, exportable truth.
+      // The fact may be late-recorded for an old period; only facts existing at
+      // the lock instant are members and are forbidden from later reassignment.
+      const businessDay = toShanghaiBusinessDate(row.occurredAt)
+      const frozenMember = tx.select({ id: reconciliationBatches.id })
+        .from(reconciliationBatches)
+        .where(and(
+          eq(reconciliationBatches.status, 'locked'),
+          lte(reconciliationBatches.periodFrom, businessDay),
+          gte(reconciliationBatches.periodTo, businessDay),
+          gte(reconciliationBatches.lockedAt, row.createdAt),
+        ))
+        .get()
+      if (frozenMember) {
+        throw new LocalError(409, API_ERROR_CODES.ledgerBatchLocked,
+          '该流水已纳入锁定对账批次，归属不可事后更改')
+      }
+
       requireActiveStaff(tx, body.staffId, row.communityId)
 
       insertAudit(tx, actor.userId, LEDGER_ATTRIBUTION_CONFIRMED_EVENT, body.entryId, now, {
