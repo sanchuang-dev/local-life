@@ -790,7 +790,12 @@ test('migration 0007 adds the disputed -> redeemed edge on fresh and upgraded da
         const applied = after.sqlite
           .prepare('SELECT count(*) AS c FROM __drizzle_migrations')
           .get() as { c: number }
-        assert.equal(applied.c, 8)
+        // The count is derived from the journal so adding a later migration does
+        // not require editing an unrelated rewards test.
+        const journal = JSON.parse(
+          readFileSync(join(migrationsFolder, 'meta', '_journal.json'), 'utf8'),
+        ) as { entries: Array<{ idx: number }> }
+        assert.equal(applied.c, journal.entries.length)
         const integrity = after.sqlite
           .prepare('PRAGMA integrity_check')
           .all() as Array<{ integrity_check: string }>

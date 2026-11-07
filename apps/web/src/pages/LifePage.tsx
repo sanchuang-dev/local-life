@@ -1,230 +1,77 @@
-import { ChevronRight, Gift } from 'lucide-react'
-import { type KeyboardEvent } from 'react'
+import { Gift, Info } from 'lucide-react'
 import { useSearchParams } from 'react-router'
 import { DemoNote } from '../components/DemoNote'
-import { LifeProductCard } from '../components/life/LifeProductCard'
-import { PointsSummaryCard } from '../components/life/PointsSummaryCard'
-import { ShopDealsSection } from '../components/life/ShopDealsSection'
 import { PageHeader } from '../components/PageHeader'
-import { PendingNotice } from '../components/PendingNotice'
-import { SectionHeading } from '../components/home/SectionHeading'
-import { usePendingNotice } from '../hooks/usePendingNotice'
-import {
-  lifeConceptNote,
-  lifeMapNotice,
-  lifeProducts,
-  lifeStores,
-} from '../mocks/life'
+import { LocalCatalogSection } from '../components/life/LocalCatalogSection'
+import { ShopDealsSection } from '../components/life/ShopDealsSection'
 
-const lifeSections = [
-  { id: 'points', label: '积分兑换' },
-  { id: 'deals', label: '优惠购' },
-  { id: 'local', label: '本地生活' },
-] as const
-
-type LifeSection = (typeof lifeSections)[number]['id']
-
-function isLifeSection(value: string | null): value is LifeSection {
-  return value === 'points' || value === 'deals' || value === 'local'
-}
-
-const toneStyles = {
-  mint: 'bg-[#e8f6f0] text-[#388b77]',
-  peach: 'bg-[#fff3e6] text-[#c6925c]',
-} as const
-
+/**
+ * 惠生活 — resident benefits.
+ *
+ * 本地好物 is now the primary product source: it reads the deployment's own
+ * on-shelf catalogue (`/catalog/products`), so the page shows real local products
+ * and a real order-registration entry even when the CRMEB adapter is not
+ * configured. The 优惠购 (CRMEB read-only) section is kept below it as a secondary
+ * channel — its adapter, hooks and copy are untouched, it simply is no longer the
+ * only source. Points exchange and the local-merchant map are still not connected,
+ * so no demo points, demo goods or invented stores are rendered.
+ */
 export function LifePage() {
-  const { message, show, dismiss } = usePendingNotice()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const tabParam = searchParams.get('tab')
+  const [searchParams] = useSearchParams()
+  // `?activityId=` is the trusted deep link from an activity purchase entry; it
+  // is only used to display the real activity source above the catalogue.
   const activityId = searchParams.get('activityId')?.trim() || null
-  // A shared activity deep link opens the real shop by default; otherwise the
-  // page keeps its original points-first demo order.
-  const activeSection: LifeSection = isLifeSection(tabParam)
-    ? tabParam
-    : activityId
-      ? 'deals'
-      : 'points'
-
-  const selectSection = (section: LifeSection) => {
-    const next = new URLSearchParams(searchParams)
-    next.set('tab', section)
-    setSearchParams(next, { replace: true })
-    dismiss()
-  }
-
-  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    const lastIndex = lifeSections.length - 1
-    let nextIndex: number
-
-    switch (event.key) {
-      case 'ArrowRight':
-        nextIndex = index === lastIndex ? 0 : index + 1
-        break
-      case 'ArrowLeft':
-        nextIndex = index === 0 ? lastIndex : index - 1
-        break
-      case 'Home':
-        nextIndex = 0
-        break
-      case 'End':
-        nextIndex = lastIndex
-        break
-      default:
-        return
-    }
-
-    event.preventDefault()
-    const nextSection = lifeSections[nextIndex]
-    selectSection(nextSection.id)
-    document.getElementById(`life-tab-${nextSection.id}`)?.focus()
-  }
+  const requestedSection = searchParams.get('tab')
+  const unavailableSection =
+    requestedSection === 'points' ? '积分兑换' : requestedSection === 'local' ? '本地生活门店' : null
 
   return (
     <div className="px-4 pb-7 pt-4">
-      <PageHeader
-        icon={Gift}
-        title="惠生活"
-        subtitle="居民权益 · 积分好礼 · 本地服务"
-      />
+      <PageHeader icon={Gift} title="惠生活" subtitle="社区本地商品 · 登记办理意向" />
 
       <DemoNote>
-        优惠购接入真实 CRMEB 商品（只读展示与购买跳转，平台不代下单、不代支付）；
-        积分兑换与本地生活仍为示例数据，不会真实扣积分或产生订单。加载失败或未配置时如实提示，不展示模拟商品。
+        本地好物来自社区自己维护的上架商品，登记订单只提交办理意向（平台不收款、不代下单）。
+        优惠购保留为只读商城渠道，未配置时如实提示，不展示模拟商品。
       </DemoNote>
 
-      <div
-        role="tablist"
-        aria-label="惠生活分类"
-        className="mt-4 grid grid-cols-3 gap-1 rounded-[18px] border border-slate-100 bg-white p-1 shadow-sm"
-      >
-        {lifeSections.map(({ id, label }, index) => {
-          const selected = id === activeSection
-          return (
-            <button
-              key={id}
-              id={`life-tab-${id}`}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              aria-controls={`life-panel-${id}`}
-              tabIndex={selected ? 0 : -1}
-              onClick={() => selectSection(id)}
-              onKeyDown={(event) => handleTabKeyDown(event, index)}
-              className={`flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl px-2 text-[13px] transition-colors focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-teal-600 ${
-                selected
-                  ? 'bg-teal-700 font-semibold text-white shadow-sm'
-                  : 'font-medium text-slate-500 hover:bg-slate-50 hover:text-teal-700'
-              }`}
-            >
-              <span
-                className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                  selected ? 'bg-white' : 'bg-slate-300'
-                }`}
-                aria-hidden="true"
-              />
-              {label}
-            </button>
-          )
-        })}
-      </div>
-
-      <div
-        id="life-panel-points"
-        role="tabpanel"
-        aria-labelledby="life-tab-points"
-        hidden={activeSection !== 'points'}
-        className="mt-4"
-      >
-        <PointsSummaryCard />
-
-        <section className="mt-5">
-          <SectionHeading
-            title="积分好礼"
-            note="示例商品"
-            actionLabel="全部好礼"
-            actionTo="/life/exchange"
-          />
-          <div className="grid grid-cols-2 gap-3">
-            {lifeProducts.map((product) => (
-              <LifeProductCard key={product.id} product={product} from="/life" />
-            ))}
-          </div>
-          <p className="mt-2.5 text-[11px] leading-5 text-slate-400">
-            商品、库存与积分价格均为示例数据，兑换不会真实扣分或发券。
-          </p>
-        </section>
-
-        <div className="mt-4">
-          <DemoNote>{lifeConceptNote}</DemoNote>
+      {unavailableSection ? (
+        <div
+          role="status"
+          className="mt-3 rounded-[16px] border border-[#f2dcc0] bg-[#fff7ec] px-3.5 py-3 text-[12px] leading-5 text-[#8a6132]"
+        >
+          {unavailableSection} 尚未接入真实服务，本页不再展示示例积分、示例兑换商品或虚构门店；
+          接入后会在同一入口开放。
         </div>
+      ) : null}
+
+      <div className="mt-5">
+        <LocalCatalogSection />
       </div>
 
-      <div
-        id="life-panel-deals"
-        role="tabpanel"
-        aria-labelledby="life-tab-deals"
-        hidden={activeSection !== 'deals'}
-        className="mt-4"
+      <div className="mt-6 border-t border-slate-100 pt-5">
+        <ShopDealsSection activityId={activityId} />
+      </div>
+
+      <section
+        className="mt-5 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm"
+        aria-labelledby="life-benefits-heading"
       >
-        {activeSection === 'deals' ? <ShopDealsSection activityId={activityId} /> : null}
-      </div>
-
-      <div
-        id="life-panel-local"
-        role="tabpanel"
-        aria-labelledby="life-tab-local"
-        hidden={activeSection !== 'local'}
-        className="mt-4"
-      >
-        <section>
-          <SectionHeading
-            title="附近可到店核销"
-            note="示例门店"
-            actionLabel="地图"
-            onAction={() => show(lifeMapNotice)}
-          />
-          <div className="overflow-hidden rounded-[18px] border border-slate-100 bg-white shadow-sm">
-            {lifeStores.map(({ id, name, meta, tag, icon: Icon, tone, pendingNotice }, index) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => show(pendingNotice)}
-                className={`flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-teal-600 ${
-                  index > 0 ? 'border-t border-slate-100' : ''
-                }`}
-              >
-                <span
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${toneStyles[tone]}`}
-                  aria-hidden="true"
-                >
-                  <Icon size={18} strokeWidth={1.7} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[14px] font-semibold text-slate-700">{name}</span>
-                  <span className="mt-0.5 block text-[11px] leading-4 text-slate-400">{meta}</span>
-                </span>
-                {tag ? (
-                  <span className="shrink-0 rounded-full bg-[#fff3e6] px-2 py-0.5 text-[10px] font-medium text-[#a96b2f]">
-                    {tag}
-                  </span>
-                ) : (
-                  <ChevronRight size={17} className="shrink-0 text-slate-300" aria-hidden="true" />
-                )}
-              </button>
-            ))}
-          </div>
-          <p className="mt-2.5 text-[11px] leading-5 text-slate-400">
-            门店位置、营业状态与核销券码均为示例，点击门店只展示演示提示。
-          </p>
-        </section>
-
-        <div className="mt-4">
-          <DemoNote>{lifeMapNotice}</DemoNote>
-        </div>
-      </div>
-
-      <PendingNotice message={message} onDismiss={dismiss} />
+        <h2
+          id="life-benefits-heading"
+          className="flex items-center gap-1.5 text-[15px] font-bold text-slate-800"
+        >
+          <Info size={16} className="shrink-0 text-teal-700" aria-hidden="true" />
+          积分与本地门店
+        </h2>
+        <p className="mt-1.5 text-[12px] leading-5 text-slate-500">
+          社区居民权益积分、积分兑换与到店核销门店均尚未接入真实服务，因此本页不再展示示例积分余额、
+          示例兑换商品与虚构门店。接入后会在这里开放，并通过服务端记录真实兑换与核销。
+        </p>
+        <p className="mt-1.5 text-[11px] leading-[1.7] text-slate-400">
+          优惠购区块的商品、价格与图片由 CRMEB 商城（outapi）提供，库存与可售状态以商城为准；
+          本地好物与本地订单由本平台服务端记录。
+        </p>
+      </section>
     </div>
   )
 }

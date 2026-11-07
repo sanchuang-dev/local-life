@@ -46,6 +46,38 @@ export const API_ERROR_CODES = {
    * budget accounting.
    */
   rewardPlanLocked: 'reward_plan_locked',
+  /**
+   * Phone (SMS one-time code) identity, Issue #93. This card ships the server
+   * state machine only: no SMS provider is bundled, so a production deployment
+   * without an injected sender fails closed with `not_configured` instead of
+   * pretending that public phone login works.
+   */
+  phoneInvalid: 'phone_invalid',
+  otpInvalid: 'otp_invalid',
+  otpExpired: 'otp_expired',
+  otpAttemptsExceeded: 'otp_attempts_exceeded',
+  otpCooldown: 'otp_cooldown',
+  otpRequestLimit: 'otp_request_limit',
+  phoneAlreadyBound: 'phone_already_bound',
+  phoneInUse: 'phone_in_use',
+  smsDeliveryFailed: 'sms_delivery_failed',
+  /**
+   * Local catalogue (#109): an off-shelf product refuses *new* registrations.
+   * Existing orders keep their frozen snapshot and are unaffected.
+   */
+  productOffShelf: 'product_off_shelf',
+  /**
+   * Local order (#109): an operator tried to verify an order that is already
+   * `verified`. Rejecting is explicit on purpose — a silent success would read
+   * like "成交了两次".
+   */
+  orderAlreadyVerified: 'order_already_verified',
+  /**
+   * Local order (#109): the idempotency key already produced an order with a
+   * different product/quantity. A key identifies one intent, so the second
+   * submission is a conflict, never an overwrite.
+   */
+  orderIdempotencyConflict: 'order_idempotency_conflict',
 } as const
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES]
@@ -128,6 +160,156 @@ export const authSessionResponseSchema = z.discriminatedUnion('authenticated', [
 ])
 
 export type AuthSessionResponse = z.infer<typeof authSessionResponseSchema>
+
+/* -------------------------------------------------------------------------- */
+/* Resident login return target (#92)                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * WeChat web authorization leaves the SPA entirely; the API then decides which
+ * URL the resident lands on afterwards. That decision must never be driven by
+ * unvalidated client input, otherwise the OAuth callback becomes an open
+ * redirect. Both the API (authority) and the H5 client (early feedback before a
+ * round trip) apply the same rules from here instead of keeping two copies.
+ *
+ * Validation is deliberately string-level and runtime-neutral (no `URL`, no
+ * Node/DOM types): this package is imported by the browser bundle, the API and
+ * plain Node tests. The API additionally resolves the accepted value with
+ * `new URL()` before using it, which is where origin equality is double-checked.
+ *
+ * A valid target is:
+ * - a relative absolute-path URL: exactly one leading `/`, never `//host`, so
+ *   it can never name another origin;
+ * - ASCII only and percent-encoded where needed. Backslashes, whitespace,
+ *   control characters and `#` are rejected because URL parsers silently
+ *   reinterpret them (`/\evil.test` parses as host `evil.test`);
+ * - free of `.` / `..` segments, which browsers would collapse into a different
+ *   path than the one that was allowlisted;
+ * - inside the resident H5 allowlist below, so a resident login can never be
+ *   bounced into the back office or an arbitrary page.
+ */
+
+/** App surfaces a resident login may return to. Keep in sync with `App.tsx`. */
+export const RESIDENT_RETURN_TO_PREFIXES = [
+  '/', // New resident activity home; exact root only (never '//').
+  '/community',
+  '/me',
+  '/life',
+  '/health',
+  '/points',
+  '/gd',
+] as const
+
+/** Upper bound: share links carry `activityId` (36) and an invite code (32). */
+export const RETURN_TO_MAX_LENGTH = 512
+
+/**
+ * Printable ASCII path/query characters. Every other byte must be
+ * percent-encoded, which keeps the value free of spaces, `\`, `#` and control
+ * characters without relying on a URL parser.
+ */
+const SAFE_RETURN_TO_PATTERN = /^\/(?:[A-Za-z0-9\-._~!$&'()*+,;=:@%/?])*$/
+
+const ENCODED_DOT_SEGMENT = /^(?:\.|%2e){1,2}$/i
+
+export type ReturnToRejection = 'invalid_shape' | 'not_allowed_path'
+
+export type ReturnToValidation =
+  | { ok: true; returnTo: string | null }
+  | { ok: false; reason: ReturnToRejection }
+
+/** Prefix match with a path boundary, so `/community-evil` is not accepted. */
+export function isResidentReturnPath(pathname: string): boolean {
+  return RESIDENT_RETURN_TO_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  )
+}
+
+function hasDotPathSegment(pathname: string): boolean {
+  return pathname.split('/').some((segment) => {
+    if (ENCODED_DOT_SEGMENT.test(segment)) return true
+    try {
+      return ENCODED_DOT_SEGMENT.test(decodeURIComponent(segment))
+    } catch {
+      // Malformed percent-encoding cannot be a valid target.
+      return true
+    }
+  })
+}
+
+/**
+ * Validate one return target. `null` / `''` / `undefined` mean "no target was
+ * supplied" and resolve to `returnTo: null`, letting the caller keep its default
+ * landing page.
+ */
+export function validateReturnTo(raw: unknown): ReturnToValidation {
+  if (raw === undefined || raw === null || raw === '') return { ok: true, returnTo: null }
+  if (typeof raw !== 'string') return { ok: false, reason: 'invalid_shape' }
+  if (raw !== raw.trim() || raw.length > RETURN_TO_MAX_LENGTH) {
+    return { ok: false, reason: 'invalid_shape' }
+  }
+  if (!SAFE_RETURN_TO_PATTERN.test(raw)) return { ok: false, reason: 'invalid_shape' }
+  if (raw.startsWith('//')) return { ok: false, reason: 'invalid_shape' }
+
+  const pathname = raw.split('?', 1)[0] ?? ''
+  if (hasDotPathSegment(pathname)) return { ok: false, reason: 'invalid_shape' }
+  if (!isResidentReturnPath(pathname)) return { ok: false, reason: 'not_allowed_path' }
+
+  return { ok: true, returnTo: raw }
+}
+
+/* -------------------------------------------------------------------------- */
+/* One-off login result markers (#92)                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Markers the WeChat OAuth callback appends to the returned H5 URL. They are
+ * read exactly once and then stripped, so they never become part of a re-issued
+ * return target or of a shared link.
+ */
+export const LOGIN_RESULT_QUERY_PARAMS = ['auth', 'auth_error'] as const
+
+export type LoginResultMarker = 'success' | 'error' | null
+
+/**
+ * Remove the one-off login markers from a `/path?query` route while keeping
+ * every other parameter untouched, in the order it arrived: `activityId`,
+ * `invite` and any campaign parameter must survive the cleanup byte-for-byte.
+ */
+export function stripLoginResultParams(route: string): string {
+  const queryIndex = route.indexOf('?')
+  if (queryIndex === -1) return route
+  const pathname = route.slice(0, queryIndex)
+  const kept = route
+    .slice(queryIndex + 1)
+    .split('&')
+    .filter((segment) => {
+      if (!segment) return false
+      const key = segment.split('=', 1)[0] ?? ''
+      return !(LOGIN_RESULT_QUERY_PARAMS as readonly string[]).includes(key)
+    })
+  return kept.length > 0 ? `${pathname}?${kept.join('&')}` : pathname
+}
+
+/**
+ * Whether a one-off login marker may be presented, and as what.
+ *
+ * `?auth=success` is plain client-visible input: it records what the callback
+ * *reported*, not that this browser holds a session. Rendering the success state
+ * without a server-confirmed session is exactly the fake success a recipient of
+ * the URL would see, so success requires `authenticated`. A failed authorization
+ * leaves no session and stays presentable (the resident is offered a retry).
+ * While the session is still loading, nothing is presented.
+ */
+export function presentLoginMarker(
+  marker: LoginResultMarker,
+  authenticated: boolean,
+  loading: boolean,
+): LoginResultMarker {
+  if (loading || marker === null) return null
+  if (marker === 'success') return authenticated ? 'success' : null
+  return 'error'
+}
 
 /* -------------------------------------------------------------------------- */
 /* Activity domain (#59 LL-MVP-003)                                           */
@@ -982,6 +1164,419 @@ export type AdminCrmFilterOptionsResponse = z.infer<
 >
 
 /* -------------------------------------------------------------------------- */
+/* Local product catalogue & resident orders (#109 LL-MVP-010)                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Route identifiers for the *local* catalogue and the *local* resident order.
+ *
+ * This is a deliberately separate domain from the CRMEB mirror (`CRMEB_ROUTES`)
+ * and from the 广电 carrier acceptance orders (`CRM_ROUTES.orderList`). A local
+ * product is a real row in this system, not a mirrored e-commerce item, and a
+ * local order is a resident's registration of intent, not a paid purchase.
+ *
+ * GET and POST share the list paths (`products`, `myOrders`, `staffOrders`), the
+ * same convention the CRM domain uses for query + creation.
+ */
+export const LOCAL_CATALOG_ROUTES = {
+  /** Public, session-free read of the on-shelf catalogue (H5 惠生活). */
+  products: '/catalog/products',
+  productDetail: '/catalog/products/:productId',
+  /** Back office: admin/operator only. `grid_worker` is rejected. */
+  adminProducts: '/admin/catalog/products',
+  adminProductDetail: '/admin/catalog/products/:productId',
+  adminProductShelf: '/admin/catalog/products/:productId/shelf',
+} as const
+
+export const LOCAL_ORDER_ROUTES = {
+  /** Resident: session identity only; the body never names the resident. */
+  myOrders: '/local-orders',
+  myOrderDetail: '/local-orders/:localOrderId',
+  /**
+   * Staff surface (all three roles, community-scoped). It exists separately from
+   * `/admin/*` because `/admin/*` rejects grid workers by convention, while the
+   * grid worker must be able to process orders for their assigned communities.
+   */
+  staffOrders: '/staff/local-orders',
+  staffOrderDetail: '/staff/local-orders/:localOrderId',
+  staffOrderStatus: '/staff/local-orders/:localOrderId/status',
+  /** Back office: admin/operator only. */
+  adminOrders: '/admin/local-orders',
+  adminOrderDetail: '/admin/local-orders/:localOrderId',
+  adminOrderStatus: '/admin/local-orders/:localOrderId/status',
+  adminOrderVerify: '/admin/local-orders/:localOrderId/verify',
+  adminOrderEvents: '/admin/local-orders/:localOrderId/events',
+} as const
+
+/**
+ * Stock state of a local product. `off_shelf` refuses *new* registrations; the
+ * snapshot already frozen on an existing order is never rewritten.
+ */
+export const localProductStatusSchema = z.enum(['on_shelf', 'off_shelf'])
+export type LocalProductStatus = z.infer<typeof localProductStatusSchema>
+
+/** Product lifecycle changes are one endpoint, so both directions are idempotent. */
+export const localProductShelfRequestSchema = z.strictObject({
+  expectedUpdatedAt: isoTimestamp,
+  status: localProductStatusSchema,
+})
+export type LocalProductShelfRequest = z.infer<typeof localProductShelfRequestSchema>
+
+const localProductImageUrlSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(500)
+  .regex(/^https?:\/\//, 'must be an http(s) URL')
+
+const localProductCategorySchema = z.string().trim().min(1).max(40)
+
+export const localProductSummarySchema = z.object({
+  id: z.string().uuid(),
+  community: authCommunitySchema,
+  name: z.string().min(1).max(60),
+  summary: z.string().nullable(),
+  category: z.string().nullable(),
+  /** Integer cents. Never a float, never a client-supplied value. */
+  priceCents: z.number().int().nonnegative(),
+  imageUrl: z.string().nullable(),
+  status: localProductStatusSchema,
+  createdAt: isoTimestamp,
+  updatedAt: isoTimestamp,
+})
+export type LocalProductSummary = z.infer<typeof localProductSummarySchema>
+
+/** `description` is plain text shown as text; the H5 never injects raw HTML. */
+export const localProductDetailSchema = localProductSummarySchema.extend({
+  description: z.string().nullable(),
+})
+export type LocalProductDetail = z.infer<typeof localProductDetailSchema>
+
+export const localProductListResponseSchema = z.object({
+  items: z.array(localProductSummarySchema),
+  total: z.number().int().nonnegative(),
+  page: z.number().int().min(1),
+  pageSize: z.number().int().min(1),
+})
+export type LocalProductListResponse = z.infer<typeof localProductListResponseSchema>
+
+export const localProductListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  communityId: z.string().uuid().optional(),
+  status: localProductStatusSchema.optional(),
+  category: z.string().trim().min(1).max(40).optional(),
+  keyword: z.string().trim().min(1).max(80).optional(),
+})
+export type LocalProductListQuery = z.infer<typeof localProductListQuerySchema>
+
+/**
+ * Create a local product. `priceCents` is the only price in the system: the
+ * server stores it as an integer number of cents and copies it into every order
+ * snapshot at registration time.
+ */
+export const createLocalProductRequestSchema = z.strictObject({
+  communityId: z.string().uuid(),
+  name: z.string().trim().min(1).max(60),
+  summary: z.string().trim().max(120).optional(),
+  description: z.string().trim().max(1000).optional(),
+  category: localProductCategorySchema.optional(),
+  priceCents: z.number().int().min(0).max(10_000_000),
+  imageUrl: localProductImageUrlSchema.optional(),
+})
+export type CreateLocalProductRequest = z.infer<typeof createLocalProductRequestSchema>
+
+/**
+ * Edit a local product. Every field is optional, but at least one must be sent.
+ * Nullable text fields accept `null` to clear them. `expectedUpdatedAt` is the
+ * shared optimistic-concurrency token; a stale value is a 409, never a silent
+ * overwrite of a concurrent edit.
+ */
+export const updateLocalProductRequestSchema = z
+  .strictObject({
+    expectedUpdatedAt: isoTimestamp,
+    name: z.string().trim().min(1).max(60).optional(),
+    summary: z.string().trim().max(120).nullable().optional(),
+    description: z.string().trim().max(1000).nullable().optional(),
+    category: localProductCategorySchema.nullable().optional(),
+    priceCents: z.number().int().min(0).max(10_000_000).optional(),
+    imageUrl: localProductImageUrlSchema.nullable().optional(),
+  })
+  .superRefine((value, ctx) => {
+    const { expectedUpdatedAt: _token, ...changes } = value
+    if (Object.keys(changes).length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'at least one product field must be changed',
+        path: ['name'],
+      })
+    }
+  })
+export type UpdateLocalProductRequest = z.infer<typeof updateLocalProductRequestSchema>
+
+/* ------------------------------- Local orders ------------------------------ */
+
+/**
+ * The resident-facing lifecycle of a local order.
+ *
+ * `registered`   resident registered intent (no payment happened)
+ * `processing`   a staff member is handling it
+ * `pending_review` waiting for the operations manual verification
+ * `verified`     operations manually verified the *fact* — NOT paid, NOT activated
+ * `cancelled`    withdrawn
+ * `rejected`     refused, with a reason
+ *
+ * The names deliberately differ from the carrier order names (`confirmed` means a
+ * verified carrier deal) so neither domain can leak into the other.
+ */
+export const localOrderStatusSchema = z.enum([
+  'registered',
+  'processing',
+  'pending_review',
+  'verified',
+  'cancelled',
+  'rejected',
+])
+export type LocalOrderStatus = z.infer<typeof localOrderStatusSchema>
+
+/**
+ * Frozen state machine. The server is the authority; clients may only use this
+ * table for affordances. `verified` is reachable *exclusively* through the
+ * operations verification endpoint, which is why it is absent from
+ * `localOrderTransitionStatusSchema`.
+ */
+export const LOCAL_ORDER_STATUS_TRANSITIONS: Record<
+  LocalOrderStatus,
+  readonly LocalOrderStatus[]
+> = {
+  registered: ['processing', 'cancelled', 'rejected'],
+  processing: ['pending_review', 'cancelled', 'rejected'],
+  pending_review: ['verified', 'rejected'],
+  verified: [],
+  cancelled: [],
+  rejected: [],
+}
+
+/** Statuses a staff member may set directly; `verified` is operator-review only. */
+export const localOrderTransitionStatusSchema = z.enum([
+  'processing',
+  'pending_review',
+  'cancelled',
+  'rejected',
+])
+export type LocalOrderTransitionStatus = z.infer<typeof localOrderTransitionStatusSchema>
+
+/** Who recorded the order: the resident, or a staff member acting for them. */
+export const localOrderRecordSourceSchema = z.enum(['resident', 'staff_on_behalf'])
+export type LocalOrderRecordSource = z.infer<typeof localOrderRecordSourceSchema>
+
+/** Stable event source for downstream consumers (#64): always this pair. */
+export const LOCAL_ORDER_EVENT_SOURCE_TYPE = 'local_order' as const
+export const localOrderEventSourceTypeSchema = z.literal(LOCAL_ORDER_EVENT_SOURCE_TYPE)
+
+export const localOrderEventTypeSchema = z.enum([
+  'order.registered',
+  'order.created_on_behalf',
+  'order.status_changed',
+  'order.verified',
+  'order.rejected',
+])
+export type LocalOrderEventType = z.infer<typeof localOrderEventTypeSchema>
+
+/**
+ * Frozen order snapshot. The client never supplies any of these values: the API
+ * copies the product name and unit price at registration time and computes the
+ * total itself, so a later price edit cannot rewrite history.
+ */
+export const localOrderSnapshotSchema = z
+  .object({
+    productId: z.string().uuid(),
+    productName: z.string().min(1),
+    unitPriceCents: z.number().int().nonnegative(),
+    quantity: z.number().int().min(1).max(99),
+    totalCents: z.number().int().nonnegative(),
+  })
+  .superRefine((snapshot, ctx) => {
+    if (snapshot.totalCents !== snapshot.unitPriceCents * snapshot.quantity) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'totalCents must equal unitPriceCents * quantity',
+        path: ['totalCents'],
+      })
+    }
+  })
+export type LocalOrderSnapshot = z.infer<typeof localOrderSnapshotSchema>
+
+export const localOrderSummarySchema = z.object({
+  id: z.string().uuid(),
+  community: authCommunitySchema,
+  resident: crmUserRefSchema,
+  snapshot: localOrderSnapshotSchema,
+  status: localOrderStatusSchema,
+  recordSource: localOrderRecordSourceSchema,
+  /** The staff member who recorded the order; null for a resident self-service order. */
+  createdByStaff: crmStaffRefSchema.nullable(),
+  /** Optional grid-worker attribution / activity source frozen at registration. */
+  attributedStaff: crmStaffRefSchema.nullable(),
+  sourceActivity: crmActivityRefSchema.nullable(),
+  note: z.string().nullable(),
+  createdAt: isoTimestamp,
+  updatedAt: isoTimestamp,
+})
+export type LocalOrderSummary = z.infer<typeof localOrderSummarySchema>
+
+export const localOrderEventSchema = z.object({
+  id: z.string().uuid(),
+  orderId: z.string().uuid(),
+  event: localOrderEventTypeSchema,
+  fromStatus: localOrderStatusSchema.nullable(),
+  toStatus: localOrderStatusSchema.nullable(),
+  /** Server-resolved actor; null only if the account was removed. */
+  actor: crmUserRefSchema.nullable(),
+  actorStaff: crmStaffRefSchema.nullable(),
+  note: z.string().nullable(),
+  /** Stable consumption contract for #64: sourceType + sourceId. */
+  sourceType: localOrderEventSourceTypeSchema,
+  sourceId: z.string().uuid(),
+  createdAt: isoTimestamp,
+})
+export type LocalOrderEvent = z.infer<typeof localOrderEventSchema>
+
+/**
+ * Order detail. `verification` exists only after an operations review, and the
+ * contract has no payment/activation field at all: `verified` is a manual fact
+ * check by a human operator, never "已付款" or "已开通".
+ */
+export const localOrderDetailSchema = localOrderSummarySchema
+  .extend({
+    verification: z
+      .object({
+        verifiedBy: crmUserRefSchema.nullable(),
+        verifiedAt: isoTimestamp,
+        note: z.string().min(2).max(500),
+      })
+      .nullable(),
+    /**
+     * Note of the most recent *status change* (derived from the append-only
+     * timeline, not a mutable column). This is where a rejection reason stays
+     * readable without inventing a second writable field.
+     */
+    statusNote: z.string().nullable(),
+    events: z.array(localOrderEventSchema),
+  })
+  .superRefine((value, ctx) => {
+    if (value.status === 'verified' && !value.verification) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'verified orders require verification details',
+        path: ['verification'],
+      })
+    }
+    if (value.status !== 'verified' && value.verification !== null) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'verification is only allowed on verified orders',
+        path: ['verification'],
+      })
+    }
+  })
+export type LocalOrderDetail = z.infer<typeof localOrderDetailSchema>
+
+/**
+ * Resident registration. Strict on purpose: the resident comes from the session,
+ * the price/community/currency come from the server product row. A client-sent
+ * `priceCents`, `totalCents`, `communityId` or `residentUserId` fails parsing
+ * instead of being silently ignored.
+ */
+export const createLocalOrderRequestSchema = z.strictObject({
+  productId: z.string().uuid(),
+  quantity: z.number().int().min(1).max(99),
+  note: z.string().trim().max(200).optional(),
+  /** Optional activity attribution; the activity must belong to the product's community. */
+  sourceActivityId: z.string().uuid().optional(),
+  /** Client-generated UUID; a replay returns the same order instead of a second one. */
+  idempotencyKey: z.string().uuid(),
+})
+export type CreateLocalOrderRequest = z.infer<typeof createLocalOrderRequestSchema>
+
+/**
+ * Staff recording on behalf of an existing resident account. The target resident
+ * must belong to the product's community and the acting staff must be assigned
+ * to that community; the acting staff id and the delegation source are recorded
+ * server-side, never taken from the body.
+ */
+export const createLocalOrderOnBehalfRequestSchema = createLocalOrderRequestSchema.extend({
+  residentUserId: z.string().uuid(),
+})
+export type CreateLocalOrderOnBehalfRequest = z.infer<
+  typeof createLocalOrderOnBehalfRequestSchema
+>
+
+export const localOrderCreateResponseSchema = z.object({
+  /** `false` means the idempotency key was replayed and this is the existing order. */
+  created: z.boolean(),
+  order: localOrderDetailSchema,
+})
+export type LocalOrderCreateResponse = z.infer<typeof localOrderCreateResponseSchema>
+
+export const updateLocalOrderStatusRequestSchema = z
+  .strictObject({
+    expectedUpdatedAt: isoTimestamp,
+    status: localOrderTransitionStatusSchema,
+    note: z.string().trim().max(500).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.status === 'rejected' && !value.note) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'note is required when rejecting an order',
+        path: ['note'],
+      })
+    }
+  })
+export type UpdateLocalOrderStatusRequest = z.infer<
+  typeof updateLocalOrderStatusRequestSchema
+>
+
+/**
+ * Operations verification. `verify` is the only path to `verified` and always
+ * records the reviewer and a note; `reject` moves the order to `rejected`.
+ * Re-verifying an already verified order is an explicit 409
+ * `order_already_verified`, never a silent second success.
+ */
+export const localOrderVerifyRequestSchema = z.strictObject({
+  expectedUpdatedAt: isoTimestamp,
+  decision: z.enum(['verify', 'reject']),
+  note: z.string().trim().min(2).max(500),
+})
+export type LocalOrderVerifyRequest = z.infer<typeof localOrderVerifyRequestSchema>
+
+export const localOrderListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  communityId: z.string().uuid().optional(),
+  status: localOrderStatusSchema.optional(),
+  productId: z.string().uuid().optional(),
+  /** Staff/back-office filter only; the resident route ignores it and never widens scope. */
+  residentUserId: z.string().uuid().optional(),
+  keyword: z.string().trim().min(1).max(80).optional(),
+})
+export type LocalOrderListQuery = z.infer<typeof localOrderListQuerySchema>
+
+export const localOrderListResponseSchema = z.object({
+  items: z.array(localOrderSummarySchema),
+  total: z.number().int().nonnegative(),
+  page: z.number().int().min(1),
+  pageSize: z.number().int().min(1),
+})
+export type LocalOrderListResponse = z.infer<typeof localOrderListResponseSchema>
+
+export const localOrderEventListResponseSchema = z.object({
+  items: z.array(localOrderEventSchema),
+})
+export type LocalOrderEventListResponse = z.infer<typeof localOrderEventListResponseSchema>
+
+/* -------------------------------------------------------------------------- */
 /* Resident participation & three-person team domain (#60 LL-MVP-004)         */
 /* -------------------------------------------------------------------------- */
 
@@ -1175,3 +1770,126 @@ export type ActivityParticipationConfirmResponse = z.infer<
 
 export * from './crmeb.js'
 export * from './rewards.js'
+
+/* -------------------------------------------------------------------------- */
+/* Phone (SMS one-time code) resident identity (#93 LL-H5-002)                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Routes of the phone identity surface. Kept in their own constant (like the
+ * activity/CRM reward domains) so the H5 client never hard-codes a path.
+ *
+ * - `POST otp`    request a 6-digit one-time code
+ * - `POST login`  exchange phone + code for a resident session
+ * - `POST bind`   bind a verified phone to the *current* resident session
+ * - `GET  status` report whether a sender is configured and which phone is bound
+ */
+export const PHONE_AUTH_ROUTES = {
+  status: '/auth/phone/status',
+  requestOtp: '/auth/phone/otp',
+  login: '/auth/phone/login',
+  bind: '/auth/phone/bind',
+} as const
+
+/** Mainland China mobile numbers only: `1` + `3-9` + 9 digits. */
+export const MAINLAND_MOBILE_PATTERN = /^1[3-9]\d{9}$/
+
+/**
+ * Canonicalizes a resident-typed mainland mobile number, or returns `null`.
+ *
+ * Residents paste numbers from WeChat, contacts and paper forms, so spaces,
+ * hyphens, parentheses and a `+86`/`86` country prefix are formatting, not
+ * identity. Everything else (short codes, landlines, foreign numbers, letters)
+ * is rejected instead of being coerced: the normalized 11-digit string is the
+ * UNIQUE identity key, so a lenient parse would merge distinct people.
+ */
+export function normalizeMainlandPhone(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  const compact = raw.trim().replace(/[\s()\-]/g, '')
+  if (!compact) return null
+  const digits = compact.startsWith('+86')
+    ? compact.slice(3)
+    : compact.startsWith('86') && compact.length > 11
+      ? compact.slice(2)
+      : compact
+  return MAINLAND_MOBILE_PATTERN.test(digits) ? digits : null
+}
+
+/** `13800138000` -> `138****8000`. The only phone shape the H5 ever displays. */
+export function maskMainlandPhone(phone: string): string {
+  return `${phone.slice(0, 3)}****${phone.slice(-4)}`
+}
+
+/**
+ * Request body validator. It accepts the raw typed value and only guarantees
+ * that {@link normalizeMainlandPhone} can canonicalize it; the API normalizes
+ * once more before touching the database, so the stored key is always the
+ * 11-digit form.
+ */
+export const mainlandPhoneSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(32)
+  .refine((value) => normalizeMainlandPhone(value) !== null, {
+    message: '请输入有效的中国大陆手机号（11 位，1 开头）',
+  })
+
+export const phoneOtpPurposeSchema = z.enum(['login', 'bind'])
+export type PhoneOtpPurpose = z.infer<typeof phoneOtpPurposeSchema>
+
+/**
+ * Strict on purpose: the resident is identified by the session cookie (bind) or
+ * by the verified phone (login). A forged `userId` must fail parsing instead of
+ * being silently ignored, following the participation contract precedent.
+ */
+export const phoneOtpRequestSchema = z.strictObject({
+  phone: mainlandPhoneSchema,
+  purpose: phoneOtpPurposeSchema,
+})
+
+export type PhoneOtpRequest = z.infer<typeof phoneOtpRequestSchema>
+
+/**
+ * Response of a successful code request. It never contains the code itself and
+ * never reveals whether the phone is already bound to an account: enumeration
+ * is answered identically for known and unknown numbers.
+ */
+export const phoneOtpRequestResponseSchema = z.object({
+  accepted: z.literal(true),
+  expiresInSeconds: z.number().int().positive(),
+  retryAfterSeconds: z.number().int().nonnegative(),
+  maxAttempts: z.number().int().positive(),
+})
+
+export type PhoneOtpRequestResponse = z.infer<typeof phoneOtpRequestResponseSchema>
+
+export const phoneOtpVerifyRequestSchema = z.strictObject({
+  phone: mainlandPhoneSchema,
+  code: z.string().regex(/^\d{6}$/, '验证码为 6 位数字'),
+})
+
+export type PhoneOtpVerifyRequest = z.infer<typeof phoneOtpVerifyRequestSchema>
+
+/** Result of binding a verified phone to the current resident session. */
+export const phoneBindResponseSchema = z.object({
+  bound: z.literal(true),
+  /** `true` when this account already owned the same verified phone. */
+  alreadyBound: z.boolean(),
+  maskedPhone: z.string().min(7),
+})
+
+export type PhoneBindResponse = z.infer<typeof phoneBindResponseSchema>
+
+/**
+ * Account panel state. `configured: false` means the deployment has no SMS
+ * sender, so the H5 must present the login method as unavailable instead of a
+ * button that can only fail.
+ */
+export const phoneAuthStatusResponseSchema = z.object({
+  configured: z.boolean(),
+  authenticated: z.boolean(),
+  maskedPhone: z.string().min(7).nullable(),
+})
+
+export type PhoneAuthStatusResponse = z.infer<typeof phoneAuthStatusResponseSchema>

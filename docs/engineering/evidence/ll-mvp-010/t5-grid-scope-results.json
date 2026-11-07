@@ -1,0 +1,57 @@
+{
+  "generatedAt": "2026-11-06T08:26:18.231Z",
+  "gridWorker": {
+    "communities": [
+      "59d5c573-d683-4854-98e7-7890dbcfe1f3"
+    ],
+    "visibleOrders": 15
+  },
+  "foreignOrder": {
+    "id": "778a019f-2220-40cf-92ec-021ad751a8fa",
+    "community": {
+      "id": "9fe20967-5545-43cc-8b36-22d9f3ab27b7",
+      "name": "阳光社区"
+    },
+    "productName": "阳光社区时令水果箱 r2e2e",
+    "residentDisplayName": "t5 跨社区居民 8223"
+  },
+  "api": {
+    "detailStatus": 403,
+    "errorCode": "forbidden"
+  },
+  "operatorOnForeignOrder": {
+    "status": 403
+  },
+  "detailUi": {
+    "showsRefusal": true,
+    "leaksResidentName": false,
+    "leaksPrice": false,
+    "hasStatusAction": false,
+    "firstText": "跳到主要内容 | 订单详情加载失败 | 没有权限：无权访问该社区的数据 | 重新加载 | 返回社区订单 | 活动 | 惠生活 | 我的 | （当前页面）",
+    "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-workbench-foreign-order-375.png"
+  },
+  "listUi": {
+    "foreignIdVisible": false,
+    "foreignProductVisible": false,
+    "communities": [
+      "授权社区",
+      "幸福社区",
+      "只显示服务端授权社区"
+    ],
+    "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-workbench-list-375.png",
+    "adminAsGridWorker": {
+      "denied": true,
+      "hasOrderTable": true,
+      "firstText": "商品与订单 | / | 订单管理 | R2 网格员 | 网格员 | 退出登录 | 经营工作台 | 订单管理 | 无权限 | 后台订单查询与人工核验仅对管理员与运营员开放。 | 网格员没有后台订单核验权限 | 后台 /admin/local-orders 拒绝网格员；即使直接访问该地址，服务端同样返回 403。请使用移动端工作台处理你授权社区内的订单。",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-admin-orders-gridworker-375.png"
+    }
+  },
+  "verdict": {
+    "apiRefuses": true,
+    "detailUiRefuses": true,
+    "detailUiLeaksResidentName": false,
+    "detailUiExposesAction": false,
+    "listOmitsForeignOrder": true,
+    "adminConsoleDeniedForGridWorker": true
+  }
+}

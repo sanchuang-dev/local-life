@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router'
-import { MiniProgramShell } from './components/MiniProgramShell'
+import { AppShell } from './components/shell/AppShell'
+import { ActivityHomePage } from './pages/ActivityHomePage'
 import { CommunityActivityPage } from './pages/CommunityActivityPage'
 import { CommunityBroadcastPage } from './pages/CommunityBroadcastPage'
 import { CommunityCulturePage } from './pages/CommunityCulturePage'
@@ -12,9 +13,11 @@ import { HealthDevicePage } from './pages/HealthDevicePage'
 import { HealthDevicesPage } from './pages/HealthDevicesPage'
 import { HealthLecturePage } from './pages/HealthLecturePage'
 import { HealthPage } from './pages/HealthPage'
-import { HomePage } from './pages/HomePage'
 import { LifePage } from './pages/LifePage'
+import { LocalProductPage } from './pages/LocalProductPage'
 import { MePage } from './pages/MePage'
+import { MyOrderDetailPage } from './pages/MyOrderDetailPage'
+import { MyOrdersPage } from './pages/MyOrdersPage'
 import { MyRewardsPage } from './pages/MyRewardsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { PointsPage } from './pages/PointsPage'
@@ -25,6 +28,8 @@ import { WorkbenchLayout } from './pages/workbench/WorkbenchLayout'
 import { WorkbenchLeadDetailPage } from './pages/workbench/WorkbenchLeadDetailPage'
 import { WorkbenchLeadNewPage } from './pages/workbench/WorkbenchLeadNewPage'
 import { WorkbenchLeadsPage } from './pages/workbench/WorkbenchLeadsPage'
+import { WorkbenchLocalOrderDetailPage } from './pages/workbench/WorkbenchLocalOrderDetailPage'
+import { WorkbenchLocalOrdersPage } from './pages/workbench/WorkbenchLocalOrdersPage'
 import { WorkbenchLoginPage } from './pages/workbench/WorkbenchLoginPage'
 import { WorkbenchOrderDetailPage } from './pages/workbench/WorkbenchOrderDetailPage'
 import { WorkbenchOrderNewPage } from './pages/workbench/WorkbenchOrderNewPage'
@@ -33,9 +38,9 @@ import { WorkbenchVerifyPage } from './pages/workbench/WorkbenchVerifyPage'
 
 export default function App() {
   return (
-    <MiniProgramShell>
+    <AppShell>
       <Routes>
-        <Route path="/" element={<HomePage />} />
+        <Route path="/" element={<ActivityHomePage />} />
         <Route path="/gd" element={<GdPage />} />
         <Route path="/community" element={<CommunityPage />} />
         <Route path="/community/broadcast" element={<CommunityBroadcastPage />} />
@@ -55,9 +60,12 @@ export default function App() {
         <Route path="/health/lecture" element={<HealthLecturePage />} />
         <Route path="/life" element={<LifePage />} />
         <Route path="/life/exchange" element={<ExchangePage />} />
+        <Route path="/life/local-products/:productId" element={<LocalProductPage />} />
         <Route path="/life/product/:productId" element={<ProductPage />} />
         <Route path="/points" element={<PointsPage />} />
         <Route path="/me/devices" element={<HealthDevicesPage />} />
+        <Route path="/me/orders" element={<MyOrdersPage />} />
+        <Route path="/me/orders/:localOrderId" element={<MyOrderDetailPage />} />
         <Route path="/me/rewards" element={<MyRewardsPage />} />
         <Route path="/me" element={<MePage />} />
         <Route path="/workbench" element={<WorkbenchLayout />}>
@@ -66,12 +74,14 @@ export default function App() {
           <Route path="leads/new" element={<WorkbenchLeadNewPage />} />
           <Route path="leads/:leadId" element={<WorkbenchLeadDetailPage />} />
           <Route path="leads/:leadId/orders/new" element={<WorkbenchOrderNewPage />} />
+          <Route path="local-orders" element={<WorkbenchLocalOrdersPage />} />
+          <Route path="local-orders/:localOrderId" element={<WorkbenchLocalOrderDetailPage />} />
           <Route path="orders" element={<WorkbenchOrdersPage />} />
           <Route path="orders/:orderId" element={<WorkbenchOrderDetailPage />} />
           <Route path="verify" element={<WorkbenchVerifyPage />} />
         </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
-    </MiniProgramShell>
+    </AppShell>
   )
 }
