@@ -21,12 +21,23 @@ export const localEnvTemplate = [
   'SESSION_TTL_HOURS=168',
   'AUTH_DEV_ENABLED=true',
   '',
+  '# 微信公众号后台配置主密钥（Issue #113）：二选一，绝不提交真实密钥。',
+  '# 缺省时 API 仍可启动，但后台配置功能 fail closed（不会假装可用）。',
+  '# 公众号 AppID/AppSecret 统一在管理台「系统管理 → 微信公众号」保存并启用；',
+  '# 旧 WECHAT_APP_ID/WECHAT_APP_SECRET/WECHAT_REDIRECT_URI 已被忽略，不要再配置。',
+  '# WECHAT_CONFIG_MASTER_KEY_FILE=../../.data/wechat-config-master-key',
+  '# WECHAT_CONFIG_MASTER_KEY=',
+  'WECHAT_CONFIG_KEY_ID=v1',
+  '',
 ].join('\n')
 
 const apiEnvironmentKeys = [
   'NODE_ENV', 'HOST', 'PORT', 'WEB_PORT', 'ADMIN_PORT', 'DATABASE_PATH', 'SESSION_TTL_HOURS',
   'LOCAL_LIFE_API_PORT', 'LOCAL_LIFE_WEB_PORT', 'LOCAL_LIFE_ADMIN_PORT',
+  // Deprecated (#113) but still scrubbed: never let exported production WeChat
+  // values leak into the local subprocess, even though the API now ignores them.
   'COOKIE_DOMAIN', 'WECHAT_APP_ID', 'WECHAT_APP_SECRET', 'WECHAT_REDIRECT_URI',
+  'WECHAT_CONFIG_MASTER_KEY', 'WECHAT_CONFIG_MASTER_KEY_FILE', 'WECHAT_CONFIG_KEY_ID',
   'WEB_BASE_URL', 'TRUSTED_ORIGINS', 'AUTH_DEV_ENABLED',
 ]
 

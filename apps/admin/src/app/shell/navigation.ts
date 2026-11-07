@@ -148,6 +148,15 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         planned: [],
       },
       {
+        key: '/system/wechat',
+        label: '微信公众号',
+        description:
+          '加密保存公众号 AppID/AppSecret，真实测试连接后启用或切换微信 OAuth 运行时配置。',
+        status: 'ready',
+        planned: [],
+        roles: ['admin'],
+      },
+      {
         key: '/system/components',
         label: '界面组件',
         description: 'DataPanel 数据面板的开发预览与组件验收场景。',

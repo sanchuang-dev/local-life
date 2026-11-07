@@ -22,13 +22,16 @@
 
 ## 3. 微信网页 OAuth
 
-1. `GET /auth/wechat/start?communityId=...` 检查公众号配置与社区 ID，创建随机 state / nonce，数据库只保存二者 hash，state 有效期 10 分钟。
-2. nonce 通过 HttpOnly、SameSite=Lax Cookie 绑定当前浏览器；授权请求使用 `snsapi_base`，不主动索取微信头像或手机号。
-3. `GET /auth/wechat/callback` 校验 state、nonce、过期时间，并通过原子更新将 state 标记为 consumed；重放请求拒绝。
-4. 服务端使用 code 向微信接口换取 openid；凭证仅在 API 服务端使用，不返回给浏览器、不写日志、不持久化 access token。
-5. 按 appid + openid 查找或创建居民用户，按 OAuth state 中的社区上下文关联居民，再签发平台 session 并回到 H5 `/#/me`。
+公众号凭证不再来自启动 env，而是来自管理台保存并经管理员启用的 `wechat_oauth_configs` active 行（详见 [wechat-admin.md](wechat-admin.md)）。`/auth/methods`、`start`、`callback` 共用 `resolveWechatRuntimeConfig` 这一读取路径：每次请求从数据库解析并用主密钥解密，激活新配置后无需重启。
 
-真实公众号 AppID/AppSecret、网页授权域名、回调 URL 与线上 HTTPS Cookie 尚未配置/实测。缺配置时 `/auth/wechat/start` 返回明确 503；不能把本地 fake provider 测试说成真实微信验收。
+1. `GET /auth/methods`：无 active 行 → `wechat:false` + `not_configured`；active 行存在但主密钥缺失/密文不可解密 → `wechat:false` + `wechat_config_unavailable`；可用 → `wechat:true`。响应不含配置 id、key id、secret。
+2. `GET /auth/wechat/start?communityId=...` 解析 active 可用配置（不可用返回 503，不回退旧 env），校验社区 ID 与 returnTo，创建随机 state / nonce，数据库只保存二者 hash，state 有效期 10 分钟，并把该配置行的 id 写入 `oauth_states.config_id`。授权请求使用该行 appId、`snsapi_base` 与系统推导的回调地址（`WEB_BASE_URL` origin + `/api/auth/wechat/callback`）。
+3. nonce 通过 HttpOnly、SameSite=Lax Cookie 绑定当前浏览器。
+4. `GET /auth/wechat/callback` 先校验 state、nonce、过期时间，并通过原子更新将 state 标记为 consumed；重放拒绝。随后按 `state.config_id` 读取该配置行（允许 `active` 或 `retired`，以支持切换期间的在途回调），用该行的 appId + secret 换 openid：绝不使用回调时新 active 配置的 secret。老 state 无 configId → `wechat_state_invalid`；行不存在/不可解密 → 清 OAuth cookie 并 `wechat_config_unavailable`，不跨账号重试。
+5. 服务端使用 code 向微信接口换取 openid；凭证仅在 API 服务端使用，不返回给浏览器、不写日志、不持久化 access token。
+6. 按 `(appid, openid)` 查找或创建居民用户，按 OAuth state 中的社区上下文关联居民，再签发平台 session 并回到 H5；切换 AppID 不会合并不同账号的身份。登录不写入参与/报名，邀请回跳仍由显式确认触发。
+
+真实公众号 AppID/AppSecret、网页授权域名、回调 URL 与线上 HTTPS Cookie 尚未配置/实测。缺配置或配置不可解密时，`/auth/wechat/start` 返回明确 503；只能把本地 stub fetch 测试视为代码边界验证，不能当作真实微信验收。
 
 ## 4. 后台接口
 
@@ -67,12 +70,14 @@ pnpm admin:local # 本地 .env.local 与项目内 .data/local-life-dev.sqlite
 
 - `DATABASE_PATH`：默认 `../../.data/local-life.sqlite`（仓库根目录下）。
 - `SESSION_TTL_HOURS`：默认 168 小时。
-- `WECHAT_APP_ID`、`WECHAT_APP_SECRET`、`WECHAT_REDIRECT_URI`：成组配置。
-- `WEB_BASE_URL`：OAuth 完成后的 H5 回跳地址；生产环境必填。
+- `WECHAT_CONFIG_MASTER_KEY_FILE` 或 `WECHAT_CONFIG_MASTER_KEY`：公众号凭证加密主密钥（二选一）；`WECHAT_CONFIG_KEY_ID` 为密钥代际标签。缺省时功能 fail closed。
+- 公众号 AppID/AppSecret 在管理台「系统管理 → 微信公众号」录入、验证并启用；不再通过 env 配置。
+- 旧 `WECHAT_APP_ID`、`WECHAT_APP_SECRET`、`WECHAT_REDIRECT_URI` 已弃用：API 不读取，只在启动时记录一条仅含变量名的忽略警告，请迁移后删除。
+- `WEB_BASE_URL`：居民 H5 回跳地址；生产环境必填。OAuth 回调地址固定由它的 origin + `/api/auth/wechat/callback` 推导，不可通过 env 单独覆盖。
 - `TRUSTED_ORIGINS`：逗号分隔的可信前端 Origin。
 - `COOKIE_DOMAIN`：只有在确实跨子域共享 Cookie 时才设置。
 - `AUTH_DEV_ENABLED`：默认 false；只允许非生产环境显式开启。
 
 ## 6. 明确未覆盖
 
-本卡不实现手机号采集/验证、短信、密码找回、后台账号停用与密码重置、完整客户跟进、活动/订单/交易/奖励、商城同步、分账和生产部署。真实微信 OAuth 必须在具备账号凭证后单独完成真实环境验收。
+本卡不实现手机号采集/验证、短信、密码找回、后台账号停用与密码重置、完整客户跟进、活动/订单/交易/奖励、商城同步、分账和生产部署。真实微信 OAuth 必须在具备账号凭证后单独完成真实环境验收；管理台的“连接验证通过”只证明 AppID/AppSecret 能换取 token，不等于真机网页授权、回调域名或 HTTPS Cookie 已验收。
