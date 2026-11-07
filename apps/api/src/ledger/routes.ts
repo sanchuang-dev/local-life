@@ -10,6 +10,8 @@ import {
   ledgerListResponseSchema,
   ledgerOverviewQuerySchema,
   ledgerOverviewSchema,
+  ledgerSyncRequestSchema,
+  ledgerSyncResponseSchema,
   reconciliationBatchListResponseSchema,
   type ApiErrorCode,
 } from '@sanchuang-dev/local-life-contracts'
@@ -35,6 +37,7 @@ import {
   resolveAttributionRequestSchema,
   reversePayment,
   reversePaymentRequestSchema,
+  syncLedgerFacts,
 } from './service.js'
 
 export interface LedgerRouteDeps {
@@ -250,6 +253,28 @@ export function registerLedgerRoutes(app: Hono<AppBindings>, deps: LedgerRouteDe
     }
     try {
       return respond(c, ledgerAnomalyListResponseSchema, listAnomalies(db, actorOf(guard), query.data, { now: now() }))
+    } catch (error) {
+      return failWithLedgerError(c, error)
+    }
+  })
+
+  /**
+   * Explicit projection from the existing local-order, verified CRM and reward
+   * source tables. POST + CSRF is intentional: report reads never write.
+   */
+  app.post(LEDGER_ROUTES.adminSync, async (c) => {
+    const guard = requireAdminSide(c)
+    if (guard instanceof Response) return guard
+    const csrfFailure = requireCsrf(c, guard.session)
+    if (csrfFailure) return csrfFailure
+    const body = ledgerSyncRequestSchema.safeParse((await c.req.json().catch(() => null)) ?? {})
+    if (!body.success) return invalidBody(c, '来源同步日期参数不正确')
+    try {
+      return respond(
+        c,
+        ledgerSyncResponseSchema,
+        syncLedgerFacts(db, actorOf(guard), body.data, { now: now() }),
+      )
     } catch (error) {
       return failWithLedgerError(c, error)
     }
