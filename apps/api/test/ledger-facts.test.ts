@@ -1038,3 +1038,166 @@ test('网格员 reads only their own community and is refused the admin ledger r
     world.cleanup()
   }
 })
+
+
+/* -------------------------------------------------------------------------- */
+/* Maintainer regression: production route, freeze and Excel export           */
+/* -------------------------------------------------------------------------- */
+
+test('real Hono source-sync POST ingests trusted facts, rejects unauthorized writes and replays safely', async () => {
+  const world = await makeWorld()
+  try {
+    assert.equal(entryCount(world.sqlite), 0, 'source fixtures exist but ledger was not yet projected')
+    const unauthenticated = await api(world.app, 'POST', '/admin/ledger/sync', { body: {} })
+    assert.equal(unauthenticated.status, 401)
+
+    const grid = await gridSession(world.app)
+    const forbidden = await api(world.app, 'POST', '/admin/ledger/sync', { session: grid, body: {} })
+    assert.equal(forbidden.status, 403)
+    assert.equal(entryCount(world.sqlite), 0, 'rejected requests must not write facts')
+
+    const admin = await adminSession(world.app)
+    const noCsrf = await world.app.request('/admin/ledger/sync', {
+      method: 'POST',
+      headers: { cookie: admin.cookies, 'content-type': 'application/json' },
+      body: '{}',
+    })
+    assert.equal(noCsrf.status, 403)
+    const badRange = await api(world.app, 'POST', '/admin/ledger/sync', {
+      session: admin, body: { from: '2026-11-07', to: '2026-11-01' },
+    })
+    assert.equal(badRange.status, 400)
+
+    const first = await api(world.app, 'POST', '/admin/ledger/sync', {
+      session: admin, body: { from: PERIOD_FROM, to: PERIOD_TO },
+    })
+    assert.equal(first.status, 200, await first.clone().text())
+    const firstResult = await first.json() as { created: number; scanned: number; skipped: number }
+    assert.ok(firstResult.created >= 4)
+    assert.ok(entryCount(world.sqlite) >= 4)
+    const foreign = world.sqlite.prepare(
+      'SELECT count(*) AS c FROM ledger_entries WHERE community_id = ?',
+    ).get(world.otherCommunityId) as { c: number }
+    assert.equal(foreign.c, 1, 'admin projection includes the foreign community fact')
+
+    const replay = await api(world.app, 'POST', '/admin/ledger/sync', {
+      session: admin, body: { from: PERIOD_FROM, to: PERIOD_TO },
+    })
+    assert.equal(replay.status, 200)
+    const replayResult = await replay.json() as { created: number; skipped: number }
+    assert.equal(replayResult.created, 0)
+    assert.ok(replayResult.skipped >= firstResult.created)
+
+    const overview = ledgerOverviewSchema.parse(
+      await (await api(world.app, 'GET', '/admin/ledger/overview', { session: admin })).json(),
+    )
+    assert.equal(overview.totals.entryCount, entryCount(world.sqlite))
+
+    const gridView = ledgerListResponseSchema.parse(
+      await (await api(world.app, 'GET', '/staff/ledger/entries?pageSize=100', { session: grid })).json(),
+    )
+    assert.ok(gridView.items.length > 0)
+    assert.ok(gridView.items.every((fact) => fact.communityId === world.communityId))
+
+    // Reopen the file: the source projection was persisted, not an in-memory mock.
+    const storedCount = entryCount(world.sqlite)
+    world.sqlite.close()
+    const reopened = createDatabase(join(world.dir, 'facts.sqlite'), migrationsFolder)
+    try {
+      assert.equal(entryCount(reopened.sqlite), storedCount)
+    } finally {
+      reopened.sqlite.close()
+    }
+  } finally {
+    world.cleanup()
+  }
+})
+
+test('reconciliation CSV reflects confirmed attribution and cannot change ownership after locking', async () => {
+  const world = await makeWorld()
+  try {
+    const admin = await adminSession(world.app)
+    const projected = await api(world.app, 'POST', '/admin/ledger/sync', {
+      session: admin, body: { from: PERIOD_FROM, to: PERIOD_TO },
+    })
+    assert.equal(projected.status, 200)
+    const entries = ledgerListResponseSchema.parse(
+      await (await api(world.app, 'GET', '/admin/ledger/entries?pageSize=100', { session: admin })).json(),
+    )
+    const local = entries.items.find((row) => row.sourceId === world.localOrderId)
+    assert.ok(local)
+    const confirm = await api(world.app, 'POST', '/admin/ledger/attributions', {
+      session: admin,
+      body: { entryId: local.entryId, staffId: world.gridStaffId, note: '已核实归属' },
+    })
+    assert.equal(confirm.status, 201)
+
+    const create = await api(world.app, 'POST', '/admin/reconciliation/batches', {
+      session: admin, body: { periodFrom: PERIOD_FROM, periodTo: PERIOD_TO },
+    })
+    assert.equal(create.status, 201)
+    const batch = await create.json() as { batchId: string; updatedAt: string }
+    const detail = await api(world.app, 'GET', `/admin/reconciliation/batches/${batch.batchId}/entries?pageSize=100`, { session: admin })
+    assert.equal(detail.status, 200)
+    const detailBody = await detail.json() as { items: Array<{ entryId: string; attribution: { state: string; staffId: string | null } }> }
+    const joined = detailBody.items.find((row) => row.entryId === local.entryId)
+    assert.equal(joined?.attribution.state, 'attributed')
+    assert.equal(joined?.attribution.staffId, world.gridStaffId)
+
+    const csvBefore = await api(world.app, 'GET', `/admin/reconciliation/export.csv?batchId=${batch.batchId}`, { session: admin })
+    assert.equal(csvBefore.status, 200)
+    const csvText = await csvBefore.text()
+    const localCsv = csvText.split('\r\n').find((line) => line.includes(world.localOrderId))
+    assert.ok(localCsv?.includes('网格员小李'))
+    assert.ok(localCsv?.includes('已归属'))
+
+    const lock = await api(world.app, 'POST', `/admin/reconciliation/batches/${batch.batchId}/lock`, {
+      session: admin, body: { expectedUpdatedAt: batch.updatedAt },
+    })
+    assert.equal(lock.status, 200, await lock.clone().text())
+    const otherPending = entries.items.find((row) => row.factKind === 'reward_cost')
+    assert.ok(otherPending)
+    const changeAfterLock = await api(world.app, 'POST', '/admin/ledger/attributions', {
+      session: admin, body: { entryId: otherPending.entryId, staffId: world.gridStaffId },
+    })
+    assert.equal(changeAfterLock.status, 409)
+    assert.equal(await errorCode(changeAfterLock), API_ERROR_CODES.ledgerBatchLocked)
+
+    const frozenCsv = await api(world.app, 'GET', `/admin/reconciliation/export.csv?batchId=${batch.batchId}`, { session: admin })
+    assert.equal(frozenCsv.status, 200)
+    assert.equal(await frozenCsv.text(), csvText, 're-export of a locked statement must be byte-identical')
+  } finally {
+    world.cleanup()
+  }
+})
+
+test('CSV export neutralizes formula-leading free-text evidence and source numbers', async () => {
+  const world = await makeWorld()
+  try {
+    const admin = await adminSession(world.app)
+    const saved = await api(world.app, 'POST', '/admin/ledger/payments', {
+      session: admin,
+      body: {
+        communityId: world.communityId,
+        amountCents: 1234,
+        sourceDisplayNo: '=1+1',
+        evidenceRef: '   @SUM(A1:A3)',
+        evidenceKind: 'manual_receipt',
+        receivedAt: '2026-11-06T10:00:00.000Z',
+        staffId: world.operatorStaffId,
+      },
+    })
+    assert.equal(saved.status, 201)
+    const exported = await api(world.app, 'GET',
+      `/admin/reconciliation/export.csv?periodFrom=${PERIOD_FROM}&periodTo=${PERIOD_TO}`,
+      { session: admin },
+    )
+    assert.equal(exported.status, 200)
+    const text = await exported.text()
+    assert.ok(text.startsWith('\uFEFF流水号,'))
+    assert.ok(text.includes(",'=1+1,"))
+    assert.ok(text.includes(",'   @SUM(A1:A3),"))
+  } finally {
+    world.cleanup()
+  }
+})
