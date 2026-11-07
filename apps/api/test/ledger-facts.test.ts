@@ -132,6 +132,8 @@ interface World {
   app: App
   communityId: string
   otherCommunityId: string
+  adminUserId: string
+  adminStaffId: string
   operatorUserId: string
   operatorStaffId: string
   gridStaffId: string
@@ -442,6 +444,17 @@ const adminActor = (world: World) => ({
   userId: world.operatorUserId,
   staffId: world.operatorStaffId,
   role: 'operator' as const,
+})
+
+/**
+ * A real `admin` staff member: `scopeCommunityIds` returns `null`, so this actor
+ * ingests *both* communities. Only that makes the 网格员 scope assertions below
+ * meaningful — otherwise the foreign fact would simply never exist.
+ */
+const adminAllActor = (world: World) => ({
+  userId: world.adminUserId,
+  staffId: world.adminStaffId,
+  role: 'admin' as const,
 })
 
 async function adminSession(app: App): Promise<Session> {
@@ -963,7 +976,8 @@ test('anomalies append, are queryable by fact and by batch, and can never be del
 test('网格员 reads only their own community and is refused the admin ledger routes', async () => {
   const world = await makeWorld()
   try {
-    syncLedgerFacts(world.db, adminActor(world), { from: PERIOD_FROM, to: PERIOD_TO }, { now: CLOCK })
+    // Ingested by an admin so the *other* community's fact really exists.
+    syncLedgerFacts(world.db, adminAllActor(world), { from: PERIOD_FROM, to: PERIOD_TO }, { now: CLOCK })
     const grid = await gridSession(world.app)
 
     const own = ledgerListResponseSchema.parse(
