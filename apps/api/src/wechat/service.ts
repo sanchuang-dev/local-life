@@ -410,19 +410,19 @@ export function activateWechatCandidate(
   if (!row) {
     throw new WechatAdminError(404, API_ERROR_CODES.notFound, '公众号配置不存在')
   }
-  // Already live: the requester's goal is achieved, so repeat/concurrent
-  // activation is an idempotent no-op. It never retires itself and never writes
-  // a second audit row; the partial unique index still guarantees one active row.
-  if (row.status === 'active') {
-    return { active: toWechatConfigSummary(row), previous: null }
-  }
-  assertExpectedUpdatedAt(row, expectedUpdatedAt)
-  if (row.status !== 'verified') {
-    throw new WechatAdminError(
-      409,
-      API_ERROR_CODES.wechatConfigNotVerified,
-      '公众号配置尚未验证通过，不能启用',
-    )
+  // A repeat activation is a no-op only when the existing provider is
+  // actually usable. Returning 200 for an active row whose key is missing or
+  // ciphertext is corrupt would falsely report success while OAuth is broken.
+  const alreadyActive = row.status === 'active'
+  if (!alreadyActive) {
+    assertExpectedUpdatedAt(row, expectedUpdatedAt)
+    if (row.status !== 'verified') {
+      throw new WechatAdminError(
+        409,
+        API_ERROR_CODES.wechatConfigNotVerified,
+        '公众号配置尚未验证通过，不能启用',
+      )
+    }
   }
 
   const resolution = deps.resolveRuntime({ configId })
@@ -439,6 +439,11 @@ export function activateWechatCandidate(
       API_ERROR_CODES.wechatConfigDecryptFailed,
       '该配置的 AppSecret 无法用当前主密钥解密，已拒绝启用并保留原启用配置',
     )
+  }
+
+  // A healthy active row is idempotent; no write or duplicate audit.
+  if (alreadyActive) {
+    return { active: toWechatConfigSummary(row), previous: null }
   }
 
   const result = promoteOrThrow(deps, configId)
