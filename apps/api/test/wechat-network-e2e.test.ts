@@ -19,7 +19,7 @@ import { createApp } from '../src/app.js'
 import { hashPassword } from '../src/auth/security.js'
 import { loadConfig } from '../src/config.js'
 import { createDatabase } from '../src/db/client.js'
-import { staffAccounts, users, wechatIdentities, wechatOauthConfigs } from '../src/db/schema.js'
+import { staffAccounts, users, wechatIdentities } from '../src/db/schema.js'
 import { resolveWechatRuntimeConfig } from '../src/wechat/runtime.js'
 
 /**
@@ -68,7 +68,7 @@ test('real TCP admin HTTP, credential switch, in-flight OAuth and SQLite backup 
   const oauthRequests: Array<{ appId: string; secret: string }> = []
   const tokenRequests: string[] = []
 
-  const wechatBoundary = (async (input: RequestInfo | URL) => {
+  const wechatBoundary = (async (input: string | URL) => {
     const url = input instanceof URL ? input : new URL(String(input))
     if (url.pathname === '/cgi-bin/token') {
       const appId = url.searchParams.get('appid') ?? ''
