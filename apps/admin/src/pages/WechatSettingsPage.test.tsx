@@ -132,6 +132,7 @@ function renderPage(session: AuthenticatedSession) {
 }
 
 function fillSaveForm(appId = APP_ID, secret = APP_SECRET) {
+  fireEvent.click(screen.getByRole('button', { name: '新增公众号' }))
   fireEvent.change(screen.getByLabelText('AppID'), { target: { value: appId } })
   fireEvent.click(screen.getByRole('radio', { name: '正式号' }))
   fireEvent.change(screen.getByLabelText('AppSecret'), { target: { value: secret } })
@@ -182,26 +183,22 @@ describe('WechatSettingsPage loading and read-only state', () => {
 
     await screen.findByTestId('wechat-state-tag')
     expect(stateTagText()).toContain('未配置')
+    expect(screen.queryByTestId('wechat-callback-url')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '查看详情' }))
     expect(screen.getByText('加密已就绪')).toBeTruthy()
     expect(screen.getByTestId('wechat-key-id').textContent).toBe('v1')
-
-    // The callback URL is a server-derived value: displayed, copyable, not editable.
     expect(screen.getByTestId('wechat-callback-url').textContent).toBe(REDIRECT_URI)
     expect(screen.getByRole('button', { name: '复制回调地址' })).toBeTruthy()
     expect(screen.queryByDisplayValue(REDIRECT_URI)).toBeNull()
     expect(screen.queryByRole('textbox', { name: /回调/ })).toBeNull()
 
     expect(screen.getByTestId('wechat-active-card').textContent).toContain(
-      '当前没有已启用的公众号配置',
+      '尚未启用公众号',
     )
-    expect(screen.getByTestId('wechat-candidate-card').textContent).toContain(
-      '没有待验证或已验证的候选配置',
-    )
+    expect(screen.getByTestId('wechat-candidate-card').textContent).toBe('')
 
-    const secret = screen.getByLabelText('AppSecret') as HTMLInputElement
-    expect(secret.value).toBe('')
-    expect(secret.type).toBe('password')
-    expect(secret.getAttribute('autocomplete')).toBe('new-password')
+    // Details are available without exposing the credential editor.
+    expect(screen.queryByLabelText('AppSecret')).toBeNull()
   })
 
   it('renders the active configuration with account type, verification time and no secret', async () => {
@@ -228,12 +225,11 @@ describe('WechatSettingsPage loading and read-only state', () => {
     expect(within(activeCard).getByText('正式号')).toBeTruthy()
     expect(within(activeCard).getByText('已启用')).toBeTruthy()
     expect(screen.getByTestId('wechat-active-verified-at').textContent).not.toBe('—')
-    expect(screen.getByTestId('wechat-candidate-card').textContent).toContain(
-      '没有待验证或已验证的候选配置',
-    )
+    expect(screen.getByTestId('wechat-candidate-card').textContent).toBe('')
 
     // The page never receives or renders the secret.
     expect(document.body.textContent).not.toContain(APP_SECRET)
+    fireEvent.click(screen.getByRole('button', { name: '新增公众号' }))
     expect((screen.getByLabelText('AppSecret') as HTMLInputElement).value).toBe('')
   })
 
@@ -267,11 +263,33 @@ describe('WechatSettingsPage loading and read-only state', () => {
     renderPage(ADMIN_SESSION)
 
     expect(await screen.findByText('凭证加密主密钥不可用')).toBeTruthy()
-    expect(screen.getByText('主密钥不可用')).toBeTruthy()
-    expect(
-      (screen.getByRole('button', { name: '保存为待验证配置' }) as HTMLButtonElement).disabled,
-    ).toBe(true)
-    expect((screen.getByLabelText('AppID') as HTMLInputElement).disabled).toBe(true)
+    expect(screen.queryByText('主密钥不可用')).toBeNull()
+    expect((screen.getByRole('button', { name: '新增公众号' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.queryByLabelText('AppSecret')).toBeNull()
+  })
+})
+
+describe('WechatSettingsPage drawer interaction', () => {
+  it('keeps credential inputs outside the main page and discards a secret on cancel', async () => {
+    const calls = stubApi((url) => {
+      if (url === CONFIG_URL) return json(config())
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+    renderPage(ADMIN_SESSION)
+    await screen.findByTestId('wechat-state-tag')
+
+    expect(screen.queryByLabelText('AppSecret')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '新增公众号' }))
+    const secret = screen.getByLabelText('AppSecret') as HTMLInputElement
+    expect(secret.type).toBe('password')
+    expect(secret.getAttribute('autocomplete')).toBe('new-password')
+    fireEvent.change(secret, { target: { value: APP_SECRET } })
+    fireEvent.click(screen.getByRole('button', { name: /取\s*消/ }))
+    await waitFor(() => expect(screen.queryByLabelText('AppSecret')).toBeNull())
+
+    fireEvent.click(screen.getByRole('button', { name: '新增公众号' }))
+    expect((screen.getByLabelText('AppSecret') as HTMLInputElement).value).toBe('')
+    expect(calls.filter((call) => call.url === SAVE_URL)).toHaveLength(0)
   })
 })
 
@@ -364,7 +382,7 @@ describe('WechatSettingsPage save/verify/activate requests', () => {
     fillSaveForm()
     expect((screen.getByLabelText('AppSecret') as HTMLInputElement).value).toBe(APP_SECRET)
 
-    fireEvent.click(screen.getByRole('button', { name: '保存为待验证配置' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存凭证' }))
 
     await waitFor(() => expect(postCall).toBeTruthy())
     expect(postCall?.init?.method).toBe('POST')
@@ -379,9 +397,9 @@ describe('WechatSettingsPage save/verify/activate requests', () => {
     await waitFor(() => expect(stateTagText()).toContain('待验证'))
     expect(configCalls).toBeGreaterThanOrEqual(2)
     // The typed secret is cleared only after a real success response.
-    await waitFor(() =>
-      expect((screen.getByLabelText('AppSecret') as HTMLInputElement).value).toBe(''),
-    )
+    await waitFor(() => expect(screen.queryByLabelText('AppSecret')).toBeNull())
+    fireEvent.click(screen.getByRole('button', { name: '新增公众号' }))
+    expect((screen.getByLabelText('AppSecret') as HTMLInputElement).value).toBe('')
     expect(document.body.textContent).not.toContain(APP_SECRET)
   })
 
@@ -402,7 +420,7 @@ describe('WechatSettingsPage save/verify/activate requests', () => {
     await screen.findByTestId('wechat-state-tag')
 
     fillSaveForm()
-    fireEvent.click(screen.getByRole('button', { name: '保存为待验证配置' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存凭证' }))
 
     expect(await screen.findByText('保存公众号凭证失败')).toBeTruthy()
     expect(

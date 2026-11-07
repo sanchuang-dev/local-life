@@ -1,41 +1,115 @@
-/*
- * 系统管理 → 微信公众号 (#113 T4).
- *
- * Only page-local layout helpers live here: the shared `.page`, `.page-stack`
- * and Ant Design theme tokens already own the visual baseline.
- */
-
-.wechat-page .wechat-grid {
-  display: grid;
-  /* The parent content area is narrower than 320px on a 320px phone. */
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
-  gap: 16px;
+/* A single operational surface; metadata stays opt-in below the form. */
+.wechat-page .wechat-layout {
+  max-width: 980px;
 }
 
-.wechat-page .wechat-form-grid {
-  display: grid;
-  grid-template-columns: minmax(240px, 1fr) minmax(180px, 240px);
-  gap: 0 16px;
+.wechat-page .wechat-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 0;
 }
 
-.wechat-page .wechat-callback-row {
+.wechat-page .wechat-primary-card .ant-card-body {
+  padding: 24px;
+}
+
+.wechat-page .wechat-current {
+  padding-bottom: 4px;
+}
+
+.wechat-page .wechat-state-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  min-width: 0;
+}
+
+.wechat-page .wechat-eyebrow {
+  color: var(--ant-color-text-description, #64748b);
+  font-size: 13px;
+  min-width: 58px;
+}
+
+.wechat-page .wechat-quiet {
+  color: var(--ant-color-text-description, #64748b);
+  font-size: 13px;
+}
+
+.wechat-page .wechat-candidate {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ant-color-border-secondary, #e9ecea);
+}
+
+.wechat-page .wechat-candidate-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--ant-color-error, #b54137);
+}
+
+.wechat-page .wechat-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.wechat-editor-drawer .wechat-form-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 20px 0 18px;
+  padding-top: 20px;
+  border-top: 1px solid var(--ant-color-border-secondary, #e9ecea);
+}
+
+.wechat-editor-drawer .wechat-form-head h5.ant-typography {
+  margin: 0;
+}
+
+.wechat-editor-drawer .wechat-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(170px, 230px);
+  column-gap: 16px;
+}
+
+.wechat-editor-drawer .wechat-form-error {
+  margin-bottom: 16px;
+}
+
+.wechat-details-drawer .wechat-advanced-content {
+  padding: 0 8px;
+}
+
+.wechat-details-drawer .wechat-advanced-section {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 16px 0;
+  min-width: 0;
+}
+
+.wechat-details-drawer .wechat-advanced-section + .wechat-advanced-section {
+  border-top: 1px solid var(--ant-color-border-secondary, #e9ecea);
+}
+
+.wechat-details-drawer .wechat-callback-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
 
-.wechat-page .wechat-callback-url {
-  word-break: break-all;
-}
-
-.wechat-page .wechat-hint {
-  margin: 12px 0 0;
-  font-size: 12px;
-}
-
-.wechat-page .wechat-form-error {
-  margin-bottom: 16px;
+.wechat-details-drawer .wechat-callback-url {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .wechat-page .wechat-confirm-target {
@@ -48,7 +122,7 @@
 .wechat-page .wechat-confirm-list {
   margin: 8px 0 0;
   padding-left: 18px;
-  color: #4b5b56;
+  color: var(--ant-color-text-secondary, #4b5b56);
 }
 
 .wechat-page .wechat-confirm-list li + li {
@@ -56,7 +130,19 @@
 }
 
 @media (max-width: 640px) {
-  .wechat-page .wechat-form-grid {
-    grid-template-columns: 1fr;
+  .wechat-page .wechat-primary-card .ant-card-body {
+    padding: 16px;
+  }
+
+  .wechat-editor-drawer .wechat-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wechat-page .wechat-eyebrow {
+    width: 100%;
+  }
+
+  .wechat-page .wechat-actions .ant-btn {
+    min-height: 36px;
   }
 }
