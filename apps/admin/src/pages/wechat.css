@@ -7,7 +7,8 @@
 
 .wechat-page .wechat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  /* The parent content area is narrower than 320px on a 320px phone. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
   gap: 16px;
 }
 
