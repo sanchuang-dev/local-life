@@ -187,16 +187,16 @@ describe('WechatSettingsPage loading and read-only state', () => {
 
     // The callback URL is a server-derived value: displayed, copyable, not editable.
     expect(screen.getByTestId('wechat-callback-url').textContent).toBe(REDIRECT_URI)
+    expect(screen.getByText('高级信息与配置历史')).toBeTruthy()
+    fireEvent.click(screen.getByText('高级信息与配置历史'))
     expect(screen.getByRole('button', { name: '复制回调地址' })).toBeTruthy()
     expect(screen.queryByDisplayValue(REDIRECT_URI)).toBeNull()
     expect(screen.queryByRole('textbox', { name: /回调/ })).toBeNull()
 
     expect(screen.getByTestId('wechat-active-card').textContent).toContain(
-      '当前没有已启用的公众号配置',
+      '尚未启用公众号',
     )
-    expect(screen.getByTestId('wechat-candidate-card').textContent).toContain(
-      '没有待验证或已验证的候选配置',
-    )
+    expect(screen.getByTestId('wechat-candidate-card').textContent).toBe('')
 
     const secret = screen.getByLabelText('AppSecret') as HTMLInputElement
     expect(secret.value).toBe('')
@@ -228,9 +228,7 @@ describe('WechatSettingsPage loading and read-only state', () => {
     expect(within(activeCard).getByText('正式号')).toBeTruthy()
     expect(within(activeCard).getByText('已启用')).toBeTruthy()
     expect(screen.getByTestId('wechat-active-verified-at').textContent).not.toBe('—')
-    expect(screen.getByTestId('wechat-candidate-card').textContent).toContain(
-      '没有待验证或已验证的候选配置',
-    )
+    expect(screen.getByTestId('wechat-candidate-card').textContent).toBe('')
 
     // The page never receives or renders the secret.
     expect(document.body.textContent).not.toContain(APP_SECRET)
@@ -268,8 +266,9 @@ describe('WechatSettingsPage loading and read-only state', () => {
 
     expect(await screen.findByText('凭证加密主密钥不可用')).toBeTruthy()
     expect(screen.getByText('主密钥不可用')).toBeTruthy()
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
     expect(
-      (screen.getByRole('button', { name: '保存为待验证配置' }) as HTMLButtonElement).disabled,
+      (screen.getByRole('button', { name: '保存凭证' }) as HTMLButtonElement).disabled,
     ).toBe(true)
     expect((screen.getByLabelText('AppID') as HTMLInputElement).disabled).toBe(true)
   })
@@ -364,7 +363,7 @@ describe('WechatSettingsPage save/verify/activate requests', () => {
     fillSaveForm()
     expect((screen.getByLabelText('AppSecret') as HTMLInputElement).value).toBe(APP_SECRET)
 
-    fireEvent.click(screen.getByRole('button', { name: '保存为待验证配置' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存凭证' }))
 
     await waitFor(() => expect(postCall).toBeTruthy())
     expect(postCall?.init?.method).toBe('POST')
@@ -402,7 +401,7 @@ describe('WechatSettingsPage save/verify/activate requests', () => {
     await screen.findByTestId('wechat-state-tag')
 
     fillSaveForm()
-    fireEvent.click(screen.getByRole('button', { name: '保存为待验证配置' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存凭证' }))
 
     expect(await screen.findByText('保存公众号凭证失败')).toBeTruthy()
     expect(
