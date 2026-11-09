@@ -199,8 +199,10 @@ export function browserLocation(): AppLocationSnapshot {
  * supplied parameter), validated against the shared allowlist, and the one-off
  * OAuth markers are stripped so a retry cannot nest a previous result.
  *
- * The loaded activity is sent as `activityId` only (#123). The API loads that
- * row and derives its community; the H5 must never name a community itself, so
+ * Only an explicit activity context from the entry URL is sent as `activityId`.
+ * A display default selected from the public activity list is not attribution
+ * context. The API loads the supplied row and derives its community; the H5 must
+ * never name a community itself, so
  * the query is built by the shared contract helper instead of string
  * concatenation — a malformed activity id throws here rather than silently
  * producing a login that attributes nothing.
