@@ -345,7 +345,7 @@ export function presentLoginMarker(
  * residence by picking a UUID that happens to exist.
  */
 export interface WechatStartRequest {
-  /** Public activity the resident is currently looking at, or `null`. */
+  /** Explicit public-activity entry context; `null` for ordinary entry points. */
   activityId?: string | null
   /** Already-validated same-origin resident return target, or `null`. */
   returnTo?: string | null
