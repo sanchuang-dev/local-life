@@ -610,7 +610,7 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     }
     let communityId: string | null = null
     const requestedActivityId = c.req.query('activityId')
-    if (requestedActivityId !== undefined && requestedActivityId !== '') {
+    if (requestedActivityId !== undefined) {
       if (!isActivityId(requestedActivityId)) {
         return fail(c, 400, API_ERROR_CODES.invalidRequest, '活动参数无效')
       }

@@ -25,7 +25,7 @@
 1. **H5 只上报活动上下文。** 活动页拉起登录时，`buildWechatLoginRequest` 用共享契约 `buildWechatStartQuery({ activityId, returnTo })` 生成 `GET /api/auth/wechat/start?activityId=…&returnTo=…`。H5 从不发送 `communityId`；`activityId` 形状非法时契约 helper 直接抛错，而不是拼出一个"能登录但没归属"的 URL。
 2. **服务端推导社区。** `resolvePublicActivityCommunityId(db, activityId)` 用 `activities.id + status IN (published, paused, ended)` 查出社区，与 `GET /activities/public/:activityId` 共用同一组 `PUBLIC_STATUSES`。推导值写入 `oauth_states.community_id`（本轮不需要迁移，该列已存在）。
 3. **客户端 `communityId` 一律拒绝。** `GET /auth/wechat/start` 只要看到 `communityId` 就返回 400「社区归属只能由活动上下文推导，请传入 activityId」，即使该 UUID 确实存在。**不做静默忽略**：忽略会让旧版 H5 看起来登录成功却什么都没归属。
-4. **活动不可用时拒绝而非降级。** ID 形状非法 → 400「活动参数无效」；查不到或非公开（含 `draft`）→ 400「活动不存在或不可公开访问」，且不写 state 行。`activityId=`（空值）按"没有活动上下文"处理，即普通的不归属登录。
+4. **活动不可用时拒绝而非降级。** ID 形状非法 → 400「活动参数无效」；查不到或非公开（含 `draft`）→ 400「活动不存在或不可公开访问」，且不写 state 行。`activityId=`（显式空值）视为无效活动参数，返回 400 且不创建 state；普通登录必须完全省略 `activityId`。
 5. **回调只消费已验证 state 的归属。** 回调用自己的 state 换取 `stateRecord.communityId`，在创建居民用户后 `INSERT ... ON CONFLICT DO NOTHING`。幂等由既有复合主键 `(user_id, community_id)` 保证，**没有新增迁移、没有第二张身份表**。
 6. **登录绝不写入业务记录。** 登录路径不写 `activity_participations`、`activity_teams`、`activity_invitations`、`activity_checkins`、`activity_orders`、`activity_reward_grants`；本卡也未改动三人团邀请规则、网格员业绩归属或 CRM 线索负责人。
 7. **无活动上下文不归属。** `/me` 等普通入口（`useResidentAuth.startWechatLogin`）仍然调用不带任何上下文的 `start`，登录后不会凭空获得社区归属。

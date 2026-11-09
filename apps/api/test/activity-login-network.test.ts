@@ -17,6 +17,8 @@ import {
   activityRewardGrants,
   activityTeams,
   communities,
+  crmebOrders,
+  crmServiceOrders,
   localOrders,
   residentCommunityAssignments,
   staffAccounts,
@@ -234,6 +236,8 @@ test('a real-socket activity login writes exactly one community residence and no
     assert.equal(db.select().from(activityInvitations).all().length, 0)
     assert.equal(db.select().from(activityRewardGrants).all().length, 0)
     assert.equal(db.select().from(localOrders).all().length, 0)
+    assert.equal(db.select().from(crmServiceOrders).all().length, 0)
+    assert.equal(db.select().from(crmebOrders).all().length, 0)
     assert.equal(residentJar.store.has('ll_session'), true, 'the resident is logged in')
 
     // 4. A second login (same resident, same activity) stays idempotent.

@@ -16,6 +16,8 @@ import {
   activityRewardGrants,
   activityTeams,
   communities,
+  crmebOrders,
+  crmServiceOrders,
   localOrders,
   oauthStates,
   residentCommunityAssignments,
@@ -198,7 +200,9 @@ function assertNoActivityWrites(db: AppDatabase): void {
   assert.equal(db.select().from(activityInvitations).all().length, 0, 'no invitation')
   assert.equal(db.select().from(activityCheckins).all().length, 0, 'no check-in')
   assert.equal(db.select().from(activityRewardGrants).all().length, 0, 'no reward')
-  assert.equal(db.select().from(localOrders).all().length, 0, 'no order')
+  assert.equal(db.select().from(localOrders).all().length, 0, 'no local order')
+  assert.equal(db.select().from(crmServiceOrders).all().length, 0, 'no carrier order')
+  assert.equal(db.select().from(crmebOrders).all().length, 0, 'no CRMEB order mirror')
 }
 
 function assignmentsOf(db: AppDatabase, userId: string) {
@@ -356,14 +360,9 @@ test('invalid, unknown and malformed activity ids are refused instead of degradi
       '?activityId=',
     ]) {
       const response = await start(app, query)
-      // An empty value means "no activity context": a plain login, not a failure.
-      if (query === '?activityId=') {
-        assert.equal(response.status, 302, 'empty activityId is the un-attributed login path')
-        continue
-      }
       assert.equal(response.status, 400, `${query} must be refused`)
     }
-    assert.equal(db.select().from(oauthStates).all().length, 1, 'only the plain login minted state')
+    assert.equal(db.select().from(oauthStates).all().length, 0, 'a refused activity never mints state')
     assert.equal(countResidents(db), 0)
   } finally {
     sqlite.close()
@@ -374,10 +373,11 @@ test('a client-supplied communityId is refused even when that community really e
   const { app, db, sqlite } = harness()
   try {
     const ownerId = addStaffUser(db)
-    const realm = addCommunity(db, '真实存在的社区')
-    const activityId = addActivity(db, realm, ownerId)
+    const activityCommunity = addCommunity(db, '活动所属社区')
+    const forgedCommunity = addCommunity(db, '客户端伪造社区')
+    const activityId = addActivity(db, activityCommunity, ownerId)
 
-    const forged = await start(app, `?communityId=${realm}`)
+    const forged = await start(app, `?communityId=${forgedCommunity}`)
     assert.equal(forged.status, 400, 'existence is not authorization')
     assert.equal(
       ((await forged.json()) as { error: { code: string } }).error.code,
@@ -386,7 +386,7 @@ test('a client-supplied communityId is refused even when that community really e
 
     // Mixing a forged community with a real activity must not be "fixed" either:
     // the parameter is rejected, never merged or preferred.
-    const mixed = await start(app, `?activityId=${activityId}&communityId=${realm}`)
+    const mixed = await start(app, `?activityId=${activityId}&communityId=${forgedCommunity}`)
     assert.equal(mixed.status, 400)
     assert.equal(db.select().from(oauthStates).all().length, 0)
     assert.equal(db.select().from(residentCommunityAssignments).all().length, 0)
