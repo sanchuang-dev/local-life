@@ -187,7 +187,7 @@ export type AuthSessionResponse = z.infer<typeof authSessionResponseSchema>
  * Resident-consented WeChat profile state. The response intentionally contains
  * no OpenID, access token, AppID, or provider credential.
  */
-export const wechatProfileStatusSchema = z.discriminatedUnion('available', [
+export const wechatProfileStatusSchema = z.union([
   z.object({
     available: z.literal(false),
     reason: z.enum(['not_configured', 'configuration_unavailable', 'identity_not_bound']),

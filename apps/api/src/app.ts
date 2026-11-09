@@ -365,7 +365,7 @@ function redirectWechatProfileResult(
 
 function normalizeWechatNickname(value: unknown): string | null {
   if (typeof value !== 'string') return null
-  const normalized = value.replace(/[\\u0000-\\u001f\\u007f]/gu, '').trim()
+  const normalized = value.replace(/[\u0000-\u001f\u007f]/gu, '').trim()
   return normalized ? Array.from(normalized).slice(0, 128).join('') : null
 }
 
@@ -856,10 +856,6 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     // exit — once a provider exists the attempt itself decides, including when
     // the currently active version has since become unusable.
     const activeResolution = wechatRuntime()
-    if (!activeResolution.ok && activeResolution.reason === 'not_configured') {
-      return redirectToWeb(c, config, 'wechat_not_configured')
-    }
-
     // Only the target minted together with this attempt is honoured, and only
     // after re-validating it. Anything else falls back to the default page.
     const boundReturnTo = readBoundReturnTo(
@@ -877,6 +873,10 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
           .get()
       : null
     const isProfileState = stateRecord?.purpose === 'profile'
+    if (!activeResolution.ok && activeResolution.reason === 'not_configured' && !stateRecord) {
+      clearOauthCookies(c, config)
+      return redirectToWeb(c, config, 'wechat_not_configured', boundReturnTo)
+    }
 
     if (!state || !nonce) {
       clearOauthCookies(c, config)
