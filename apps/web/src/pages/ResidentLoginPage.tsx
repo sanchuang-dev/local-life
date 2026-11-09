@@ -21,7 +21,7 @@ export function ResidentLoginPage() {
   const auth = useResidentAuth()
   const returnTo = resolveResidentLoginTarget(searchParams.get('next'))
   const target = new URL(returnTo, window.location.origin)
-  const activityId = searchParams.get('activityId') || target.searchParams.get('activityId')
+  const activityId = searchParams.get('activityId')
   const invite = parseInviteParam(searchParams.get('invite') ?? target.searchParams.get('invite'))
   const inviteInvalid =
     searchParams.get('inviteInvalid') === '1' ||
