@@ -697,8 +697,8 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     }
 
     const now = new Date()
-    const state = randomToken(32)
-    const nonce = randomToken(32)
+    const state = randomToken()
+    const nonce = randomToken()
     db.delete(oauthStates).where(lt(oauthStates.expiresAt, now)).run()
     db.insert(oauthStates).values({
       id: randomUUID(),
