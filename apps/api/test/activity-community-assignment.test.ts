@@ -369,6 +369,31 @@ test('invalid, unknown and malformed activity ids are refused instead of degradi
   }
 })
 
+test('activity UUID lookup is case-insensitive and still derives the stored community', async () => {
+  const { app, db, sqlite } = harness()
+  try {
+    const ownerId = addStaffUser(db)
+    const communityId = addCommunity(db, '大小写归属社区')
+    const activityId = addActivity(db, communityId, ownerId)
+    const uppercaseActivityId = activityId.toUpperCase()
+
+    const started = await start(app, `?activityId=${uppercaseActivityId}`)
+    assert.equal(started.status, 302, 'uppercase UUID accepted by the shared contract resolves the same activity')
+    assert.equal(db.select().from(oauthStates).all()[0]?.communityId, communityId)
+
+    const callback = await finish(app, started)
+    assert.equal(callback.status, 302)
+    const residentId = onlyResident(db)
+    assert.deepEqual(
+      assignmentsOf(db, residentId).map((row) => row.communityId),
+      [communityId],
+    )
+    assertNoActivityWrites(db)
+  } finally {
+    sqlite.close()
+  }
+})
+
 test('a client-supplied communityId is refused even when that community really exists', async () => {
   const { app, db, sqlite } = harness()
   try {
