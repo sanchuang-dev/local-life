@@ -976,7 +976,9 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
       const response = await fetcher(tokenUrl, { signal: AbortSignal.timeout(10_000) })
       if (!response.ok) {
         clearOauthCookies(c, config)
-        return redirectToWeb(c, config, 'wechat_provider_unavailable', boundReturnTo)
+        return isProfileState
+          ? redirectWechatProfileResult(c, config, 'provider_unavailable', boundReturnTo)
+          : redirectToWeb(c, config, 'wechat_provider_unavailable', boundReturnTo)
       }
       const tokenPayload = (await response.json()) as {
         access_token?: string

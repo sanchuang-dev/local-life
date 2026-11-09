@@ -118,7 +118,7 @@ export function useResidentAuth() {
     return () => {
       active = false
     }
-  }, [loadPhoneStatus, loadWechatProfile]
+  }, [loadPhoneStatus, loadWechatProfile])
 
   /** Fetch a fresh double-submit token; the resident session cookie is reused. */
   const csrfToken = useCallback(async (): Promise<string> => {
@@ -193,7 +193,7 @@ export function useResidentAuth() {
     } finally {
       setBusy(false)
     }
-  }, [methods, csrfToken, loadPhoneStatus])
+  }, [methods, csrfToken, loadPhoneStatus, loadWechatProfile])
 
   /**
    * Request an SMS code. The code is delivered out of band by the deployment's
