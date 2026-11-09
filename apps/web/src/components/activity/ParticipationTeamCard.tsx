@@ -25,6 +25,8 @@ type Feedback = {
 
 type ParticipationTeamCardProps = {
   activity: PublicActivityDetail | null
+  /** Activity context explicitly present in the entry URL; display defaults are not attribution. */
+  loginActivityId: string | null
   activityError: string | null
   onRetryActivity: () => void
   auth: ResidentAuth
@@ -80,6 +82,7 @@ function unavailableText(state: {
  */
 export function ParticipationTeamCard({
   activity,
+  loginActivityId,
   activityError,
   onRetryActivity,
   auth,
@@ -153,7 +156,7 @@ export function ParticipationTeamCard({
         <div className="mt-3 grid gap-2">
           {/* WeChat login with its own availability, return-to and retry states. */}
           <ActivityLoginCard
-            activityId={activity.id}
+            activityId={loginActivityId}
             inviteCode={inviteCode}
             inviteInvalid={inviteInvalid}
             loginResult={loginResult}

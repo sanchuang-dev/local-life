@@ -7,6 +7,7 @@ import { createApp } from '../src/app.js'
 import { loadConfig, type ApiConfig } from '../src/config.js'
 import { createDatabase, type AppDatabase } from '../src/db/client.js'
 import {
+  activities,
   activityParticipations,
   communities,
   oauthStates,
@@ -186,6 +187,51 @@ async function methods(app: ReturnType<typeof createApp>): Promise<{
 
 function activeRow(db: AppDatabase) {
   return db.select().from(wechatOauthConfigs).where(eq(wechatOauthConfigs.status, 'active')).get()
+}
+
+const PUBLIC_RULES_JSON = JSON.stringify({
+  eligibility: '本社区 60 岁以上居民',
+  checkin: '到社区服务中心签到并领取参与卡',
+  purchase: '现场购买指定套餐一份',
+  prizeClaim: '凭核销码领取，每人限一次',
+})
+
+/**
+ * Minimal published activity in `communityId`. #123 derives attribution from a
+ * real activity row, so an OAuth test that wants a residence has to seed one
+ * rather than pass a community id in the query.
+ */
+function seedActivity(db: AppDatabase, communityId: string): string {
+  const ownerId = randomUUID()
+  const now = new Date()
+  db.insert(users)
+    .values({ id: ownerId, displayName: '活动创建者', createdAt: now, updatedAt: now })
+    .run()
+  const activityId = randomUUID()
+  db.insert(activities)
+    .values({
+      id: activityId,
+      communityId,
+      title: '切换期活动',
+      summary: null,
+      description: null,
+      status: 'published',
+      startsAt: new Date(now.getTime() - 60 * 60 * 1000),
+      endsAt: new Date(now.getTime() + 60 * 60 * 1000),
+      location: '社区服务中心',
+      budgetCapCents: 100_000,
+      prizeQuantityCap: 100,
+      publicRulesJson: PUBLIC_RULES_JSON,
+      currentRuleVersionId: null,
+      createdByUserId: ownerId,
+      createdAt: now,
+      updatedAt: now,
+      publishedAt: now,
+      pausedAt: null,
+      endedAt: null,
+    })
+    .run()
+  return activityId
 }
 
 /* -------------------------------- tests ---------------------------------- */
@@ -599,7 +645,7 @@ test('a provider failure is reported as provider_unavailable without creating a 
   }
 })
 
-test('a community-scoped attempt still associates the resident after a switch', async () => {
+test('an activity-scoped attempt still associates the resident after a switch', async () => {
   const harness = createHarness()
   try {
     const communityId = randomUUID()
@@ -607,11 +653,19 @@ test('a community-scoped attempt still associates the resident after a switch', 
       .insert(communities)
       .values({ id: communityId, name: '切换测试社区', createdAt: new Date() })
       .run()
-    const start = await beginLogin(harness.app, `?communityId=${communityId}`)
+    // #123: attribution rides on the activity, never on a client-sent community.
+    const activityId = seedActivity(harness.db, communityId)
+    const start = await beginLogin(harness.app, `?activityId=${activityId}`)
     seedWechatConfig(harness.db, { appId: TEST_APP_ID_B, appSecret: TEST_APP_SECRET_B })
     const callback = await finishLogin(harness.app, start)
     assert.equal(new URL(callback.headers.get('location')!).search, '?auth=success')
-    const resident = harness.db.select().from(users).get()
+    // `users` also holds the seeded activity owner; the resident is the one the
+    // callback bound a WeChat identity to.
+    const resident = harness.db
+      .select({ id: users.id })
+      .from(users)
+      .innerJoin(wechatIdentities, eq(wechatIdentities.userId, users.id))
+      .get()
     assert.ok(resident)
     const assignment = harness.db
       .select()
@@ -624,3 +678,22 @@ test('a community-scoped attempt still associates the resident after a switch', 
     harness.sqlite.close()
   }
 })
+
+test('a client-supplied communityId is refused by start', async () => {
+  const harness = createHarness()
+  try {
+    const communityId = randomUUID()
+    harness.db
+      .insert(communities)
+      .values({ id: communityId, name: '客户端社区', createdAt: new Date() })
+      .run()
+    const start = await beginLogin(harness.app, `?communityId=${communityId}`)
+    assert.equal(start.status, 400)
+    const body = (await start.json()) as { error?: { code?: string } }
+    assert.equal(body.error?.code, 'invalid_request')
+    assert.equal(harness.db.select().from(oauthStates).all().length, 0)
+  } finally {
+    harness.sqlite.close()
+  }
+})
+

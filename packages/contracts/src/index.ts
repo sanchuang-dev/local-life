@@ -331,6 +331,71 @@ export function presentLoginMarker(
 }
 
 /* -------------------------------------------------------------------------- */
+/* Resident WeChat OAuth start query (#123)                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Context the H5 may hand to `GET /auth/wechat/start`.
+ *
+ * `activityId` is *context*, never an authorization claim: the API loads that
+ * activity row and derives its community itself. A client-supplied
+ * `communityId` is deliberately not part of this contract — "the resident is in
+ * this community" is an attribution claim that only server-side data can
+ * support, so accepting it would let anyone mint an arbitrary community
+ * residence by picking a UUID that happens to exist.
+ */
+export interface WechatStartRequest {
+  /** Explicit public-activity entry context; `null` for ordinary entry points. */
+  activityId?: string | null
+  /** Already-validated same-origin resident return target, or `null`. */
+  returnTo?: string | null
+}
+
+const ACTIVITY_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Shape check only: an activity UUID that *looks* right says nothing about
+ * whether the activity exists or is publicly visible. Both callers still treat
+ * the value as untrusted input and let the API decide.
+ */
+export function isActivityId(value: unknown): value is string {
+  return typeof value === 'string' && ACTIVITY_ID_PATTERN.test(value)
+}
+
+/**
+ * Query string (leading `?`, or `''`) for `GET /auth/wechat/start`.
+ *
+ * Both inputs are re-validated here instead of trusted: `activityId` must be a
+ * UUID shape and `returnTo` must survive the shared allowlist *unchanged*.
+ * Invalid input throws, so a caller bug can never be shipped as a silently
+ * dropped parameter — the login would otherwise look successful while the
+ * resident never gets attributed.
+ */
+export function buildWechatStartQuery(request: WechatStartRequest): string {
+  const parts: string[] = []
+
+  const activityId = request.activityId ?? null
+  if (activityId !== null) {
+    if (typeof activityId !== 'string' || !ACTIVITY_ID_PATTERN.test(activityId)) {
+      throw new RangeError('invalid activityId')
+    }
+    parts.push(`activityId=${encodeURIComponent(activityId)}`)
+  }
+
+  const returnTo = request.returnTo ?? null
+  if (returnTo !== null) {
+    const validation = validateReturnTo(returnTo)
+    if (!validation.ok || validation.returnTo !== returnTo) {
+      throw new RangeError('invalid returnTo')
+    }
+    parts.push(`returnTo=${encodeURIComponent(returnTo)}`)
+  }
+
+  return parts.length > 0 ? `?${parts.join('&')}` : ''
+}
+
+/* -------------------------------------------------------------------------- */
 /* Activity domain (#59 LL-MVP-003)                                           */
 /* -------------------------------------------------------------------------- */
 

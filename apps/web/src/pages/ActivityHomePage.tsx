@@ -63,6 +63,8 @@ export function ActivityHomePage() {
   const inviteParam = parseInviteParam(searchParams.get('invite'))
   const { state, retry } = usePublicActivity(requestedActivityId)
   const activity = state.status === 'ready' ? state.activity : null
+  // The public list may supply a display default, but only an explicit deep-link ID is login attribution context.
+  const loginActivityId = requestedActivityId && activity ? activity.id : null
 
   const auth = useResidentAuth()
   const [loginResult] = useState<ActivityLoginResult>(() => readActivityLoginResult())
@@ -180,6 +182,7 @@ export function ActivityHomePage() {
       {activity ? (
         <ParticipationTeamCard
           activity={activity}
+          loginActivityId={loginActivityId}
           activityError={null}
           onRetryActivity={retry}
           auth={auth}

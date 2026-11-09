@@ -1,0 +1,4334 @@
+{
+  "generatedAt": "2026-11-09T06:52:33.022Z",
+  "issue": "LL-MVP-012 (#123)",
+  "webOrigin": "http://127.0.0.1:5173",
+  "apiOrigin": "http://127.0.0.1:4080",
+  "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.49(0x18003129) NetType/WIFI Language/zh_CN",
+  "activityId": "2a94e2c3-0a8c-4197-a260-25fcc4259270",
+  "communityId": "817bd09e-6b14-41f7-b672-6450ae77dad9",
+  "invite": "0123456789abcdef0123456789abcdef",
+  "realWechatAuthorization": false,
+  "realWechatAuthorizationNote": "No AppID/AppSecret exists and nothing was sent to open.weixin.qq.com (the host is blocked in the browser). The token exchange is answered by the evidence server in-process fake at the fetch boundary; everything after the code exchange (state consumption, identity, assignment, session, redirect) is production code.",
+  "checks": [
+    {
+      "name": "evidence database starts without resident attribution",
+      "ok": true,
+      "detail": "{\"reset\":true,\"removedResidents\":1}"
+    },
+    {
+      "name": "baseline has no assignment, identity or participation",
+      "ok": true,
+      "detail": "{\"users\":2,\"participations\":0,\"teams\":0,\"invitations\":0,\"checkins\":0,\"rewards\":0,\"orders\":0,\"staff\":1}"
+    },
+    {
+      "name": "activity page renders the server-backed three-seat team card",
+      "ok": true,
+      "detail": "跳到主要内容活动进行中已发布活动·数据来自服务端银发社区欢乐季幸福社区·幸福社区党群服务中心2026.11.0913:21-2026.11.1614:21北京时间秋季社区敬老活动活动规则活动玩法页我的三人团真实业务未登录登录后报名三人团参与"
+    },
+    {
+      "name": "unauthenticated card asks the resident to log in first",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "WeChat login entry is offered",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "login entry states that login does not auto-join",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "logged-out page offers no participation confirm",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "login entry requests the API start route",
+      "ok": true,
+      "detail": "http://127.0.0.1:5173/api/auth/wechat/start?activityId=2a94e2c3-0a8c-4197-a260-25fcc4259270&returnTo=%2F%3FactivityId%3D2a94e2c3-0a8c-4197-a260-25fcc4259270%26invite%3D0123456789abcdef0123456789abcdef"
+    },
+    {
+      "name": "start request carries the loaded activityId",
+      "ok": true,
+      "detail": "?activityId=2a94e2c3-0a8c-4197-a260-25fcc4259270&returnTo=%2F%3FactivityId%3D2a94e2c3-0a8c-4197-a260-25fcc4259270%26invite%3D0123456789abcdef0123456789abcdef"
+    },
+    {
+      "name": "start request never carries a communityId",
+      "ok": true,
+      "detail": "?activityId=2a94e2c3-0a8c-4197-a260-25fcc4259270&returnTo=%2F%3FactivityId%3D2a94e2c3-0a8c-4197-a260-25fcc4259270%26invite%3D0123456789abcdef0123456789abcdef"
+    },
+    {
+      "name": "start request keeps the activity and invite in the return target",
+      "ok": true,
+      "detail": "/?activityId=2a94e2c3-0a8c-4197-a260-25fcc4259270&invite=0123456789abcdef0123456789abcdef"
+    },
+    {
+      "name": "start request is a top-level navigation",
+      "ok": true,
+      "detail": "Document"
+    },
+    {
+      "name": "API answers the login start with 302",
+      "ok": true,
+      "detail": "302"
+    },
+    {
+      "name": "the 302 goes to the WeChat authorization endpoint",
+      "ok": true,
+      "detail": "https://open.weixin.qq.com/connect/oauth2/authorize?appid=wx1234567890abcdef&redirect_uri=http%3A%2F%2F127.0.0.1%3A5173%2Fapi%2Fauth%2Fwechat%2Fcallback&response_type=code&scope=snsapi_base&state=LZEOIVXih0PLYMTyweK5CRdcGbdNwpeoalZ8X37sv4A#wechat_redirect"
+    },
+    {
+      "name": "authorization redirect_uri points at this origin callback",
+      "ok": true,
+      "detail": "http://127.0.0.1:5173/api/auth/wechat/callback"
+    },
+    {
+      "name": "authorization URL carries no communityId",
+      "ok": true,
+      "detail": "?appid=wx1234567890abcdef&redirect_uri=http%3A%2F%2F127.0.0.1%3A5173%2Fapi%2Fauth%2Fwechat%2Fcallback&response_type=code&scope=snsapi_base&state=LZEOIVXih0PLYMTyweK5CRdcGbdNwpeoalZ8X37sv4A"
+    },
+    {
+      "name": "authorization URL carries a one-time state",
+      "ok": true,
+      "detail": "LZEOIVXih0PLYMTyweK5CRdcGbdNwpeoalZ8X37sv4A"
+    },
+    {
+      "name": "API stored a state-bound nonce cookie in the browser",
+      "ok": true,
+      "detail": "{\"httpOnly\":true,\"path\":\"/\"}"
+    },
+    {
+      "name": "the stored OAuth state already carries the derived community",
+      "ok": true,
+      "detail": "{\"id\":\"184143a4-b182-4d84-a957-6d20620932a3\",\"communityId\":\"817bd09e-6b14-41f7-b672-6450ae77dad9\",\"hasConfigId\":true,\"consumed\":false,\"createdAt\":\"2026-11-09T06:52:28.740Z\"}"
+    },
+    {
+      "name": "callback returns to the original activity link with auth=success",
+      "ok": true,
+      "detail": "http://127.0.0.1:5173/?activityId=2a94e2c3-0a8c-4197-a260-25fcc4259270&invite=0123456789abcdef0123456789abcdef&auth=success#"
+    },
+    {
+      "name": "returned link keeps activityId and invite",
+      "ok": true,
+      "detail": "http://127.0.0.1:5173/?activityId=2a94e2c3-0a8c-4197-a260-25fcc4259270&invite=0123456789abcdef0123456789abcdef&auth=success#"
+    },
+    {
+      "name": "browser session cookie is set by the callback",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "authenticated page presents the WeChat login success notice",
+      "ok": true,
+      "detail": "跳到主要内容活动进行中已发布活动·数据来自服务端银发社区欢乐季幸福社区·幸福社区党群服务中心2026.11.0913:21-2026.11.1614:21北京时间秋季社区敬老活动活动规则活动玩法页我的三人团真实业务可参与接受邀请，加入三人团三人团固定3个不同居民账户，发起人占一席，另邀两位街坊。只有你主动确认参与，服务端才会写入记录。微信登录成功。页面不会自动报名，参与仍需你在下方主动确认。你通过"
+    },
+    {
+      "name": "success notice states participation still needs an explicit confirm",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "participation confirm is still available and was not auto-submitted",
+      "ok": true,
+      "detail": "跳到主要内容活动进行中已发布活动·数据来自服务端银发社区欢乐季幸福社区·幸福社区党群服务中心2026.11.0913:21-2026.11.1614:21北京时间秋季社区敬老活动活动规则活动玩法页我的三人团真实业务可参与接受邀请，加入三人团三人团固定3个不同居民账户，发起人占一席，另邀两位街坊。只有你主动确认参与，服务端才会写入记录。微信登录成功。页面不会自动报名，参与仍需你在下方主动确认。你通过"
+    },
+    {
+      "name": "address bar no longer replays the one-off auth marker",
+      "ok": true,
+      "detail": "http://127.0.0.1:5173/?activityId=2a94e2c3-0a8c-4197-a260-25fcc4259270&invite=0123456789abcdef0123456789abcdef"
+    },
+    {
+      "name": "address bar keeps the activity and invite context",
+      "ok": true,
+      "detail": "http://127.0.0.1:5173/?activityId=2a94e2c3-0a8c-4197-a260-25fcc4259270&invite=0123456789abcdef0123456789abcdef"
+    },
+    {
+      "name": "exactly one resident community assignment exists after login",
+      "ok": true,
+      "detail": "[{\"userId\":\"7d8cd471-0a99-4617-afe4-20e792d1e8cd\",\"communityId\":\"817bd09e-6b14-41f7-b672-6450ae77dad9\",\"createdAt\":\"2026-11-09T06:52:28.863Z\"}]"
+    },
+    {
+      "name": "the assignment is the activity owner community, derived server-side",
+      "ok": true,
+      "detail": "{\"userId\":\"7d8cd471-0a99-4617-afe4-20e792d1e8cd\",\"communityId\":\"817bd09e-6b14-41f7-b672-6450ae77dad9\",\"createdAt\":\"2026-11-09T06:52:28.863Z\"}"
+    },
+    {
+      "name": "a single resident identity was created for the WeChat openid",
+      "ok": true,
+      "detail": "[{\"userId\":\"7d8cd471-0a99-4617-afe4-20e792d1e8cd\",\"appId\":\"wx1234567890abcdef\",\"openId\":\"evidence-resident-openid\"}]"
+    },
+    {
+      "name": "login created no participation, team, invitation, check-in, reward or order",
+      "ok": true,
+      "detail": "{\"users\":3,\"participations\":0,\"teams\":0,\"invitations\":0,\"checkins\":0,\"rewards\":0,\"orders\":0,\"staff\":1}"
+    },
+    {
+      "name": "the token exchange ran exactly once through the faked fetch boundary",
+      "ok": true,
+      "detail": "[{\"appId\":\"wx1234567890abcdef\",\"code\":\"evidence-browser-1794207148851\"}]"
+    },
+    {
+      "name": "cleared session returns to the login entry",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "second login gets a fresh one-time state",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "duplicate login keeps exactly one assignment",
+      "ok": true,
+      "detail": "[{\"userId\":\"7d8cd471-0a99-4617-afe4-20e792d1e8cd\",\"communityId\":\"817bd09e-6b14-41f7-b672-6450ae77dad9\",\"createdAt\":\"2026-11-09T06:52:28.863Z\"}]"
+    },
+    {
+      "name": "duplicate login keeps exactly one resident identity",
+      "ok": true,
+      "detail": "[{\"userId\":\"7d8cd471-0a99-4617-afe4-20e792d1e8cd\",\"appId\":\"wx1234567890abcdef\",\"openId\":\"evidence-resident-openid\"}]"
+    },
+    {
+      "name": "duplicate login still created no participation or team",
+      "ok": true,
+      "detail": "{\"users\":3,\"participations\":0,\"teams\":0,\"invitations\":0,\"checkins\":0,\"rewards\":0,\"orders\":0,\"staff\":1}"
+    },
+    {
+      "name": "the first OAuth state was consumed exactly once and never replayed",
+      "ok": true,
+      "detail": "[true,true]"
+    },
+    {
+      "name": "the API refuses a client-supplied communityId with 400",
+      "ok": true,
+      "detail": "{\"status\":400,\"body\":\"{\\\"error\\\":{\\\"code\\\":\\\"invalid_request\\\",\\\"message\\\":\\\"社区归属只能由活动上下文推导，请传入 activityId\\\",\\\"requestId\\\":\\\"88483383-d4f2-4529-a1ec-9ec92b230ba5\\\"}}\"}"
+    },
+    {
+      "name": "the refusal explains attribution comes from the activity only",
+      "ok": true,
+      "detail": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"社区归属只能由活动上下文推导，请传入 activityId\",\"requestId\":\"88483383-d4f2-4529-a1ec-9ec92b230ba5\"}}"
+    },
+    {
+      "name": "the API refuses a non-public activity with 400",
+      "ok": true,
+      "detail": "{\"status\":400,\"body\":\"{\\\"error\\\":{\\\"code\\\":\\\"invalid_request\\\",\\\"message\\\":\\\"活动不存在或不可公开访问\\\",\\\"requestId\\\":\\\"0f2410fc-6f25-48bd-8a8e-2982b14f4968\\\"}}\"}"
+    },
+    {
+      "name": "the refusal does not reveal why the activity is unavailable",
+      "ok": true,
+      "detail": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"活动不存在或不可公开访问\",\"requestId\":\"0f2410fc-6f25-48bd-8a8e-2982b14f4968\"}}"
+    },
+    {
+      "name": "refused logins created no extra assignment or state community",
+      "ok": true,
+      "detail": "{\"assignments\":1,\"states\":2}"
+    },
+    {
+      "name": "the refusal document is what a stale link would actually show",
+      "ok": true,
+      "detail": "{\"error\":{\"code\":\"invalid_request\",\"message\":\"活动不存在或不可公开访问\",\"requestId\":\"781dd21f-c05f-476d-a9d9-c3c858cf18df\"}}"
+    },
+    {
+      "name": "375px viewport has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"viewportWidth\":375,\"viewportHeight\":812,\"documentScrollWidth\":375,\"documentClientWidth\":375,\"horizontalOverflow\":false}"
+    },
+    {
+      "name": "320px viewport has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"viewportWidth\":320,\"viewportHeight\":568,\"documentScrollWidth\":320,\"documentClientWidth\":320,\"horizontalOverflow\":false}"
+    },
+    {
+      "name": "320px viewport still shows the activity title and team card",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "passed": 47,
+  "failed": 0,
+  "finalSnapshot": {
+    "generatedAt": "2026-11-09T06:52:33.020Z",
+    "database": "E:\\tomz\\local-life-wt\\mvp-012\\.data\\ll-mvp-012-browser.sqlite",
+    "activities": [
+      {
+        "id": "2a94e2c3-0a8c-4197-a260-25fcc4259270",
+        "communityId": "817bd09e-6b14-41f7-b672-6450ae77dad9",
+        "status": "published",
+        "title": "银发社区欢乐季"
+      },
+      {
+        "id": "d1c3dc63-d0ce-4e7b-8150-81f871e9d406",
+        "communityId": "2f0aa7b4-8a8f-479e-baba-13aaa00d7774",
+        "status": "paused",
+        "title": "阳光社区暂停活动"
+      },
+      {
+        "id": "a25e8edf-03e2-4528-9673-7ba312afd9a3",
+        "communityId": "817bd09e-6b14-41f7-b672-6450ae77dad9",
+        "status": "draft",
+        "title": "尚未发布的活动"
+      }
+    ],
+    "communities": [
+      {
+        "id": "817bd09e-6b14-41f7-b672-6450ae77dad9",
+        "name": "幸福社区"
+      },
+      {
+        "id": "2f0aa7b4-8a8f-479e-baba-13aaa00d7774",
+        "name": "阳光社区"
+      }
+    ],
+    "oauthStates": [
+      {
+        "id": "184143a4-b182-4d84-a957-6d20620932a3",
+        "communityId": "817bd09e-6b14-41f7-b672-6450ae77dad9",
+        "hasConfigId": true,
+        "consumed": true,
+        "createdAt": "2026-11-09T06:52:28.740Z"
+      },
+      {
+        "id": "03c67277-82fa-421a-bb9d-bbf3ebb50a63",
+        "communityId": "817bd09e-6b14-41f7-b672-6450ae77dad9",
+        "hasConfigId": true,
+        "consumed": true,
+        "createdAt": "2026-11-09T06:52:30.354Z"
+      }
+    ],
+    "assignments": [
+      {
+        "userId": "7d8cd471-0a99-4617-afe4-20e792d1e8cd",
+        "communityId": "817bd09e-6b14-41f7-b672-6450ae77dad9",
+        "createdAt": "2026-11-09T06:52:28.863Z"
+      }
+    ],
+    "identities": [
+      {
+        "userId": "7d8cd471-0a99-4617-afe4-20e792d1e8cd",
+        "appId": "wx1234567890abcdef",
+        "openId": "evidence-resident-openid"
+      }
+    ],
+    "residents": [
+      {
+        "id": "7d8cd471-0a99-4617-afe4-20e792d1e8cd",
+        "display_name": "微信用户"
+      }
+    ],
+    "sessions": 2,
+    "counts": {
+      "users": 3,
+      "participations": 0,
+      "teams": 0,
+      "invitations": 0,
+      "checkins": 0,
+      "rewards": 0,
+      "orders": 0,
+      "staff": 1
+    },
+    "wechatTokenCalls": [
+      {
+        "appId": "wx1234567890abcdef",
+        "code": "evidence-browser-1794207148851"
+      },
+      {
+        "appId": "wx1234567890abcdef",
+        "code": "evidence-browser-1794207150454"
+      }
+    ]
+  },
+  "requests": [
+    {
+      "url": "http://127.0.0.1:5173/?activityId=2a94e2c3-0a8c-4197-a260-25fcc4259270&invite=0123456789abcdef0123456789abcdef",
+      "method": "GET",
+      "resourceType": "Document",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@vite/client",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/main.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@react-refresh",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react.js?v=0a620576",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=5bc04d0c",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-router.js?v=d728987b",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/App.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/loginReturn.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/index.css",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=0a620576",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/node_modules/.pnpm/vite@8.3.4_@types+node@24.1_31550c061482022cb50f0774f2c55186/node_modules/vite/dist/client/env.mjs",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-XU9BOcOH.js?v=69cb198c",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/shell/AppShell.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/ActivityHomePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityActivityPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityBroadcastPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityCulturePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityNoticePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/ExchangePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/GdPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthAssistantPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthDevicePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthDevicesPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthLecturePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/LifePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/LocalProductPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/MePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/MyOrderDetailPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/MyOrdersPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/MyRewardsPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/NotFoundPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/PointsPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/ProductPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/SilverActivityProductsPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/SilverNeighborhoodCampaignPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLayout.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLeadDetailPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLeadNewPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLeadsPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLocalOrderDetailPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLocalOrdersPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLoginPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchOrderDetailPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchOrderNewPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchOrdersPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchVerifyPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/packages/contracts/dist/index.js",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/rolldown-runtime-SbdDWaPq.js?v=69cb198c",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/shell/BottomTabBar.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/shell/useKeyboardVisible.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/lucide-react.js?v=c17b3119",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/DemoNote.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/PageHeader.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/PendingNotice.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useBackTarget.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/usePendingNotice.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/community.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/CampaignSheet.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/home/ActivityShareSheet.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/home/activityFormat.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/ParticipationTeamCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/ActivityLoginResult.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/RewardProgressCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/share.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useActivityParticipation.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/usePublicActivity.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useResidentAuth.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useRewardProgress.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom-DHbhrdcq.js?v=69cb198c",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/LifeProductCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/PointsSummaryCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/life.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/community/CommunitySceneCards.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/health.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/LocalCatalogSection.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopDealsSection.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/gd.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/home/SectionHeading.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useLocalCatalog.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/localOrderLabels.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/services/localOrders.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/services/localApi.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/FilterChips.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useLocalOrders.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/auth/PhoneVerificationForm.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/auth/wechatEnvironment.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/crmLabels.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useRewardWallet.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/rewardLabels.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useStaffSession.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/StaffSessionProvider.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopProductDetail.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/silverActivityProducts.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useCrmApi.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useAsyncResource.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/StaffGate.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/WorkbenchUi.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useStaffLocalOrders.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/qrcode__react.js?v=adc03635",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/silverLuckyPrizes.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/services/rewards.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/shell/navigation.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/zod.js?v=097f5a6e",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/packages/contracts/dist/rewards.js",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/packages/contracts/dist/crmeb.js",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/packages/contracts/dist/ledger.js",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/ActivityLoginCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/apiError.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/LocalProductCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useShopProducts.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ActivitySourceNote.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopProductCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopStateCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/services/localCatalog.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopProductImage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/shop.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useActivityLoginReturn.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/activities/public/2a94e2c3-0a8c-4197-a260-25fcc4259270",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/session",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/methods",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/phone/status",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/activities/public/2a94e2c3-0a8c-4197-a260-25fcc4259270",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/session",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/methods",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/phone/status",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/favicon.svg",
+      "method": "GET",
+      "resourceType": "Other",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/methods",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/methods",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/wechat/start?activityId=2a94e2c3-0a8c-4197-a260-25fcc4259270&returnTo=%2F%3FactivityId%3D2a94e2c3-0a8c-4197-a260-25fcc4259270%26invite%3D0123456789abcdef0123456789abcdef",
+      "method": "GET",
+      "resourceType": "Document",
+      "redirectFrom": null
+    },
+    {
+      "url": "https://open.weixin.qq.com/connect/oauth2/authorize?appid=wx1234567890abcdef&redirect_uri=http%3A%2F%2F127.0.0.1%3A5173%2Fapi%2Fauth%2Fwechat%2Fcallback&response_type=code&scope=snsapi_base&state=LZEOIVXih0PLYMTyweK5CRdcGbdNwpeoalZ8X37sv4A",
+      "method": "GET",
+      "resourceType": "Document",
+      "redirectFrom": "http://127.0.0.1:5173/api/auth/wechat/start?activityId=2a94e2c3-0a8c-4197-a260-25fcc4259270&returnTo=%2F%3FactivityId%3D2a94e2c3-0a8c-4197-a260-25fcc4259270%26invite%3D0123456789abcdef0123456789abcdef"
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/wechat/callback?code=evidence-browser-1794207148851&state=LZEOIVXih0PLYMTyweK5CRdcGbdNwpeoalZ8X37sv4A",
+      "method": "GET",
+      "resourceType": "Document",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/?activityId=2a94e2c3-0a8c-4197-a260-25fcc4259270&invite=0123456789abcdef0123456789abcdef&auth=success",
+      "method": "GET",
+      "resourceType": "Document",
+      "redirectFrom": "http://127.0.0.1:5173/api/auth/wechat/callback?code=evidence-browser-1794207148851&state=LZEOIVXih0PLYMTyweK5CRdcGbdNwpeoalZ8X37sv4A"
+    },
+    {
+      "url": "http://127.0.0.1:5173/@vite/client",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/main.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@react-refresh",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/node_modules/.pnpm/vite@8.3.4_@types+node@24.1_31550c061482022cb50f0774f2c55186/node_modules/vite/dist/client/env.mjs",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react.js?v=0a620576",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=5bc04d0c",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-router.js?v=d728987b",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/App.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/loginReturn.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/index.css",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=0a620576",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-XU9BOcOH.js?v=69cb198c",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/rolldown-runtime-SbdDWaPq.js?v=69cb198c",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom-DHbhrdcq.js?v=69cb198c",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/shell/AppShell.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/ActivityHomePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityActivityPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityBroadcastPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityCulturePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityNoticePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/ExchangePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/GdPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthAssistantPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthDevicePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthDevicesPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthLecturePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/LifePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/LocalProductPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/MePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/MyOrderDetailPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/MyOrdersPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/MyRewardsPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/NotFoundPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/PointsPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/ProductPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/SilverActivityProductsPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/SilverNeighborhoodCampaignPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLayout.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLeadDetailPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLeadNewPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLeadsPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLocalOrderDetailPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLocalOrdersPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLoginPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchOrderDetailPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchOrderNewPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchOrdersPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchVerifyPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/packages/contracts/dist/index.js",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/shell/BottomTabBar.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/shell/useKeyboardVisible.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/lucide-react.js?v=c17b3119",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/CampaignSheet.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/home/ActivityShareSheet.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/home/activityFormat.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/ParticipationTeamCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/ActivityLoginResult.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/RewardProgressCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/share.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useActivityParticipation.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/usePublicActivity.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useResidentAuth.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useRewardProgress.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/DemoNote.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/PageHeader.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/PendingNotice.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useBackTarget.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/usePendingNotice.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/community.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/community/CommunitySceneCards.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/LifeProductCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/PointsSummaryCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/life.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/gd.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/health.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/home/SectionHeading.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/LocalCatalogSection.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopDealsSection.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useLocalCatalog.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/localOrderLabels.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/services/localOrders.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/services/localApi.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/auth/PhoneVerificationForm.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/auth/wechatEnvironment.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/crmLabels.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useRewardWallet.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useLocalOrders.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/FilterChips.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/rewardLabels.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopProductDetail.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/silverActivityProducts.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/qrcode__react.js?v=adc03635",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/silverLuckyPrizes.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useStaffSession.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/StaffSessionProvider.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useCrmApi.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useAsyncResource.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/StaffGate.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/WorkbenchUi.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useStaffLocalOrders.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/services/rewards.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/zod.js?v=097f5a6e",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/packages/contracts/dist/rewards.js",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/packages/contracts/dist/crmeb.js",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/packages/contracts/dist/ledger.js",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/shell/navigation.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/ActivityLoginCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/apiError.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/LocalProductCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useShopProducts.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ActivitySourceNote.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopProductCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopStateCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/services/localCatalog.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopProductImage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/shop.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useActivityLoginReturn.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/activities/public/2a94e2c3-0a8c-4197-a260-25fcc4259270",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/session",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/methods",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/phone/status",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/activities/public/2a94e2c3-0a8c-4197-a260-25fcc4259270",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/session",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/methods",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/phone/status",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/activities/2a94e2c3-0a8c-4197-a260-25fcc4259270/participation",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/activities/2a94e2c3-0a8c-4197-a260-25fcc4259270/checkin",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/activities/2a94e2c3-0a8c-4197-a260-25fcc4259270/rewards",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/?activityId=2a94e2c3-0a8c-4197-a260-25fcc4259270&invite=0123456789abcdef0123456789abcdef",
+      "method": "GET",
+      "resourceType": "Document",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@vite/client",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/main.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@react-refresh",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react.js?v=0a620576",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=5bc04d0c",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-router.js?v=d728987b",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/App.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/loginReturn.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/index.css",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=0a620576",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-XU9BOcOH.js?v=69cb198c",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/rolldown-runtime-SbdDWaPq.js?v=69cb198c",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom-DHbhrdcq.js?v=69cb198c",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/node_modules/.pnpm/vite@8.3.4_@types+node@24.1_31550c061482022cb50f0774f2c55186/node_modules/vite/dist/client/env.mjs",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/shell/AppShell.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/ActivityHomePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityActivityPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityBroadcastPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityCulturePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityNoticePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/ExchangePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/GdPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthAssistantPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthDevicePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthDevicesPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthLecturePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/LifePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/LocalProductPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/MePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/MyOrderDetailPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/MyOrdersPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/MyRewardsPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/NotFoundPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/PointsPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/ProductPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/SilverActivityProductsPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/SilverNeighborhoodCampaignPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLayout.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLeadDetailPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLeadNewPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLeadsPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLocalOrderDetailPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLocalOrdersPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLoginPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchOrderDetailPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchOrderNewPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchOrdersPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchVerifyPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/packages/contracts/dist/index.js",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/shell/BottomTabBar.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/shell/useKeyboardVisible.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/lucide-react.js?v=c17b3119",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/CampaignSheet.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/home/ActivityShareSheet.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/home/activityFormat.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/ParticipationTeamCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/ActivityLoginResult.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/RewardProgressCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/share.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useActivityParticipation.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/usePublicActivity.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useResidentAuth.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useRewardProgress.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/PageHeader.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/DemoNote.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useBackTarget.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/community.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/PendingNotice.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/usePendingNotice.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/health.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/community/CommunitySceneCards.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/gd.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/FilterChips.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/localOrderLabels.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useLocalOrders.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/LifeProductCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/PointsSummaryCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/life.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/auth/PhoneVerificationForm.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/auth/wechatEnvironment.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/crmLabels.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useRewardWallet.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/rewardLabels.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useStaffSession.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/StaffSessionProvider.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopProductDetail.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useLocalCatalog.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/services/localOrders.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/services/localApi.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/LocalCatalogSection.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopDealsSection.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/silverActivityProducts.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useCrmApi.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useAsyncResource.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/StaffGate.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/WorkbenchUi.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useStaffLocalOrders.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/shell/navigation.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/qrcode__react.js?v=adc03635",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/home/SectionHeading.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/apiError.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/ActivityLoginCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/services/rewards.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/silverLuckyPrizes.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/zod.js?v=097f5a6e",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/packages/contracts/dist/rewards.js",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/packages/contracts/dist/crmeb.js",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/packages/contracts/dist/ledger.js",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useShopProducts.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ActivitySourceNote.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopProductCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopStateCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/LocalProductCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/services/localCatalog.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopProductImage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/shop.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useActivityLoginReturn.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/activities/public/2a94e2c3-0a8c-4197-a260-25fcc4259270",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/session",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/methods",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/phone/status",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/activities/public/2a94e2c3-0a8c-4197-a260-25fcc4259270",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/session",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/methods",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/phone/status",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/methods",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/methods",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/wechat/start?activityId=2a94e2c3-0a8c-4197-a260-25fcc4259270&returnTo=%2F%3FactivityId%3D2a94e2c3-0a8c-4197-a260-25fcc4259270%26invite%3D0123456789abcdef0123456789abcdef",
+      "method": "GET",
+      "resourceType": "Document",
+      "redirectFrom": null
+    },
+    {
+      "url": "https://open.weixin.qq.com/connect/oauth2/authorize?appid=wx1234567890abcdef&redirect_uri=http%3A%2F%2F127.0.0.1%3A5173%2Fapi%2Fauth%2Fwechat%2Fcallback&response_type=code&scope=snsapi_base&state=n005yP4NCQ51TrDLwwfeQaBQNpjz06jjg_weBXgIO6A",
+      "method": "GET",
+      "resourceType": "Document",
+      "redirectFrom": "http://127.0.0.1:5173/api/auth/wechat/start?activityId=2a94e2c3-0a8c-4197-a260-25fcc4259270&returnTo=%2F%3FactivityId%3D2a94e2c3-0a8c-4197-a260-25fcc4259270%26invite%3D0123456789abcdef0123456789abcdef"
+    },
+    {
+      "url": "https://open.weixin.qq.com/connect/oauth2/authorize?appid=wx1234567890abcdef&redirect_uri=http%3A%2F%2F127.0.0.1%3A5173%2Fapi%2Fauth%2Fwechat%2Fcallback&response_type=code&scope=snsapi_base&state=n005yP4NCQ51TrDLwwfeQaBQNpjz06jjg_weBXgIO6A&connect_redirect=1",
+      "method": "GET",
+      "resourceType": "Document",
+      "redirectFrom": "https://open.weixin.qq.com/connect/oauth2/authorize?appid=wx1234567890abcdef&redirect_uri=http%3A%2F%2F127.0.0.1%3A5173%2Fapi%2Fauth%2Fwechat%2Fcallback&response_type=code&scope=snsapi_base&state=n005yP4NCQ51TrDLwwfeQaBQNpjz06jjg_weBXgIO6A"
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/wechat/callback?code=evidence-browser-1794207150454&state=n005yP4NCQ51TrDLwwfeQaBQNpjz06jjg_weBXgIO6A",
+      "method": "GET",
+      "resourceType": "Document",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/?activityId=2a94e2c3-0a8c-4197-a260-25fcc4259270&invite=0123456789abcdef0123456789abcdef&auth=success",
+      "method": "GET",
+      "resourceType": "Document",
+      "redirectFrom": "http://127.0.0.1:5173/api/auth/wechat/callback?code=evidence-browser-1794207150454&state=n005yP4NCQ51TrDLwwfeQaBQNpjz06jjg_weBXgIO6A"
+    },
+    {
+      "url": "http://127.0.0.1:5173/@vite/client",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/main.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@react-refresh",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/node_modules/.pnpm/vite@8.3.4_@types+node@24.1_31550c061482022cb50f0774f2c55186/node_modules/vite/dist/client/env.mjs",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react.js?v=0a620576",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=5bc04d0c",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-router.js?v=d728987b",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/App.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/loginReturn.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/index.css",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=0a620576",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-XU9BOcOH.js?v=69cb198c",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/rolldown-runtime-SbdDWaPq.js?v=69cb198c",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom-DHbhrdcq.js?v=69cb198c",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/shell/AppShell.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/ActivityHomePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityActivityPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityBroadcastPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityCulturePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityNoticePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/ExchangePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/GdPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthAssistantPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthDevicePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthDevicesPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthLecturePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/LifePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/LocalProductPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/MePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/MyOrderDetailPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/MyOrdersPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/MyRewardsPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/NotFoundPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/PointsPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/ProductPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/SilverActivityProductsPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/SilverNeighborhoodCampaignPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLayout.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLeadDetailPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLeadNewPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLeadsPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLocalOrderDetailPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLocalOrdersPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLoginPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchOrderDetailPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchOrderNewPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchOrdersPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchVerifyPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/packages/contracts/dist/index.js",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/shell/BottomTabBar.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/shell/useKeyboardVisible.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/lucide-react.js?v=c17b3119",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/CampaignSheet.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/home/ActivityShareSheet.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/home/activityFormat.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/ParticipationTeamCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/ActivityLoginResult.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/RewardProgressCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/share.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useActivityParticipation.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/usePublicActivity.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useResidentAuth.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useRewardProgress.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/DemoNote.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/PageHeader.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/PendingNotice.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useBackTarget.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/usePendingNotice.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/community.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/community/CommunitySceneCards.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/LifeProductCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/PointsSummaryCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/life.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/gd.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/health.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/home/SectionHeading.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/LocalCatalogSection.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopDealsSection.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useLocalCatalog.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/localOrderLabels.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/services/localOrders.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/services/localApi.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/auth/PhoneVerificationForm.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/auth/wechatEnvironment.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/crmLabels.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useRewardWallet.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useLocalOrders.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/FilterChips.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/rewardLabels.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopProductDetail.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/silverActivityProducts.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/qrcode__react.js?v=adc03635",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/silverLuckyPrizes.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useStaffSession.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/StaffSessionProvider.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useCrmApi.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useAsyncResource.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/StaffGate.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/WorkbenchUi.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useStaffLocalOrders.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/services/rewards.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/zod.js?v=097f5a6e",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/packages/contracts/dist/rewards.js",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/packages/contracts/dist/crmeb.js",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/packages/contracts/dist/ledger.js",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/shell/navigation.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/ActivityLoginCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/apiError.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/LocalProductCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useShopProducts.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ActivitySourceNote.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopProductCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopStateCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/services/localCatalog.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopProductImage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/shop.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useActivityLoginReturn.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/activities/public/2a94e2c3-0a8c-4197-a260-25fcc4259270",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/session",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/methods",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/phone/status",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/activities/public/2a94e2c3-0a8c-4197-a260-25fcc4259270",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/session",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/methods",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/phone/status",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/activities/2a94e2c3-0a8c-4197-a260-25fcc4259270/participation",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/activities/2a94e2c3-0a8c-4197-a260-25fcc4259270/checkin",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/activities/2a94e2c3-0a8c-4197-a260-25fcc4259270/rewards",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/wechat/start?activityId=2a94e2c3-0a8c-4197-a260-25fcc4259270&communityId=2f0aa7b4-8a8f-479e-baba-13aaa00d7774",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/wechat/start?activityId=a25e8edf-03e2-4528-9673-7ba312afd9a3",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/wechat/start?activityId=a25e8edf-03e2-4528-9673-7ba312afd9a3",
+      "method": "GET",
+      "resourceType": "Document",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/favicon.ico",
+      "method": "GET",
+      "resourceType": "Other",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/?activityId=2a94e2c3-0a8c-4197-a260-25fcc4259270&invite=0123456789abcdef0123456789abcdef",
+      "method": "GET",
+      "resourceType": "Document",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@vite/client",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/main.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@react-refresh",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/node_modules/.pnpm/vite@8.3.4_@types+node@24.1_31550c061482022cb50f0774f2c55186/node_modules/vite/dist/client/env.mjs",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react.js?v=0a620576",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom_client.js?v=5bc04d0c",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-router.js?v=d728987b",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/App.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/loginReturn.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/index.css",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=0a620576",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-XU9BOcOH.js?v=69cb198c",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/rolldown-runtime-SbdDWaPq.js?v=69cb198c",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/react-dom-DHbhrdcq.js?v=69cb198c",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/shell/AppShell.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/ActivityHomePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityActivityPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityBroadcastPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityCulturePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityNoticePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/CommunityPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/ExchangePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/GdPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthAssistantPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthDevicePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthDevicesPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthLecturePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/HealthPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/LifePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/LocalProductPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/MePage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/MyOrderDetailPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/MyOrdersPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/MyRewardsPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/NotFoundPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/PointsPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/ProductPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/SilverActivityProductsPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/SilverNeighborhoodCampaignPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLayout.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLeadDetailPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLeadNewPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLeadsPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLocalOrderDetailPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLocalOrdersPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchLoginPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchOrderDetailPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchOrderNewPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchOrdersPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/pages/workbench/WorkbenchVerifyPage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/packages/contracts/dist/index.js",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/shell/BottomTabBar.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/shell/useKeyboardVisible.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/lucide-react.js?v=c17b3119",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/CampaignSheet.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/home/ActivityShareSheet.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/home/activityFormat.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/ParticipationTeamCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/ActivityLoginResult.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/RewardProgressCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/share.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useActivityParticipation.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/usePublicActivity.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useResidentAuth.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useRewardProgress.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/DemoNote.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/PageHeader.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/PendingNotice.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useBackTarget.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/usePendingNotice.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/community.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/community/CommunitySceneCards.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/LifeProductCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/PointsSummaryCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/life.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/gd.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/health.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/home/SectionHeading.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/LocalCatalogSection.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopDealsSection.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useLocalCatalog.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/localOrderLabels.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/services/localOrders.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/services/localApi.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/auth/PhoneVerificationForm.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/auth/wechatEnvironment.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/crmLabels.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useRewardWallet.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useLocalOrders.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/FilterChips.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/rewardLabels.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopProductDetail.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/silverActivityProducts.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/qrcode__react.js?v=adc03635",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/mocks/silverLuckyPrizes.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useStaffSession.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/StaffSessionProvider.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useCrmApi.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useAsyncResource.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/StaffGate.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/crm/WorkbenchUi.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useStaffLocalOrders.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/services/rewards.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/node_modules/.vite/deps/zod.js?v=097f5a6e",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/packages/contracts/dist/rewards.js",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/packages/contracts/dist/crmeb.js",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/@fs/E:/tomz/local-life-wt/mvp-012/packages/contracts/dist/ledger.js",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/shell/navigation.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/activity/ActivityLoginCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/apiError.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/LocalProductCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useShopProducts.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ActivitySourceNote.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopProductCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopStateCard.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/services/localCatalog.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/ShopProductImage.tsx",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/components/life/shop.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/src/hooks/useActivityLoginReturn.ts",
+      "method": "GET",
+      "resourceType": "Script",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/activities/public/2a94e2c3-0a8c-4197-a260-25fcc4259270",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/session",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/methods",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/phone/status",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/activities/public/2a94e2c3-0a8c-4197-a260-25fcc4259270",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/session",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/methods",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/auth/phone/status",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/activities/2a94e2c3-0a8c-4197-a260-25fcc4259270/participation",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/activities/2a94e2c3-0a8c-4197-a260-25fcc4259270/checkin",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    },
+    {
+      "url": "http://127.0.0.1:5173/api/activities/2a94e2c3-0a8c-4197-a260-25fcc4259270/rewards",
+      "method": "GET",
+      "resourceType": "Fetch",
+      "redirectFrom": null
+    }
+  ]
+}
