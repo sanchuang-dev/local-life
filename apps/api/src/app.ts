@@ -9,6 +9,8 @@ import {
   API_ROUTES,
   SERVICE_NAME,
   authSessionResponseSchema,
+  wechatProfileStartResponseSchema,
+  wechatProfileStatusSchema,
   createCommunityRequestSchema,
   createStaffAccountRequestSchema,
   healthResponseSchema,
@@ -43,6 +45,7 @@ import {
   readBoundReturnTo,
   resolveReturnTo,
   wechatCallbackUrl,
+  wechatProfileResultDestination,
 } from './auth/oauth-return.js'
 import { registerPhoneAuthRoutes } from './auth/phone-routes.js'
 import type { SmsSender } from './auth/phone.js'
@@ -351,6 +354,37 @@ function redirectToWeb(
   return c.redirect(oauthResultDestination(config.webBaseUrl, result, returnTo), 302)
 }
 
+function redirectWechatProfileResult(
+  c: AppContext,
+  config: ApiConfig,
+  result: string,
+  returnTo: string | null = null,
+) {
+  return c.redirect(wechatProfileResultDestination(config.webBaseUrl, result, returnTo), 302)
+}
+
+function normalizeWechatNickname(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const normalized = value.replace(/[\\u0000-\\u001f\\u007f]/gu, '').trim()
+  return normalized ? Array.from(normalized).slice(0, 128).join('') : null
+}
+
+function normalizeWechatAvatarUrl(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length > 2048) return null
+  try {
+    const url = new URL(value)
+    if (
+      (url.protocol !== 'https:' && url.protocol !== 'http:') ||
+      !url.hostname ||
+      url.username ||
+      url.password
+    ) return null
+    return url.toString()
+  } catch {
+    return null
+  }
+}
+
 function bodySchemaError<T>(
   value: unknown,
   schema: z.ZodType<T>,
@@ -575,6 +609,134 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     )
   })
 
+  app.get('/auth/wechat/profile', (c) => {
+    const session = c.get('authSession')
+    if (!session) return fail(c, 401, API_ERROR_CODES.unauthorized, '请先登录居民账户')
+    if (session.staff) return fail(c, 403, API_ERROR_CODES.forbidden, '仅居民账户可以读取微信资料')
+
+    const resolution = wechatRuntime()
+    if (!resolution.ok) {
+      return c.json(wechatProfileStatusSchema.parse({
+        available: false,
+        reason: resolution.reason === 'not_configured' ? 'not_configured' : 'configuration_unavailable',
+      }))
+    }
+
+    const identity = db
+      .select({
+        nickname: wechatIdentities.nickname,
+        avatarUrl: wechatIdentities.avatarUrl,
+        profileAuthorizedAt: wechatIdentities.profileAuthorizedAt,
+      })
+      .from(wechatIdentities)
+      .where(and(
+        eq(wechatIdentities.userId, session.userId),
+        eq(wechatIdentities.appId, resolution.config.appId),
+      ))
+      .get()
+
+    if (!identity) {
+      return c.json(wechatProfileStatusSchema.parse({
+        available: false,
+        reason: 'identity_not_bound',
+      }))
+    }
+    if (!identity.profileAuthorizedAt) {
+      return c.json(wechatProfileStatusSchema.parse({ available: true, authorized: false }))
+    }
+    return c.json(wechatProfileStatusSchema.parse({
+      available: true,
+      authorized: true,
+      nickname: identity.nickname,
+      avatarUrl: identity.avatarUrl,
+      authorizedAt: identity.profileAuthorizedAt.toISOString(),
+    }))
+  })
+
+  /**
+   * Explicit, CSRF-protected resident action. It uses the same OAuth state,
+   * nonce, TTL, config-version binding and callback as login; only the purpose
+   * and requested scope differ.
+   */
+  app.post('/auth/wechat/profile/start', (c) => {
+    const session = c.get('authSession')
+    if (!session) return fail(c, 401, API_ERROR_CODES.unauthorized, '请先登录居民账户')
+    if (session.staff) return fail(c, 403, API_ERROR_CODES.forbidden, '仅居民账户可以授权微信资料')
+    if (!validCsrf(c, config, session)) return fail(c, 403, API_ERROR_CODES.forbidden, 'CSRF 或来源校验失败')
+
+    const resolution = wechatRuntime()
+    if (!resolution.ok) {
+      const code =
+        resolution.reason === 'not_configured'
+          ? API_ERROR_CODES.notConfigured
+          : resolution.reason === 'master_key_unavailable'
+            ? API_ERROR_CODES.wechatConfigMasterKeyUnavailable
+            : resolution.reason === 'master_key_invalid'
+              ? API_ERROR_CODES.wechatConfigMasterKeyUnavailable
+              : API_ERROR_CODES.wechatConfigDecryptFailed
+      return fail(c, 503, code, '微信资料授权配置当前不可用，请联系运营人员')
+    }
+
+    // A phone-only account or an account belonging to another AppID must not
+    // acquire a new WeChat identity through the profile-consent path.
+    const identity = db
+      .select({ id: wechatIdentities.id })
+      .from(wechatIdentities)
+      .where(and(
+        eq(wechatIdentities.userId, session.userId),
+        eq(wechatIdentities.appId, resolution.config.appId),
+      ))
+      .get()
+    if (!identity) {
+      return fail(
+        c,
+        409,
+        API_ERROR_CODES.wechatProfileIdentityMismatch,
+        '当前账户未绑定此公众号微信身份，不能在资料授权时自动绑定其他微信账户',
+      )
+    }
+
+    const now = new Date()
+    const state = randomToken(32)
+    const nonce = randomToken(32)
+    db.delete(oauthStates).where(lt(oauthStates.expiresAt, now)).run()
+    db.insert(oauthStates).values({
+      id: randomUUID(),
+      stateHash: hashToken(state),
+      nonceHash: hashToken(nonce),
+      communityId: null,
+      configId: resolution.config.configId,
+      purpose: 'profile',
+      userId: session.userId,
+      expiresAt: new Date(now.getTime() + OAUTH_STATE_TTL_SECONDS * 1_000),
+      consumedAt: null,
+      createdAt: now,
+    }).run()
+
+    const cookieOptionsForAttempt = oauthCookieOptions(config, OAUTH_STATE_TTL_SECONDS)
+    setCookie(c, OAUTH_NONCE_COOKIE, nonce, cookieOptionsForAttempt)
+    const returnCookie = bindReturnToCookie(state, '/me')
+    if (returnCookie) {
+      setCookie(c, OAUTH_RETURN_COOKIE, returnCookie, {
+        ...cookieOptionsForAttempt,
+        path: OAUTH_RETURN_COOKIE_PATH,
+      })
+    }
+
+    const authorizeUrl = new URL('https://open.weixin.qq.com/connect/oauth2/authorize')
+    authorizeUrl.search = new URLSearchParams({
+      appid: resolution.config.appId,
+      redirect_uri: wechatCallbackUrl(config.webBaseUrl),
+      response_type: 'code',
+      scope: 'snsapi_userinfo',
+      state,
+    }).toString()
+    authorizeUrl.hash = 'wechat_redirect'
+    return c.json(wechatProfileStartResponseSchema.parse({
+      authorizationUrl: authorizeUrl.toString(),
+    }))
+  })
+
   app.get('/auth/wechat/start', (c) => {
     // The provider is resolved from the database on every request (no startup
     // snapshot), so activating a new version takes effect for the next start
@@ -644,6 +806,8 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
         // Pin the exact provider version this attempt started with. The callback
         // must use this row even if a newer one became active meanwhile.
         configId: provider.configId,
+        purpose: 'login',
+        userId: null,
         expiresAt: new Date(now.getTime() + OAUTH_STATE_TTL_SECONDS * 1000),
         consumedAt: null,
         createdAt: now,
@@ -704,23 +868,22 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
       config.webBaseUrl,
     )
 
-    if (oauthError || !code) {
-      clearOauthCookies(c, config)
-      return redirectToWeb(c, config, 'wechat_authorization_failed', boundReturnTo)
-    }
-    if (!state || !nonce) {
-      // Without the attempt's state (or the nonce cookie it is bound to) nothing
-      // proves this callback belongs to a login this browser started.
-      clearOauthCookies(c, config)
-      return redirectToWeb(c, config, 'wechat_state_invalid', boundReturnTo)
-    }
-
     const now = new Date()
-    const stateRecord = db
-      .select()
-      .from(oauthStates)
-      .where(eq(oauthStates.stateHash, hashToken(state)))
-      .get()
+    const stateRecord = state
+      ? db
+          .select()
+          .from(oauthStates)
+          .where(eq(oauthStates.stateHash, hashToken(state)))
+          .get()
+      : null
+    const isProfileState = stateRecord?.purpose === 'profile'
+
+    if (!state || !nonce) {
+      clearOauthCookies(c, config)
+      return isProfileState
+        ? redirectWechatProfileResult(c, config, 'state_invalid', boundReturnTo)
+        : redirectToWeb(c, config, 'wechat_state_invalid', boundReturnTo)
+    }
     if (
       !stateRecord ||
       stateRecord.consumedAt ||
@@ -728,7 +891,9 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
       !constantTimeTextEqual(stateRecord.nonceHash, hashToken(nonce))
     ) {
       clearOauthCookies(c, config)
-      return redirectToWeb(c, config, 'wechat_state_invalid', boundReturnTo)
+      return isProfileState
+        ? redirectWechatProfileResult(c, config, 'state_invalid', boundReturnTo)
+        : redirectToWeb(c, config, 'wechat_state_invalid', boundReturnTo)
     }
 
     const consumed = db
@@ -744,7 +909,35 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
       .run()
     if (consumed.changes !== 1) {
       clearOauthCookies(c, config)
-      return redirectToWeb(c, config, 'wechat_state_replayed', boundReturnTo)
+      return isProfileState
+        ? redirectWechatProfileResult(c, config, 'state_replayed', boundReturnTo)
+        : redirectToWeb(c, config, 'wechat_state_replayed', boundReturnTo)
+    }
+
+    if (isProfileState) {
+      const currentSession = c.get('authSession')
+      if (
+        !stateRecord.userId ||
+        !currentSession ||
+        currentSession.userId !== stateRecord.userId ||
+        currentSession.staff
+      ) {
+        clearOauthCookies(c, config)
+        return redirectWechatProfileResult(c, config, 'session_mismatch', boundReturnTo)
+      }
+    }
+
+    if (oauthError || !code) {
+      clearOauthCookies(c, config)
+      if (isProfileState) {
+        return redirectWechatProfileResult(
+          c,
+          config,
+          oauthError === 'authdeny' ? 'cancelled' : 'authorization_failed',
+          boundReturnTo,
+        )
+      }
+      return redirectToWeb(c, config, 'wechat_authorization_failed', boundReturnTo)
     }
 
     // The state is consumed before any provider call, so a retry can never use
@@ -755,7 +948,9 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     const boundConfigId = stateRecord.configId
     if (!boundConfigId) {
       clearOauthCookies(c, config)
-      return redirectToWeb(c, config, 'wechat_state_invalid', boundReturnTo)
+      return isProfileState
+        ? redirectWechatProfileResult(c, config, 'state_invalid', boundReturnTo)
+        : redirectToWeb(c, config, 'wechat_state_invalid', boundReturnTo)
     }
     const boundResolution = wechatRuntime({ configId: boundConfigId })
     if (
@@ -764,7 +959,9 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
         boundResolution.config.status !== 'retired')
     ) {
       clearOauthCookies(c, config)
-      return redirectToWeb(c, config, 'wechat_config_unavailable', boundReturnTo)
+      return isProfileState
+        ? redirectWechatProfileResult(c, config, 'configuration_unavailable', boundReturnTo)
+        : redirectToWeb(c, config, 'wechat_config_unavailable', boundReturnTo)
     }
     const provider = boundResolution.config
 
@@ -782,13 +979,98 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
         return redirectToWeb(c, config, 'wechat_provider_unavailable', boundReturnTo)
       }
       const tokenPayload = (await response.json()) as {
+        access_token?: string
         openid?: string
         unionid?: string
-        errcode?: number
+        errcode?: number | string
       }
       if (!tokenPayload.openid || tokenPayload.errcode) {
         clearOauthCookies(c, config)
-        return redirectToWeb(c, config, 'wechat_identity_unavailable', boundReturnTo)
+        return isProfileState
+          ? redirectWechatProfileResult(c, config, 'provider_unavailable', boundReturnTo)
+          : redirectToWeb(c, config, 'wechat_identity_unavailable', boundReturnTo)
+      }
+
+      if (isProfileState) {
+        const boundUserId = stateRecord.userId
+        if (!boundUserId || !tokenPayload.access_token) {
+          clearOauthCookies(c, config)
+          return redirectWechatProfileResult(c, config, 'provider_unavailable', boundReturnTo)
+        }
+
+        // The OpenID must already belong to the exact user that initiated this
+        // consent. A missing or different mapping is a refusal, never a bind.
+        const identity = db
+          .select({ id: wechatIdentities.id, userId: wechatIdentities.userId })
+          .from(wechatIdentities)
+          .where(and(
+            eq(wechatIdentities.appId, provider.appId),
+            eq(wechatIdentities.openId, tokenPayload.openid),
+          ))
+          .get()
+        if (!identity || identity.userId !== boundUserId) {
+          clearOauthCookies(c, config)
+          return redirectWechatProfileResult(c, config, 'identity_mismatch', boundReturnTo)
+        }
+
+        const userInfoUrl = new URL('https://api.weixin.qq.com/sns/userinfo')
+        userInfoUrl.search = new URLSearchParams({
+          access_token: tokenPayload.access_token,
+          openid: tokenPayload.openid,
+          lang: 'zh_CN',
+        }).toString()
+        const userInfoResponse = await fetcher(userInfoUrl, {
+          signal: AbortSignal.timeout(10_000),
+        })
+        if (!userInfoResponse.ok) {
+          clearOauthCookies(c, config)
+          return redirectWechatProfileResult(c, config, 'provider_unavailable', boundReturnTo)
+        }
+        const userInfoPayload = (await userInfoResponse.json()) as {
+          openid?: string
+          nickname?: string
+          headimgurl?: string
+          errcode?: number | string
+        }
+        if (
+          userInfoPayload.errcode ||
+          !userInfoPayload.openid ||
+          userInfoPayload.openid !== tokenPayload.openid
+        ) {
+          clearOauthCookies(c, config)
+          return redirectWechatProfileResult(c, config, 'identity_mismatch', boundReturnTo)
+        }
+
+        const nickname = normalizeWechatNickname(userInfoPayload.nickname)
+        const avatarUrl = normalizeWechatAvatarUrl(userInfoPayload.headimgurl)
+        const saved = db.transaction((tx) => {
+          const currentIdentity = tx
+            .select({ id: wechatIdentities.id, userId: wechatIdentities.userId })
+            .from(wechatIdentities)
+            .where(and(
+              eq(wechatIdentities.id, identity.id),
+              eq(wechatIdentities.appId, provider.appId),
+              eq(wechatIdentities.openId, tokenPayload.openid!),
+            ))
+            .get()
+          if (!currentIdentity || currentIdentity.userId !== boundUserId) return false
+          const updated = tx
+            .update(wechatIdentities)
+            .set({ nickname, avatarUrl, profileAuthorizedAt: now })
+            .where(and(
+              eq(wechatIdentities.id, currentIdentity.id),
+              eq(wechatIdentities.userId, boundUserId),
+            ))
+            .run()
+          return updated.changes === 1
+        })
+        if (!saved) {
+          clearOauthCookies(c, config)
+          return redirectWechatProfileResult(c, config, 'identity_mismatch', boundReturnTo)
+        }
+
+        clearOauthCookies(c, config)
+        return redirectWechatProfileResult(c, config, 'success', boundReturnTo)
       }
 
       const userId = db.transaction((tx) => {
@@ -848,7 +1130,9 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
         errorType: error instanceof Error ? error.name : 'unknown',
       })
       clearOauthCookies(c, config)
-      return redirectToWeb(c, config, 'wechat_provider_unavailable', boundReturnTo)
+      return isProfileState
+        ? redirectWechatProfileResult(c, config, 'provider_unavailable', boundReturnTo)
+        : redirectToWeb(c, config, 'wechat_provider_unavailable', boundReturnTo)
     }
   })
 
