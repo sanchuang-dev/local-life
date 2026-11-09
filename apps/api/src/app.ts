@@ -945,7 +945,7 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
       return redirectWechatProfileResult(
         c,
         config,
-        oauthError === 'authdeny' ? 'cancelled' : 'authorization_failed',
+        (!code || oauthError === 'authdeny') ? 'cancelled' : 'authorization_failed',
         boundReturnTo,
       )
     }

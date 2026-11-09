@@ -422,7 +422,7 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
     const cancelNonce = cookiePair(cancelStart, 'll_oauth_nonce')
     const cancelReturn = cookiePair(cancelStart, 'll_oauth_return')
     const cancelCallback = await fetch(
-      base + '/auth/wechat/callback?state=' + encodeURIComponent(cancelUrl.searchParams.get('state')!) + '&errcode=authdeny',
+      base + '/auth/wechat/callback?state=' + encodeURIComponent(cancelUrl.searchParams.get('state')!),
       {
         headers: { cookie: cookieHeader(sessionCookie, csrfCookie, cancelNonce, cancelReturn) },
         redirect: 'manual',
