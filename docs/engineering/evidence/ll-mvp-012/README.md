@@ -10,11 +10,11 @@
 | 验证 | 结果 | 证据 |
 | --- | --- | --- |
 | 契约单测（start query 构造 / 活动 ID 形状） | **8 / 8 通过** | `packages/contracts/test/wechat-start-contract.test.mjs` |
-| 归属推导与边界（真实 Hono `app.request` + 真实 SQLite） | **7 / 7 通过** | `apps/api/test/activity-community-assignment.test.ts` |
+| 归属推导与边界（真实 Hono `app.request` + 真实 SQLite） | **8 / 8 通过** | `apps/api/test/activity-community-assignment.test.ts` |
 | 真实 TCP 登录网络流（Host / Cookie / redirect_uri） | **2 / 2 通过** | `apps/api/test/activity-login-network.test.ts` |
 | 既有 OAuth 回归（runtime / auth / return-to / 网络 e2e） | **30 / 30 通过** | `wechat-oauth-runtime` 14、`auth` 3、`auth-oauth-return` 12、`wechat-network-e2e` 1 |
 | 浏览器端到端（真实 Vite H5 + 真实 API + 真实 cookie） | **47 / 47 通过，0 失败** | `browser-results.json`、4 张截图 |
-| 真实微信公众号授权 | **未验证（无 AppID/AppSecret）** | 见 §5，这是本卡唯一的实质缺口 |
+| 真实微信公众号授权 | **未验证（无 AppID/AppSecret）** | 见 §5，这是本卡的外部验收缺口 |
 | 类型检查 / lint / 构建 | **通过**（见下） | `pnpm lint` 0 error / 38 warning；`pnpm typecheck` 全绿；`pnpm build` 全绿 |
 | 仓库 `pnpm check` | **1 个既有失败，与本卡无关** | `ledger-reconciliation-service.test.ts` 时间依赖缺陷，见 §5 |
 
@@ -37,7 +37,7 @@
 4. **活动不可用时拒绝而非降级。** ID 形状非法 → 400「活动参数无效」；查不到或非公开（含 `draft`）→ 400「活动不存在或不可公开访问」，且不写 state 行。`activityId=`（显式空值）视为无效活动参数，返回 400 且不创建 state；普通登录必须完全省略 `activityId`。
 5. **回调只消费已验证 state 的归属。** 回调用自己的 state 换取 `stateRecord.communityId`，在创建居民用户后 `INSERT ... ON CONFLICT DO NOTHING`。幂等由既有复合主键 `(user_id, community_id)` 保证，**没有新增迁移、没有第二张身份表**。
 6. **登录绝不写入业务记录。** 登录路径不写 `activity_participations`、`activity_teams`、`activity_invitations`、`activity_checkins`、`activity_orders`、`activity_reward_grants`；本卡也未改动三人团邀请规则、网格员业绩归属或 CRM 线索负责人。
-7. **无活动上下文不归属。** `/me` 等普通入口（`useResidentAuth.startWechatLogin`）仍然调用不带任何上下文的 `start`，登录后不会凭空获得社区归属。
+7. **无活动上下文不归属。** 普通入口（如 `/me`）不带活动上下文；首页或旧活动路径即使为了展示而选出公开列表第一项，也不应把该默认项当作归属上下文。只有入口 URL 明确携带 `activityId` 才会建立社区归属。
 8. **回跳目标不变。** `returnTo` 仍由当前路由推导并经共享白名单校验，`activityId` / `invite` 参数原样保留；Pages `HashRouter` 兼容逻辑未改动。
 
 ## 2. 环境与复现
@@ -67,12 +67,13 @@ node docs\engineering\evidence\ll-mvp-012\browser-verify.mjs docs\engineering\ev
 
 `evidence-server.ts` 只替换了一件事：`/sns/oauth2/access_token` 由进程内 fake 应答。它自己的 `__evidence/*` 路由（snapshot / reset）包在 `app.fetch` 外层，**不属于产品 API**。
 
-## 3. 浏览器验收矩阵（47 项断言）
+## 3. 浏览器验收矩阵（原始已执行 47 项；新增场景待执行）
 
 设备指标为 iPhone 375×812 与 320×568，UA 为 `MicroMessenger/8.0.49`（否则页面不会显示微信登录按钮）。
 
 | 阶段 | 断言要点 |
 | --- | --- |
+| 0 普通入口（本轮新增，待执行） | `/` 首页与无 `activityId` 的旧活动玩法路径可以展示公开列表第一项，但实际登录请求必须省略 `activityId` / `communityId`；OAuth state 的 `communityId` 为空；回调只创建身份，不创建社区归属或业务记录。 |
 | 1 未登录活动页 | 服务端三人团卡片渲染；提示需先登录；提供「微信授权登录」；明确写「登录成功不会自动报名」；未登录时**没有**「确认参与」按钮 |
 | 2 页面发出的登录请求 | 实际网络请求为 `/api/auth/wechat/start`，携带 `activityId`，**不含 `communityId`**；`returnTo` 同时保留 `activityId` 与 `invite`；为顶层导航（`Document`）；API 302 到 `open.weixin.qq.com/connect/oauth2/authorize`；`redirect_uri` 指向本 origin 的 `/api/auth/wechat/callback`；authorize URL 不含 `communityId`；带一次性 `state`；浏览器收到 HttpOnly 的 `ll_oauth_nonce`；此刻 `oauth_states` 行**已带推导出的社区** |
 | 3 回调消费 state | 回调 302 回到原活动链接并带 `auth=success`；链接保留 `activityId` + `invite`；浏览器拿到 HttpOnly `ll_session`；页面显示「微信登录成功」且仍提示需主动确认；**确认参与按钮仍在且未被自动点击**；地址栏的一次性 `auth` 标记已被清理；地址栏保留活动与邀请参数 |
