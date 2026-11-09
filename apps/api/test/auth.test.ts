@@ -7,6 +7,7 @@ import { createApp } from '../src/app.js'
 import { loadConfig } from '../src/config.js'
 import { createDatabase } from '../src/db/client.js'
 import {
+  activities,
   communities,
   residentCommunityAssignments,
   staffAccounts,
@@ -79,6 +80,48 @@ function testContext(
   if (options.seedWechat) seedWechatConfig(db, { appId: TEST_APP_ID })
   const app = createApp({ db, config, logRequests: false, fetcher })
   return { app, db, sqlite }
+}
+
+/** A published activity in `communityId`; #123 derives the community from it. */
+function seedActivity(
+  db: ReturnType<typeof createDatabase>['db'],
+  communityId: string,
+): { activityId: string; ownerId: string } {
+  const now = new Date()
+  const ownerId = randomUUID()
+  db.insert(users)
+    .values({ id: ownerId, displayName: '活动创建者', createdAt: now, updatedAt: now })
+    .run()
+  const activityId = randomUUID()
+  db.insert(activities)
+    .values({
+      id: activityId,
+      communityId,
+      title: '微信授权活动',
+      summary: null,
+      description: null,
+      status: 'published',
+      startsAt: new Date(now.getTime() - 60 * 60 * 1000),
+      endsAt: new Date(now.getTime() + 60 * 60 * 1000),
+      location: '社区服务中心',
+      budgetCapCents: 100_000,
+      prizeQuantityCap: 100,
+      publicRulesJson: JSON.stringify({
+        eligibility: '本社区 60 岁以上居民',
+        checkin: '到社区服务中心签到并领取参与卡',
+        purchase: '现场购买指定套餐一份',
+        prizeClaim: '凭核销码领取，每人限一次',
+      }),
+      currentRuleVersionId: null,
+      createdByUserId: ownerId,
+      createdAt: now,
+      updatedAt: now,
+      publishedAt: now,
+      pausedAt: null,
+      endedAt: null,
+    })
+    .run()
+  return { activityId, ownerId }
 }
 
 async function createAdmin(db: ReturnType<typeof createDatabase>['db']) {
@@ -259,8 +302,10 @@ test('WeChat OAuth binds one stable resident identity, validates state/nonce and
       .insert(communities)
       .values({ id: communityId, name: '微信授权社区', createdAt: new Date() })
       .run()
+    // #123: the H5 names the activity, never the community.
+    const { activityId } = seedActivity(context.db, communityId)
 
-    const start = await context.app.request(`/auth/wechat/start?communityId=${communityId}`)
+    const start = await context.app.request(`/auth/wechat/start?activityId=${activityId}`)
     assert.equal(start.status, 302)
     const authorizeUrl = new URL(start.headers.get('location')!)
     const state = authorizeUrl.searchParams.get('state')
@@ -324,14 +369,15 @@ test('WeChat OAuth binds one stable resident identity, validates state/nonce and
     assert.equal(new URL(replay.headers.get('location')!).search, '?auth_error=wechat_state_invalid')
     assert.equal(providerCalls, 1)
 
-    const secondStart = await context.app.request(`/auth/wechat/start?communityId=${communityId}`)
+    const secondStart = await context.app.request(`/auth/wechat/start?activityId=${activityId}`)
     const secondState = new URL(secondStart.headers.get('location')!).searchParams.get('state')!
     const secondCallback = await context.app.request(
       `/auth/wechat/callback?state=${secondState}&code=oauth-code-2`,
       { headers: { cookie: cookiePair(secondStart, 'll_oauth_nonce') } },
     )
     assert.equal(secondCallback.status, 302)
-    assert.equal(context.db.select().from(users).all().length, 1)
+    // Re-login reuses the identity: one WeChat identity, one resident, one
+    // residence — the seeded activity owner is a staff fixture, not a resident.
     assert.equal(context.db.select().from(wechatIdentities).all().length, 1)
     assert.equal(
       context.db

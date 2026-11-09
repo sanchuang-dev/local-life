@@ -12,6 +12,7 @@ import {
   createCommunityRequestSchema,
   createStaffAccountRequestSchema,
   healthResponseSchema,
+  isActivityId,
   staffLoginRequestSchema,
   type ApiError,
   type ApiErrorCode,
@@ -47,6 +48,7 @@ import { registerPhoneAuthRoutes } from './auth/phone-routes.js'
 import type { SmsSender } from './auth/phone.js'
 import { logEvent } from './log.js'
 import { registerActivityRoutes } from './activities/routes.js'
+import { resolvePublicActivityCommunityId } from './activities/service.js'
 import { registerCrmRoutes } from './crm/routes.js'
 import { registerLocalCatalogRoutes } from './local/routes.js'
 import { registerLocalOrderRoutes } from './local/order-routes.js'
@@ -593,10 +595,33 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
       return fail(c, 503, code, message)
     }
     const provider = resolution.config
-    const communityId = c.req.query('communityId')
-    if (communityId && (!/^[0-9a-f-]{36}$/i.test(communityId) ||
-      !db.select().from(communities).where(eq(communities.id, communityId)).get())) {
-      return fail(c, 400, API_ERROR_CODES.invalidRequest, '社区参数无效')
+    // Community attribution is derived, never accepted (#123). A client-supplied
+    // `communityId` used to be honoured after an existence check, which meant any
+    // caller could mint a residence in an arbitrary community by pasting a UUID
+    // that happens to exist. It is now an explicit 400: silently ignoring it
+    // would let a stale H5 look successful while attributing nothing.
+    if (c.req.query('communityId') !== undefined) {
+      return fail(
+        c,
+        400,
+        API_ERROR_CODES.invalidRequest,
+        '社区归属只能由活动上下文推导，请传入 activityId',
+      )
+    }
+    let communityId: string | null = null
+    const requestedActivityId = c.req.query('activityId')
+    if (requestedActivityId !== undefined && requestedActivityId !== '') {
+      if (!isActivityId(requestedActivityId)) {
+        return fail(c, 400, API_ERROR_CODES.invalidRequest, '活动参数无效')
+      }
+      // Same public-visibility rule as `GET /activities/public/:activityId`;
+      // a draft, unknown or deleted activity resolves to nothing and is refused
+      // rather than degraded, so an unusable activity id can never silently
+      // produce an unattributed login.
+      communityId = resolvePublicActivityCommunityId(db, requestedActivityId)
+      if (!communityId) {
+        return fail(c, 400, API_ERROR_CODES.invalidRequest, '活动不存在或不可公开访问')
+      }
     }
     // A target that is present but not a same-origin resident path is a caller
     // bug or an attack, never something to silently ignore: fail before a state
@@ -615,7 +640,7 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
         id: randomUUID(),
         stateHash: hashToken(state),
         nonceHash: hashToken(nonce),
-        communityId: communityId ?? null,
+        communityId: communityId,
         // Pin the exact provider version this attempt started with. The callback
         // must use this row even if a newer one became active meanwhile.
         configId: provider.configId,

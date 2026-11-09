@@ -469,6 +469,30 @@ export function getPublicActivity(
   return toPublicDetail(row)
 }
 
+/**
+ * Community a resident login may be attributed to, derived from the activity
+ * itself (#123).
+ *
+ * This is the *only* server-side bridge from "I was looking at this activity"
+ * to "this resident belongs to that community". The caller supplies an opaque
+ * activity id; the community comes from the row, and the visibility rule is the
+ * same `PUBLIC_STATUSES` set the public read path uses, so a draft activity —
+ * or one that does not exist — can never establish a residence. Keep the two
+ * queries aligned: if public visibility changes, this function must change with
+ * it rather than growing its own status whitelist.
+ */
+export function resolvePublicActivityCommunityId(
+  db: AppDatabase,
+  activityId: string,
+): string | null {
+  const row = db
+    .select({ communityId: activities.communityId })
+    .from(activities)
+    .where(and(eq(activities.id, activityId), inArray(activities.status, PUBLIC_STATUSES)))
+    .get()
+  return row?.communityId ?? null
+}
+
 /* ------------------------------- Admin API -------------------------------- */
 
 export interface AdminActivityListInput {

@@ -101,7 +101,7 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 `resolveWechatRuntimeConfig(db, masterKey, { configId? })` 是唯一读取路径：
 
 - `/auth/methods`：无 active → `wechat:false, reason:'not_configured'`；active 存在但主密钥缺失/密文不可解密 → `wechat:false, reason:'wechat_config_unavailable'`；正常 → `wechat:true, reason:null`。不返回配置 id、key id 或 secret。
-- `/auth/wechat/start`：解析 active 并解密；不可用 503。state 行写入 `configId`，authorize URL 使用该行 `appId`，`redirect_uri` 用第 4 节推导值。
+- `/auth/wechat/start`：解析 active 并解密；不可用 503。活动 H5 只传活动 `activityId`，服务端据此推导社区；显式 `communityId` 一律 400（#123，见 [identity-auth.md](identity-auth.md)）。state 行写入 `configId` 与推导出的 `communityId`，authorize URL 使用该行 `appId`，`redirect_uri` 用第 4 节推导值。
 - `/auth/wechat/callback`：
   1. 先完成 state/nonce/过期/重放校验并原子消费；
   2. 按 `state.configId` 读取该行（允许 `active` 或 `retired`），用该行的 `appId` + 解密后的 `secret` 换 code；

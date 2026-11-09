@@ -1,5 +1,7 @@
 import {
   API_ROUTES,
+  buildWechatStartQuery,
+  isActivityId,
   participationInviteCodeSchema,
   stripLoginResultParams,
   validateReturnTo,
@@ -33,8 +35,6 @@ export const API_PREFIX = '/api'
 
 /** A pending context older than this is stale and must not be replayed. */
 export const ACTIVITY_LOGIN_CONTEXT_TTL_MS = 30 * 60 * 1000
-
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export interface AppLocationSnapshot {
   /** `import.meta.env.BASE_URL`: `/` for the online MVP, `/local-life/` for Pages. */
@@ -198,6 +198,12 @@ export function browserLocation(): AppLocationSnapshot {
  * The return target is derived from the *current* route (never from a client
  * supplied parameter), validated against the shared allowlist, and the one-off
  * OAuth markers are stripped so a retry cannot nest a previous result.
+ *
+ * The loaded activity is sent as `activityId` only (#123). The API loads that
+ * row and derives its community; the H5 must never name a community itself, so
+ * the query is built by the shared contract helper instead of string
+ * concatenation — a malformed activity id throws here rather than silently
+ * producing a login that attributes nothing.
  */
 export function buildWechatLoginRequest(
   location: AppLocationSnapshot,
@@ -206,7 +212,7 @@ export function buildWechatLoginRequest(
 ): { url: string; context: ActivityLoginContext } {
   const route = stripLoginResultParams(appRouteFromLocation(location))
   const returnTo = sanitizeReturnTo(route)
-  const query = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''
+  const query = buildWechatStartQuery({ activityId: activity.activityId, returnTo })
   return {
     url: `${API_PREFIX}${API_ROUTES.authWechatStart}${query}`,
     context: {
@@ -253,10 +259,6 @@ export function readActivityLoginResult(): ActivityLoginResult {
 /** Marker kind only, for the shared presentation rule. */
 export function activityLoginMarker(result: ActivityLoginResult): 'success' | 'error' | null {
   return result?.status ?? null
-}
-
-function isActivityId(value: unknown): value is string {
-  return typeof value === 'string' && UUID_PATTERN.test(value)
 }
 
 function normalizeInvite(value: unknown): { code: string | null; invalid: boolean } {
