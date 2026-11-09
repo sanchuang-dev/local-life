@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { AlertTriangle, ArrowRight, MessageCircle, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, MessageCircle, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router'
 import { buildResidentLoginHref } from '../auth/residentLogin'
 import { appRouteFromLocation, browserLocation, type ActivityLoginResult } from './loginReturn'
@@ -15,7 +14,7 @@ type ActivityLoginCardProps = {
 }
 
 const primaryButtonClassName =
-  'flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] bg-teal-700 px-4 text-[14px] font-bold text-white transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600'
+  'flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] bg-[#138b79] px-4 text-[14px] font-bold text-white transition-colors hover:bg-[#116d63] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600'
 
 /**
  * Activity pages only provide a doorway to the single resident login screen.
@@ -28,9 +27,7 @@ export function ActivityLoginCard({
   inviteInvalid,
   loginResult,
 }: ActivityLoginCardProps) {
-  const [dismissed, setDismissed] = useState(false)
-  const errorMessage =
-    !dismissed && loginResult?.status === 'error' ? loginResult.message : null
+  const errorMessage = loginResult?.status === 'error' ? loginResult.message : null
   const loginHref = buildResidentLoginHref(
     appRouteFromLocation(browserLocation()),
     { activityId, inviteCode, inviteInvalid },
@@ -40,36 +37,18 @@ export function ActivityLoginCard({
   return (
     <div className="mt-3 grid gap-2" aria-label="居民登录入口">
       {errorMessage ? (
-        <div
+        <p
           role="alert"
-          className="rounded-[12px] bg-[#fff1ee] px-3 py-2.5 text-[12px] leading-5 text-rose-700"
+          className="flex items-start gap-2 rounded-[12px] bg-[#fff1ee] px-3 py-2.5 text-[12px] leading-5 text-rose-700"
         >
-          <p className="flex items-start gap-2">
-            <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
-            <span className="min-w-0 break-words">{errorMessage}</span>
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <Link
-              to={loginHref}
-              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-rose-700 px-4 text-[12px] font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-700"
-            >
-              重新登录
-              <ArrowRight size={14} aria-hidden="true" />
-            </Link>
-            <button
-              type="button"
-              onClick={() => setDismissed(true)}
-              className="inline-flex min-h-[44px] items-center rounded-full px-3 text-[12px] font-semibold text-slate-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
-            >
-              稍后再说
-            </button>
-          </div>
-        </div>
+          <AlertTriangle size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
+          <span className="min-w-0 break-words">{errorMessage}</span>
+        </p>
       ) : null}
 
       <Link to={loginHref} className={primaryButtonClassName}>
         <MessageCircle size={17} aria-hidden="true" />
-        微信 / 手机号登录
+        {errorMessage ? '重新登录' : '微信 / 手机号登录'}
       </Link>
       <p className="flex items-start gap-1.5 text-[11px] leading-4 text-slate-400">
         <ShieldCheck size={13} className="mt-0.5 shrink-0" aria-hidden="true" />
