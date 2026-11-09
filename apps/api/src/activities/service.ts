@@ -485,10 +485,12 @@ export function resolvePublicActivityCommunityId(
   db: AppDatabase,
   activityId: string,
 ): string | null {
+  // UUID input is case-insensitive by contract, while SQLite TEXT equality is not.
+  const canonicalActivityId = activityId.toLowerCase()
   const row = db
     .select({ communityId: activities.communityId })
     .from(activities)
-    .where(and(eq(activities.id, activityId), inArray(activities.status, PUBLIC_STATUSES)))
+    .where(and(eq(activities.id, canonicalActivityId), inArray(activities.status, PUBLIC_STATUSES)))
     .get()
   return row?.communityId ?? null
 }
