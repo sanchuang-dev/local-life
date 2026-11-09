@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronRight, ClipboardList, Gift, LogOut, ShieldCheck, ShoppingBasket, Smartphone, UserRound } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
 import { DemoNote } from '../components/DemoNote'
@@ -9,6 +9,18 @@ import { useActivityParticipation } from '../hooks/useActivityParticipation'
 import { usePublicActivity } from '../hooks/usePublicActivity'
 import { useResidentAuth } from '../hooks/useResidentAuth'
 import { useRewardWallet } from '../hooks/useRewardWallet'
+
+const WECHAT_PROFILE_RESULT_MESSAGES: Record<string, string> = {
+  success: '微信头像和昵称已同步。平台昵称不会被覆盖。',
+  cancelled: '你已取消微信资料授权，当前登录状态不受影响。',
+  authorization_failed: '微信资料授权未完成，当前登录状态不受影响。',
+  state_invalid: '本次资料授权已过期或无效，请重新发起。',
+  state_replayed: '本次资料授权已使用，请重新发起。',
+  session_mismatch: '授权期间登录账户发生变化，未修改任何资料。请在当前账户重新发起。',
+  identity_mismatch: '返回的微信身份与当前账户不匹配，未修改资料，也未绑定其他账户。',
+  configuration_unavailable: '公众号配置当前不可用，请联系运营人员。',
+  provider_unavailable: '微信资料服务暂时不可用，请稍后重试。',
+}
 
 const statTones = {
   mint: 'bg-[#e8f6f0] text-[#388b77]',
@@ -29,7 +41,17 @@ export function MePage() {
   const auth = useResidentAuth()
   const wechatBrowser = typeof navigator !== 'undefined' && isWeChatBrowser(navigator.userAgent)
   const [showBindForm, setShowBindForm] = useState(false)
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [profileNotice] = useState(() => {
+    const result = searchParams.get('wechat_profile')
+    return result ? WECHAT_PROFILE_RESULT_MESSAGES[result] ?? '微信资料授权流程已结束。' : null
+  })
+  useEffect(() => {
+    if (!searchParams.has('wechat_profile')) return
+    const next = new URLSearchParams(searchParams)
+    next.delete('wechat_profile')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
   // `?activityId=` lets a link open the account page already scoped to the
   // activity the resident came from; otherwise the currently published activity
   // of the public list is used. There is no cross-activity registration endpoint,
@@ -46,6 +68,15 @@ export function MePage() {
     sessionKey: auth.session?.user.id ?? null,
     authLoading: auth.loading,
   })
+
+  const profileNickname =
+    auth.wechatProfile?.available === true && auth.wechatProfile.authorized
+      ? auth.wechatProfile.nickname
+      : null
+  const profileAvatarUrl =
+    auth.wechatProfile?.available === true && auth.wechatProfile.authorized
+      ? auth.wechatProfile.avatarUrl
+      : null
 
   const participationData = participation.state.status === 'ready' ? participation.state.data : null
   const joined = participationData?.participation ?? null
@@ -117,15 +148,22 @@ export function MePage() {
       <article className="rounded-[22px] border border-slate-100 bg-white p-5 shadow-sm">
         <div className="flex items-center gap-3.5">
           <span
-            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#e8f6f0] text-[#388b77]"
+            className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#e8f6f0] text-[#388b77]"
             aria-hidden="true"
           >
-            <UserRound size={28} strokeWidth={1.6} />
+            {profileAvatarUrl ? (
+              <img src={profileAvatarUrl} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+            ) : (
+              <UserRound size={28} strokeWidth={1.6} />
+            )}
           </span>
           <div className="min-w-0 flex-1">
             <h1 className="break-words text-[19px] font-semibold tracking-tight text-slate-900">
               {auth.session?.user.displayName || '未登录'}
             </h1>
+            {profileNickname && (
+              <p className="mt-0.5 text-[11px] leading-4 text-slate-500">微信昵称：{profileNickname}</p>
+            )}
             <p className="mt-0.5 text-[11px] leading-4 text-slate-400">
               {auth.session
                 ? auth.session.staff
@@ -138,6 +176,51 @@ export function MePage() {
             {auth.session ? '已登录' : '未登录'}
           </span>
         </div>
+
+        {profileNotice && (
+          <p role="status" className="mt-3 rounded-[12px] bg-[#f0f8f4] px-3 py-2 text-[12px] leading-5 text-[#327563]">
+            {profileNotice}
+          </p>
+        )}
+
+        {auth.session && !auth.session.staff && (
+          <section className="mt-3 rounded-[16px] border border-slate-100 bg-white p-3.5">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[12px] font-semibold text-slate-700">微信头像与昵称</p>
+                <p className="mt-1 text-[11px] leading-5 text-slate-500">
+                  {auth.wechatProfile?.available === true
+                    ? auth.wechatProfile.authorized
+                      ? '已获得你的授权，可在这里更新微信资料。'
+                      : '尚未授权。是否同步由你决定，不影响登录和其他账户功能。'
+                    : auth.wechatProfile?.reason === 'identity_not_bound'
+                      ? '当前账户未绑定此公众号微信身份，不能在这里自动绑定其他账户。'
+                      : auth.wechatProfile?.reason === 'not_configured'
+                        ? '公众号网页授权尚未配置，暂时无法同步资料。'
+                        : auth.wechatProfile?.reason === 'configuration_unavailable'
+                          ? '公众号配置暂不可用，请联系运营人员。'
+                          : '正在读取微信资料授权状态…'}
+                </p>
+              </div>
+              {auth.wechatProfile?.available === true && wechatBrowser && (
+                <button
+                  type="button"
+                  disabled={auth.busy}
+                  onClick={() => void auth.startWechatProfileAuthorization()}
+                  className="min-h-9 shrink-0 rounded-full bg-[#138b79] px-3.5 text-[11px] font-semibold text-white transition-colors hover:bg-[#116d63] disabled:opacity-50"
+                >
+                  {auth.busy ? '正在发起…' : auth.wechatProfile.authorized ? '更新资料' : '授权同步'}
+                </button>
+              )}
+            </div>
+            {auth.wechatProfile?.available === true && !wechatBrowser && (
+              <p className="mt-2 text-[11px] text-slate-400">请在微信内打开页面，再点击授权同步。</p>
+            )}
+            {auth.wechatProfileError && (
+              <p role="alert" className="mt-2 text-[11px] leading-5 text-rose-600">{auth.wechatProfileError}</p>
+            )}
+          </section>
+        )}
 
         {!auth.session && (
           <div className="mt-4 rounded-[16px] bg-[#f4f8f6] p-3.5">
