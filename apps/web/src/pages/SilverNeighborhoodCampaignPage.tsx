@@ -571,6 +571,7 @@ export function SilverNeighborhoodCampaignPage() {
 
       <ParticipationTeamCard
         activity={activity}
+        loginActivityId={requestedActivityId && activity ? activity.id : null}
         activityError={
           activityState.status === 'empty'
             ? '当前没有已发布的活动，暂不能读取参与状态。'

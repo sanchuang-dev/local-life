@@ -150,3 +150,30 @@ export function oauthResultDestination(
     ? `${fallback.toString()}#`
     : `${base.origin}${base.pathname}#${fallback.pathname}${fallback.search}`
 }
+
+
+/**
+ * Profile authorization is a distinct user-consent result, not a login result.
+ * It shares the same validated return target and router-mode handling.
+ */
+export function wechatProfileResultDestination(
+  webBaseUrl: string,
+  result: string,
+  returnTo: string | null,
+): string {
+  const base = new URL(webBaseUrl)
+  if (returnTo) {
+    const target = new URL(returnTo, base.origin)
+    target.searchParams.set('wechat_profile', result)
+    const route = `${target.pathname}${target.search}`
+    return base.pathname === '/'
+      ? `${base.origin}${route}#`
+      : `${base.origin}${base.pathname}#${route}`
+  }
+
+  const fallback = new URL('/me', base.origin)
+  fallback.searchParams.set('wechat_profile', result)
+  return base.pathname === '/'
+    ? `${fallback.toString()}#`
+    : `${base.origin}${base.pathname}#${fallback.pathname}${fallback.search}`
+}

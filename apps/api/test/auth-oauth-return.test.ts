@@ -6,6 +6,7 @@ import { createApp } from '../src/app.js'
 import { loadConfig } from '../src/config.js'
 import { createDatabase } from '../src/db/client.js'
 import {
+  activities,
   activityParticipations,
   activityTeams,
   communities,
@@ -95,6 +96,45 @@ async function startOauth(
 
 function activityReturnTo(activityId: string): string {
   return `/community/activity/silver-neighborhood?activityId=${activityId}&invite=${INVITE_CODE}`
+}
+
+/** A published activity; #123 derives the resident's community from this row. */
+function seedActivity(db: ReturnType<typeof createDatabase>['db'], communityId: string): string {
+  const now = new Date()
+  const ownerId = randomUUID()
+  db.insert(users)
+    .values({ id: ownerId, displayName: '活动创建者', createdAt: now, updatedAt: now })
+    .run()
+  const activityId = randomUUID()
+  db.insert(activities)
+    .values({
+      id: activityId,
+      communityId,
+      title: '回跳活动',
+      summary: null,
+      description: null,
+      status: 'published',
+      startsAt: new Date(now.getTime() - 60 * 60 * 1000),
+      endsAt: new Date(now.getTime() + 60 * 60 * 1000),
+      location: '社区服务中心',
+      budgetCapCents: 100_000,
+      prizeQuantityCap: 100,
+      publicRulesJson: JSON.stringify({
+        eligibility: '本社区 60 岁以上居民',
+        checkin: '到社区服务中心签到并领取参与卡',
+        purchase: '现场购买指定套餐一份',
+        prizeClaim: '凭核销码领取，每人限一次',
+      }),
+      currentRuleVersionId: null,
+      createdByUserId: ownerId,
+      createdAt: now,
+      updatedAt: now,
+      publishedAt: now,
+      pausedAt: null,
+      endedAt: null,
+    })
+    .run()
+  return activityId
 }
 
 test('WeChat login returns to the activity invite link and never auto-joins it', async () => {
@@ -544,20 +584,21 @@ test('an unconfigured WeChat account is reported as unavailable instead of faked
   }
 })
 
-test('a valid community scope still round-trips through the return flow', async () => {
+test('a valid activity scope still round-trips through the return flow', async () => {
   const provider = countingProvider()
   const context = oauthContext('https://local-life.example.test', provider.fetcher)
   const communityId = randomUUID()
-  const activityId = randomUUID()
 
   try {
     context.db
       .insert(communities)
       .values({ id: communityId, name: '回跳社区', createdAt: new Date() })
       .run()
+    // #123: the community is derived from this activity, not sent by the H5.
+    const activityId = seedActivity(context.db, communityId)
 
     const start = await context.app.request(
-      `/auth/wechat/start?communityId=${communityId}&returnTo=${encodeURIComponent(
+      `/auth/wechat/start?activityId=${activityId}&returnTo=${encodeURIComponent(
         activityReturnTo(activityId),
       )}`,
     )
