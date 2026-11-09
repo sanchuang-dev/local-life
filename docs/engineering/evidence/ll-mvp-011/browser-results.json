@@ -1,0 +1,103 @@
+{
+  "generatedAt": "2026-11-09T10:52:38.150Z",
+  "webOrigin": "http://127.0.0.1:5181",
+  "apiOrigin": "http://127.0.0.1:4181",
+  "viewportCssPixels": [
+    375,
+    320
+  ],
+  "externalWechatAuthorization": "blocked before network; no real WeChat credentials used",
+  "results": [
+    {
+      "name": "real browser can use the local resident test login",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "browser session is authenticated",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "explicit profile-consent button is visible in WeChat browser",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "resident click starts the profile authorization action",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "WeChat authorize request was intercepted before leaving the test browser",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "explicit click requests snsapi_userinfo",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "authorize request uses the configured AppID",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "profile start API returned HTTP 200",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "OAuth state is bound to the current resident",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "OAuth state pins the initiating WeChat config version",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "uncompleted browser authorization has not consumed its state",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "H5 renders the persisted avatar URL",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "H5 displays the persisted WeChat nickname without replacing platform displayName",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "H5 offers refresh after profile consent has been saved",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "320px H5 layout has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"width\":320,\"scrollWidth\":320,\"height\":812}"
+    },
+    {
+      "name": "cancelled feedback is shown and the one-off query marker is removed",
+      "ok": true,
+      "detail": "{\"query\":\"\",\"loggedIn\":true}"
+    },
+    {
+      "name": "cancelling profile consent leaves the resident session intact",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "screenshots": [
+    "01-profile-consent-375.png",
+    "02-profile-authorized-375.png",
+    "03-profile-authorized-320.png",
+    "04-profile-cancelled-375.png"
+  ]
+}

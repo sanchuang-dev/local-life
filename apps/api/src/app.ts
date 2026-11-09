@@ -365,7 +365,13 @@ function redirectWechatProfileResult(
 
 function normalizeWechatNickname(value: unknown): string | null {
   if (typeof value !== 'string') return null
-  const normalized = value.replace(/[\u0000-\u001f\u007f]/gu, '').trim()
+  const normalized = Array.from(value)
+    .filter((character) => {
+      const codePoint = character.codePointAt(0) ?? 0
+      return codePoint > 0x1f && codePoint !== 0x7f
+    })
+    .join('')
+    .trim()
   return normalized ? Array.from(normalized).slice(0, 128).join('') : null
 }
 
@@ -873,6 +879,13 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
           .get()
       : null
     const isProfileState = stateRecord?.purpose === 'profile'
+    // Preserve the established login-cancellation contract: login denial does
+    // not consume the attempt. Profile consent is different and is consumed
+    // below, after its user-bound state and current session are validated.
+    if (!isProfileState && (oauthError || !code)) {
+      clearOauthCookies(c, config)
+      return redirectToWeb(c, config, 'wechat_authorization_failed', boundReturnTo)
+    }
     if (!activeResolution.ok && activeResolution.reason === 'not_configured' && !stateRecord) {
       clearOauthCookies(c, config)
       return redirectToWeb(c, config, 'wechat_not_configured', boundReturnTo)
@@ -927,16 +940,17 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
       }
     }
 
-    if (oauthError || !code) {
+    if (isProfileState && (oauthError || !code)) {
       clearOauthCookies(c, config)
-      if (isProfileState) {
-        return redirectWechatProfileResult(
-          c,
-          config,
-          oauthError === 'authdeny' ? 'cancelled' : 'authorization_failed',
-          boundReturnTo,
-        )
-      }
+      return redirectWechatProfileResult(
+        c,
+        config,
+        oauthError === 'authdeny' ? 'cancelled' : 'authorization_failed',
+        boundReturnTo,
+      )
+    }
+    if (!code) {
+      clearOauthCookies(c, config)
       return redirectToWeb(c, config, 'wechat_authorization_failed', boundReturnTo)
     }
 
@@ -1034,11 +1048,11 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
           headimgurl?: string
           errcode?: number | string
         }
-        if (
-          userInfoPayload.errcode ||
-          !userInfoPayload.openid ||
-          userInfoPayload.openid !== tokenPayload.openid
-        ) {
+        if (userInfoPayload.errcode) {
+          clearOauthCookies(c, config)
+          return redirectWechatProfileResult(c, config, 'provider_unavailable', boundReturnTo)
+        }
+        if (!userInfoPayload.openid || userInfoPayload.openid !== tokenPayload.openid) {
           clearOauthCookies(c, config)
           return redirectWechatProfileResult(c, config, 'identity_mismatch', boundReturnTo)
         }

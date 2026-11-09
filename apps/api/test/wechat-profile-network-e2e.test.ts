@@ -59,7 +59,7 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
   const tokenCalls: Array<{ appId: string | null; secret: string | null; code: string | null }> = []
   const userInfoCalls: Array<{ openId: string | null; accessToken: string | null }> = []
 
-  const fetcher = (async (input: RequestInfo | URL) => {
+  const fetcher = (async (input: string | URL | Request) => {
     const url = input instanceof URL ? input : new URL(String(input))
     if (url.pathname === '/sns/oauth2/access_token') {
       const code = url.searchParams.get('code')
@@ -69,18 +69,34 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
         code,
       })
       return Response.json({
-        access_token: code === 'login-code' ? 'base-only-access-token' : PROFILE_ACCESS_TOKEN,
-        openid: code === 'mismatch-code' ? OTHER_OPENID : PROFILE_OPENID,
+        access_token:
+          code === 'login-code'
+            ? 'base-only-access-token'
+            : code === 'userinfo-error-code'
+              ? 'profile-error-token'
+              : code === 'userinfo-mismatch-code'
+                ? 'profile-mismatch-token'
+                : PROFILE_ACCESS_TOKEN,
+        openid:
+          code === 'mismatch-code'
+            ? OTHER_OPENID
+            : code === 'unbound-code'
+              ? 'openid-never-bound'
+              : PROFILE_OPENID,
         expires_in: 7200,
       })
     }
     if (url.pathname === '/sns/userinfo') {
+      const accessToken = url.searchParams.get('access_token')
       userInfoCalls.push({
         openId: url.searchParams.get('openid'),
-        accessToken: url.searchParams.get('access_token'),
+        accessToken,
       })
+      if (accessToken === 'profile-error-token') {
+        return Response.json({ errcode: 40003, errmsg: 'invalid openid' })
+      }
       return Response.json({
-        openid: url.searchParams.get('openid'),
+        openid: accessToken === 'profile-mismatch-token' ? OTHER_OPENID : url.searchParams.get('openid'),
         nickname: '街坊的微信昵称',
         headimgurl: 'https://thirdwx.qlogo.cn/mmopen/profile-avatar.png',
         // These unrelated fields deliberately exist at the provider boundary.
@@ -118,6 +134,10 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
     assert.equal(loginAuthorize.searchParams.get('scope'), 'snsapi_base')
     const loginState = loginAuthorize.searchParams.get('state')
     assert.ok(loginState)
+    const loginStateRow = db.select().from(oauthStates)
+      .where(eq(oauthStates.stateHash, hashToken(loginState))).get()
+    assert.equal(loginStateRow?.purpose, 'login')
+    assert.equal(loginStateRow?.userId, null)
     const loginNonce = cookiePair(loginStart, 'll_oauth_nonce')
     const loginCallback = await fetch(
       base + '/auth/wechat/callback?state=' + encodeURIComponent(loginState) + '&code=login-code',
@@ -286,6 +306,106 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
     assert.equal(otherIdentity?.nickname, null)
     assert.equal(otherIdentity?.profileAuthorizedAt, null)
 
+    // An OpenID that belongs to nobody is also refused. Profile consent is
+    // never an implicit first-time account-binding operation.
+    const unboundStart = await fetch(base + API_ROUTES.authWechatProfileStart, {
+      method: 'POST',
+      headers: {
+        origin: WEB_ORIGIN,
+        cookie: cookieHeader(sessionCookie, csrfCookie),
+        'x-csrf-token': csrfToken,
+      },
+      redirect: 'manual',
+    })
+    const unboundUrl = new URL(((await unboundStart.json()) as { authorizationUrl: string }).authorizationUrl)
+    const unboundCallback = await fetch(
+      base + '/auth/wechat/callback?state=' + encodeURIComponent(unboundUrl.searchParams.get('state')!) + '&code=unbound-code',
+      {
+        headers: {
+          cookie: cookieHeader(sessionCookie, csrfCookie, cookiePair(unboundStart, 'll_oauth_nonce'), cookiePair(unboundStart, 'll_oauth_return')),
+        },
+        redirect: 'manual',
+      },
+    )
+    assert.equal(redirectLocation(unboundCallback).searchParams.get('wechat_profile'), 'identity_mismatch')
+    assert.equal(userInfoCalls.length, 1)
+    assert.equal(
+      db.select().from(wechatIdentities).where(eq(wechatIdentities.openId, 'openid-never-bound')).get(),
+      undefined,
+    )
+
+    // Even when the token exchange OpenID belongs to the current resident,
+    // sns/userinfo must return the same OpenID before any profile is saved.
+    const userInfoMismatchStart = await fetch(base + API_ROUTES.authWechatProfileStart, {
+      method: 'POST',
+      headers: {
+        origin: WEB_ORIGIN,
+        cookie: cookieHeader(sessionCookie, csrfCookie),
+        'x-csrf-token': csrfToken,
+      },
+      redirect: 'manual',
+    })
+    const userInfoMismatchUrl = new URL(((await userInfoMismatchStart.json()) as { authorizationUrl: string }).authorizationUrl)
+    const userInfoMismatchCallback = await fetch(
+      base + '/auth/wechat/callback?state=' + encodeURIComponent(userInfoMismatchUrl.searchParams.get('state')!) + '&code=userinfo-mismatch-code',
+      {
+        headers: {
+          cookie: cookieHeader(
+            sessionCookie,
+            csrfCookie,
+            cookiePair(userInfoMismatchStart, 'll_oauth_nonce'),
+            cookiePair(userInfoMismatchStart, 'll_oauth_return'),
+          ),
+        },
+        redirect: 'manual',
+      },
+    )
+    assert.equal(redirectLocation(userInfoMismatchCallback).searchParams.get('wechat_profile'), 'identity_mismatch')
+    assert.equal(userInfoCalls.at(-1)?.accessToken, 'profile-mismatch-token')
+    const unchangedAfterUserInfoMismatch = db.select().from(wechatIdentities)
+      .where(and(
+        eq(wechatIdentities.userId, resident.id),
+        eq(wechatIdentities.appId, TEST_APP_ID),
+        eq(wechatIdentities.openId, PROFILE_OPENID),
+      )).get()
+    assert.equal(unchangedAfterUserInfoMismatch?.nickname, '街坊的微信昵称')
+
+    // A provider error is not misreported as an identity mismatch and cannot
+    // erase the profile that was already saved by an earlier consent.
+    const userInfoErrorStart = await fetch(base + API_ROUTES.authWechatProfileStart, {
+      method: 'POST',
+      headers: {
+        origin: WEB_ORIGIN,
+        cookie: cookieHeader(sessionCookie, csrfCookie),
+        'x-csrf-token': csrfToken,
+      },
+      redirect: 'manual',
+    })
+    const userInfoErrorUrl = new URL(((await userInfoErrorStart.json()) as { authorizationUrl: string }).authorizationUrl)
+    const userInfoErrorCallback = await fetch(
+      base + '/auth/wechat/callback?state=' + encodeURIComponent(userInfoErrorUrl.searchParams.get('state')!) + '&code=userinfo-error-code',
+      {
+        headers: {
+          cookie: cookieHeader(
+            sessionCookie,
+            csrfCookie,
+            cookiePair(userInfoErrorStart, 'll_oauth_nonce'),
+            cookiePair(userInfoErrorStart, 'll_oauth_return'),
+          ),
+        },
+        redirect: 'manual',
+      },
+    )
+    assert.equal(redirectLocation(userInfoErrorCallback).searchParams.get('wechat_profile'), 'provider_unavailable')
+    assert.equal(userInfoCalls.at(-1)?.accessToken, 'profile-error-token')
+    const unchangedAfterProviderError = db.select().from(wechatIdentities)
+      .where(and(
+        eq(wechatIdentities.userId, resident.id),
+        eq(wechatIdentities.appId, TEST_APP_ID),
+        eq(wechatIdentities.openId, PROFILE_OPENID),
+      )).get()
+    assert.equal(unchangedAfterProviderError?.nickname, '街坊的微信昵称')
+
     // Cancellation consumes only this OAuth attempt; the existing session and
     // previously saved profile remain untouched.
     const cancelStart = await fetch(base + API_ROUTES.authWechatProfileStart, {
@@ -298,6 +418,7 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
       redirect: 'manual',
     })
     const cancelUrl = new URL(((await cancelStart.json()) as { authorizationUrl: string }).authorizationUrl)
+    const cancelState = cancelUrl.searchParams.get('state')!
     const cancelNonce = cookiePair(cancelStart, 'll_oauth_nonce')
     const cancelReturn = cookiePair(cancelStart, 'll_oauth_return')
     const cancelCallback = await fetch(
@@ -309,7 +430,9 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
     )
     assert.equal(redirectLocation(cancelCallback).searchParams.get('wechat_profile'), 'cancelled')
     assert.equal(cancelCallback.headers.getSetCookie().some((header) => header.startsWith('ll_session=')), false)
-    assert.equal(userInfoCalls.length, 1)
+    assert.ok(db.select().from(oauthStates)
+      .where(eq(oauthStates.stateHash, hashToken(cancelState))).get()?.consumedAt)
+    assert.equal(userInfoCalls.length, 3)
     const unchangedAfterCancel = db.select().from(wechatIdentities)
       .where(and(
         eq(wechatIdentities.userId, resident.id),
@@ -348,6 +471,22 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
     assert.equal(secondLogin.status, 200)
     const secondSession = cookiePair(secondLogin, 'll_session')
     const secondCsrf = cookiePair(secondLogin, 'll_csrf')
+    const stateCountBeforeUnboundAccountStart = db.select().from(oauthStates).all().length
+    const unboundAccountStart = await fetch(base + API_ROUTES.authWechatProfileStart, {
+      method: 'POST',
+      headers: {
+        origin: WEB_ORIGIN,
+        cookie: cookieHeader(secondSession, secondCsrf),
+        'x-csrf-token': cookieValue(secondCsrf),
+      },
+      redirect: 'manual',
+    })
+    assert.equal(unboundAccountStart.status, 409)
+    assert.equal(
+      db.select().from(oauthStates).all().length,
+      stateCountBeforeUnboundAccountStart,
+      'a phone-only account cannot create a profile-consent OAuth state',
+    )
     const callsBeforeSwitchedCallback = tokenCalls.length
     const switchedCallback = await fetch(
       base + '/auth/wechat/callback?state=' + encodeURIComponent(switchUrl.searchParams.get('state')!) + '&code=profile-code',
@@ -396,7 +535,7 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
       },
     )
     assert.equal(redirectLocation(replayCallback).searchParams.get('wechat_profile'), 'state_invalid')
-    assert.equal(userInfoCalls.length, 1)
+    assert.equal(userInfoCalls.length, 3)
 
     const finalStatus = await fetch(base + API_ROUTES.authWechatProfile, {
       headers: { cookie: cookieHeader(sessionCookie, csrfCookie) },
