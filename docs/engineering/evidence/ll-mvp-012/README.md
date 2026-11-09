@@ -20,6 +20,15 @@
 
 浏览器脚本退出码 0；`browser-results.json` 中 `passed: 47, failed: 0`。
 
+## 复核追加（2026-11-09）
+
+独立评审后仅补充两项与 #123 直接相关的修正：
+
+- 首页和旧版活动玩法路径即使为了展示而读取公开活动列表第一项，也不会把该默认项当成登录归属上下文；只有入口 URL 明确携带 `activityId` 才会随微信登录请求发送。
+- 活动 UUID 按共享契约大小写不敏感；服务端在 SQLite 精确文本查询前规范为小写。
+
+`browser-verify.mjs` 已追加普通首页与无 `activityId` 的旧活动路径回归场景，但这两个新增浏览器场景**尚未在本轮重新执行**。仓库中的 `browser-results.json`、截图及下文原有 **47 / 47** 结果来自此前执行，只证明显式活动链接场景；不得将其解释为新增场景已通过。真实微信授权仍未验证。
+
 ## 1. 实现内容
 
 1. **H5 只上报活动上下文。** 活动页拉起登录时，`buildWechatLoginRequest` 用共享契约 `buildWechatStartQuery({ activityId, returnTo })` 生成 `GET /api/auth/wechat/start?activityId=…&returnTo=…`。H5 从不发送 `communityId`；`activityId` 形状非法时契约 helper 直接抛错，而不是拼出一个"能登录但没归属"的 URL。
