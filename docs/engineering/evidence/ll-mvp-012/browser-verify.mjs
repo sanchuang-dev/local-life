@@ -379,6 +379,62 @@ async function main() {
 
   const chrome = await launchChrome()
   try {
+    console.log('--- stage 0: ordinary home login must not infer the displayed activity ---')
+    await gotoActivity(`${WEB_ORIGIN}/`)
+    check(
+      'ordinary home may display the first public activity without becoming its attribution context',
+      await cdp.eval(`__t.bodyText().includes('三人团')`),
+    )
+    const homeLogin = await clickWechatLogin()
+    const homeStartUrl = new URL(homeLogin.startRequest.url)
+    check(
+      'ordinary home login request omits activityId',
+      !homeStartUrl.searchParams.has('activityId'),
+      homeStartUrl.search,
+    )
+    const homeAuthorizeLocation = headerValue(homeLogin.startResponse.headers, 'location')
+    const homeState = homeAuthorizeLocation
+      ? new URL(homeAuthorizeLocation).searchParams.get('state')
+      : null
+    check('ordinary home login receives an OAuth state', Boolean(homeState))
+    if (!homeState) throw new Error('ordinary home login did not receive an OAuth state')
+    const homeStateRow = (await snapshot()).oauthStates.find((item) => item.consumed === false)
+    check(
+      'ordinary home OAuth state has no community attribution',
+      homeStateRow?.communityId === null,
+      JSON.stringify(homeStateRow),
+    )
+    await navigateCallback(homeState)
+    const afterHomeLogin = await snapshot()
+    check(
+      'ordinary home login creates an identity but no community assignment',
+      afterHomeLogin.identities.length === 1 && afterHomeLogin.assignments.length === 0,
+      JSON.stringify({ identities: afterHomeLogin.identities.length, assignments: afterHomeLogin.assignments.length }),
+    )
+    check(
+      'ordinary home login creates no participation, team, invitation, check-in, reward or order',
+      afterHomeLogin.counts.participations === 0
+        && afterHomeLogin.counts.teams === 0
+        && afterHomeLogin.counts.invitations === 0
+        && afterHomeLogin.counts.checkins === 0
+        && afterHomeLogin.counts.rewards === 0
+        && afterHomeLogin.counts.orders === 0,
+      JSON.stringify(afterHomeLogin.counts),
+    )
+    check('ordinary home OAuth token exchange ran once', afterHomeLogin.wechatTokenCalls.length === 1)
+    const resetAfterHome = await resetEvidenceDatabase()
+    check('home-only scenario reset removed its identity and state', resetAfterHome.reset === true, JSON.stringify(resetAfterHome))
+    await cdp.send('Network.clearBrowserCookies')
+    await cdp.eval(`sessionStorage.clear(); true`)
+    const cleanAfterHome = await snapshot()
+    check(
+      'activity scenario starts with no resident identity or attribution',
+      cleanAfterHome.assignments.length === 0
+        && cleanAfterHome.identities.length === 0
+        && cleanAfterHome.oauthStates.length === 0,
+      JSON.stringify({ assignments: cleanAfterHome.assignments.length, identities: cleanAfterHome.identities.length, states: cleanAfterHome.oauthStates.length }),
+    )
+
     console.log('--- stage 1: unauthenticated activity page ---')
     await gotoActivity(activityUrl(`&invite=${INVITE}`))
     check(
