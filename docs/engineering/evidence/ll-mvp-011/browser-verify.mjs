@@ -36,6 +36,8 @@ const db = new Database(DATABASE)
 const results = []
 const authorizeRequests = []
 const profileStartResponses = []
+const heldProfileResponses = []
+let holdNextProfileResponse = false
 let chrome
 let socket
 let chromeProfile
@@ -89,7 +91,14 @@ class Cdp {
       }
       if (message.method === 'Fetch.requestPaused') {
         const url = message.params.request.url
-        if (url.startsWith('https://open.weixin.qq.com/')) {
+        if (message.params.responseStatusCode && url.includes('/auth/wechat/profile')) {
+          if (holdNextProfileResponse && message.params.responseStatusCode === 200) {
+            holdNextProfileResponse = false
+            heldProfileResponses.push(message.params.requestId)
+          } else {
+            void this.send('Fetch.continueResponse', { requestId: message.params.requestId }).catch(() => {})
+          }
+        } else if (url.startsWith('https://open.weixin.qq.com/')) {
           authorizeRequests.push(url)
           void this.send('Fetch.failRequest', {
             requestId: message.params.requestId,
@@ -333,6 +342,52 @@ async function main() {
   const finalSession = await cdp.evaluate(`fetch('/api/auth/session', { credentials: 'include' }).then((response) => response.json())`)
   record('cancelling profile consent leaves the resident session intact', finalSession.authenticated === true && finalSession.user?.id === userId)
 
+  // Regression: force a successful profile response for resident A to arrive
+  // after logout and login as resident B. A's nickname/avatar may never leak
+  // into B's view, even when the old network response was already HTTP 200.
+  await cdp.send('Fetch.enable', {
+    patterns: [{ urlPattern: '*auth/wechat/profile', requestStage: 'Response' }],
+  })
+  holdNextProfileResponse = true
+  await cdp.navigate(`${WEB}/me`)
+  const holdDeadline = Date.now() + 8_000
+  while (!heldProfileResponses.length && Date.now() < holdDeadline) await wait(80)
+  record('old resident profile HTTP 200 response is held for race regression', heldProfileResponses.length === 1)
+  const logoutClicked = await cdp.evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')]
+      .find((item) => item.innerText.includes('退出登录'))
+    if (!button) return false
+    button.click()
+    return true
+  })()`)
+  record('resident can log out while profile fetch remains pending', logoutClicked)
+  await cdp.waitFor(`document.body.innerText.includes('登录本地生活')`, 'logout with held response')
+  await cdp.waitFor(`[...document.querySelectorAll('button')].some((b) => b.innerText.includes('开发测试登录'))`, 'relogin button available')
+  const reloginClicked = await cdp.evaluate(`(() => {
+    const button = [...document.querySelectorAll('button')]
+      .find((item) => item.innerText.includes('开发测试登录'))
+    if (!button) return false
+    button.click()
+    return true
+  })()`)
+  record('different resident can log in while old profile response is held', reloginClicked)
+  await cdp.waitFor(`document.body.innerText.includes('居民账户 · 已登录')`, 'second account login')
+  const switchedSession = await cdp.evaluate(`fetch('/api/auth/session', { credentials: 'include' }).then((r) => r.json())`)
+  record('second session is a different resident', switchedSession.authenticated && switchedSession.user?.id !== userId)
+  for (const requestId of heldProfileResponses) {
+    await cdp.send('Fetch.continueResponse', { requestId })
+  }
+  await wait(450)
+  const afterRace = await cdp.evaluate(`({
+    nicknameVisible: document.body.innerText.includes('测试微信昵称'),
+    oldAvatarVisible: [...document.images].some((image) => image.src.includes('/favicon.svg')),
+    loggedIn: document.body.innerText.includes('居民账户 · 已登录'),
+  })`)
+  record('late old-account response cannot show another resident nickname/avatar',
+    afterRace.loggedIn && !afterRace.nicknameVisible && !afterRace.oldAvatarVisible, JSON.stringify(afterRace))
+  await cdp.send('Fetch.disable')
+  await cdp.screenshot('05-profile-race-second-account-375.png')
+
   writeFileSync(join(OUT, 'browser-results.json'), JSON.stringify({
     generatedAt: new Date().toISOString(),
     webOrigin: WEB,
@@ -345,6 +400,7 @@ async function main() {
       '02-profile-authorized-375.png',
       '03-profile-authorized-320.png',
       '04-profile-cancelled-375.png',
+      '05-profile-race-second-account-375.png',
     ],
   }, null, 2) + '\n')
 }

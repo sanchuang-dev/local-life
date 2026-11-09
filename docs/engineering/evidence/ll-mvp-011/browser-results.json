@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-09T10:52:38.150Z",
+  "generatedAt": "2026-11-09T13:30:22.130Z",
   "webOrigin": "http://127.0.0.1:5181",
   "apiOrigin": "http://127.0.0.1:4181",
   "viewportCssPixels": [
@@ -92,12 +92,38 @@
       "name": "cancelling profile consent leaves the resident session intact",
       "ok": true,
       "detail": ""
+    },
+    {
+      "name": "old resident profile HTTP 200 response is held for race regression",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "resident can log out while profile fetch remains pending",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "different resident can log in while old profile response is held",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "second session is a different resident",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "late old-account response cannot show another resident nickname/avatar",
+      "ok": true,
+      "detail": "{\"nicknameVisible\":false,\"oldAvatarVisible\":false,\"loggedIn\":true}"
     }
   ],
   "screenshots": [
     "01-profile-consent-375.png",
     "02-profile-authorized-375.png",
     "03-profile-authorized-320.png",
-    "04-profile-cancelled-375.png"
+    "04-profile-cancelled-375.png",
+    "05-profile-race-second-account-375.png"
   ]
 }
