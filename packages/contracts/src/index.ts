@@ -11,6 +11,8 @@ export const API_ROUTES = {
   authLogin: '/auth/login',
   authLogout: '/auth/logout',
   authWechatStart: '/auth/wechat/start',
+  authWechatProfile: '/auth/wechat/profile',
+  authWechatProfileStart: '/auth/wechat/profile/start',
 } as const
 
 export const SERVICE_NAME = 'local-life-api' as const
@@ -97,6 +99,7 @@ export const API_ERROR_CODES = {
   wechatConfigVerifyFailed: 'wechat_config_verify_failed',
   wechatConfigMasterKeyUnavailable: 'wechat_config_master_key_unavailable',
   wechatConfigDecryptFailed: 'wechat_config_decrypt_failed',
+  wechatProfileIdentityMismatch: 'wechat_profile_identity_mismatch',
 } as const
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES]
@@ -179,6 +182,36 @@ export const authSessionResponseSchema = z.discriminatedUnion('authenticated', [
 ])
 
 export type AuthSessionResponse = z.infer<typeof authSessionResponseSchema>
+
+/**
+ * Resident-consented WeChat profile state. The response intentionally contains
+ * no OpenID, access token, AppID, or provider credential.
+ */
+export const wechatProfileStatusSchema = z.discriminatedUnion('available', [
+  z.object({
+    available: z.literal(false),
+    reason: z.enum(['not_configured', 'configuration_unavailable', 'identity_not_bound']),
+  }),
+  z.object({
+    available: z.literal(true),
+    authorized: z.literal(false),
+  }),
+  z.object({
+    available: z.literal(true),
+    authorized: z.literal(true),
+    nickname: z.string().nullable(),
+    avatarUrl: z.string().url().nullable(),
+    authorizedAt: isoTimestamp,
+  }),
+])
+
+export type WechatProfileStatusResponse = z.infer<typeof wechatProfileStatusSchema>
+
+export const wechatProfileStartResponseSchema = z.object({
+  authorizationUrl: z.string().url(),
+})
+
+export type WechatProfileStartResponse = z.infer<typeof wechatProfileStartResponseSchema>
 
 /* -------------------------------------------------------------------------- */
 /* Resident login return target (#92)                                         */
