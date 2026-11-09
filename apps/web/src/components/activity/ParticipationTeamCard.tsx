@@ -10,7 +10,6 @@ import {
 import type { PublicActivityDetail } from '@sanchuang-dev/local-life-contracts'
 import type { useActivityParticipation } from '../../hooks/useActivityParticipation'
 import type { useResidentAuth } from '../../hooks/useResidentAuth'
-import { PhoneVerificationForm } from '../auth/PhoneVerificationForm'
 import { ActivityLoginCard } from './ActivityLoginCard'
 import { ActivityLoginSuccessNotice } from './ActivityLoginResult'
 import type { ActivityLoginResult } from './loginReturn'
@@ -154,45 +153,13 @@ export function ParticipationTeamCard({
           </p>
         ) : null}
         <div className="mt-3 grid gap-2">
-          {/* WeChat login with its own availability, return-to and retry states. */}
+          {/* All resident login methods and retry states live on the shared /login page. */}
           <ActivityLoginCard
             activityId={loginActivityId}
             inviteCode={inviteCode}
             inviteInvalid={inviteInvalid}
             loginResult={loginResult}
           />
-          {auth.phoneStatus ? (
-            <PhoneVerificationForm
-              purpose="login"
-              configured={auth.phoneStatus.configured}
-              title="手机号验证码登录"
-              description="不在微信也可使用手机号完成认证；登录后仍须主动确认报名。"
-              submitLabel="手机号登录"
-              onRequestCode={(phone) => auth.requestPhoneCode(phone, 'login')}
-              onSubmit={(phone, code) => auth.loginWithPhone(phone, code)}
-            />
-          ) : null}
-          {auth.methods?.developmentResidentLogin ? (
-            <button
-              type="button"
-              disabled={auth.busy}
-              onClick={() => void auth.developmentLogin()}
-              className="flex min-h-[48px] w-full items-center justify-center rounded-[14px] border border-teal-200 bg-white px-4 text-[14px] font-semibold text-teal-700 disabled:cursor-wait disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
-            >
-              {auth.busy ? '登录中…' : '开发测试登录'}
-            </button>
-          ) : null}
-          {!auth.methods && !auth.loading ? (
-            <p className="rounded-[12px] bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-500">
-              账户服务暂不可用，请稍后重试。
-            </p>
-          ) : null}
-          {auth.loading ? <LoadingLine text="正在读取登录方式…" /> : null}
-          {auth.error ? (
-            <p role="alert" className="break-words text-[12px] leading-5 text-rose-600">
-              {auth.error}
-            </p>
-          ) : null}
         </div>
         <p className="mt-3 text-[11px] leading-4 text-slate-400">
           登录成功后会自动重新读取本活动状态，活动与邀请参数保留在当前链接中；登录不会自动报名。

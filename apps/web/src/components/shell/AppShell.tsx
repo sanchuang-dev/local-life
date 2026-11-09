@@ -16,6 +16,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const navigationType = useNavigationType()
   const keyboardVisible = useKeyboardVisible()
+  const isAuthRoute = pathname === '/login'
 
   // A new page starts at the top; history traversal keeps the browser's own
   // scroll restoration so back/forward return to the same reading position.
@@ -41,12 +42,16 @@ export function AppShell({ children }: { children: ReactNode }) {
       </button>
 
       <div className="app-shell__column">
-        <main id="main-content" tabIndex={-1} className="app-shell__main">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className={isAuthRoute ? 'app-shell__main app-shell__main--auth' : 'app-shell__main'}
+        >
           {children}
         </main>
       </div>
 
-      <BottomTabBar pathname={pathname} />
+      {!isAuthRoute ? <BottomTabBar pathname={pathname} /> : null}
     </div>
   )
 }

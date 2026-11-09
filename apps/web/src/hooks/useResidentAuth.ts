@@ -19,6 +19,7 @@ type AuthenticatedSession = Extract<AuthSessionResponse, { authenticated: true }
 
 interface AuthMethods {
   wechat: boolean
+  wechatUnavailableReason: string | null
   developmentResidentLogin: boolean
 }
 
@@ -41,11 +42,13 @@ export function useResidentAuth() {
   const [session, setSession] = useState<AuthenticatedSession | null>(null)
   const [methods, setMethods] = useState<AuthMethods | null>(null)
   const [phoneStatus, setPhoneStatus] = useState<PhoneAuthStatusResponse | null>(null)
+  const [phoneStatusLoading, setPhoneStatusLoading] = useState(true)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const loadPhoneStatus = useCallback(async (): Promise<PhoneAuthStatusResponse | null> => {
+    setPhoneStatusLoading(true)
     try {
       const response = await fetch(`/api${PHONE_AUTH_ROUTES.status}`, { credentials: 'include' })
       if (!response.ok) throw new Error(await readError(response))
@@ -57,6 +60,8 @@ export function useResidentAuth() {
       // account page keeps working (WeChat/dev login are unaffected).
       setPhoneStatus(null)
       return null
+    } finally {
+      setPhoneStatusLoading(false)
     }
   }, [])
 
@@ -72,10 +77,17 @@ export function useResidentAuth() {
         if (!sessionResponse.ok) throw new Error(await readError(sessionResponse))
         if (!methodsResponse.ok) throw new Error(await readError(methodsResponse))
         const parsed = authSessionResponseSchema.parse(await sessionResponse.json())
-        const available = (await methodsResponse.json()) as AuthMethods
+        const available = (await methodsResponse.json()) as Partial<AuthMethods>
         if (!active) return
         setSession(parsed.authenticated ? parsed : null)
-        setMethods(available)
+        setMethods({
+          wechat: available.wechat === true,
+          wechatUnavailableReason:
+            typeof available.wechatUnavailableReason === 'string'
+              ? available.wechatUnavailableReason
+              : null,
+          developmentResidentLogin: available.developmentResidentLogin === true,
+        })
         setError(null)
       } catch (cause) {
         if (active) {
@@ -227,6 +239,7 @@ export function useResidentAuth() {
     session,
     methods,
     phoneStatus,
+    phoneStatusLoading,
     loading,
     busy,
     error,
