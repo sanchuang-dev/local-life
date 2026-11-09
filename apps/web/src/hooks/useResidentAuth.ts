@@ -3,6 +3,9 @@ import {
   API_ROUTES,
   PHONE_AUTH_ROUTES,
   authSessionResponseSchema,
+  wechatProfileStartResponseSchema,
+  wechatProfileStatusSchema,
+  type WechatProfileStatusResponse,
   phoneAuthStatusResponseSchema,
   phoneBindResponseSchema,
   phoneOtpRequestResponseSchema,
@@ -41,6 +44,8 @@ export function useResidentAuth() {
   const [session, setSession] = useState<AuthenticatedSession | null>(null)
   const [methods, setMethods] = useState<AuthMethods | null>(null)
   const [phoneStatus, setPhoneStatus] = useState<PhoneAuthStatusResponse | null>(null)
+  const [wechatProfile, setWechatProfile] = useState<WechatProfileStatusResponse | null>(null)
+  const [wechatProfileError, setWechatProfileError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -56,6 +61,21 @@ export function useResidentAuth() {
       // The phone panel degrades to "unknown/unavailable"; the rest of the
       // account page keeps working (WeChat/dev login are unaffected).
       setPhoneStatus(null)
+      return null
+    }
+  }, [])
+
+  const loadWechatProfile = useCallback(async (): Promise<WechatProfileStatusResponse | null> => {
+    try {
+      const response = await fetch(`/api${API_ROUTES.authWechatProfile}`, { credentials: 'include' })
+      if (!response.ok) throw new Error(await readError(response))
+      const parsed = wechatProfileStatusSchema.parse(await response.json())
+      setWechatProfile(parsed)
+      setWechatProfileError(null)
+      return parsed
+    } catch (cause) {
+      setWechatProfile(null)
+      setWechatProfileError(cause instanceof Error ? cause.message : '暂时无法读取微信资料状态')
       return null
     }
   }, [])
@@ -76,6 +96,12 @@ export function useResidentAuth() {
         if (!active) return
         setSession(parsed.authenticated ? parsed : null)
         setMethods(available)
+        if (parsed.authenticated && !parsed.staff) {
+          void loadWechatProfile()
+        } else {
+          setWechatProfile(null)
+          setWechatProfileError(null)
+        }
         setError(null)
       } catch (cause) {
         if (active) {
@@ -92,7 +118,7 @@ export function useResidentAuth() {
     return () => {
       active = false
     }
-  }, [loadPhoneStatus])
+  }, [loadPhoneStatus, loadWechatProfile]
 
   /** Fetch a fresh double-submit token; the resident session cookie is reused. */
   const csrfToken = useCallback(async (): Promise<string> => {
@@ -113,6 +139,35 @@ export function useResidentAuth() {
     window.location.assign(`/api${API_ROUTES.authWechatStart}`)
   }, [methods])
 
+  const startWechatProfileAuthorization = useCallback(async () => {
+    if (!session || session.staff) return
+    if (typeof navigator === 'undefined' || !isWeChatBrowser(navigator.userAgent)) {
+      setWechatProfileError('请在微信内打开页面，再主动授权同步头像和昵称')
+      return
+    }
+    if (!wechatProfile?.available) {
+      setWechatProfileError('当前账户没有可用的公众号微信身份，不能自动绑定其他微信账户')
+      return
+    }
+    setBusy(true)
+    setWechatProfileError(null)
+    try {
+      const token = await csrfToken()
+      const response = await fetch(`/api${API_ROUTES.authWechatProfileStart}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'x-csrf-token': token },
+      })
+      if (!response.ok) throw new Error(await readError(response))
+      const parsed = wechatProfileStartResponseSchema.parse(await response.json())
+      window.location.assign(parsed.authorizationUrl)
+    } catch (cause) {
+      setWechatProfileError(cause instanceof Error ? cause.message : '发起微信资料授权失败')
+    } finally {
+      setBusy(false)
+    }
+  }, [session, wechatProfile, csrfToken])
+
   const developmentLogin = useCallback(async () => {
     if (!methods?.developmentResidentLogin) return
     setBusy(true)
@@ -132,6 +187,7 @@ export function useResidentAuth() {
       const parsed = authSessionResponseSchema.parse(await response.json())
       setSession(parsed.authenticated ? parsed : null)
       await loadPhoneStatus()
+      if (parsed.authenticated && !parsed.staff) await loadWechatProfile()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '测试登录失败')
     } finally {
@@ -179,8 +235,9 @@ export function useResidentAuth() {
       setSession(parsed.authenticated ? parsed : null)
       setError(null)
       await loadPhoneStatus()
+      if (parsed.authenticated && !parsed.staff) await loadWechatProfile()
     },
-    [csrfToken, loadPhoneStatus],
+    [csrfToken, loadPhoneStatus, loadWechatProfile],
   )
 
   const bindPhone = useCallback(
@@ -215,6 +272,8 @@ export function useResidentAuth() {
       })
       if (!response.ok) throw new Error(await readError(response))
       setSession(null)
+      setWechatProfile(null)
+      setWechatProfileError(null)
       await loadPhoneStatus()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '退出登录失败')
@@ -227,6 +286,8 @@ export function useResidentAuth() {
     session,
     methods,
     phoneStatus,
+    wechatProfile,
+    wechatProfileError,
     loading,
     busy,
     error,
@@ -236,6 +297,8 @@ export function useResidentAuth() {
     loginWithPhone,
     bindPhone,
     refreshPhoneStatus: loadPhoneStatus,
+    refreshWechatProfile: loadWechatProfile,
+    startWechatProfileAuthorization,
     logout,
   }
 }
