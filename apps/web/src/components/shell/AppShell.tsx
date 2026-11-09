@@ -16,7 +16,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const navigationType = useNavigationType()
   const keyboardVisible = useKeyboardVisible()
-  const isAuthRoute = pathname === '/login'
+  const isAuthRoute = pathname.replace(/\/+$/, '') === '/login'
 
   // A new page starts at the top; history traversal keeps the browser's own
   // scroll restoration so back/forward return to the same reading position.

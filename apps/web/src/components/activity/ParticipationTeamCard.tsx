@@ -152,15 +152,13 @@ export function ParticipationTeamCard({
             你打开了邀请链接。登录后还需要你主动确认，才会加入三人团并记录邀请归属。
           </p>
         ) : null}
-        <div className="mt-3 grid gap-2">
-          {/* All resident login methods and retry states live on the shared /login page. */}
-          <ActivityLoginCard
-            activityId={loginActivityId}
-            inviteCode={inviteCode}
-            inviteInvalid={inviteInvalid}
-            loginResult={loginResult}
-          />
-        </div>
+        {/* All resident login methods and retry states live on the shared /login page. */}
+        <ActivityLoginCard
+          activityId={loginActivityId}
+          inviteCode={inviteCode}
+          inviteInvalid={inviteInvalid}
+          loginResult={loginResult}
+        />
         <p className="mt-3 text-[11px] leading-4 text-slate-400">
           登录成功后会自动重新读取本活动状态，活动与邀请参数保留在当前链接中；登录不会自动报名。
         </p>

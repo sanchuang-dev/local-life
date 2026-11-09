@@ -145,7 +145,7 @@ export function ResidentLoginPage() {
                   <button
                     type="button"
                     onClick={() => window.location.reload()}
-                    className="mt-2 inline-flex min-h-[40px] items-center gap-1.5 rounded-full bg-[#7a4a2c] px-3.5 text-[11px] font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+                    className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-[#7a4a2c] px-3.5 text-[11px] font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
                   >
                     <RefreshCw size={13} aria-hidden="true" />
                     重新读取
@@ -154,10 +154,9 @@ export function ResidentLoginPage() {
               ) : null}
 
               <div className="mt-4 border-t border-slate-100 pt-4">
-                <p className="mb-2 text-[13px] font-semibold text-slate-700">手机号验证码登录</p>
                 {auth.phoneStatusLoading ? (
-                  <p className="text-[11px] leading-5 text-slate-400" role="status">
-                    正在读取手机号登录状态…
+                  <p className="text-[12px] leading-5 text-slate-400" role="status">
+                    正在读取手机号验证码登录状态…
                   </p>
                 ) : auth.phoneStatus ? (
                   <PhoneVerificationForm
@@ -171,11 +170,12 @@ export function ResidentLoginPage() {
                   />
                 ) : (
                   <div className="rounded-[12px] bg-slate-50 px-3 py-2.5 text-[11px] leading-5 text-slate-500">
-                    <p>暂时无法读取手机号登录状态。</p>
+                    <p className="font-semibold text-slate-600">手机号验证码登录</p>
+                    <p className="mt-1">暂时无法读取手机号登录状态。</p>
                     <button
                       type="button"
                       onClick={() => void auth.refreshPhoneStatus()}
-                      className="mt-1 inline-flex min-h-[40px] items-center gap-1 rounded-full px-2 font-semibold text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+                      className="mt-1 inline-flex min-h-[44px] items-center gap-1 rounded-full px-2 font-semibold text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
                     >
                       <RefreshCw size={12} aria-hidden="true" />
                       重试
@@ -211,9 +211,6 @@ export function ResidentLoginPage() {
           </p>
         </section>
 
-        <p className="mt-4 px-1 text-center text-[10px] leading-4 text-slate-400">
-          账号身份与活动、社区及奖励记录关联；平台不会因登录自动替你执行业务操作。
-        </p>
       </div>
     </div>
   )
