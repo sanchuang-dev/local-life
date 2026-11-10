@@ -164,6 +164,36 @@ export const communityLocationSchema = z.strictObject({
 })
 export type CommunityLocation = z.infer<typeof communityLocationSchema>
 
+/** Residents can browse these public service-point records without login. */
+export const PUBLIC_COMMUNITY_ROUTE = '/communities/public' as const
+const optionalCoordinate = (min: number, max: number) =>
+  z.preprocess(
+    (value) => value === undefined || value === '' ? undefined : Number(value),
+    z.number().finite().min(min).max(max).optional(),
+  )
+export const publicCommunityQuerySchema = z.object({
+  q: z.string().trim().max(60).optional(),
+  latitude: optionalCoordinate(-90, 90),
+  longitude: optionalCoordinate(-180, 180),
+}).superRefine((value, ctx) => {
+  if ((value.latitude === undefined) !== (value.longitude === undefined)) {
+    ctx.addIssue({ code: 'custom', message: '经纬度必须成对提供', path: ['latitude'] })
+  }
+})
+export type PublicCommunityQuery = z.infer<typeof publicCommunityQuerySchema>
+export const publicCommunitySchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1),
+  address: z.string().nullable(),
+  distanceMeters: z.number().int().nonnegative().nullable(),
+  nearby: z.boolean(),
+})
+export const publicCommunityListSchema = z.object({
+  items: z.array(publicCommunitySchema),
+})
+export type PublicCommunity = z.infer<typeof publicCommunitySchema>
+export type PublicCommunityList = z.infer<typeof publicCommunityListSchema>
+
 /** Admin-only Tencent map configuration; saved Key is never included in status responses. */
 export const TENCENT_MAP_ADMIN_ROUTES = {
   config: '/admin/tencent-map/config',
