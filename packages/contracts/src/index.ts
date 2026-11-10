@@ -2276,3 +2276,52 @@ export const activateWechatConfigResponseSchema = z.object({
 })
 
 export type ActivateWechatConfigResponse = z.infer<typeof activateWechatConfigResponseSchema>
+
+/* -------------------------------------------------------------------------- */
+/* External promotions: third-party links only (#144 LL-H5-007)               */
+/* -------------------------------------------------------------------------- */
+
+/** No payment, stock, award, claim, or redemption occurs in this domain. */
+export const EXTERNAL_OFFER_ROUTES = {
+  publicList: '/external-offers',
+  adminList: '/admin/external-offers',
+  adminDetail: '/admin/external-offers/:offerId',
+} as const
+
+/** Reject non-web schemes, local destinations, credentials, and parser ambiguities. */
+export const externalOfferUrlSchema = z.string().trim().min(12).max(2048).refine((value) =>
+  /^https:\/\/(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}(?:[/?#][^\s\\\u0000-\u001f]*)?$/i.test(value),
+  '只接受有效的外部 HTTPS 网页链接')
+
+export const externalOfferSchema = z.object({
+  id: z.string().uuid(),
+  kind: z.literal('external_promotion'),
+  title: z.string().min(1).max(80),
+  platform: z.string().min(1).max(40),
+  category: z.string().min(1).max(40),
+  description: z.string().nullable(),
+  url: externalOfferUrlSchema,
+  sortOrder: z.number().int().min(0),
+  enabled: z.boolean(),
+  expiresAt: isoTimestamp.nullable(),
+  createdAt: isoTimestamp,
+  updatedAt: isoTimestamp,
+})
+export type ExternalOffer = z.infer<typeof externalOfferSchema>
+export const externalOfferListSchema = z.object({ items: z.array(externalOfferSchema) })
+
+export const createExternalOfferRequestSchema = z.strictObject({
+  title: z.string().trim().min(1).max(80),
+  platform: z.string().trim().min(1).max(40),
+  category: z.string().trim().min(1).max(40),
+  description: z.string().trim().max(300).nullable(),
+  url: externalOfferUrlSchema,
+  sortOrder: z.number().int().min(0).max(10000),
+  enabled: z.boolean(),
+  expiresAt: isoTimestamp.nullable(),
+})
+export type CreateExternalOfferRequest = z.infer<typeof createExternalOfferRequestSchema>
+
+export const updateExternalOfferRequestSchema =
+  createExternalOfferRequestSchema.extend({ expectedUpdatedAt: isoTimestamp })
+export type UpdateExternalOfferRequest = z.infer<typeof updateExternalOfferRequestSchema>

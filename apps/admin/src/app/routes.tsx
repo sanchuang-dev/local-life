@@ -11,6 +11,7 @@ import { OrdersPage } from '../pages/OrdersPage'
 import { PerformancePage } from '../pages/PerformancePage'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
 import { ProductsPage } from '../pages/ProductsPage'
+import { ExternalOffersPage } from '../pages/ExternalOffersPage'
 import { SettlementsPage } from '../pages/SettlementsPage'
 import { UsersPage } from '../pages/UsersPage'
 import { SystemInfoPage } from '../pages/SystemInfoPage'
@@ -39,6 +40,7 @@ export const routes: RouteObject[] = [
       { path: 'activities/checkin', element: <ActivityCheckinPage /> },
       { path: 'customers', element: <CrmPage /> },
       { path: 'products', element: <ProductsPage /> },
+      { path: 'external-offers', element: <ExternalOffersPage /> },
       { path: 'orders', element: <OrdersPage /> },
       { path: 'performance', element: <PerformancePage /> },
       { path: 'settlements', element: <SettlementsPage /> },
