@@ -161,6 +161,14 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         roles: ['admin'],
       },
       {
+        key: '/system/tencent-map',
+        label: '腾讯地图',
+        description: '管理员维护社区地图选点 Key，保存后即时生效。',
+        status: 'ready',
+        planned: [],
+        roles: ['admin'],
+      },
+      {
         key: '/system/components',
         label: '界面组件',
         description: 'DataPanel 数据面板的开发预览与组件验收场景。',
