@@ -256,7 +256,7 @@ export function LocalProductPage() {
 
             <p className="mt-2 text-right text-[12px] text-slate-500">
               参考合计 <span className="font-semibold text-[#8a6132]">{formatLocalPriceCents(totalCents)}</span>
-              （以服务端快照为准）
+              （以登记确认时的价格为准）
             </p>
 
             <label className="mt-3 block text-[12px] font-medium text-slate-600" htmlFor="local-order-note">

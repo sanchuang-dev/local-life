@@ -294,10 +294,10 @@ export function ShopProductDetail({ rawProductId }: { rawProductId: string }) {
           <ShopStateCard
             icon={Store}
             tone="warn"
-            title="商城未配置"
+            title="优惠购暂未开放"
             description="优惠购暂未开放，请稍后再试。"
             onRetry={retry}
-            retryLabel="检查配置后重试"
+            retryLabel="重新加载"
           />
         </div>
       </div>

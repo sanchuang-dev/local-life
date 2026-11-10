@@ -285,7 +285,7 @@ function OrderDetailContent({ order, reload }: { order: CrmOrderDetail; reload: 
       <section className="mt-4 rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm">
         <h2 className="text-[16px] font-semibold text-slate-900">状态流转</h2>
         <p className="mt-1 text-[11px] leading-5 text-slate-400">
-          只能按服务端允许的动作提交；“确认有效成交”仅由运营后台人工核验完成。
+          确认有效成交需由运营人员核验。
         </p>
 
         {actions.length === 0 ? (
@@ -318,7 +318,7 @@ function OrderDetailContent({ order, reload }: { order: CrmOrderDetail; reload: 
               确认执行“{draft.label}”？
             </p>
             <p className="mt-0.5 text-[11px] leading-5 text-slate-400">
-              将提交给服务端校验状态机与并发版本；旧页面会被 409 拒绝。
+              如订单状态已经变化，请刷新后重试。
             </p>
             {draft.status === 'failed' ? (
               <Field label="失败原因" htmlFor="order-failure-reason" required>
@@ -387,7 +387,7 @@ function OrderDetailContent({ order, reload }: { order: CrmOrderDetail; reload: 
 
       <section className="mt-4 rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm">
         <h2 className="text-[16px] font-semibold text-slate-900">事件时间线</h2>
-        <p className="mt-0.5 text-[11px] text-slate-400">来自服务端追加式审计事件</p>
+        <p className="mt-0.5 text-[11px] text-slate-400">处理记录</p>
         <div className="mt-3">
           <EventTimeline entries={timeline} emptyText="暂无事件记录" />
         </div>

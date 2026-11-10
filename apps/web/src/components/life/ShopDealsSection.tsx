@@ -46,10 +46,10 @@ export function ShopDealsSection({ activityId }: { activityId: string | null }) 
           <ShopStateCard
             icon={Store}
             tone="warn"
-            title="优惠购尚未接入商城"
+            title="优惠购暂未开放"
             description="优惠购暂未开放，请稍后再试。"
             onRetry={retry}
-            retryLabel="检查配置后重试"
+            retryLabel="重新加载"
           />
         </div>
       ) : null}
