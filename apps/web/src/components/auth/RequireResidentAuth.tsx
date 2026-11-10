@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router'
 import { buildResidentLoginHref } from './residentLogin'
+import { stripLoginResultParams } from '../activity/loginReturn'
 import { decideResidentGate } from './residentGate'
 import { useResidentAuth } from '../../hooks/useResidentAuth'
 
@@ -30,9 +31,16 @@ export function RequireResidentAuth({ children }: { children?: ReactNode }) {
   }
 
   if (decision === 'login') {
-    const loginHref = buildResidentLoginHref(location.pathname + location.search, {
-      activityId: null, inviteCode: null, inviteInvalid: false,
-    })
+    const search = new URLSearchParams(location.search)
+    const loginHref = buildResidentLoginHref(
+      stripLoginResultParams(location.pathname + location.search),
+      {
+        activityId: search.get('activityId'),
+        inviteCode: search.get('invite'),
+        inviteInvalid: search.get('inviteInvalid') === '1',
+      },
+      search.get('auth_error'),
+    )
     return <Navigate to={loginHref} replace />
   }
 
