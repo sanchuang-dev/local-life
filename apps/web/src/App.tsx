@@ -3,6 +3,9 @@ import { AppShell } from './components/shell/AppShell'
 import { RequireResidentAuth } from './components/auth/RequireResidentAuth'
 import { ResidentAuthProvider } from './hooks/useResidentAuth'
 import { ActivityHomePage } from './pages/ActivityHomePage'
+import { CommunityDiscoveryPage } from './pages/CommunityDiscoveryPage'
+import { isLegacyActivityHome } from './lib/communityHomeRoute'
+import { useLocation } from 'react-router'
 import { CommunityActivityPage } from './pages/CommunityActivityPage'
 import { CommunityBroadcastPage } from './pages/CommunityBroadcastPage'
 import { CommunityCulturePage } from './pages/CommunityCulturePage'
@@ -44,7 +47,7 @@ export default function App() {
     <ResidentAuthProvider>
       <AppShell>
       <Routes>
-        <Route path="/" element={<ActivityHomePage />} />
+        <Route path="/" element={<CommunityRoot />} />
         <Route path="/gd" element={<GdPage />} />
         <Route path="/community" element={<CommunityPage />} />
         <Route path="/community/broadcast" element={<CommunityBroadcastPage />} />
@@ -92,4 +95,12 @@ export default function App() {
       </AppShell>
     </ResidentAuthProvider>
   )
+}
+
+/** Keep old distributed invite links intact while the default root becomes discovery. */
+function CommunityRoot() {
+  const location = useLocation()
+  return isLegacyActivityHome(location.search)
+    ? <ActivityHomePage />
+    : <CommunityDiscoveryPage />
 }
