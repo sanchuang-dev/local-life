@@ -54,7 +54,7 @@ describe('filterNavigation', () => {
     const { groups } = filterNavigation('  社区  ')
 
     expect(groups.map((group) => group.key)).toEqual(['customer'])
-    expect(groups[0]?.pages.map((page) => page.label)).toEqual(['账户与社区'])
+    expect(groups[0]?.pages.map((page) => page.label)).toEqual(['社区管理'])
   })
 
   it('returns no items when nothing matches', () => {
@@ -105,7 +105,7 @@ describe('customer CRM navigation', () => {
     expect(customers?.roles).toEqual(['admin', 'operator'])
     expect(customers?.label).toContain('客户')
     expect(customers?.description).toContain('受理单')
-    // The neighbouring account/community registry stays a separate real page.
+    // The neighbouring community registry stays a separate real page.
     expect(findNavPage('/communities')?.status).toBe('ready')
   })
 
@@ -124,6 +124,36 @@ describe('customer CRM navigation', () => {
       filterNavigation('', 'operator')
         .groups.flatMap((group) => group.pages.map((page) => page.key)),
     ).toContain('/customers')
+  })
+})
+
+describe('platform user directory navigation', () => {
+  it('registers /users as an independent ready page for every staff role', () => {
+    const users = findNavPage('/users')
+    expect(users).toBeTruthy()
+    expect(users?.status).toBe('ready')
+    expect(users?.planned).toEqual([])
+    expect(users?.label).toBe('用户管理')
+    expect(users?.roles).toBeUndefined()
+    expect(groupForPage('/users')?.label).toBe('客户与网格')
+    expect(activeMenuKey('/users')).toBe('/users')
+    for (const role of ['admin', 'operator', 'grid_worker'] as const) {
+      expect(isPageVisible(users!, role)).toBe(true)
+      expect(
+        filterNavigation('', role).groups.flatMap((group) => group.pages.map((page) => page.key)),
+      ).toContain('/users')
+    }
+  })
+
+  it('renames /communities to community management and removes the duplicate roster wording', () => {
+    const communities = findNavPage('/communities')
+    expect(communities?.status).toBe('ready')
+    expect(communities?.label).toBe('社区管理')
+    expect(communities?.description).toContain('后台账户')
+    expect(communities?.description).not.toContain('居民列表')
+    expect(activeMenuKey('/communities')).toBe('/communities')
+    // The user directory is a sibling destination, not a tab inside 社区管理.
+    expect(findNavPage('/users')?.label).not.toBe(communities?.label)
   })
 })
 
