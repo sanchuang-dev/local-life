@@ -244,7 +244,7 @@ function NewLeadView() {
 
             {sourceType === 'grid_promotion' ? (
               <p className="mt-2 rounded-[12px] bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
-                推广网格员默认为你本人，由服务端在创建时校验社区归属。
+                推广负责人默认是你本人。
               </p>
             ) : null}
           </PageSection>
@@ -279,7 +279,7 @@ function NewLeadView() {
           {busy ? '提交中…' : '登记线索'}
         </button>
         <p className="mt-2 text-center text-[11px] leading-5 text-slate-400">
-          成功后进入线索详情，状态与归属均以服务端返回为准。
+          保存后进入线索详情。
         </p>
       </form>
     </div>

@@ -292,7 +292,7 @@ function LeadDetailContent({
       <section className="mt-4 rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-[16px] font-semibold text-slate-900">新增跟进</h2>
-          <span className="text-[10px] text-slate-400">保存后更新服务端下次联系</span>
+          <span className="text-[10px] text-slate-400">保存后更新下次联系时间</span>
         </div>
         <form className="mt-3" onSubmit={(event) => void submitFollowUp(event)}>
           <Field label="跟进内容" htmlFor="follow-up-content" required>
@@ -444,7 +444,7 @@ function LeadDetailContent({
 
       <section className="mt-4 rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm">
         <h2 className="text-[16px] font-semibold text-slate-900">跟进记录</h2>
-        <p className="mt-0.5 text-[11px] text-slate-400">共 {followUps.length} 条，来自服务端</p>
+        <p className="mt-0.5 text-[11px] text-slate-400">共 {followUps.length} 条</p>
         {followUps.length === 0 ? (
           <div className="mt-3">
             <EmptyBlock
@@ -499,7 +499,7 @@ function LeadDetailContent({
 
       <div className="mt-2 flex items-center gap-2 text-[11px] text-slate-400">
         <UserRound size={13} aria-hidden="true" />
-        仅显示服务端返回的本人授权数据
+        仅显示你有权查看的线索
       </div>
 
       <div className="mt-3">

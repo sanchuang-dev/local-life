@@ -110,7 +110,7 @@ export function ParticipationTeamCard({
   }
 
   let heading = '我的三人团'
-  let description = '参与、三人团与邀请为真实业务，状态来自服务端。'
+  let description = '查看你的三人团进度'
   let statusChip: { text: string; tone: 'teal' | 'orange' | 'slate' } | null = null
   let seatsChip: string | null = null
   let body: ReactNode = null
@@ -119,7 +119,7 @@ export function ParticipationTeamCard({
     heading = activityError ? '参与状态暂不可读取' : '正在读取活动信息…'
     description = activityError
       ? '活动信息加载失败，参与状态需要先确认活动。'
-      : '参与、三人团与邀请为真实业务，状态来自服务端。'
+      : '请稍候…'
     body = activityError ? (
       <div className="mt-3 rounded-[14px] bg-[#fff7f0] p-3 text-[#7a4a2c]">
         <p className="break-words text-[12px] leading-5">{activityError}</p>
@@ -137,13 +137,13 @@ export function ParticipationTeamCard({
     )
   } else if (loadState.status === 'idle' || loadState.status === 'loading') {
     heading = '正在读取参与状态…'
-    description = '参与、三人团与邀请为真实业务，状态来自服务端。'
+    description = '请稍候…'
     statusChip = { text: '读取中', tone: 'slate' }
     body = <LoadingLine text={auth.loading ? '正在读取登录状态…' : '正在读取你的参与状态…'} />
   } else if (loadState.status === 'unauthenticated') {
     heading = '登录后报名三人团'
     description =
-      '参与、三人团与邀请为真实业务。登录后读取你在本活动的参与状态；仅浏览、复制或扫码分享链接不会自动报名。'
+      '登录后可以报名或查看三人团进度。'
     statusChip = { text: '未登录', tone: 'orange' }
     body = (
       <>
@@ -166,7 +166,7 @@ export function ParticipationTeamCard({
     )
   } else if (loadState.status === 'error') {
     heading = '参与状态读取失败'
-    description = '没有用演示数据替代真实状态。请稍后重试。'
+    description = '请稍后重试。'
     statusChip = { text: '读取失败', tone: 'orange' }
     body = (
       <div className="mt-3 rounded-[14px] bg-[#fff7f0] p-3 text-[#7a4a2c]">
@@ -191,7 +191,7 @@ export function ParticipationTeamCard({
       const remainingSeats = team ? Math.max(0, team.seatsTotal - team.seatsFilled) : 3
       heading = inviteCode ? '接受邀请，加入三人团' : '参与本活动，组成三人团'
       description =
-        '三人团固定 3 个不同居民账户，发起人占一席，另邀两位街坊。只有你主动确认参与，服务端才会写入记录。'
+        '每团 3 人，确认参与后占用一个席位。'
       statusChip = {
         text: data.joinable ? '可参与' : '暂不可参与',
         tone: data.joinable ? 'teal' : 'slate',
@@ -239,7 +239,7 @@ export function ParticipationTeamCard({
       )
     } else if (!team) {
       heading = '参与记录已读取，团队信息暂不可用'
-      description = '服务端返回了参与记录，但团队信息缺失。请刷新后重试，页面不会用演示成员补齐。'
+      description = '团队信息暂不可用，请刷新重试。'
       statusChip = { text: '数据异常', tone: 'orange' }
       body = (
         <button
@@ -264,7 +264,7 @@ export function ParticipationTeamCard({
             : '你是本团成员'
 
       heading = locked ? '已成团' : `还差 ${remaining} 位街坊`
-      description = `${attribution}。席位与成员来自服务端实时状态，刷新或换设备后保持一致。`
+      description = attribution
       statusChip = locked
         ? { text: '已成团', tone: 'teal' }
         : { text: '进行中', tone: 'orange' }
@@ -354,9 +354,6 @@ export function ParticipationTeamCard({
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-[#e8f6f0] px-2.5 py-1 text-[12px] font-bold text-teal-700">
               我的三人团
-            </span>
-            <span className="rounded-full border border-teal-200 bg-white px-2 py-0.5 text-[10px] font-bold text-teal-700">
-              真实业务
             </span>
             {statusChip ? (
               <span

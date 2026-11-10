@@ -220,7 +220,7 @@ function LeadsView() {
 
       <div className="mt-4 flex items-center justify-between gap-2 rounded-[16px] bg-[#eef7f2] px-3.5 py-2.5">
         <p className="min-w-0 text-[12px] leading-5 text-[#52786c]">
-          只显示服务端授权社区内、你有权处理的线索。
+          仅显示你负责的社区线索。
         </p>
         <div className="flex shrink-0 items-center gap-1.5">
           <Link

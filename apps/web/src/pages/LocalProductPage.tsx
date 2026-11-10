@@ -201,9 +201,6 @@ export function LocalProductPage() {
                 </span>
                 <span className="text-[12px] text-slate-400">/ 件 · 参考单价</span>
               </div>
-              <p className="mt-1.5 text-[11px] leading-5 text-slate-400">
-                本页价格由社区维护，登记订单时由服务端冻结商品名称与单价快照。
-              </p>
             </div>
           </article>
 
@@ -259,7 +256,7 @@ export function LocalProductPage() {
 
             <p className="mt-2 text-right text-[12px] text-slate-500">
               参考合计 <span className="font-semibold text-[#8a6132]">{formatLocalPriceCents(totalCents)}</span>
-              （以服务端快照为准）
+              （以登记确认时的价格为准）
             </p>
 
             <label className="mt-3 block text-[12px] font-medium text-slate-600" htmlFor="local-order-note">

@@ -274,7 +274,6 @@ export function CommunityDiscoveryPage() {
                   <p className="text-[14px] text-[#5b6c67]">{community.address || '社区服务点地址暂未录入'}</p>
                 </div>
               </div>
-              <p className="mt-3 text-[13px] text-[#5b6c67]">当前选择只影响浏览内容，不会自动建立居民归属或报名。</p>
             </>
           ) : (
             <>
@@ -333,7 +332,7 @@ export function CommunityDiscoveryPage() {
         <section className="mt-9" aria-labelledby="community-activities-title">
           <h2 id="community-activities-title" className="text-[21px] font-bold">社区活动</h2>
           <p className="mt-1 text-[14px] leading-6 text-[#5b6c67]">
-            {community ? `${community.name} · 已公开发布的活动` : '选择社区后查看真实活动'}
+            {community ? `${community.name} · 已公开发布的活动` : '选择社区后查看活动'}
           </p>
           {!community ? (
             <div className="mt-3 flex items-start gap-3 rounded-2xl border border-[#dce6e2] bg-white p-4">

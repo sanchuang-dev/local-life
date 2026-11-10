@@ -80,7 +80,7 @@ export function WorkbenchLoginPage() {
         </div>
 
         <p className="mt-4 text-[12px] leading-5 text-slate-500">
-          使用街道/社区分配的网格员、运营员或管理员账号登录。登录后只显示服务端授权社区内、你本人有权处理的线索与受理单。
+          使用街道/社区分配的网格员、运营员或管理员账号登录。登录后查看你负责的社区线索与受理单。
         </p>
 
         {residentOnly ? (

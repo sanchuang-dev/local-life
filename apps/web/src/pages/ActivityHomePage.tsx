@@ -36,8 +36,8 @@ import { useRewardProgress } from '../hooks/useRewardProgress'
 import { useWechatActivityShare } from '../hooks/useWechatActivityShare'
 
 const quickEntries = [
-  { id: 'rewards', label: '我的奖励', hint: '真实奖励与核销凭据', to: '/me/rewards', icon: Gift },
-  { id: 'life', label: '惠生活', hint: '真实商城商品', to: '/life', icon: Sparkles },
+  { id: 'rewards', label: '我的奖励', hint: '领取与核销进度', to: '/me/rewards', icon: Gift },
+  { id: 'life', label: '惠生活', hint: '社区优惠与商品', to: '/life', icon: Sparkles },
   { id: 'me', label: '我的', hint: '账户 · 报名 · 三人团', to: '/me', icon: UserRound },
 ] as const
 
@@ -132,14 +132,6 @@ export function ActivityHomePage() {
             >
               {residentActivityPhaseLabels[phase]}
             </span>
-            <span className="rounded-full bg-white/70 px-2.5 py-1 text-[10px] font-medium text-[#52786c]">
-              已发布活动 · 数据来自服务端
-            </span>
-            {activity.ruleVersion !== null ? (
-              <span className="rounded-full bg-white/70 px-2.5 py-1 text-[10px] font-medium text-[#52786c]">
-                规则第 {activity.ruleVersion} 版
-              </span>
-            ) : null}
           </div>
 
           <h1 className="mt-2 break-words text-[22px] font-bold leading-[1.32] tracking-tight text-[#1f4d3c]">
@@ -199,7 +191,7 @@ export function ActivityHomePage() {
           onShare={() => setSheet('share')}
         />
       ) : (
-        <ActivityHomeStatus state={state} requestedActivityId={requestedActivityId} onRetry={retry} />
+        <ActivityHomeStatus state={state} onRetry={retry} />
       )}
 
       {activity ? (
@@ -214,7 +206,6 @@ export function ActivityHomePage() {
                 我的签到与团队奖励
               </h2>
             </div>
-            <span className="shrink-0 text-[11px] text-slate-400">真实数据</span>
           </div>
           <div className="rounded-[20px] border border-slate-100 bg-white p-3.5 shadow-sm">
             <RewardProgressCard
@@ -240,7 +231,7 @@ export function ActivityHomePage() {
             </p>
             <p className="mt-1 text-[12px] leading-5 text-[#52786c]">
               你本场三人团还有 {Math.max(0, (team?.seatsTotal ?? 3) - (team?.seatsFilled ?? 0))} 个空席，
-              邀请链接与二维码带真实活动与邀请码；好友需登录并主动确认才会加入。
+              邀请好友确认加入三人团。
             </p>
             <button
               type="button"
@@ -281,10 +272,6 @@ export function ActivityHomePage() {
         </div>
       </section>
 
-      <p className="mx-4 mt-5 text-[11px] leading-[1.7] text-slate-400">
-        本页只呈现服务端已发布的活动：活动信息、参与、三人团、签到与团队奖励为真实业务。
-        抽奖、社区榜单与压轴大奖等尚未落地的玩法只保留在活动玩法页，并明确标注为演示，不会产生真实记录或发放。
-      </p>
 
       <CampaignSheet
         open={sheet === 'rules'}
@@ -359,11 +346,9 @@ export function ActivityHomePage() {
  */
 function ActivityHomeStatus({
   state,
-  requestedActivityId,
   onRetry,
 }: {
   state: ReturnType<typeof usePublicActivity>['state']
-  requestedActivityId: string | null
   onRetry: () => void
 }) {
   // `ready` is rendered by the parent; this component owns the three non-ready states.
@@ -403,8 +388,7 @@ function ActivityHomeStatus({
         </span>
         <h1 className="mt-3 text-[17px] font-bold text-slate-800">当前没有已发布的活动</h1>
         <p className="mt-1.5 text-[12px] leading-5 text-slate-500">
-          活动发布后，这里会显示真实的活动标题、社区、地点、时间与参与入口。
-          本页不会用示例活动、虚构名额或演示奖品填充。
+          有新活动发布后，可以在这里查看详情并报名。
         </p>
         <div className="mt-3 flex flex-col items-center gap-2">
           <button
@@ -434,11 +418,6 @@ function ActivityHomeStatus({
         活动信息加载失败
       </p>
       <p className="mt-1 break-words text-[12px] leading-5 text-[#7a4a2c]">{state.message}</p>
-      {requestedActivityId ? (
-        <p className="mt-1 break-words text-[11px] leading-4 text-[#8a6132]">
-          当前链接指定了活动 {requestedActivityId}，没有回退到其他活动或示例数据。
-        </p>
-      ) : null}
       <button
         type="button"
         onClick={onRetry}
