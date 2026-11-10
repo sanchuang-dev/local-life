@@ -16,6 +16,8 @@ import {
   wechatProfileStatusSchema,
   createCommunityRequestSchema,
   communityLocationSchema,
+  PUBLIC_COMMUNITY_ROUTE,
+  publicCommunityQuerySchema,
   TENCENT_MAP_ADMIN_ROUTES,
   saveTencentMapConfigRequestSchema,
   setTencentMapEnabledRequestSchema,
@@ -62,6 +64,7 @@ import { registerPhoneAuthRoutes } from './auth/phone-routes.js'
 import type { SmsSender } from './auth/phone.js'
 import { logEvent } from './log.js'
 import { registerActivityRoutes } from './activities/routes.js'
+import { listPublicCommunities } from './communities/discovery.js'
 import { resolvePublicActivityCommunityId } from './activities/service.js'
 import { registerCrmRoutes } from './crm/routes.js'
 import { registerLocalCatalogRoutes } from './local/routes.js'
@@ -1163,6 +1166,20 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
         ? redirectWechatProfileResult(c, config, 'provider_unavailable', boundReturnTo)
         : redirectToWeb(c, config, 'wechat_provider_unavailable', boundReturnTo)
     }
+  })
+
+  /** Public community search is browse-only; location never changes resident identity. */
+  app.get(PUBLIC_COMMUNITY_ROUTE, (c) => {
+    const input = publicCommunityQuerySchema.safeParse({
+      q: c.req.query('q'),
+      latitude: c.req.query('latitude'),
+      longitude: c.req.query('longitude'),
+    })
+    if (!input.success) {
+      return fail(c, 400, API_ERROR_CODES.invalidRequest, '社区查询参数不正确')
+    }
+    c.header('Cache-Control', 'no-store')
+    return c.json(listPublicCommunities(db, input.data))
   })
 
   app.get('/admin/communities', (c) => {
