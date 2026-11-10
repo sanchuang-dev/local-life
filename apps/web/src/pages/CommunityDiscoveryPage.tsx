@@ -14,12 +14,12 @@ import {
   ArrowRight, CalendarDays, CalendarX, ChevronDown, ChevronRight,
   CircleAlert, Clock3, LocateFixed, MapPin, Search, X,
 } from 'lucide-react'
-import { requestCommunityLocation } from '../lib/communityGeolocation'
+import { CommunityLocationError, createCommunityLocationRequester } from '../lib/communityGeolocation'
+import { communityLocationSheetCopy, type CommunityLocationStatus } from '../lib/communityLocationCopy'
 import type { Gcj02Point } from '../lib/communityCoordinates'
 import { activityDetailHref, SELECTED_COMMUNITY_KEY } from '../lib/communityHomeRoute'
 
 type AsyncList<T> = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; items: T[] }
-type LocationStatus = 'idle' | 'locating' | 'success' | 'error'
 
 const actionClass = 'inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 text-[15px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#116d63]'
 const primary = `${actionClass} bg-[#138b79] text-white hover:bg-[#116d63]`
@@ -59,8 +59,9 @@ function activityStatus(activity: PublicActivitySummary): string {
 }
 
 export function CommunityDiscoveryPage() {
-  const [locationStatus, setLocationStatus] = useState<LocationStatus>('idle')
+  const [locationStatus, setLocationStatus] = useState<CommunityLocationStatus>('idle')
   const [position, setPosition] = useState<Gcj02Point | null>(null)
+  const [locationRequester] = useState(createCommunityLocationRequester)
   const [directory, setDirectory] = useState<AsyncList<PublicCommunity>>({ status: 'loading' })
   const [directoryToken, refreshDirectory] = useState(0)
   const [selectedId, setSelectedId] = useState<string | null>(savedCommunityId)
@@ -71,6 +72,7 @@ export function CommunityDiscoveryPage() {
   const [search, setSearch] = useState('')
   const [searchResults, setSearchResults] = useState<AsyncList<PublicCommunity> | null>(null)
   const [locationError, setLocationError] = useState('')
+  const mountedRef = useRef(true)
   const lastTrigger = useRef<HTMLElement | null>(null)
   const modalRef = useRef<HTMLElement | null>(null)
 
@@ -166,19 +168,31 @@ export function CommunityDiscoveryPage() {
     return () => { window.clearTimeout(timer); controller.abort() }
   }, [sheetOpen, search])
 
-  const startLocation = useCallback(async () => {
-    if (locationStatus === 'locating') return
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      locationRequester.cancel()
+    }
+  }, [locationRequester])
+
+  const startLocation = useCallback(() => {
+    // Rapid double taps share one request instead of stacking prompts/timeouts.
+    if (locationRequester.pending) return
     setLocationStatus('locating')
     setLocationError('')
-    try {
-      const coordinates = await requestCommunityLocation()
+    locationRequester.request().then((coordinates) => {
+      if (!mountedRef.current) return
       setPosition(coordinates)
       setLocationStatus('success')
-    } catch (cause) {
+    }).catch((cause: unknown) => {
+      // Unmount cancellation must not surface as a resident-facing error.
+      if (!mountedRef.current) return
+      if (cause instanceof CommunityLocationError && cause.reason === 'cancelled') return
       setLocationStatus('error')
-      setLocationError(cause instanceof Error ? cause.message : '定位失败')
-    }
-  }, [locationStatus])
+      setLocationError(cause instanceof Error ? cause.message : '定位失败，请手动选择社区')
+    })
+  }, [locationRequester])
 
   const closeSheet = useCallback(() => {
     setSheetOpen(false)
@@ -239,6 +253,7 @@ export function CommunityDiscoveryPage() {
   const listHeading = search.trim() ? '搜索结果' : locationStatus === 'success' ? '附近社区' : '全部社区'
   const showAllManual = !search.trim() && locationStatus === 'success' && nearby.length === 0 && directory.status === 'ready'
   const displayed = showAllManual ? directory : shown
+  const locationCopy = communityLocationSheetCopy(locationStatus, locationError)
 
   return (
     <div className="mx-auto min-h-[70vh] w-full max-w-[480px] bg-[#f5f7f7] text-[#172d28]">
@@ -247,12 +262,12 @@ export function CommunityDiscoveryPage() {
           <h1 className="text-[24px] font-bold tracking-tight text-[#0b4a42]">本地生活</h1>
           <p className="mt-0.5 text-[14px] text-[#5b6c67]">社区活动与便民服务</p>
         </div>
-        <button type="button" onClick={() => { void startLocation() }}
+        <button type="button" onClick={startLocation}
           disabled={locationStatus === 'locating'}
           className="flex min-h-11 shrink-0 items-center gap-1 rounded-full border border-[#dce6e2] bg-white px-3 text-[13px] font-semibold text-[#116d63]">
           <MapPin size={17} aria-hidden="true" />
           {locationStatus === 'success' ? '已定位 · 重新定位' :
-            locationStatus === 'locating' ? '定位中…' : '定位附近'}
+            locationStatus === 'locating' ? '定位中…' : locationStatus === 'error' ? '定位失败 · 重试' : '定位附近'}
         </button>
       </header>
 
@@ -317,7 +332,7 @@ export function CommunityDiscoveryPage() {
               )}
               <div className="mt-5 grid grid-cols-2 gap-2 max-[359px]:grid-cols-1">
                 <button type="button" className={primary} disabled={locationStatus === 'locating'}
-                  onClick={() => { void startLocation() }}>
+                  onClick={startLocation}>
                   <LocateFixed size={18}/> {locationStatus === 'locating' ? '定位中…' : locationStatus === 'success' ? '重新定位' : '定位附近社区'}
                 </button>
                 <button type="button" className={secondary}
@@ -392,16 +407,21 @@ export function CommunityDiscoveryPage() {
                 className="grid h-11 w-11 place-items-center rounded-full text-[#5b6c67]"><X size={21}/></button>
             </div>
             <div className="px-5">
-              <div className="flex items-center justify-between rounded-xl bg-[#e8f6f0] p-3">
-                <div className="flex items-center gap-2">
-                  <LocateFixed size={19} className="text-[#138b79]"/>
-                  <div>
-                    <p className="text-[14px] font-semibold">{locationStatus === 'success' ? '已获取位置' : locationStatus === 'locating' ? '正在定位' : '未获取位置'}</p>
-                    <p className="text-[12px] text-[#5b6c67]">位置仅用于推荐附近社区</p>
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-[#e8f6f0] p-3">
+                <div className="flex min-w-0 items-start gap-2">
+                  <LocateFixed size={19} className="mt-0.5 shrink-0 text-[#138b79]"/>
+                  <div className="min-w-0">
+                    <p className="text-[14px] font-semibold">{locationCopy.title}</p>
+                    <p
+                      className={`mt-0.5 text-[12px] leading-5 ${locationStatus === 'error' ? 'text-[#934a35]' : 'text-[#5b6c67]'}`}
+                      role={locationStatus === 'error' ? 'alert' : 'status'}
+                    >
+                      {locationCopy.detail}
+                    </p>
                   </div>
                 </div>
-                <button type="button" className="min-h-11 px-1 text-[13px] font-semibold text-[#116d63]" disabled={locationStatus === 'locating'}
-                  onClick={() => { void startLocation() }}>重新定位</button>
+                <button type="button" className="min-h-11 shrink-0 px-1 text-[13px] font-semibold text-[#116d63]" disabled={locationStatus === 'locating'}
+                  onClick={startLocation}>{locationCopy.action}</button>
               </div>
               <label className="mt-4 flex min-h-12 items-center gap-2 rounded-xl border border-[#dce6e2] bg-white px-3">
                 <Search size={19} className="text-[#5b6c67]"/>
