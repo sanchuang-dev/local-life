@@ -5,6 +5,7 @@ import type { Hono } from 'hono'
 import {
   API_ERROR_CODES, EXTERNAL_OFFER_ROUTES,
   createExternalOfferRequestSchema, externalOfferListSchema, externalOfferSchema,
+  externalOfferImportRequestSchema, externalOfferImportResponseSchema,
   updateExternalOfferRequestSchema, type ExternalOffer,
 } from '@sanchuang-dev/local-life-contracts'
 import type { AppBindings, AppContext } from '../http.js'
@@ -75,6 +76,49 @@ export function registerExternalOfferRoutes(
       })
     })
     return c.json(toOffer(get(id)!), 201)
+  })
+
+  app.post(EXTERNAL_OFFER_ROUTES.importBatch, async (c) => {
+    const actor = guard(c, true)
+    if (actor instanceof Response) return actor
+    const input = bodySchemaError(await c.req.json().catch(() => null), externalOfferImportRequestSchema)
+    if (!input) {
+      return fail(c, 400, API_ERROR_CODES.invalidRequest, '导入数据格式不正确（仅支持最多100条有效的HTTPS优惠）')
+    }
+    const stamp = now()
+    // Compare the exact destination and platform, never title alone. Existing
+    // entries remain untouched; a second import is safe to retry.
+    const existingKeys = new Set(
+      db.select({ platform: externalOffers.platform, url: externalOffers.url }).from(externalOffers)
+        .all().map((row) => row.platform.trim().toLowerCase() + '\n' + row.url),
+    )
+    let imported = 0
+    let skipped = 0
+    db.transaction((tx) => {
+      for (const item of input.items) {
+        const key = item.platform.trim().toLowerCase() + '\n' + item.url
+        if (existingKeys.has(key)) {
+          skipped += 1
+          continue
+        }
+        existingKeys.add(key)
+        tx.insert(externalOffers).values({
+          ...item,
+          id: randomUUID(),
+          enabled: false,
+          expiresAt: item.expiresAt ? new Date(item.expiresAt) : null,
+          createdAt: stamp,
+          updatedAt: stamp,
+          createdByUserId: actor.userId,
+        }).run()
+        imported += 1
+      }
+      insertAudit(tx, actor.userId, 'external_offer.imported', null, stamp, {
+        imported: String(imported),
+        skipped: String(skipped),
+      })
+    })
+    return c.json(externalOfferImportResponseSchema.parse({ imported, skipped }), 201)
   })
 
   app.patch(EXTERNAL_OFFER_ROUTES.adminDetail, async (c) => {
