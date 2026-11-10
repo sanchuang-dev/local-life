@@ -4,9 +4,12 @@ import {
   updateExternalOfferRequestSchema,
   externalOfferSchema,
   externalOfferListSchema,
+  externalOfferImportRequestSchema,
+  externalOfferImportResponseSchema,
   type ExternalOffer,
   type CreateExternalOfferRequest,
   type UpdateExternalOfferRequest,
+  type ExternalOfferImportItem,
 } from '@sanchuang-dev/local-life-contracts'
 import { fillRoute, parsePayload, requestLocalJson } from './localApi'
 
@@ -33,4 +36,15 @@ export async function updateAdminOffer(
     '/api' + fillRoute(EXTERNAL_OFFER_ROUTES.adminDetail, ':offerId', id),
     { method: 'PATCH', csrfToken, body },
   ), '第三方优惠修改结果')
+}
+
+/** Batch import is deliberately draft-only, even when a source file says enabled. */
+export async function importAdminOffers(
+  csrfToken: string, items: ExternalOfferImportItem[],
+) {
+  const body = externalOfferImportRequestSchema.parse({ items })
+  return parsePayload(externalOfferImportResponseSchema, await requestLocalJson(
+    '/api' + EXTERNAL_OFFER_ROUTES.importBatch,
+    { method: 'POST', csrfToken, body },
+  ), '第三方优惠批量导入结果')
 }

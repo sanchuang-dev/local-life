@@ -160,6 +160,61 @@ test('external offers: real auth/CSRF, publication, expiry, audit and no transac
   }
 })
 
+test('external offers bulk import: atomic validation, CSRF, draft-only and idempotency', async () => {
+  const { db, sqlite } = createDatabase(':memory:', migrations)
+  const config = loadConfig({ NODE_ENV: 'test', AUTH_DEV_ENABLED: 'true' })
+  const app = createApp({ db, config, logRequests: false, now: () => frozen })
+  try {
+    await addStaff(db, 'admin', 'importadmin')
+    await addStaff(db, 'operator', 'importoperator')
+    await addStaff(db, 'grid_worker', 'importgrid')
+    const admin = await login(app, 'importadmin')
+    const operator = await login(app, 'importoperator')
+    const grid = await login(app, 'importgrid')
+    const path = EXTERNAL_OFFER_ROUTES.importBatch
+    const first = { title: '外卖红包', platform: '美团', category: '外卖',
+      description: null, url: 'https://example.com/coupon-a', sortOrder: 10, expiresAt: null }
+    const second = { ...first, title: '即时零售', url: 'https://example.com/coupon-b', sortOrder: 20 }
+    const items = { items: [first, second] }
+    assert.equal((await request(app, 'POST', path, items)).status, 401)
+    assert.equal((await request(app, 'POST', path, items, grid)).status, 403)
+    assert.equal((await request(app, 'POST', path, items, admin, false)).status, 403)
+    assert.equal((await request(app, 'POST', path, items, admin, true, 'https://evil.example')).status, 403)
+    assert.equal((await request(app, 'POST', path,
+      { items: [first, { ...second, url: 'http://unsafe.example' }] }, admin)).status, 400)
+    assert.equal((await request(app, 'POST', path,
+      { items: [{ ...first, enabled: true }] }, admin)).status, 400)
+    assert.equal((await request(app, 'POST', path, { items: [] }, admin)).status, 400)
+    assert.equal(db.select().from(externalOffers).all().length, 0)
+
+    const created = await request(app, 'POST', path, items, operator)
+    assert.equal(created.status, 201)
+    assert.deepEqual(await created.json(), { imported: 2, skipped: 0 })
+    const stored = db.select().from(externalOffers).all()
+    assert.equal(stored.length, 2)
+    assert.ok(stored.every((row) => row.enabled === false))
+    assert.deepEqual(externalOfferListSchema.parse(await (
+      await request(app, 'GET', EXTERNAL_OFFER_ROUTES.publicList)
+    ).json()).items, [])
+
+    const repeated = await request(app, 'POST', path, items, admin)
+    assert.equal(repeated.status, 201)
+    assert.deepEqual(await repeated.json(), { imported: 0, skipped: 2 })
+    const withinBatch = await request(app, 'POST', path, {
+      items: [second, { ...second, title: '同链接另一个标题' }],
+    }, admin)
+    assert.equal(withinBatch.status, 201)
+    assert.deepEqual(await withinBatch.json(), { imported: 0, skipped: 2 })
+    assert.equal(db.select().from(externalOffers).all().length, 2)
+    assert.equal(db.select().from(localOrders).all().length, 0)
+    assert.equal(db.select().from(activityRewardGrants).all().length, 0)
+    assert.equal(db.select().from(ledgerEntries).all().length, 0)
+    assert.ok(db.select().from(auditLogs).all().some((row) => row.event === 'external_offer.imported'))
+  } finally {
+    sqlite.close()
+  }
+})
+
 test('0014 migration persists external offers over SQLite restart without seeding any promotions', () => {
   const root = mkdtempSync(join(tmpdir(), 'll-offer-'))
   const path = join(root, 'offers.sqlite')

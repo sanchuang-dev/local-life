@@ -8,8 +8,9 @@ import {
 } from '@sanchuang-dev/local-life-contracts'
 import { useAdminAuth } from '../app/auth-context'
 import { PageHeader } from '../components/PageHeader'
-import { createAdminOffer, listAdminOffers, updateAdminOffer } from '../services/externalOffers'
+import { createAdminOffer, importAdminOffers, listAdminOffers, updateAdminOffer } from '../services/externalOffers'
 import { describeLocalError } from '../services/localApi'
+import { downloadExternalOffersTemplate, previewExternalOffersExcel, type PreviewOfferRow } from '../utils/externalOffersExcel'
 import './local-console.css'
 
 interface OfferForm {
@@ -48,6 +49,10 @@ export function ExternalOffersPage() {
   const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState<ExternalOffer | null>(null)
   const [saving, setSaving] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [parsing, setParsing] = useState(false)
+  const [preview, setPreview] = useState<PreviewOfferRow[] | null>(null)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -133,6 +138,48 @@ export function ExternalOffersPage() {
     })
   }
 
+  const previewFile = async (file: File | undefined) => {
+    setPreview(null)
+    if (!file) return
+    setParsing(true)
+    try {
+      setPreview(await previewExternalOffersExcel(file))
+    } catch (cause) {
+      message.error(describeLocalError(cause, 'Excel 文件解析失败'))
+    } finally {
+      setParsing(false)
+    }
+  }
+
+  const submitImport = () => {
+    const valid = preview?.filter((entry) => entry.item).map((entry) => entry.item!) ?? []
+    const invalid = preview?.filter((entry) => entry.error).length ?? 0
+    if (!valid.length) return
+    modal.confirm({
+      title: '确认批量导入 ' + valid.length + ' 条优惠？',
+      content: invalid
+        ? '将跳过 ' + invalid + ' 条无效数据。全部导入为下架草稿；确认后仍须逐条检查外部页面并手动启用。'
+        : '全部导入为下架草稿；确认后仍须逐条检查外部页面并手动启用。',
+      okText: '导入有效项（默认下架）',
+      cancelText: '取消',
+      onOk: async () => {
+        setImporting(true)
+        try {
+          const result = await importAdminOffers(session.csrfToken, valid)
+          message.success('新增草稿 ' + result.imported + ' 条，去重跳过 ' + result.skipped + ' 条')
+          setImportOpen(false)
+          setPreview(null)
+          await refresh()
+        } catch (cause) {
+          message.error(describeLocalError(cause, '导入失败'))
+          throw cause
+        } finally {
+          setImporting(false)
+        }
+      },
+    })
+  }
+
   const columns: TableProps<ExternalOffer>['columns'] = [
     {
       title: '活动 / 实际平台', key: 'title',
@@ -178,13 +225,53 @@ export function ExternalOffersPage() {
           description="请在目标手机与微信内核验链接、活动名称和有效期，再明确启用。普通 H5 链接不能保证自动打开小程序或 App。" />
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
           <Button onClick={() => void refresh()} loading={loading}>刷新列表</Button>
-          <Button type="primary" onClick={openCreate}>新增优惠活动</Button>
+          <Space wrap>
+            <Button onClick={downloadExternalOffersTemplate}>下载Excel模板</Button>
+            <Button onClick={() => { setPreview(null); setImportOpen(true) }}>Excel批量导入</Button>
+            <Button type="primary" onClick={openCreate}>新增优惠活动</Button>
+          </Space>
         </div>
         {error && <Alert type="error" showIcon message={error} />}
         <Table<ExternalOffer> rowKey="id" size="middle" dataSource={rows} columns={columns}
           loading={loading} pagination={{ pageSize: 10 }} scroll={{ x: 660 }}
           locale={{ emptyText: '暂无第三方优惠。请先新增并核实真实链接。' }} />
       </div>
+      <Modal title="Excel 批量导入" open={importOpen}
+        onCancel={() => { if (!parsing && !importing) setImportOpen(false) }}
+        footer={[
+          <Button key="cancel" onClick={() => setImportOpen(false)} disabled={importing}>关闭</Button>,
+          <Button key="submit" type="primary" loading={importing} disabled={parsing || !preview?.some((r) => r.item)}
+            onClick={submitImport}>导入有效项（默认下架）</Button>,
+        ]}
+        width={850} destroyOnHidden>
+        <Space direction="vertical" size="middle" style={{ display: 'flex' }}>
+          <Alert type="warning" showIcon
+            message="不自动发布任何优惠"
+            description="使用模板第一张「导入数据」，一次最多100条。仅完整 HTTPS 链接可导入；HTTP、tbopen:// 和小程序相对路径会被标红并跳过。真实活动还需微信真机核验。" />
+          <input aria-label="选择Excel文件" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            disabled={parsing || importing}
+            onChange={(event) => void previewFile(event.target.files?.[0])} />
+          {parsing && <Typography.Text>正在解析 Excel…</Typography.Text>}
+          {preview && (
+            <>
+              <Typography.Text>
+                共 {preview.length} 条，格式有效 {preview.filter((r) => r.item).length} 条，
+                待修正 {preview.filter((r) => r.error).length} 条。
+                语法有效不代表活动链接已验证。
+              </Typography.Text>
+              <Table<PreviewOfferRow> size="small" rowKey="rowNumber"
+                dataSource={preview} pagination={{ pageSize: 8 }}
+                scroll={{ x: 700 }} columns={[
+                  { title: 'Excel行', dataIndex: 'rowNumber', width: 80 },
+                  { title: '活动', dataIndex: 'title', ellipsis: true },
+                  { title: '检查结果', width: 300, render: (_, row) =>
+                    row.error ? <Tag color="red">{row.error}</Tag>
+                      : <Tag color="orange">格式有效 · 导入后下架</Tag> },
+                ]} />
+            </>
+          )}
+        </Space>
+      </Modal>
       <Modal title={editing ? '编辑第三方优惠' : '新增第三方优惠'}
         open={editorOpen} onCancel={() => setEditorOpen(false)}
         onOk={() => void form.submit()} okText="保存" confirmLoading={saving}
