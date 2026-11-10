@@ -295,7 +295,7 @@ export function ShopProductDetail({ rawProductId }: { rawProductId: string }) {
             icon={Store}
             tone="warn"
             title="商城未配置"
-            description={`${state.message} `}
+            description="优惠购暂未开放，请稍后再试。"
             onRetry={retry}
             retryLabel="检查配置后重试"
           />

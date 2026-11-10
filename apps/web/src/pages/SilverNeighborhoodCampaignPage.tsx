@@ -681,6 +681,27 @@ export function SilverNeighborhoodCampaignPage() {
                   </p>
                 </div>
               </div>
+              <RewardProgressCard
+                auth={auth}
+                progress={rewardProgress}
+                activityId={activity?.id ?? null}
+                inviteCode={inviteParam.code}
+                inviteInvalid={inviteParam.invalid}
+              />
+            </div>
+          ) : (
+            <div className="mt-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[14px] font-bold text-slate-800">三人有效购买 + 团队达标</p>
+                  <p className="mt-1 text-[12px] leading-5 text-slate-500">
+                    消费模块仍为演示，尚未接入真实订单与金额。
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full bg-[#f1edff] px-2.5 py-1 text-[11px] font-bold text-[#725aa9]">
+                  演示玩法
+                </span>
+              </div>
               <div className="mt-3 rounded-[12px] border border-dashed border-slate-200 bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-500">
                 消费任务尚未开放。
               </div>

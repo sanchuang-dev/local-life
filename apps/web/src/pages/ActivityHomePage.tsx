@@ -132,7 +132,6 @@ export function ActivityHomePage() {
             >
               {residentActivityPhaseLabels[phase]}
             </span>
-            ) : null}
           </div>
 
           <h1 className="mt-2 break-words text-[22px] font-bold leading-[1.32] tracking-tight text-[#1f4d3c]">

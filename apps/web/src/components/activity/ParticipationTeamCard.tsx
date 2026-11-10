@@ -355,6 +355,18 @@ export function ParticipationTeamCard({
             <span className="rounded-full bg-[#e8f6f0] px-2.5 py-1 text-[12px] font-bold text-teal-700">
               我的三人团
             </span>
+            {statusChip ? (
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  statusChip.tone === 'teal'
+                    ? 'bg-[#e8f6f0] text-teal-700'
+                    : statusChip.tone === 'orange'
+                      ? 'bg-[#fff3e6] text-[#a96b2f]'
+                      : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {statusChip.text}
+              </span>
             ) : null}
             {seatsChip ? (
               <span className="text-[12px] font-semibold tabular-nums text-orange-600">{seatsChip}</span>
