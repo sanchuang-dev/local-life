@@ -160,7 +160,7 @@ test('external offers: real auth/CSRF, publication, expiry, audit and no transac
   }
 })
 
-test('0013 migration persists external offers over SQLite restart without seeding any promotions', () => {
+test('0014 migration persists external offers over SQLite restart without seeding any promotions', () => {
   const root = mkdtempSync(join(tmpdir(), 'll-offer-'))
   const path = join(root, 'offers.sqlite')
   try {
@@ -179,7 +179,7 @@ test('0013 migration persists external offers over SQLite restart without seedin
   } finally { rmSync(root, { recursive: true, force: true }) }
 })
 
-test('an already-populated 0012 database upgrades to 0013 with its users intact', () => {
+test('an already-populated 0012 database upgrades through 0014 with its users intact', () => {
   const root = mkdtempSync(join(tmpdir(), 'll-offer-upgrade-'))
   const prior = join(root, 'prior')
   const dbPath = join(root, 'before.sqlite')
