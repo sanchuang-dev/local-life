@@ -112,7 +112,7 @@ function stubBaseline(options?: {
   return stubApi((url) => {
     if (url === '/api/admin/communities') return json({ items: communities })
     if (url === '/api/admin/staff') return json({ items: options?.staffItems ?? [] })
-    if (url.startsWith('/api/crm/residents?')) return json({ items: options?.residentItems ?? [] })
+    if (url.startsWith('/api/crm/residents?')) return json({ items: options?.residentItems ?? [], total: options?.residentItems?.length ?? 0, page: 1, pageSize: 20 })
     throw new Error(`unexpected fetch: ${url}`)
   })
 }
@@ -175,7 +175,7 @@ describe('UsersPage create-community drawer', () => {
         return json({ items: created ? [COMMUNITY_A, COMMUNITY_B] : [COMMUNITY_A] })
       }
       if (url === '/api/admin/staff') return json({ items: [] })
-      if (url.startsWith('/api/crm/residents?')) return json({ items: [] })
+      if (url.startsWith('/api/crm/residents?')) return json({ items: [], total: 0, page: 1, pageSize: 20 })
       throw new Error(`unexpected fetch: ${url}`)
     })
 
@@ -211,7 +211,7 @@ describe('UsersPage create-community drawer', () => {
       }
       if (url === '/api/admin/communities') return json({ items: [COMMUNITY_A] })
       if (url === '/api/admin/staff') return json({ items: [] })
-      if (url.startsWith('/api/crm/residents?')) return json({ items: [] })
+      if (url.startsWith('/api/crm/residents?')) return json({ items: [], total: 0, page: 1, pageSize: 20 })
       throw new Error(`unexpected fetch: ${url}`)
     })
 
@@ -248,7 +248,7 @@ describe('UsersPage create-community drawer', () => {
       }
       if (url === '/api/admin/communities') return json({ items: [COMMUNITY_A] })
       if (url === '/api/admin/staff') return json({ items: [] })
-      if (url.startsWith('/api/crm/residents?')) return json({ items: [] })
+      if (url.startsWith('/api/crm/residents?')) return json({ items: [], total: 0, page: 1, pageSize: 20 })
       throw new Error(`unexpected fetch: ${url}`)
     })
 
@@ -333,7 +333,7 @@ describe('UsersPage create-staff drawer', () => {
       }
       if (url === '/api/admin/communities') return json({ items: [COMMUNITY_A] })
       if (url === '/api/admin/staff') return json({ items: created ? [staffRow] : [] })
-      if (url.startsWith('/api/crm/residents?')) return json({ items: [] })
+      if (url.startsWith('/api/crm/residents?')) return json({ items: [], total: 0, page: 1, pageSize: 20 })
       throw new Error(`unexpected fetch: ${url}`)
     })
     return calls
@@ -398,7 +398,7 @@ describe('UsersPage create-staff drawer', () => {
       }
       if (url === '/api/admin/communities') return json({ items: [COMMUNITY_A] })
       if (url === '/api/admin/staff') return json({ items: [] })
-      if (url.startsWith('/api/crm/residents?')) return json({ items: [] })
+      if (url.startsWith('/api/crm/residents?')) return json({ items: [], total: 0, page: 1, pageSize: 20 })
       throw new Error(`unexpected fetch: ${url}`)
     })
 
@@ -429,5 +429,117 @@ describe('UsersPage create-staff drawer', () => {
     expect(await screen.findByText('请选择至少一个负责社区')).toBeTruthy()
     expect(postCalls(calls, '/api/admin/staff')).toEqual([])
     expect(openDrawers()).toBe(1)
+  })
+})
+
+// Resident directory (#125): the fetch stub only replaces transport; every
+// pagination/search state change is driven through the real UsersPage controls.
+const entry = (id: string, name: string, overrides: Record<string, unknown> = {}) => ({
+  id,
+  displayName: name,
+  localDisplayName: name,
+  wechatNickname: null,
+  wechatAvatarUrl: null,
+  profileAuthorizedAt: null,
+  createdAt: '2026-10-01T00:00:00.000Z',
+  joinedAt: '2026-10-05T00:00:00.000Z',
+  ...overrides,
+})
+
+describe('UsersPage server-side resident directory', () => {
+  it('uses server page/total; searches, clears, changes pages and resets context on community switch', async () => {
+    const calls = stubApi((url) => {
+      if (url === '/api/admin/communities') return json({ items: [COMMUNITY_A, COMMUNITY_B] })
+      if (url === '/api/admin/staff') return json({ items: [] })
+      if (!url.startsWith('/api/crm/residents?')) throw new Error(`unexpected fetch: ${url}`)
+
+      const params = new URL(url, 'http://test.local').searchParams
+      const communityId = params.get('communityId')
+      const page = Number(params.get('page'))
+      const pageSize = Number(params.get('pageSize'))
+      const keyword = params.get('keyword')
+      const total = keyword === '花花' ? 1 : communityId === COMMUNITY_A.id ? 43 : 2
+      const items = Array.from({ length: Math.min(pageSize, Math.max(0, total - (page - 1) * pageSize)) },
+        (_, index) => entry(`123e4567-e89b-42d3-a456-${String(6000 + (page - 1) * pageSize + index).padStart(12, '0')}`,
+          keyword ? '微信花花' : `居民 ${index + (page - 1) * pageSize}`,
+          keyword ? {
+            localDisplayName: '本地花花',
+            wechatNickname: '微信花花',
+            wechatAvatarUrl: null,
+            profileAuthorizedAt: '2026-10-06T00:00:00.000Z',
+          } : {}),
+      )
+      return json({ items, total, page, pageSize })
+    })
+    renderPage(ADMIN_SESSION)
+    await waitFor(() => expect(residentCalls(calls)).toHaveLength(1))
+    await screen.findByText('43 位居民')
+
+    const next = document.querySelector<HTMLButtonElement>('.ant-pagination-next button')
+    expect(next).not.toBeNull()
+    fireEvent.click(next!)
+    await waitFor(() => expect(
+      new URL(residentCalls(calls).at(-1)!.url, 'http://test.local').searchParams.get('page'),
+    ).toBe('2'))
+
+    const input = screen.getByRole('searchbox', { name: '搜索居民' })
+    fireEvent.change(input, { target: { value: '花花' } })
+    fireEvent.click(screen.getByRole('button', { name: /搜\s*索/ }))
+    await waitFor(() => {
+      const params = new URL(residentCalls(calls).at(-1)!.url, 'http://test.local').searchParams
+      expect(params.get('keyword')).toBe('花花')
+      expect(params.get('page')).toBe('1')
+    })
+    expect(await screen.findByText('微信花花')).toBeTruthy()
+    expect(screen.getByText('本地：本地花花')).toBeTruthy()
+    await screen.findByText('1 位居民')
+
+    fireEvent.change(input, { target: { value: '' } })
+    await waitFor(() => {
+      const params = new URL(residentCalls(calls).at(-1)!.url, 'http://test.local').searchParams
+      expect(params.has('keyword')).toBe(false)
+      expect(params.get('page')).toBe('1')
+    })
+    await screen.findByText('43 位居民')
+
+    // The first combobox belongs to the community selector (the other selects
+    // are only mounted in closed admin drawers).
+    const select = screen.getAllByRole('combobox')[0]
+    expect(select).toBeTruthy()
+    await chooseOption(select, '阳光社区')
+    await waitFor(() => {
+      const params = new URL(residentCalls(calls).at(-1)!.url, 'http://test.local').searchParams
+      expect(params.get('communityId')).toBe(COMMUNITY_B.id)
+      expect(params.get('page')).toBe('1')
+      expect(params.has('keyword')).toBe(false)
+    })
+    await screen.findByText('2 位居民')
+    // A page of 20 rows is fetched; never all 43 items to paginate in React.
+    expect(residentCalls(calls).some((call) =>
+      new URL(call.url, 'http://test.local').searchParams.get('pageSize') === '20')).toBe(true)
+  })
+
+  it('shows server failures and an explicit retry without hiding the rest of the management page', async () => {
+    let fail = true
+    const calls = stubApi((url) => {
+      if (url === '/api/admin/communities') return json({ items: [COMMUNITY_A] })
+      if (url === '/api/admin/staff') return json({ items: [] })
+      if (url.startsWith('/api/crm/residents?')) {
+        if (fail) return json({ error: { code: 'server_error', message: '居民接口暂不可用' } }, 503)
+        return json({
+          items: [entry('123e4567-e89b-42d3-a456-426614174222', '微信用户', { localDisplayName: null })],
+          total: 1, page: 1, pageSize: 20,
+        })
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+    renderPage(ADMIN_SESSION)
+    expect(await screen.findByText('居民接口暂不可用')).toBeTruthy()
+    expect(screen.getByText('社区范围')).toBeTruthy()
+    fail = false
+    fireEvent.click(screen.getByRole('button', { name: /重\s*试/ }))
+    await waitFor(() => expect(residentCalls(calls)).toHaveLength(2))
+    await screen.findByText('微信用户')
+    expect(screen.queryByText('居民接口暂不可用')).toBeNull()
   })
 })

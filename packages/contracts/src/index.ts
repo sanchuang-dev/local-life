@@ -785,6 +785,38 @@ export type ActivityAuditEntryListResponse = z.infer<
 >
 
 /* -------------------------------------------------------------------------- */
+/* Resident directory (#125 LL-MVP-013)                                        */
+/* -------------------------------------------------------------------------- */
+
+/** Queries are server-scoped to one authorized community, never global. */
+export const residentDirectoryQuerySchema = z.strictObject({
+  communityId: z.string().uuid(),
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  keyword: z.string().trim().min(1).max(80).optional(),
+})
+
+export const residentDirectoryEntrySchema = z.strictObject({
+  id: z.string().uuid(),
+  /** Display-only precedence: consented WeChat > local name > 微信用户. */
+  displayName: z.string().min(1),
+  localDisplayName: z.string().nullable(),
+  wechatNickname: z.string().nullable(),
+  wechatAvatarUrl: z.string().nullable(),
+  profileAuthorizedAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+  joinedAt: z.string().datetime(),
+})
+export const residentDirectoryResponseSchema = z.strictObject({
+  items: z.array(residentDirectoryEntrySchema),
+  total: z.number().int().nonnegative(),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+})
+export type ResidentDirectoryEntry = z.infer<typeof residentDirectoryEntrySchema>
+export type ResidentDirectoryResponse = z.infer<typeof residentDirectoryResponseSchema>
+
+/* -------------------------------------------------------------------------- */
 /* CRM domain (#61 LL-MVP-005)                                                */
 /* -------------------------------------------------------------------------- */
 
@@ -811,6 +843,7 @@ export const CRM_ROUTES = {
   orderStatus: '/crm/orders/:orderId/status',
   orderAudit: '/crm/orders/:orderId/audit',
   // Back office
+  residentList: '/crm/residents',
   adminLeadList: '/admin/crm/leads',
   adminLeadDetail: '/admin/crm/leads/:leadId',
   adminLeadAudit: '/admin/crm/leads/:leadId/audit',
