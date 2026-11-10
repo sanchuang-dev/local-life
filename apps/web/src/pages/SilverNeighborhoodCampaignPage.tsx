@@ -294,7 +294,7 @@ function ActivityLoadNotice({
         <div className="rounded-t-[12px] bg-gradient-to-b from-[#d8f0cc] via-[#e1f3d8]/85 to-transparent px-3 pb-5 pt-3 text-center text-[#275942]">
           <p className="text-[14px] font-bold">当前没有已发布活动</p>
           <p className="mt-1 text-[11px] leading-4 text-[#52786c]">
-            活动发布后，这里会显示真实的活动标题、社区、地点与时间。
+            有新活动发布后，可以在这里查看活动详情。
           </p>
         </div>
       </div>
@@ -694,7 +694,7 @@ export function SilverNeighborhoodCampaignPage() {
                 <div className="min-w-0">
                   <p className="text-[14px] font-bold text-slate-800">三人有效购买 + 团队达标</p>
                   <p className="mt-1 text-[12px] leading-5 text-slate-500">
-                    消费模块仍为演示，尚未接入真实订单与金额。
+                    消费任务暂未开放。
                   </p>
                 </div>
                 <span className="shrink-0 rounded-full bg-[#f1edff] px-2.5 py-1 text-[11px] font-bold text-[#725aa9]">
@@ -1089,7 +1089,7 @@ export function SilverNeighborhoodCampaignPage() {
               {activity.publishedAt
                 ? `，发布时间 ${formatShanghaiDateTime(activity.publishedAt)}（北京时间）`
                 : ''}
-              。参与、三人团与邀请记录来自真实服务；抽奖、榜单与大奖玩法仍为演示，未接入真实业务。
+              。抽奖、榜单与大奖玩法仅作演示。
             </p>
           </>
         ) : (
@@ -1191,7 +1191,7 @@ export function SilverNeighborhoodCampaignPage() {
                 </p>
               </div>
               <p className="mt-2 text-center text-[11px] leading-4 text-slate-500">
-                二维码、转发与复制使用同一条链接，包含真实活动与邀请参数；浏览不会自动加入，需登录后确认参与。
+                好友打开链接后，需主动确认加入三人团。
               </p>
               <p className="mt-1 text-center text-[11px] leading-4 text-slate-400">
                 线上正式域名待配置；本地开发时该链接仅本机可访问。
@@ -1208,7 +1208,7 @@ export function SilverNeighborhoodCampaignPage() {
       <CampaignSheet
         open={activeSheet === 'checkin-reward'}
         title={rewardReady?.reward?.reward?.prizeName ?? '团队生活礼'}
-        eyebrow="签到任务 · 真实奖励"
+        eyebrow="签到任务 · 团队奖励"
         onClose={() => setActiveSheet(null)}
       >
         <div className="rounded-[16px] bg-[#f2faf6] p-4">
@@ -1268,7 +1268,7 @@ export function SilverNeighborhoodCampaignPage() {
                     ? '尚未加入三人团'
                     : '本活动未配置正式奖励计划'
                   : rewardProgress.state.status === 'unauthenticated'
-                    ? '登录后查看真实进度'
+                    ? '登录后查看进度'
                     : rewardProgress.state.status === 'error'
                       ? '进度读取失败'
                       : '正在读取…'}
@@ -1457,14 +1457,14 @@ export function SilverNeighborhoodCampaignPage() {
           </div>
         ) : (
           <div className="rounded-[16px] border border-slate-100 bg-white p-4">
-            <p className="font-bold text-slate-800">本活动暂无真实奖励记录</p>
+            <p className="font-bold text-slate-800">本活动暂无奖励记录</p>
             <p className="mt-1 text-[12px] leading-5 text-slate-500">
               {rewardProgress.state.status === 'ready'
                 ? rewardProgress.state.data.gate?.kind === 'no_team'
                   ? '你还没有加入三人团，暂不满足奖励条件。'
                   : '本活动尚未配置正式奖励计划，未生成任何奖励或凭据。'
                 : rewardProgress.state.status === 'unauthenticated'
-                  ? '登录后可查看本活动的真实奖励与核销凭据。'
+                  ? '登录后查看奖励与核销凭据。'
                   : rewardProgress.state.status === 'error'
                     ? '奖励状态读取失败，请稍后重试。'
                     : '正在读取奖励状态…'}
