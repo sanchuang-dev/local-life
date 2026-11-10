@@ -4,6 +4,7 @@ import {
   index,
   integer,
   primaryKey,
+  real,
   sqliteTable,
   text,
   uniqueIndex,
@@ -52,6 +53,9 @@ export type StaffStatus = 'active' | 'disabled'
 export const communities = sqliteTable('communities', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
+  address: text('address'),
+  latitudeGcj02: real('latitude_gcj02'),
+  longitudeGcj02: real('longitude_gcj02'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 })
 

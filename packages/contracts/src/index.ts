@@ -156,8 +156,17 @@ export const staffLoginRequestSchema = z.object({
   password: z.string().min(1).max(128),
 })
 
-export const createCommunityRequestSchema = z.object({
+/** Tencent's location-picker returns GCJ-02. Keep that coordinate system explicit. */
+export const communityLocationSchema = z.strictObject({
+  address: z.string().trim().min(1).max(200),
+  latitude: z.number().finite().min(-90).max(90),
+  longitude: z.number().finite().min(-180).max(180),
+})
+export type CommunityLocation = z.infer<typeof communityLocationSchema>
+
+export const createCommunityRequestSchema = z.strictObject({
   name: z.string().trim().min(2).max(60),
+  location: communityLocationSchema.optional(),
 })
 
 export const createStaffAccountRequestSchema = z.object({

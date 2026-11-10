@@ -37,6 +37,8 @@ const environmentSchema = z
     WEB_BASE_URL: z.string().url().optional(),
     TRUSTED_ORIGINS: z.string().default(''),
     AUTH_DEV_ENABLED: z.enum(['true', 'false']).default('false'),
+    /** Browser-visible Tencent map-picker Key; restrict by domain in Tencent console. */
+    TENCENT_MAP_PICKER_KEY: z.string().trim().min(1).optional(),
     // CRMEB integration (Issue #63). The three credentials are optional as a
     // group: when they are absent the adapter reports `not_configured` instead
     // of faking a working shop. A partially supplied group is a deployment
@@ -147,6 +149,7 @@ export interface ApiConfig {
   trustedOrigins: string[]
   webBaseUrl: string
   authDevEnabled: boolean
+  tencentMapPickerKey?: string
   crmeb?: {
     baseUrl: string
     appId: string
@@ -313,6 +316,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): ApiConfig {
     trustedOrigins,
     webBaseUrl,
     authDevEnabled: value.AUTH_DEV_ENABLED === 'true',
+    ...(value.TENCENT_MAP_PICKER_KEY ? { tencentMapPickerKey: value.TENCENT_MAP_PICKER_KEY } : {}),
     ...(value.CRMEB_BASE_URL && value.CRMEB_OUTAPI_APPID && value.CRMEB_OUTAPI_APPSECRET
       ? {
           crmeb: {

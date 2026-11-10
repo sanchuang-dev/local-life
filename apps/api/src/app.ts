@@ -15,6 +15,7 @@ import {
   wechatProfileStartResponseSchema,
   wechatProfileStatusSchema,
   createCommunityRequestSchema,
+  communityLocationSchema,
   createStaffAccountRequestSchema,
   healthResponseSchema,
   isActivityId,
@@ -1160,11 +1161,30 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
   app.get('/admin/communities', (c) => {
     const session = c.get('authSession')
     if (!session?.staff) return fail(c, 401, API_ERROR_CODES.unauthorized, '请先登录管理后台')
+    const selection = {
+      id: communities.id,
+      name: communities.name,
+      address: communities.address,
+      latitudeGcj02: communities.latitudeGcj02,
+      longitudeGcj02: communities.longitudeGcj02,
+    }
     const result =
       session.staff.role === 'admin'
-        ? db.select({ id: communities.id, name: communities.name }).from(communities).all()
-        : staffCommunities(db, session.staff.id)
+        ? db.select(selection).from(communities).all()
+        : db.select(selection).from(communities)
+          .innerJoin(staffCommunityAssignments, eq(staffCommunityAssignments.communityId, communities.id))
+          .where(eq(staffCommunityAssignments.staffAccountId, session.staff.id)).all()
     return c.json({ items: result })
+  })
+
+  app.get('/admin/map-picker-config', (c) => {
+    const session = c.get('authSession')
+    if (!session?.staff) return fail(c, 401, API_ERROR_CODES.unauthorized, '请先登录管理后台')
+    if (session.staff.role !== 'admin') return fail(c, 403, API_ERROR_CODES.forbidden, '只有管理员可以管理社区位置')
+    c.header('Cache-Control', 'no-store')
+    return c.json(config.tencentMapPickerKey
+      ? { available: true, key: config.tencentMapPickerKey }
+      : { available: false })
   })
 
   app.post('/admin/communities', async (c) => {
@@ -1173,12 +1193,39 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     if (session.staff.role !== 'admin') return fail(c, 403, API_ERROR_CODES.forbidden, '只有管理员可以创建社区')
     if (!validCsrf(c, config, session)) return fail(c, 403, API_ERROR_CODES.forbidden, 'CSRF 校验失败')
     const body = bodySchemaError(await c.req.json().catch(() => null), createCommunityRequestSchema)
-    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '社区名称不正确')
+    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '社区信息不正确')
 
     const id = randomUUID()
-    db.insert(communities).values({ id, name: body.name, createdAt: new Date() }).run()
+    db.insert(communities).values({
+      id,
+      name: body.name,
+      address: body.location?.address ?? null,
+      latitudeGcj02: body.location?.latitude ?? null,
+      longitudeGcj02: body.location?.longitude ?? null,
+      createdAt: new Date(),
+    }).run()
     recordAudit(db, session.userId, 'community.created', id)
     return c.json({ id, name: body.name }, 201)
+  })
+
+  app.patch('/admin/communities/:communityId/location', async (c) => {
+    const session = c.get('authSession')
+    if (!session?.staff) return fail(c, 401, API_ERROR_CODES.unauthorized, '请先登录管理后台')
+    if (session.staff.role !== 'admin') return fail(c, 403, API_ERROR_CODES.forbidden, '只有管理员可以管理社区位置')
+    if (!validCsrf(c, config, session)) return fail(c, 403, API_ERROR_CODES.forbidden, 'CSRF 校验失败')
+    const communityId = c.req.param('communityId')
+    const current = db.select({ id: communities.id }).from(communities)
+      .where(eq(communities.id, communityId)).get()
+    if (!current) return fail(c, 404, API_ERROR_CODES.notFound, '社区不存在')
+    const location = bodySchemaError(await c.req.json().catch(() => null), communityLocationSchema)
+    if (!location) return fail(c, 400, API_ERROR_CODES.invalidRequest, '社区位置不正确')
+    db.update(communities).set({
+      address: location.address,
+      latitudeGcj02: location.latitude,
+      longitudeGcj02: location.longitude,
+    }).where(eq(communities.id, communityId)).run()
+    recordAudit(db, session.userId, 'community.location_updated', communityId)
+    return c.json({ id: communityId, location })
   })
 
   app.get('/admin/staff', (c) => {
