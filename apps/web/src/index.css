@@ -83,6 +83,10 @@ select {
   padding-bottom: calc(var(--app-shell-nav-height) + env(safe-area-inset-bottom, 0px));
 }
 
+.app-shell__main--auth {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 .app-shell__main:focus {
   outline: none;
 }
