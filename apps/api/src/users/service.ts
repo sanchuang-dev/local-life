@@ -263,6 +263,7 @@ function directoryQuery(db: AppDatabase, appId: string | null) {
 function residentMembershipMap(
   db: AppDatabase,
   userIds: string[],
+  allowedCommunityIds?: string[],
 ): Map<string, ResidentMembership[]> {
   const map = new Map<string, ResidentMembership[]>()
   if (userIds.length === 0) return map
@@ -275,7 +276,12 @@ function residentMembershipMap(
     })
     .from(residentCommunityAssignments)
     .innerJoin(communities, eq(communities.id, residentCommunityAssignments.communityId))
-    .where(inArray(residentCommunityAssignments.userId, userIds))
+    .where(and(
+      inArray(residentCommunityAssignments.userId, userIds),
+      allowedCommunityIds === undefined
+        ? undefined
+        : inArray(residentCommunityAssignments.communityId, allowedCommunityIds),
+    ))
     .orderBy(asc(residentCommunityAssignments.userId), asc(communities.id))
     .all()
   for (const row of rows) {
@@ -344,12 +350,21 @@ export function maskDirectoryPhone(phone: string): string {
   return `${compact.slice(0, 3)}****${compact.slice(7)}`
 }
 
-function staffCommunitiesOf(db: AppDatabase, staffAccountId: string) {
+function staffCommunitiesOf(
+  db: AppDatabase,
+  staffAccountId: string,
+  allowedCommunityIds?: string[],
+) {
   return db
     .select({ id: communities.id, name: communities.name })
     .from(staffCommunityAssignments)
     .innerJoin(communities, eq(communities.id, staffCommunityAssignments.communityId))
-    .where(eq(staffCommunityAssignments.staffAccountId, staffAccountId))
+    .where(and(
+      eq(staffCommunityAssignments.staffAccountId, staffAccountId),
+      allowedCommunityIds === undefined
+        ? undefined
+        : inArray(staffCommunityAssignments.communityId, allowedCommunityIds),
+    ))
     .orderBy(asc(communities.id))
     .all()
 }
@@ -401,9 +416,14 @@ export function listUserDirectory(
     .limit(query.pageSize)
     .offset((query.page - 1) * query.pageSize)
     .all()
+  // Do not expose out-of-scope community memberships, even for a user whose
+  // account is visible through one authorized community.
+  const allowedCommunityIds =
+    actor.role === 'admin' ? undefined : assignedCommunityIds(db, actor.staffId)
   const memberships = residentMembershipMap(
     db,
     rows.map((row) => row.id),
+    allowedCommunityIds,
   )
   return userDirectoryResponseSchema.parse({
     items: rows.map((row) => toEntry(row, memberships.get(row.id) ?? [])),
@@ -428,7 +448,12 @@ export function getUserDirectory(
     throw new UserDirectoryError(404, API_ERROR_CODES.notFound, '用户不存在')
   }
 
-  const entry = toEntry(row, residentMembershipMap(db, [userId]).get(userId) ?? [])
+  const allowedCommunityIds =
+    actor.role === 'admin' ? undefined : assignedCommunityIds(db, actor.staffId)
+  const entry = toEntry(
+    row,
+    residentMembershipMap(db, [userId], allowedCommunityIds).get(userId) ?? [],
+  )
   const phone = db
     .select({ phone: residentPhoneIdentities.phone })
     .from(residentPhoneIdentities)
@@ -440,7 +465,7 @@ export function getUserDirectory(
       : {
           username: row.staffUsername,
           status: row.staffStatus,
-          communities: staffCommunitiesOf(db, row.staffAccountId),
+          communities: staffCommunitiesOf(db, row.staffAccountId, allowedCommunityIds),
         }
   return userDirectoryDetailSchema.parse({
     ...entry,
