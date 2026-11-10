@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router'
 import { DemoNote } from '../components/DemoNote'
 import { PageHeader } from '../components/PageHeader'
 import { LocalCatalogSection } from '../components/life/LocalCatalogSection'
+import { ExternalOffersSection } from '../components/life/ExternalOffersSection'
 import { ShopDealsSection } from '../components/life/ShopDealsSection'
 
 /**
@@ -46,6 +47,10 @@ export function LifePage() {
 
       <div className="mt-5">
         <LocalCatalogSection />
+      </div>
+
+      <div className="mt-6 border-t border-slate-100 pt-5">
+        <ExternalOffersSection />
       </div>
 
       <div className="mt-6 border-t border-slate-100 pt-5">

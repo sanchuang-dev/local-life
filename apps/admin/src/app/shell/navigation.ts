@@ -98,6 +98,14 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         roles: ['admin', 'operator'],
       },
       {
+        key: '/external-offers',
+        label: '精选优惠',
+        description: '第三方活动链接维护与启停，不承担发券、支付或核销。',
+        status: 'ready',
+        planned: [],
+        roles: ['admin', 'operator'],
+      },
+      {
         key: '/orders',
         label: '订单管理',
         description: '居民登记订单的查询、状态处理与运营人工核验；按授权社区过滤，核验只是人工事实确认。',
