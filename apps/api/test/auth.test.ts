@@ -391,3 +391,70 @@ test('WeChat OAuth binds one stable resident identity, validates state/nonce and
     context.sqlite.close()
   }
 })
+
+
+test('admin community location: map key is gated and GCJ-02 coordinates persist and update', async () => {
+  const { app, db, sqlite } = testContext({ TENCENT_MAP_PICKER_KEY: 'test-map-key' })
+  try {
+    await createAdmin(db)
+    assert.equal((await app.request('/admin/map-picker-config')).status, 401)
+    const signedIn = await login(app, 'admin', 'Admin-Password-123!')
+    const token = signedIn.csrfToken!
+    const cookies = cookieHeader(
+      cookiePair(signedIn.response, 'll_session'),
+      cookiePair(signedIn.response, 'll_csrf'),
+    )
+
+    const picker = await app.request('/admin/map-picker-config', { headers: { cookie: cookies } })
+    assert.equal(picker.status, 200)
+    assert.deepEqual(await picker.json(), { available: true, key: 'test-map-key' })
+    assert.equal(picker.headers.get('cache-control'), 'no-store')
+
+    const newLocation = { address: '广东省韶关市社区服务中心', latitude: 24.8121, longitude: 113.5962 }
+    const created = await app.request('/admin/communities', {
+      method: 'POST',
+      headers: postHeaders(cookies, token),
+      body: JSON.stringify({ name: '幸福社区', location: newLocation }),
+    })
+    assert.equal(created.status, 201)
+    const { id } = (await created.json()) as { id: string }
+    const rows = await app.request('/admin/communities', { headers: { cookie: cookies } })
+    const list = (await rows.json()) as { items: Array<{
+      id: string, address: string | null, latitudeGcj02: number | null, longitudeGcj02: number | null
+    }> }
+    const row = list.items.find((item) => item.id === id)
+    assert.equal(row?.address, newLocation.address)
+    assert.equal(row?.latitudeGcj02, newLocation.latitude)
+    assert.equal(row?.longitudeGcj02, newLocation.longitude)
+    const stored = db.select().from(communities).where(eq(communities.id, id)).get()
+    assert.equal(stored?.latitudeGcj02, newLocation.latitude)
+
+    const updatedLocation = { address: '韶关市新服务点', latitude: 24.8, longitude: 113.6 }
+    const path = `/admin/communities/${id}/location`
+    const noCsrf = await app.request(path, {
+      method: 'PATCH', headers: { cookie: cookies, 'content-type': 'application/json' },
+      body: JSON.stringify(updatedLocation),
+    })
+    assert.equal(noCsrf.status, 403)
+    const invalid = await app.request(path, {
+      method: 'PATCH', headers: postHeaders(cookies, token),
+      body: JSON.stringify({ ...updatedLocation, latitude: 100 }),
+    })
+    assert.equal(invalid.status, 400)
+    assert.equal(db.select().from(communities).where(eq(communities.id, id)).get()?.address, newLocation.address)
+    const updated = await app.request(path, {
+      method: 'PATCH', headers: postHeaders(cookies, token),
+      body: JSON.stringify(updatedLocation),
+    })
+    assert.equal(updated.status, 200)
+    assert.equal(db.select().from(communities).where(eq(communities.id, id)).get()?.address, updatedLocation.address)
+
+    const legacy = await app.request('/admin/communities', {
+      method: 'POST', headers: postHeaders(cookies, token),
+      body: JSON.stringify({ name: '未定位社区' }),
+    })
+    assert.equal(legacy.status, 201)
+  } finally {
+    sqlite.close()
+  }
+})
