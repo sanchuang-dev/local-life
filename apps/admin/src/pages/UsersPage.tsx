@@ -14,19 +14,24 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { PlusOutlined, UserAddOutlined } from '@ant-design/icons'
+import { EnvironmentOutlined, PlusOutlined, UserAddOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import {
   CRM_ROUTES,
   residentDirectoryResponseSchema,
   type ResidentDirectoryEntry,
+  type CommunityLocation,
 } from '@sanchuang-dev/local-life-contracts'
 import type { AuthenticatedSession } from '../services/auth'
+import { TencentLocationPicker } from '../components/TencentLocationPicker'
 import './users.css'
 
 interface Community {
   id: string
   name: string
+  address?: string | null
+  latitudeGcj02?: number | null
+  longitudeGcj02?: number | null
 }
 
 interface StaffAccount {
@@ -113,6 +118,15 @@ export function UsersPage({ session }: UsersPageProps) {
   const [communityDrawerOpen, setCommunityDrawerOpen] = useState(false)
   const [staffDrawerOpen, setStaffDrawerOpen] = useState(false)
   const [communityError, setCommunityError] = useState<string | null>(null)
+  const [draftLocation, setDraftLocation] = useState<CommunityLocation | null>(null)
+  const [mapPicker, setMapPicker] = useState<{
+    key: string
+    mode: 'create' | 'update'
+    communityId?: string
+    initialLocation?: CommunityLocation
+  } | null>(null)
+  const [mapLoading, setMapLoading] = useState(false)
+  const [locationSaving, setLocationSaving] = useState(false)
   const [staffError, setStaffError] = useState<string | null>(null)
   // Ref-guarded so a fast double click can never fire the same POST twice,
   // even before React flushes the disabled/loading state to the button.
@@ -223,7 +237,67 @@ export function UsersPage({ session }: UsersPageProps) {
 
   function openCommunityDrawer() {
     setCommunityError(null)
+    setDraftLocation(null)
     setCommunityDrawerOpen(true)
+  }
+
+  async function openMapPicker(mode: 'create' | 'update') {
+    if (mapLoading) return
+    const selectedCommunity = mode === 'update'
+      ? communities.find((item) => item.id === selectedCommunityId)
+      : null
+    if (mode === 'update' && !selectedCommunity) return
+    setMapLoading(true)
+    try {
+      const config = await apiRequest<{ available: boolean; key?: string }>('/api/admin/map-picker-config')
+      if (!config.available || !config.key) {
+        throw new Error('腾讯地图尚未配置，请先在 API 服务设置 TENCENT_MAP_PICKER_KEY')
+      }
+      const initialLocation = mode === 'create'
+        ? draftLocation ?? undefined
+        : selectedCommunity?.latitudeGcj02 != null && selectedCommunity.longitudeGcj02 != null
+          ? {
+              address: selectedCommunity.address || selectedCommunity.name,
+              latitude: selectedCommunity.latitudeGcj02,
+              longitude: selectedCommunity.longitudeGcj02,
+            }
+          : undefined
+      setMapPicker({
+        key: config.key,
+        mode,
+        ...(selectedCommunity ? { communityId: selectedCommunity.id } : {}),
+        ...(initialLocation ? { initialLocation } : {}),
+      })
+    } catch (cause) {
+      message.error(cause instanceof Error ? cause.message : '无法打开腾讯地图')
+    } finally {
+      setMapLoading(false)
+    }
+  }
+
+  async function acceptMapLocation(location: CommunityLocation) {
+    const target = mapPicker
+    setMapPicker(null)
+    if (!target) return
+    if (target.mode === 'create') {
+      setDraftLocation(location)
+      return
+    }
+    if (!target.communityId) return
+    setLocationSaving(true)
+    try {
+      await apiRequest(`/api/admin/communities/${encodeURIComponent(target.communityId)}/location`, {
+        method: 'PATCH',
+        headers: { 'x-csrf-token': session.csrfToken },
+        body: JSON.stringify(location),
+      })
+      await refreshCommunities()
+      message.success('社区位置已保存')
+    } catch (cause) {
+      message.error(cause instanceof Error ? cause.message : '社区位置保存失败')
+    } finally {
+      setLocationSaving(false)
+    }
   }
 
   function openStaffDrawer() {
@@ -251,7 +325,7 @@ export function UsersPage({ session }: UsersPageProps) {
    */
   function requestCloseCommunityDrawer() {
     if (savingRef.current) return
-    if (!communityForm.isFieldsTouched() && !hasDraftValues(communityForm.getFieldsValue())) {
+    if (!draftLocation && !communityForm.isFieldsTouched() && !hasDraftValues(communityForm.getFieldsValue())) {
       setCommunityDrawerOpen(false)
       return
     }
@@ -262,6 +336,7 @@ export function UsersPage({ session }: UsersPageProps) {
       cancelText: '继续填写',
       onOk: () => {
         communityForm.resetFields()
+        setDraftLocation(null)
         setCommunityError(null)
         setCommunityDrawerOpen(false)
       },
@@ -296,7 +371,7 @@ export function UsersPage({ session }: UsersPageProps) {
       await apiRequest<Community>('/api/admin/communities', {
         method: 'POST',
         headers: { 'x-csrf-token': session.csrfToken },
-        body: JSON.stringify(values),
+        body: JSON.stringify({ ...values, ...(draftLocation ? { location: draftLocation } : {}) }),
       })
     } catch (cause) {
       // 失败：提示留在抽屉内，输入保留，操作者可以修正后重试。
@@ -307,6 +382,7 @@ export function UsersPage({ session }: UsersPageProps) {
       setSaving(false)
     }
     communityForm.resetFields()
+    setDraftLocation(null)
     setCommunityDrawerOpen(false)
     message.success('社区已创建')
     // Only the community list changed; staff and resident context stay put.
@@ -462,9 +538,26 @@ export function UsersPage({ session }: UsersPageProps) {
             options={communities.map((item) => ({ value: item.id, label: item.name }))}
             onChange={changeResidentCommunity}
           />
+          {isAdmin && selectedCommunityId && (
+            <Button
+              size="small"
+              icon={<EnvironmentOutlined />}
+              onClick={() => { void openMapPicker('update') }}
+              loading={mapLoading || locationSaving}
+            >
+              {communities.find((item) => item.id === selectedCommunityId)?.latitudeGcj02 == null
+                ? '设置社区位置'
+                : '修改社区位置'}
+            </Button>
+          )}
           <Tag color={isAdmin ? 'green' : 'blue'}>{ROLE_LABELS[session.staff.role]}</Tag>
           {!isAdmin && <Typography.Text type="secondary">仅显示管理员分配给你的社区范围。</Typography.Text>}
         </Space>
+        {communities.find((item) => item.id === selectedCommunityId)?.address && (
+          <Typography.Paragraph type="secondary" style={{ margin: '8px 0 0' }}>
+            社区服务点：{communities.find((item) => item.id === selectedCommunityId)?.address}
+          </Typography.Paragraph>
+        )}
       </Card>
 
       {isAdmin && (
@@ -593,12 +686,39 @@ export function UsersPage({ session }: UsersPageProps) {
             >
               <Input placeholder="例如：幸福社区" maxLength={60} autoFocus />
             </Form.Item>
+            <Form.Item label="社区服务点位置（可稍后补录）">
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Button
+                  icon={<EnvironmentOutlined />}
+                  onClick={() => { void openMapPicker('create') }}
+                  loading={mapLoading}
+                >
+                  在腾讯地图上选点
+                </Button>
+                {draftLocation && (
+                  <Alert
+                    type="success"
+                    showIcon
+                    message="已选择位置"
+                    description={draftLocation.address}
+                  />
+                )}
+              </Space>
+            </Form.Item>
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              创建后可在「新增账户」中把它分配给运营员或网格员；编辑 / 停用 / 删除社区暂无 API 支持，已记录为未来需求。
+              创建后可分配运营员或网格员，社区位置也可随时修改；不会因此改变居民归属。
             </Typography.Text>
           </Form>
         </Drawer>
       )}
+
+      <TencentLocationPicker
+        open={mapPicker !== null}
+        apiKey={mapPicker?.key ?? ''}
+        initialLocation={mapPicker?.initialLocation}
+        onCancel={() => setMapPicker(null)}
+        onSelect={(location) => { void acceptMapLocation(location) }}
+      />
 
       {isAdmin && (
         <Drawer
