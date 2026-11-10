@@ -56,7 +56,7 @@ export function LocalCatalogSection() {
           </span>
           <p className="mt-3 text-[15px] font-semibold text-slate-700">当前没有已上架的本地商品</p>
           <p className="mx-auto mt-2 max-w-[300px] text-[12px] leading-6 text-slate-400">
-            社区上架商品后会自动出现在这里。为避免误导，本页不会用示例商品或商城商品填充本地目录。
+            暂无上架商品，稍后再来看看。
           </p>
           <button
             type="button"

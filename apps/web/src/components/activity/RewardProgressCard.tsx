@@ -165,13 +165,13 @@ export function RewardProgressCard({
   return (
     <div className="mt-4">
       {state.status === 'idle' || state.status === 'loading' ? (
-        <LoadingLine text={auth.loading ? '正在读取登录状态…' : '正在读取真实签到与奖励状态…'} />
+        <LoadingLine text={auth.loading ? '正在读取登录状态…' : '正在读取签到与奖励状态…'} />
       ) : null}
 
       {state.status === 'unauthenticated' ? (
         <div className="rounded-[14px] bg-[#f6f8f7] px-3 py-3">
           <p className="text-[12px] leading-5 text-slate-600">
-            登录后可读取你在本活动的真实签到与团队奖励状态。签到需要先加入三人团。
+            登录后查看签到与团队奖励。签到前请先加入三人团。
           </p>
           <div className="mt-2.5 flex flex-wrap gap-2">
             {auth.methods?.wechat && typeof navigator !== 'undefined' && isWeChatBrowser(navigator.userAgent) ? (
@@ -302,13 +302,13 @@ export function RewardProgressCard({
 
             {state.data.gate?.kind === 'no_team' ? (
               <p className="mt-2 rounded-[12px] bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-600">
-                你还没有加入三人团，暂不满足奖励条件。参与并坐满 3 人后，这里会显示真实的签到与奖励进度。
+                你还没有加入三人团，暂不满足奖励条件。成团后可以查看签到与奖励进度。
               </p>
             ) : null}
 
             {state.data.gate?.kind === 'plan_missing' ? (
               <p className="mt-2 rounded-[12px] bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-600">
-                本活动暂未配置正式奖励计划，奖励入口未开放。页面不会用演示奖品替代正式奖励。
+                本活动暂未开放奖励领取。
               </p>
             ) : null}
 

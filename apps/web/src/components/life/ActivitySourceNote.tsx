@@ -83,8 +83,8 @@ export function ActivitySourceNote({
       </p>
       <p className="mt-1 break-words">
         {published
-          ? '购买时只提交该 activityId，由服务端核验活动与社区归属；推荐码同样由服务端解析。'
-          : `该活动当前${activityStatusLabel(activity.status)}，服务端不会接受其作为购买来源。`}
+          ? '已关联到当前活动。'
+          : `该活动当前${activityStatusLabel(activity.status)}，暂不可用于购买。`}
       </p>
     </div>
   )

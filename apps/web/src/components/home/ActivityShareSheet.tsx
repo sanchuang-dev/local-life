@@ -129,7 +129,7 @@ export function ActivityShareSheet({
             <p className="mt-2 text-center text-[11px] leading-4 text-slate-400">
               {wechatShare.isWechat
                 ? '请通过微信右上角「···」菜单选择发送给朋友或分享到朋友圈；二维码和复制使用同一邀请链接。'
-                : '二维码、转发与复制使用同一条链接，包含真实活动与邀请参数。'}
+                : '分享活动链接给街坊。'}
             </p>
             <div className="text-center text-[12px] font-medium" aria-live="polite">
               {wechatShare.isWechat && wechatShare.status === 'loading' ? (
@@ -184,7 +184,7 @@ export function ActivityShareSheet({
               </p>
             </div>
             <p className="mt-2 text-center text-[11px] leading-4 text-slate-500">
-              二维码、转发与复制使用同一条链接，包含真实活动与邀请参数；浏览不会自动加入，需登录后确认参与。
+              好友打开链接后，需要主动确认才能加入三人团。
             </p>
           </div>
         </div>
