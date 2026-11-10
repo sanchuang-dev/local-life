@@ -114,7 +114,7 @@ function VerifyView() {
         <div className="min-w-0">
           <h1 className="text-[20px] font-semibold tracking-tight text-slate-900">现场核验核销</h1>
           <p className="mt-0.5 text-[12px] text-slate-500">
-            核销凭据码 · 核验参与者签到 · 权限来自服务端
+            核销凭据 · 现场签到
           </p>
         </div>
       </div>
@@ -128,7 +128,7 @@ function VerifyView() {
           当前身份：{staffRoleLabels[session.staff.role]}，可核销社区：
           {session.staff.communities.map((item) => item.name).join('、') || '未分配社区'}。
           {session.staff.role === 'grid_worker'
-            ? ' 网格员只能核销所属社区的凭据；跨社区的请求会被服务端拒绝并记录审计。'
+            ? ' 只能核销负责社区的凭据。'
             : ''}
         </p>
       ) : null}
@@ -331,7 +331,7 @@ function RedeemPanel({ onRedeemed }: { onRedeemed: (result: RewardRedeemResponse
       </div>
 
       <p className="mt-3 text-[11px] leading-[1.7] text-slate-400">
-        核销只在服务端执行一次：并发或重复提交都只会成功一次，不会多扣库存或重复发奖。
+        同一奖励凭据只能核销一次。
       </p>
     </section>
   )

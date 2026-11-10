@@ -99,7 +99,7 @@ function LocalOrdersView() {
       </div>
 
       <p className="mt-2 rounded-[14px] bg-[#fff7ec] px-3.5 py-2.5 text-[11px] leading-5 text-[#8a6132]">
-        只显示服务端授权社区内的居民登记订单。人工核验通过由运营后台完成，工作台不能把订单改成「人工核验通过」。
+        仅显示你负责社区的登记订单。人工核验由运营人员完成。
       </p>
 
       <div className="mt-4 space-y-3">
