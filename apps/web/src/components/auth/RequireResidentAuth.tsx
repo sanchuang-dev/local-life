@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router'
 import { buildResidentLoginHref } from './residentLogin'
-import { stripLoginResultParams } from '../activity/loginReturn'
+import { stripLoginResultParams } from '@sanchuang-dev/local-life-contracts'
 import { decideResidentGate } from './residentGate'
 import { useResidentAuth } from '../../hooks/useResidentAuth'
 
