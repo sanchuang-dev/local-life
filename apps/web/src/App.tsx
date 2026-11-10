@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router'
 import { AppShell } from './components/shell/AppShell'
 import { RequireResidentAuth } from './components/auth/RequireResidentAuth'
+import { ResidentSiteGate } from './components/auth/ResidentSiteGate'
 import { ResidentAuthProvider } from './hooks/useResidentAuth'
 import { ActivityHomePage } from './pages/ActivityHomePage'
 import { CommunityDiscoveryPage } from './pages/CommunityDiscoveryPage'
@@ -45,6 +46,7 @@ import { WorkbenchVerifyPage } from './pages/workbench/WorkbenchVerifyPage'
 export default function App() {
   return (
     <ResidentAuthProvider>
+      <ResidentSiteGate>
       <AppShell>
       <Routes>
         <Route path="/" element={<CommunityRoot />} />
@@ -93,6 +95,7 @@ export default function App() {
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
       </AppShell>
+      </ResidentSiteGate>
     </ResidentAuthProvider>
   )
 }

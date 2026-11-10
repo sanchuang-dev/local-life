@@ -1,13 +1,15 @@
+import type { ReactNode } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router'
 import { buildResidentLoginHref } from './residentLogin'
+import { stripLoginResultParams } from '@sanchuang-dev/local-life-contracts'
 import { decideResidentGate } from './residentGate'
 import { useResidentAuth } from '../../hooks/useResidentAuth'
 
 /** Navigation guard only: the API still owns authorization to personal data. */
-export function RequireResidentAuth() {
+export function RequireResidentAuth({ children }: { children?: ReactNode }) {
   const auth = useResidentAuth()
   const location = useLocation()
-  const decision = decideResidentGate(auth.sessionStatus, Boolean(auth.session))
+  const decision = decideResidentGate(auth.sessionStatus, Boolean(auth.session && !auth.session.staff))
 
   if (decision === 'loading') {
     return <p className="px-4 py-10 text-center text-[13px] text-slate-500" role="status">正在验证居民身份…</p>
@@ -29,11 +31,18 @@ export function RequireResidentAuth() {
   }
 
   if (decision === 'login') {
-    const loginHref = buildResidentLoginHref(location.pathname + location.search, {
-      activityId: null, inviteCode: null, inviteInvalid: false,
-    })
+    const search = new URLSearchParams(location.search)
+    const loginHref = buildResidentLoginHref(
+      stripLoginResultParams(location.pathname + location.search),
+      {
+        activityId: search.get('activityId'),
+        inviteCode: search.get('invite'),
+        inviteInvalid: search.get('inviteInvalid') === '1',
+      },
+      search.get('auth_error'),
+    )
     return <Navigate to={loginHref} replace />
   }
 
-  return <Outlet />
+  return children ?? <Outlet />
 }
