@@ -1,6 +1,6 @@
 import { useId, useState, type ReactNode } from 'react'
 import {
-  AlertCircle, Check, ChevronLeft, Copy, Home, LoaderCircle,
+  AlertCircle, Check, ChevronLeft, Copy, LoaderCircle,
   RefreshCw, ShieldCheck,
 } from 'lucide-react'
 
@@ -16,15 +16,14 @@ export interface UnifiedLoginViewProps {
   phoneForm?: ReactNode
   contextLabel: string
   error?: string | null
+  extraActions?: ReactNode
   onWechatLogin: () => void
-  onBack: () => void
+  onBack?: () => void
   onRetry: () => void
   onContinue: () => void
   copyUrl: string
 }
 
-const ink = '#182420'
-const accent = '#116D63'
 const button = 'flex min-h-[50px] w-full items-center justify-center gap-2 rounded-[14px] bg-[#116D63] px-4 text-[16px] font-semibold text-white shadow-[0_10px_22px_rgba(17,109,99,.18)] transition-colors hover:bg-[#0D544C] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#138B79] disabled:opacity-60'
 const linkButton = 'inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-[14px] font-semibold text-[#116D63] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#138B79]'
 
@@ -116,7 +115,7 @@ function CopyCard({ copyUrl }: { copyUrl: string }) {
 
 export function UnifiedLoginView({
   environment, state, wechatEnabled, phoneForm, contextLabel, error,
-  onWechatLogin, onBack, onRetry, onContinue, copyUrl,
+  onWechatLogin, onBack, onRetry, onContinue, copyUrl, extraActions,
 }: UnifiedLoginViewProps) {
   const [usePhone, setUsePhone] = useState(false)
   const phoneMode = Boolean(phoneForm) && (environment === 'browser' || usePhone)
@@ -132,9 +131,9 @@ export function UnifiedLoginView({
       </div>
       <div className="relative z-10 mx-auto flex min-h-[calc(100dvh-env(safe-area-inset-top,0px))] max-w-[375px] flex-col px-5 pb-[calc(16px+env(safe-area-inset-bottom,0px))] min-[360px]:px-6">
         <header className="flex min-h-16 items-center py-2.5">
-          <button type="button" onClick={onBack} className={linkButton + ' -ml-3 text-[#3B4C46]'}>
+          {onBack && <button type="button" onClick={onBack} className={linkButton + ' -ml-3 text-[#3B4C46]'}>
             <ChevronLeft size={20}/>返回
-          </button>
+          </button>}
         </header>
         <Brand />
         {state !== 'idle' ? (
@@ -186,6 +185,7 @@ export function UnifiedLoginView({
                 </div>}
               </Card>
             )}
+            {extraActions}
           </>
         )}
         <footer className="mt-auto pb-2 pt-6 text-center text-[12px] leading-5 text-[#5D6C66]">
@@ -197,5 +197,3 @@ export function UnifiedLoginView({
   )
 }
 
-void ink
-void accent

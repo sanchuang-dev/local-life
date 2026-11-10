@@ -1,10 +1,11 @@
+import type { ReactNode } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router'
 import { buildResidentLoginHref } from './residentLogin'
 import { decideResidentGate } from './residentGate'
 import { useResidentAuth } from '../../hooks/useResidentAuth'
 
 /** Navigation guard only: the API still owns authorization to personal data. */
-export function RequireResidentAuth() {
+export function RequireResidentAuth({ children }: { children?: ReactNode }) {
   const auth = useResidentAuth()
   const location = useLocation()
   const decision = decideResidentGate(auth.sessionStatus, Boolean(auth.session))
@@ -35,5 +36,5 @@ export function RequireResidentAuth() {
     return <Navigate to={loginHref} replace />
   }
 
-  return <Outlet />
+  return children ?? <Outlet />
 }

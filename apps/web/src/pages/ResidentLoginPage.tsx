@@ -78,7 +78,7 @@ export function ResidentLoginPage() {
       copyUrl={window.location.href}
       error={reason}
       onWechatLogin={startWechatLogin}
-      onBack={() => { if (window.history.length > 1) navigate(-1) }}
+      onBack={window.history.length > 1 ? () => navigate(-1) : undefined}
       onRetry={() => window.location.reload()}
       onContinue={() => navigate(returnTo, { replace: true })}
       phoneForm={phoneAvailable ? (

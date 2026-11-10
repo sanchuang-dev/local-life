@@ -57,7 +57,7 @@ export function buildResidentWechatLoginRequest(options: {
   const returnTo = resolveResidentLoginTarget(options.returnTo)
   const target = new URL(returnTo, 'https://local-life.invalid')
   // Only explicit activity context is sent. A display default is never inferred.
-  const activityId = normalizeActivityId(options.context.activityId)
+  const activityId = normalizeActivityId(options.context.activityId || target.searchParams.get('activityId'))
   const rawInvite = options.context.inviteCode || target.searchParams.get('invite')
   const inviteCode = normalizeInvite(rawInvite)
   const inviteInvalid =
