@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import {
   AlertTriangle,
   CheckCircle2,
@@ -34,6 +34,8 @@ const MAX_QUANTITY = 99
 export function LocalProductPage() {
   const { productId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  const productReturnTo = location.pathname + location.search
   const { backTo, backLabel } = useBackTarget('/life', '返回惠生活')
   const { state, reload } = useLocalProduct(productId ?? null)
   const auth = useResidentAuth()
@@ -80,7 +82,7 @@ export function LocalProductPage() {
         if (cause.status === 409) reload()
         if (cause.status === 401) {
           reportResidentSessionExpired()
-          navigate(buildResidentLoginHref(`/life/local-products/${product.id}`, {
+          navigate(buildResidentLoginHref(productReturnTo, {
             activityId: null, inviteCode: null, inviteInvalid: false,
           }), { replace: true })
         }
@@ -331,7 +333,7 @@ export function LocalProductPage() {
                 {!session ? (
                   <Link
                     to={buildResidentLoginHref(
-                       `/life/local-products/${product.id}`,
+                       productReturnTo,
                        { activityId: null, inviteCode: null, inviteInvalid: false },
                      )}
                     className="mt-2 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[#138b79] px-4 text-[13px] font-semibold text-white"
