@@ -1,0 +1,14 @@
+/* LL-USER-002：/communities 收敛为社区管理后的页面局部样式。
+ * 保证窄屏（<768，含 375/320）下 Drawer 不横向溢出，底部操作不被遮挡。 */
+.communities-drawer .ant-drawer-content-wrapper {
+  max-width: 100vw;
+}
+
+.communities-drawer .ant-drawer-body {
+  /* 让长表单自身的滚动发生在 body 内，底部 footer 操作始终可见。 */
+  overflow-y: auto;
+}
+
+.communities-page-actions .ant-btn {
+  flex-shrink: 0;
+}

@@ -1,829 +1,604 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Alert, Avatar, Button, Descriptions, Drawer, Space, Spin, Tag, Typography } from 'antd'
 import {
-  Alert,
-  Avatar,
-  App as AntdApp,
-  Button,
-  Card,
-  Drawer,
-  Form,
-  Input,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Typography,
-} from 'antd'
-import { EnvironmentOutlined, PlusOutlined, UserAddOutlined } from '@ant-design/icons'
-import type { ColumnsType } from 'antd/es/table'
-import {
-  CRM_ROUTES,
-  residentDirectoryResponseSchema,
-  type ResidentDirectoryEntry,
-  type CommunityLocation,
+  apiErrorSchema,
+  type StaffRole,
+  type UserDirectoryDetail,
+  type UserDirectoryEntry,
+  type UserDirectoryRoleFilter,
 } from '@sanchuang-dev/local-life-contracts'
+import { PageHeader } from '../components/PageHeader'
+import {
+  DataPanel,
+  type PanelColumn,
+  type PanelFilter,
+  type PanelQuery,
+} from '../shared/components/DataPanel'
 import type { AuthenticatedSession } from '../services/auth'
-import { TencentLocationPicker } from '../components/TencentLocationPicker'
+import {
+  getUserDirectoryEntry,
+  isUserDirectoryApiError,
+  listUserDirectory,
+} from '../services/users'
 import './users.css'
 
-interface Community {
-  id: string
-  name: string
-  address?: string | null
-  latitudeGcj02?: number | null
-  longitudeGcj02?: number | null
-}
-
-interface StaffAccount {
-  id: string
-  username: string
-  displayName: string | null
-  role: 'admin' | 'operator' | 'grid_worker'
-  status: 'active' | 'disabled'
-  communities: Community[]
-}
+/**
+ * Independent platform user directory (#154 LL-USER-002).
+ *
+ * Every account in the platform `users` table is a row, including accounts that
+ * never joined a community. The page never derives its list from one community's
+ * resident roster and never filters or paginates a local copy: the server owns
+ * keyword/role/community filtering, paging and the real total. Detail is
+ * read-only and a failed read clears the drawer instead of keeping another
+ * account's data on screen.
+ */
 
 interface UsersPageProps {
   session: AuthenticatedSession
 }
 
-interface CommunityFormValues {
+interface UserDirectoryFilters {
+  keyword: string
+  role?: UserDirectoryRoleFilter
+  community?: string
+}
+
+type UserSortKey = 'createdAt'
+
+interface CommunityOption {
+  id: string
   name: string
 }
 
-interface StaffFormValues {
-  username: string
-  displayName: string
-  password: string
-  role: 'operator' | 'grid_worker'
-  userId?: string
-  communityIds: string[]
-}
-
-const ROLE_LABELS = {
+const ROLE_LABELS: Record<StaffRole, string> = {
   admin: '管理员',
   operator: '运营员',
   grid_worker: '网格员',
+}
+
+const ROLE_FILTER_OPTIONS: ReadonlyArray<{ label: string; value: UserDirectoryRoleFilter }> = [
+  { label: '管理员', value: 'admin' },
+  { label: '运营员', value: 'operator' },
+  { label: '网格员', value: 'grid_worker' },
+  { label: '居民（无后台账户）', value: 'resident' },
+]
+
+const IDENTITY_METHOD_LABELS = {
+  wechat: '微信',
+  phone: '手机号',
+  staff: '后台账户',
 } as const
 
-const COMMUNITY_FORM_ID = 'll-ui-007-create-community-form'
-const STAFF_FORM_ID = 'll-ui-007-create-staff-form'
+const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+})
 
-async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
+const DATE_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
+function formatDateTime(iso: string): string {
+  return DATE_TIME_FORMATTER.format(new Date(iso))
+}
+
+function formatDate(iso: string): string {
+  return DATE_FORMATTER.format(new Date(iso))
+}
+
+function roleTag(staffRole: StaffRole | null) {
+  if (!staffRole) return <Tag>居民</Tag>
+  return (
+    <Tag
+      color={
+        staffRole === 'grid_worker' ? 'blue' : staffRole === 'operator' ? 'geekblue' : 'green'
+      }
+    >
+      {ROLE_LABELS[staffRole]}
+    </Tag>
+  )
+}
+
+function identityTags(methods: readonly (keyof typeof IDENTITY_METHOD_LABELS)[]): ReactNode {
+  // The final #153 contract allows an empty array only for a legacy account that
+  // has no persistent identity row (for example an AUTH_DEV_ENABLED login). Show
+  // that state explicitly instead of rendering a blank identity cell.
+  if (methods.length === 0) return <Tag>无持久身份</Tag>
+  return methods.map((method) => <Tag key={method}>{IDENTITY_METHOD_LABELS[method]}</Tag>)
+}
+
+function residentCommunityTags(
+  communities: ReadonlyArray<{ id: string; name: string }>,
+): ReactNode {
+  if (communities.length === 0) return <Tag>未关联社区</Tag>
+  const visible = communities.slice(0, 2)
+  return (
+    <Space size={4} wrap>
+      {visible.map((community) => (
+        <Tag key={community.id}>{community.name}</Tag>
+      ))}
+      {communities.length > visible.length ? (
+        <Tag>+{communities.length - visible.length}</Tag>
+      ) : null}
+    </Space>
+  )
+}
+
+function describeError(cause: unknown, fallback: string): string {
+  if (isUserDirectoryApiError(cause)) {
+    if (cause.status === 403) return `无权查看该用户（HTTP 403）：${cause.message}`
+    if (cause.status === 404) return `用户不存在或已被移除（HTTP 404）：${cause.message}`
+    return cause.message
+  }
+  return cause instanceof Error ? cause.message : fallback
+}
+
+function isCommunityListPayload(value: unknown): value is { items: CommunityOption[] } {
+  if (typeof value !== 'object' || value === null || !('items' in value)) return false
+  const items = value.items
+  return (
+    Array.isArray(items) &&
+    items.every(
+      (item) =>
+        typeof item === 'object' &&
+        item !== null &&
+        'id' in item &&
+        typeof item.id === 'string' &&
+        'name' in item &&
+        typeof item.name === 'string',
+    )
+  )
+}
+
+/**
+ * Community filter options come from the same server-scoped community list the
+ * rest of the console uses. They only populate a filter; the directory API still
+ * authorizes each query, so a stale or crafted option cannot widen access.
+ */
+async function readCommunityOptions(signal?: AbortSignal): Promise<CommunityOption[]> {
+  const response = await fetch('/api/admin/communities', {
     credentials: 'include',
-    ...init,
-    headers: {
-      ...(init?.body ? { 'content-type': 'application/json' } : {}),
-      ...init?.headers,
-    },
+    signal,
+    headers: { accept: 'application/json' },
   })
   const payload: unknown = await response.json().catch(() => null)
   if (!response.ok) {
-    const message =
-      typeof payload === 'object' &&
-      payload !== null &&
-      'error' in payload &&
-      typeof payload.error === 'object' &&
-      payload.error !== null &&
-      'message' in payload.error
-        ? String(payload.error.message)
-        : `请求失败（HTTP ${response.status}）`
-    throw new Error(message)
+    const parsed = apiErrorSchema.safeParse(payload)
+    throw new Error(
+      parsed.success
+        ? parsed.data.error.message
+        : `无法读取社区筛选选项（HTTP ${response.status}）`,
+    )
   }
-  return payload as T
+  if (!isCommunityListPayload(payload)) throw new Error('社区筛选选项与预期结构不一致')
+  return payload.items
 }
 
 export function UsersPage({ session }: UsersPageProps) {
-  const { modal, message } = AntdApp.useApp()
-  const [communityForm] = Form.useForm<CommunityFormValues>()
-  const [staffForm] = Form.useForm<StaffFormValues>()
-  const [communities, setCommunities] = useState<Community[]>([])
-  const [staff, setStaff] = useState<StaffAccount[]>([])
-  const [residents, setResidents] = useState<ResidentDirectoryEntry[]>([])
-  const [residentTotal, setResidentTotal] = useState(0)
-  const [residentPage, setResidentPage] = useState(1)
-  const [residentPageSize, setResidentPageSize] = useState(20)
-  const [residentSearchDraft, setResidentSearchDraft] = useState('')
-  const [residentKeyword, setResidentKeyword] = useState('')
-  const [residentReload, setResidentReload] = useState(0)
-  const [residentLoading, setResidentLoading] = useState(false)
-  const [residentError, setResidentError] = useState<string | null>(null)
-  const [selectedCommunityId, setSelectedCommunityId] = useState<string | undefined>(
-    session.staff.communities[0]?.id,
-  )
+  const [query, setQuery] = useState<PanelQuery<UserDirectoryFilters, UserSortKey>>(() => ({
+    filters: { keyword: '' },
+    page: 1,
+    pageSize: 20,
+  }))
+  const [rows, setRows] = useState<UserDirectoryEntry[]>([])
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [communityDrawerOpen, setCommunityDrawerOpen] = useState(false)
-  const [staffDrawerOpen, setStaffDrawerOpen] = useState(false)
-  const [communityError, setCommunityError] = useState<string | null>(null)
-  const [draftLocation, setDraftLocation] = useState<CommunityLocation | null>(null)
-  const [mapPicker, setMapPicker] = useState<{
-    key: string
-    appName: string
-    mode: 'create' | 'update'
-    communityId?: string
-    initialLocation?: CommunityLocation
-  } | null>(null)
-  const [mapLoading, setMapLoading] = useState(false)
-  const [locationSaving, setLocationSaving] = useState(false)
-  const [staffError, setStaffError] = useState<string | null>(null)
-  // Ref-guarded so a fast double click can never fire the same POST twice,
-  // even before React flushes the disabled/loading state to the button.
-  const savingRef = useRef(false)
-  const communityButtonRef = useRef<HTMLButtonElement>(null)
-  const staffButtonRef = useRef<HTMLButtonElement>(null)
+  const [listError, setListError] = useState<Error | null>(null)
+  const [reloadToken, setReloadToken] = useState(0)
+
+  const [communityOptions, setCommunityOptions] = useState<CommunityOption[]>([])
+  const [communityOptionsError, setCommunityOptionsError] = useState<string | null>(null)
+  const [communityOptionsToken, setCommunityOptionsToken] = useState(0)
+
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [detail, setDetail] = useState<UserDirectoryDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
+  const [detailUserId, setDetailUserId] = useState<string | null>(null)
+  const detailRequestRef = useRef(0)
+
   const isAdmin = session.staff.role === 'admin'
 
-  /**
-   * Re-reads only the community list. Keeping the current selection when it is
-   * still valid means creating a community never moves the resident table or
-   * the scroll position the operator was working in.
-   */
-  async function refreshCommunities() {
-    const result = await apiRequest<{ items: Community[] }>('/api/admin/communities')
-    setCommunities(result.items)
-    setSelectedCommunityId((previous) => {
-      if (previous && result.items.some((item) => item.id === previous)) return previous
-      return result.items[0]?.id
-    })
-  }
-
-  async function refreshStaff() {
-    const result = await apiRequest<{ items: StaffAccount[] }>('/api/admin/staff')
-    setStaff(result.items)
-  }
-
-  async function loadData() {
-    setLoading(true)
-    setError(null)
-    try {
-      await refreshCommunities()
-      if (isAdmin) await refreshStaff()
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '无法读取账户和社区信息')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   useEffect(() => {
-    void loadData()
-    // This screen loads once per authenticated staff session.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  useEffect(() => {
-    if (!selectedCommunityId) {
-      setResidents([])
-      setResidentTotal(0)
-      setResidentLoading(false)
-      setResidentError(null)
-      return
-    }
     let active = true
     const controller = new AbortController()
-    setResidentLoading(true)
-    setResidentError(null)
-    // Never show another community/page's old rows while this request loads.
-    setResidents([])
-
-    const params = new URLSearchParams({
-      communityId: selectedCommunityId,
-      page: String(residentPage),
-      pageSize: String(residentPageSize),
-    })
-    if (residentKeyword) params.set('keyword', residentKeyword)
-    void apiRequest<unknown>(`/api${CRM_ROUTES.residentList}?${params.toString()}`, {
-      signal: controller.signal,
-    }).then((raw) => {
-      if (!active) return
-      const result = residentDirectoryResponseSchema.parse(raw)
-      setResidents(result.items)
-      setResidentTotal(result.total)
-      // When entries are removed concurrently, restore a valid page.
-      const lastPage = Math.max(1, Math.ceil(result.total / result.pageSize))
-      if (residentPage > lastPage) setResidentPage(lastPage)
-    }).catch((cause: unknown) => {
-      if (!active || controller.signal.aborted) return
-      setResidentTotal(0)
-      setResidentError(cause instanceof Error ? cause.message : '无法读取社区居民')
-    }).finally(() => {
-      if (active) setResidentLoading(false)
-    })
+    setCommunityOptionsError(null)
+    readCommunityOptions(controller.signal)
+      .then((items) => {
+        if (active) setCommunityOptions(items)
+      })
+      .catch((cause: unknown) => {
+        if (!active || controller.signal.aborted) return
+        setCommunityOptions([])
+        setCommunityOptionsError(
+          cause instanceof Error ? cause.message : '无法读取社区筛选选项',
+        )
+      })
     return () => {
       active = false
       controller.abort()
     }
-  }, [selectedCommunityId, residentPage, residentPageSize, residentKeyword, residentReload])
+  }, [communityOptionsToken])
 
-  function changeResidentCommunity(communityId: string) {
-    setSelectedCommunityId(communityId)
-    setResidentPage(1)
-    setResidentKeyword('')
-    setResidentSearchDraft('')
-    setResidentTotal(0)
-    setResidents([])
-    setResidentError(null)
-  }
+  useEffect(() => {
+    let active = true
+    const controller = new AbortController()
+    setLoading(true)
+    setListError(null)
+    // Never keep a previous page/filter's rows on screen while another request
+    // is in flight, and never keep them after it fails.
+    setRows([])
+    setTotal(0)
 
-  function searchResidents(value: string) {
-    const keyword = value.trim()
-    setResidentSearchDraft(keyword)
-    setResidentPage(1)
-    if (residentKeyword === keyword) setResidentReload((previous) => previous + 1)
-    else setResidentKeyword(keyword)
-  }
-
-  function openCommunityDrawer() {
-    setCommunityError(null)
-    setDraftLocation(null)
-    setCommunityDrawerOpen(true)
-  }
-
-  async function openMapPicker(mode: 'create' | 'update') {
-    if (mapLoading) return
-    const selectedCommunity = mode === 'update'
-      ? communities.find((item) => item.id === selectedCommunityId)
-      : null
-    if (mode === 'update' && !selectedCommunity) return
-    setMapLoading(true)
-    try {
-      const config = await apiRequest<{ available: boolean; key?: string; appName?: string }>('/api/admin/map-picker-config')
-      if (!config.available || !config.key || !config.appName) {
-        throw new Error('请先到「系统管理 → 腾讯地图」保存并启用 Key')
-      }
-      const initialLocation = mode === 'create'
-        ? draftLocation ?? undefined
-        : selectedCommunity?.latitudeGcj02 != null && selectedCommunity.longitudeGcj02 != null
-          ? {
-              address: selectedCommunity.address || selectedCommunity.name,
-              latitude: selectedCommunity.latitudeGcj02,
-              longitude: selectedCommunity.longitudeGcj02,
-            }
-          : undefined
-      setMapPicker({
-        key: config.key,
-        appName: config.appName,
-        mode,
-        ...(selectedCommunity ? { communityId: selectedCommunity.id } : {}),
-        ...(initialLocation ? { initialLocation } : {}),
-      })
-    } catch (cause) {
-      message.error(cause instanceof Error ? cause.message : '无法打开腾讯地图')
-    } finally {
-      setMapLoading(false)
-    }
-  }
-
-  async function acceptMapLocation(location: CommunityLocation) {
-    const target = mapPicker
-    setMapPicker(null)
-    if (!target) return
-    if (target.mode === 'create') {
-      setDraftLocation(location)
-      return
-    }
-    if (!target.communityId) return
-    setLocationSaving(true)
-    try {
-      await apiRequest(`/api/admin/communities/${encodeURIComponent(target.communityId)}/location`, {
-        method: 'PATCH',
-        headers: { 'x-csrf-token': session.csrfToken },
-        body: JSON.stringify(location),
-      })
-      await refreshCommunities()
-      message.success('社区位置已保存')
-    } catch (cause) {
-      message.error(cause instanceof Error ? cause.message : '社区位置保存失败')
-    } finally {
-      setLocationSaving(false)
-    }
-  }
-
-  function openStaffDrawer() {
-    setStaffError(null)
-    setStaffDrawerOpen(true)
-  }
-
-  /**
-   * A form counts as dirty once any registered field holds typed content, even
-   * if the user never blurred it (rc-field-form marks touched on change, but
-   * values are the ground truth for "would closing lose input?").
-   */
-  function hasDraftValues(values: object): boolean {
-    return Object.values(values).some((value) => {
-      if (Array.isArray(value)) return value.length > 0
-      return typeof value === 'string' && value.trim().length > 0
-    })
-  }
-
-  /**
-   * Dirty-guarded close shared by the X button, mask click and 取消: only a
-   * form with real edits asks for confirmation, so a clean close never nags
-   * and an accidental click can never silently drop typed input. Closing
-   * never submits; submission only happens through the footer submit button.
-   */
-  function requestCloseCommunityDrawer() {
-    if (savingRef.current) return
-    if (!draftLocation && !communityForm.isFieldsTouched() && !hasDraftValues(communityForm.getFieldsValue())) {
-      setCommunityDrawerOpen(false)
-      return
-    }
-    modal.confirm({
-      title: '放弃已填写的社区信息？',
-      content: '抽屉关闭后，本次填写的内容将被清空，且不会创建社区。',
-      okText: '放弃并关闭',
-      cancelText: '继续填写',
-      onOk: () => {
-        communityForm.resetFields()
-        setDraftLocation(null)
-        setCommunityError(null)
-        setCommunityDrawerOpen(false)
-      },
-    })
-  }
-
-  function requestCloseStaffDrawer() {
-    if (savingRef.current) return
-    if (!staffForm.isFieldsTouched() && !hasDraftValues(staffForm.getFieldsValue())) {
-      setStaffDrawerOpen(false)
-      return
-    }
-    modal.confirm({
-      title: '放弃已填写的账户信息？',
-      content: '抽屉关闭后，本次填写的内容将被清空，且不会创建后台账户。',
-      okText: '放弃并关闭',
-      cancelText: '继续填写',
-      onOk: () => {
-        staffForm.resetFields()
-        setStaffError(null)
-        setStaffDrawerOpen(false)
-      },
-    })
-  }
-
-  async function createCommunity(values: CommunityFormValues) {
-    if (savingRef.current) return
-    savingRef.current = true
-    setSaving(true)
-    setCommunityError(null)
-    try {
-      await apiRequest<Community>('/api/admin/communities', {
-        method: 'POST',
-        headers: { 'x-csrf-token': session.csrfToken },
-        body: JSON.stringify({ ...values, ...(draftLocation ? { location: draftLocation } : {}) }),
-      })
-    } catch (cause) {
-      // 失败：提示留在抽屉内，输入保留，操作者可以修正后重试。
-      setCommunityError(cause instanceof Error ? cause.message : '创建社区失败')
-      return
-    } finally {
-      savingRef.current = false
-      setSaving(false)
-    }
-    communityForm.resetFields()
-    setDraftLocation(null)
-    setCommunityDrawerOpen(false)
-    message.success('社区已创建')
-    // Only the community list changed; staff and resident context stay put.
-    try {
-      await refreshCommunities()
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? `社区已创建，但列表刷新失败：${cause.message}`
-          : '社区已创建，但列表刷新失败，请手动刷新',
-      )
-    }
-  }
-
-  async function createStaff(values: StaffFormValues) {
-    if (savingRef.current) return
-    savingRef.current = true
-    setSaving(true)
-    setStaffError(null)
-    try {
-      await apiRequest<StaffAccount>('/api/admin/staff', {
-        method: 'POST',
-        headers: { 'x-csrf-token': session.csrfToken },
-        body: JSON.stringify(values),
-      })
-    } catch (cause) {
-      setStaffError(cause instanceof Error ? cause.message : '创建后台账户失败')
-      return
-    } finally {
-      savingRef.current = false
-      setSaving(false)
-    }
-    staffForm.resetFields()
-    setStaffDrawerOpen(false)
-    message.success('后台账户已创建')
-    // Only the account list changed; the selected community and residents stay.
-    try {
-      await refreshStaff()
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? `后台账户已创建，但列表刷新失败：${cause.message}`
-          : '后台账户已创建，但列表刷新失败，请手动刷新',
-      )
-    }
-  }
-
-  const staffColumns: ColumnsType<StaffAccount> = useMemo(
-    () => [
-      { title: '登录账号', dataIndex: 'username', key: 'username' },
-      { title: '姓名', dataIndex: 'displayName', key: 'displayName', render: (value: string | null) => value || '—' },
+    listUserDirectory(
       {
-        title: '角色',
-        dataIndex: 'role',
+        page: query.page,
+        pageSize: query.pageSize,
+        keyword: query.filters.keyword,
+        role: query.filters.role,
+        community: query.filters.community,
+      },
+      controller.signal,
+    )
+      .then((result) => {
+        if (!active) return
+        setRows(result.items)
+        setTotal(result.total)
+      })
+      .catch((cause: unknown) => {
+        if (!active || controller.signal.aborted) return
+        setRows([])
+        setTotal(0)
+        setListError(cause instanceof Error ? cause : new Error('无法读取用户目录'))
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+
+    return () => {
+      active = false
+      controller.abort()
+    }
+  }, [query, reloadToken])
+
+  const filters = useMemo<readonly PanelFilter<UserDirectoryFilters>[]>(() => {
+    const communities = communityOptions.map((community) => ({
+      label: community.name,
+      value: community.id,
+    }))
+    // `unassigned` is a real server filter, but only admins can see accounts
+    // outside a community; offering it to scoped staff would always be empty.
+    const communityFilterOptions = isAdmin
+      ? [...communities, { label: '未关联社区', value: 'unassigned' }]
+      : communities
+    return [
+      {
+        key: 'keyword',
+        kind: 'text',
+        label: '关键词',
+        placeholder: '微信昵称 / 本地名称 / 平台 UUID',
+        width: 260,
+      },
+      {
         key: 'role',
-        render: (role: StaffAccount['role']) => <Tag color={role === 'grid_worker' ? 'blue' : 'green'}>{ROLE_LABELS[role]}</Tag>,
+        kind: 'select',
+        label: '角色',
+        width: 170,
+        options: ROLE_FILTER_OPTIONS,
       },
       {
-        title: '负责社区',
-        dataIndex: 'communities',
-        key: 'communities',
-        render: (items: Community[]) => items.map((item) => item.name).join('、'),
+        key: 'community',
+        kind: 'select',
+        label: '社区归属',
+        width: 190,
+        options: communityFilterOptions,
       },
-      {
-        title: '状态',
-        dataIndex: 'status',
-        key: 'status',
-        render: (status: StaffAccount['status']) => <Tag color={status === 'active' ? 'success' : 'default'}>{status === 'active' ? '正常' : '已停用'}</Tag>,
-      },
-    ],
-    [],
-  )
+    ]
+  }, [communityOptions, isAdmin])
 
-  const residentColumns: ColumnsType<ResidentDirectoryEntry> = useMemo(
+  const columns = useMemo<readonly PanelColumn<UserDirectoryEntry, UserSortKey>[]>(
     () => [
       {
-        title: '居民',
-        key: 'resident',
-        render: (_value: unknown, resident: ResidentDirectoryEntry) => (
-          <Space size={8}>
-            <Avatar src={resident.wechatAvatarUrl || undefined}>
-              {resident.displayName.slice(0, 1)}
+        key: 'user',
+        title: '用户',
+        hideable: false,
+        render: (_value: unknown, row: UserDirectoryEntry) => (
+          <Space size={8} align="center">
+            <Avatar src={row.wechatAvatarUrl || undefined} alt={row.displayName}>
+              {row.displayName.slice(0, 1)}
             </Avatar>
-            <div>
-              <Typography.Text strong>{resident.displayName}</Typography.Text>
-              {resident.wechatNickname?.trim() && resident.localDisplayName?.trim()
-                && resident.wechatNickname.trim() !== resident.localDisplayName.trim() ? (
-                  <div><Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    本地：{resident.localDisplayName}
-                  </Typography.Text></div>
-                ) : null}
-            </div>
+            <Space direction="vertical" size={0}>
+              <Typography.Text strong>{row.displayName}</Typography.Text>
+              {row.localDisplayName && row.localDisplayName !== row.displayName ? (
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  本地：{row.localDisplayName}
+                </Typography.Text>
+              ) : null}
+            </Space>
           </Space>
         ),
       },
       {
-        title: '微信资料',
-        key: 'wechatProfile',
-        render: (_value: unknown, resident: ResidentDirectoryEntry) => (
-          <Tag color={resident.profileAuthorizedAt ? 'green' : 'default'}>
-            {resident.profileAuthorizedAt ? '已授权' : '未授权'}
-          </Tag>
+        key: 'id',
+        title: '平台 UUID',
+        dataIndex: 'id',
+        render: (value: string) => (
+          <Typography.Text code copyable={{ text: value }} style={{ fontSize: 12 }}>
+            {value}
+          </Typography.Text>
         ),
       },
-      { title: '平台用户 ID', dataIndex: 'id', key: 'id', render: (value: string) => <Typography.Text code copyable>{value}</Typography.Text> },
-      { title: '加入社区', dataIndex: 'joinedAt', key: 'joinedAt', render: (value: string) => new Date(value).toLocaleString('zh-CN') },
-      { title: '注册时间', dataIndex: 'createdAt', key: 'createdAt', render: (value: string) => new Date(value).toLocaleString('zh-CN') },
+      {
+        key: 'identity',
+        title: '身份 / 角色',
+        render: (_value: unknown, row: UserDirectoryEntry) => (
+          <Space size={4} wrap>
+            {identityTags(row.identityMethods)}
+            {roleTag(row.staffRole)}
+          </Space>
+        ),
+      },
+      {
+        key: 'residentCommunities',
+        title: '社区归属',
+        render: (_value: unknown, row: UserDirectoryEntry) =>
+          residentCommunityTags(row.residentCommunities),
+      },
+      {
+        key: 'createdAt',
+        title: '注册时间',
+        dataIndex: 'createdAt',
+        render: (value: string) => formatDateTime(value),
+      },
     ],
     [],
   )
+
+  function refresh() {
+    setReloadToken((value) => value + 1)
+  }
+
+  function openDetail(userId: string) {
+    setDetailOpen(true)
+    setDetail(null)
+    setDetailError(null)
+    setDetailUserId(userId)
+    void loadDetail(userId)
+  }
+
+  async function loadDetail(userId: string) {
+    const request = detailRequestRef.current + 1
+    detailRequestRef.current = request
+    setDetailLoading(true)
+    setDetailError(null)
+    // A retry or a newly opened row must never show the previous account while
+    // the next detail request is running.
+    setDetail(null)
+    try {
+      const result = await getUserDirectoryEntry(userId)
+      if (detailRequestRef.current !== request) return
+      setDetail(result)
+    } catch (cause: unknown) {
+      if (detailRequestRef.current !== request) return
+      setDetail(null)
+      setDetailError(describeError(cause, '无法读取用户详情'))
+    } finally {
+      if (detailRequestRef.current === request) setDetailLoading(false)
+    }
+  }
+
+  function closeDetail() {
+    detailRequestRef.current += 1
+    setDetailOpen(false)
+    setDetail(null)
+    setDetailError(null)
+    setDetailLoading(false)
+    setDetailUserId(null)
+  }
 
   return (
-    <Space direction="vertical" size={16} style={{ width: '100%' }}>
-      {error && <Alert type="error" showIcon message={error} />}
-      <Card
-        size="small"
-        title="社区范围"
-        extra={
-          <Space wrap className="users-page-actions">
-            {isAdmin && (
-              <>
-                <Button
-                  ref={communityButtonRef}
-                  type="primary"
-                  size="small"
-                  icon={<PlusOutlined />}
-                  onClick={openCommunityDrawer}
-                >
-                  新建社区
-                </Button>
-                <Button
-                  ref={staffButtonRef}
-                  size="small"
-                  icon={<UserAddOutlined />}
-                  onClick={openStaffDrawer}
-                  disabled={communities.length === 0}
-                  title={communities.length === 0 ? '请先创建社区，再分配后台账户' : undefined}
-                >
-                  新增账户
-                </Button>
-              </>
-            )}
-            <Button size="small" onClick={() => { void loadData(); setResidentReload((n) => n + 1) }} loading={loading}>刷新</Button>
-          </Space>
+    <div className="page">
+      <PageHeader
+        title="用户管理"
+        description="平台全部用户目录（含未关联社区的账号）。社区归属只是用户属性；后台账户的社区授权与居民社区归属是两种不同关系。"
+        status={
+          <Tag color="blue">
+            {session.staff.role === 'admin' ? '管理员：全部用户' : '仅权限范围内用户'}
+          </Tag>
         }
-      >
-        <Space wrap>
-          <Typography.Text type="secondary">当前账户可访问的社区：</Typography.Text>
-          <Select
-            style={{ minWidth: 220 }}
-            value={selectedCommunityId}
-            placeholder="选择社区"
-            options={communities.map((item) => ({ value: item.id, label: item.name }))}
-            onChange={changeResidentCommunity}
-          />
-          {isAdmin && selectedCommunityId && (
-            <Button
-              size="small"
-              icon={<EnvironmentOutlined />}
-              onClick={() => { void openMapPicker('update') }}
-              loading={mapLoading || locationSaving}
-            >
-              {communities.find((item) => item.id === selectedCommunityId)?.latitudeGcj02 == null
-                ? '设置社区位置'
-                : '修改社区位置'}
-            </Button>
-          )}
-          <Tag color={isAdmin ? 'green' : 'blue'}>{ROLE_LABELS[session.staff.role]}</Tag>
-          {!isAdmin && <Typography.Text type="secondary">仅显示管理员分配给你的社区范围。</Typography.Text>}
-        </Space>
-        {communities.find((item) => item.id === selectedCommunityId)?.address && (
-          <Typography.Paragraph type="secondary" style={{ margin: '8px 0 0' }}>
-            社区服务点：{communities.find((item) => item.id === selectedCommunityId)?.address}
-          </Typography.Paragraph>
-        )}
-      </Card>
-
-      {isAdmin && (
-        <Card size="small" title="后台账户">
-          <Table
-            rowKey="id"
-            size="small"
-            loading={loading}
-            columns={staffColumns}
-            dataSource={staff}
-            pagination={{ pageSize: 8 }}
-            scroll={{ x: 680 }}
-          />
-        </Card>
-      )}
-
-      <Card size="small" title="社区居民" extra={<Tag>{residentTotal} 位居民</Tag>}>
-        {selectedCommunityId ? (
-          <>
-            <Space wrap style={{ width: '100%', marginBottom: 12 }}>
-              <Input.Search
-                aria-label="搜索居民"
-                placeholder="搜索微信昵称、本地名称或平台 UUID"
-                value={residentSearchDraft}
-                onChange={(event) => {
-                  setResidentSearchDraft(event.target.value)
-                  if (!event.target.value && residentKeyword) searchResidents('')
-                }}
-                onSearch={searchResidents}
-                allowClear
-                maxLength={80}
-                enterButton="搜索"
-                style={{ width: 'min(100%, 380px)' }}
-              />
-            </Space>
-            {residentError && (
-              <Alert
-                type="error"
-                showIcon
-                style={{ marginBottom: 12 }}
-                message="居民目录加载失败"
-                description={residentError}
-                action={<Button size="small" onClick={() => setResidentReload((n) => n + 1)}>重试</Button>}
-              />
-            )}
-            <Table
-              rowKey="id"
-              size="small"
-              loading={loading || residentLoading}
-              columns={residentColumns}
-              dataSource={residents}
-              pagination={{
-                current: residentPage,
-                pageSize: residentPageSize,
-                total: residentTotal,
-                showSizeChanger: true,
-                pageSizeOptions: ['10', '20', '50'],
-                showTotal: (total) => `共 ${total} 位居民`,
-                onChange: (page, size) => {
-                  setResidentPage(size !== residentPageSize ? 1 : page)
-                  setResidentPageSize(size)
-                },
-              }}
-              scroll={{ x: 790 }}
-              locale={{
-                emptyText: residentKeyword ? '没有找到匹配的居民' : '该社区暂时没有已关联的居民账户',
-              }}
-            />
-          </>
-        ) : (
-          <Typography.Text type="secondary">请先选择社区；管理员可以先创建社区并分配网格员。</Typography.Text>
-        )}
-      </Card>
-
-      {isAdmin && (
-        <Drawer
-          title="新建社区"
-          size={400}
-          open={communityDrawerOpen}
-          onClose={requestCloseCommunityDrawer}
-          rootClassName="users-drawer"
-          afterOpenChange={(open) => {
-            // 焦点回到触发按钮；preventScroll 保证关闭抽屉不会把页面拉回顶部，
-            // 列表上下文与滚动位置仍然属于操作者。
-            if (!open) communityButtonRef.current?.focus({ preventScroll: true })
-          }}
-          footer={
-            <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button onClick={requestCloseCommunityDrawer} disabled={saving}>取消</Button>
-              <Button type="primary" htmlType="submit" form={COMMUNITY_FORM_ID} loading={saving}>
-                创建社区
-              </Button>
-            </Space>
-          }
-        >
-          <Form<CommunityFormValues>
-            id={COMMUNITY_FORM_ID}
-            form={communityForm}
-            layout="vertical"
-            onFinish={createCommunity}
-          >
-            {communityError && (
-              <Alert
-                style={{ marginBottom: 16 }}
-                type="error"
-                showIcon
-                message="创建社区失败"
-                description={communityError}
-              />
-            )}
-            <Form.Item
-              name="name"
-              label="社区名称"
-              rules={[
-                { required: true, whitespace: true, message: '请填写社区名称' },
-                {
-                  // The API trims before enforcing 2-60, so validate the trimmed value.
-                  validator: async (_rule, value: string | undefined) => {
-                    const trimmed = (value ?? '').trim()
-                    if (trimmed.length < 2 || trimmed.length > 60) {
-                      throw new Error('社区名称长度需为 2-60 个字符')
-                    }
-                  },
-                },
-              ]}
-            >
-              <Input placeholder="例如：幸福社区" maxLength={60} autoFocus />
-            </Form.Item>
-            <Form.Item label="社区服务点位置（可稍后补录）">
-              <Space direction="vertical" style={{ width: '100%' }}>
-                <Button
-                  icon={<EnvironmentOutlined />}
-                  onClick={() => { void openMapPicker('create') }}
-                  loading={mapLoading}
-                >
-                  在腾讯地图上选点
-                </Button>
-                {draftLocation && (
-                  <Alert
-                    type="success"
-                    showIcon
-                    message="已选择位置"
-                    description={draftLocation.address}
-                  />
-                )}
-              </Space>
-            </Form.Item>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              创建后可分配运营员或网格员，社区位置也可随时修改；不会因此改变居民归属。
-            </Typography.Text>
-          </Form>
-        </Drawer>
-      )}
-
-      <TencentLocationPicker
-        open={mapPicker !== null}
-        apiKey={mapPicker?.key ?? ''}
-        appName={mapPicker?.appName ?? ''}
-        initialLocation={mapPicker?.initialLocation}
-        onCancel={() => setMapPicker(null)}
-        onSelect={(location) => { void acceptMapLocation(location) }}
+        extra={
+          <Button onClick={refresh} loading={loading}>
+            刷新
+          </Button>
+        }
       />
 
-      {isAdmin && (
-        <Drawer
-          title="新增后台账户（运营员 / 网格员）"
-          size={560}
-          open={staffDrawerOpen}
-          onClose={requestCloseStaffDrawer}
-          rootClassName="users-drawer"
-          afterOpenChange={(open) => {
-            if (!open) staffButtonRef.current?.focus({ preventScroll: true })
-          }}
-          footer={
-            <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button onClick={requestCloseStaffDrawer} disabled={saving}>取消</Button>
-              <Button type="primary" htmlType="submit" form={STAFF_FORM_ID} loading={saving}>
-                创建账户
-              </Button>
-            </Space>
+      {communityOptionsError ? (
+        <Alert
+          type="warning"
+          showIcon
+          message="社区筛选选项加载失败"
+          description={`${communityOptionsError} 仍可查看权限范围内的全部用户。`}
+          action={
+            <Button
+              size="small"
+              onClick={() => setCommunityOptionsToken((value) => value + 1)}
+            >
+              重试
+            </Button>
           }
-        >
-          <Form<StaffFormValues>
-            id={STAFF_FORM_ID}
-            form={staffForm}
-            layout="vertical"
-            onFinish={createStaff}
-          >
-            {staffError && (
-              <Alert
-                style={{ marginBottom: 16 }}
-                type="error"
-                showIcon
-                message="创建后台账户失败"
-                description={staffError}
-              />
-            )}
-            <Form.Item
-              name="username"
-              label="登录账号"
-              normalize={(value: string) => value?.trim()}
-              rules={[
-                { required: true, message: '请填写登录账号' },
-                { pattern: /^[a-zA-Z0-9._-]{3,32}$/, message: '3-32 位字母、数字、点、下划线或短横线' },
-              ]}
-            >
-              <Input
-                placeholder="3-32 位字母、数字、点、下划线或短横线"
-                autoFocus
-              />
-            </Form.Item>
-            <Form.Item
-              name="displayName"
-              label="姓名 / 显示名称"
-              rules={[
-                { required: true, whitespace: true, message: '请填写姓名' },
-                { min: 1, max: 40, message: '姓名长度需为 1-40 个字符' },
-              ]}
-            >
-              <Input placeholder="工作人员姓名" />
-            </Form.Item>
-            <Form.Item
-              name="password"
-              label="初始密码"
-              rules={[
-                { required: true, message: '请填写初始密码' },
-                { min: 12, max: 128, message: '初始密码长度需为 12-128 位' },
-              ]}
-            >
-              <Input.Password placeholder="至少 12 位，创建后请安全告知本人" />
-            </Form.Item>
-            <Form.Item
-              name="userId"
-              normalize={(value: string) => value?.trim() || undefined}
-              label="关联已有居民账户（可选）"
-              tooltip="填写已完成微信授权的居民平台用户 ID，可让居民身份与网格员/运营员身份属于同一平台账户。"
-              rules={[{ pattern: /^[0-9a-f-]{36}$/i, message: '请输入完整的平台用户 UUID' }]}
-            >
-              <Input placeholder="留空则创建独立后台账户" />
-            </Form.Item>
-            <Form.Item name="role" label="角色" rules={[{ required: true, message: '请选择角色' }]}>
-              <Select
-                options={[
-                  { value: 'grid_worker', label: '网格员' },
-                  { value: 'operator', label: '运营员' },
-                ]}
-                placeholder="选择角色"
-              />
-            </Form.Item>
-            <Form.Item
-              name="communityIds"
-              label="负责社区"
-              rules={[{ required: true, type: 'array', min: 1, message: '请选择至少一个负责社区' }]}
-            >
-              <Select
-                mode="multiple"
-                allowClear
-                placeholder="选择一个或多个社区"
-                options={communities.map((item) => ({ value: item.id, label: item.name }))}
-              />
-            </Form.Item>
-          </Form>
-        </Drawer>
-      )}
-    </Space>
+          style={{ marginBottom: 12 }}
+        />
+      ) : null}
+
+      <DataPanel<UserDirectoryEntry, UserDirectoryFilters, UserSortKey>
+        id="user-directory"
+        label="平台用户目录"
+        rowKey={(row) => row.id}
+        query={query}
+        onQueryChange={(next) => {
+          setQuery(next)
+          return true
+        }}
+        initialFilters={{ keyword: '' }}
+        data={{ rows, total, loading, error: listError ?? undefined }}
+        filters={filters}
+        columns={columns}
+        onRefresh={refresh}
+        errorTitle="用户目录加载失败"
+        rowActions={(row) => [
+          { key: 'detail', label: '详情', onClick: () => openDetail(row.id) },
+        ]}
+      />
+
+      <Drawer
+        title={detail ? `用户详情 · ${detail.displayName}` : '用户详情'}
+        size={640}
+        open={detailOpen}
+        onClose={closeDetail}
+        rootClassName="users-drawer"
+      >
+        {detailLoading ? (
+          <div className="users-drawer-loading">
+            <Spin description="正在读取用户详情…" />
+          </div>
+        ) : detailError ? (
+          <Alert
+            type="error"
+            showIcon
+            message="用户详情加载失败"
+            description={detailError}
+            action={
+              <Button
+                size="small"
+                disabled={!detailUserId}
+                onClick={() => {
+                  if (detailUserId) void loadDetail(detailUserId)
+                }}
+              >
+                重试
+              </Button>
+            }
+          />
+        ) : detail ? (
+          <Space direction="vertical" size={18} style={{ width: '100%' }}>
+            <Space size={12} align="start">
+              <Avatar
+                size={48}
+                src={detail.wechatAvatarUrl || undefined}
+                alt={detail.displayName}
+              >
+                {detail.displayName.slice(0, 1)}
+              </Avatar>
+              <Space direction="vertical" size={4}>
+                <Typography.Text strong style={{ fontSize: 16 }}>
+                  {detail.displayName}
+                </Typography.Text>
+                <Space size={4} wrap>
+                  {identityTags(detail.identityMethods)}
+                  {roleTag(detail.staffRole)}
+                </Space>
+              </Space>
+            </Space>
+
+            <Descriptions size="small" column={1} bordered title="身份资料">
+              <Descriptions.Item label="平台用户 ID">
+                <Typography.Text code copyable={{ text: detail.id }}>
+                  {detail.id}
+                </Typography.Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="本地显示名">
+                {detail.localDisplayName || '—'}
+              </Descriptions.Item>
+              <Descriptions.Item label="微信昵称">
+                {detail.wechatNickname || '未授权或未设置'}
+              </Descriptions.Item>
+              <Descriptions.Item label="微信资料授权">
+                {detail.wechatProfileAuthorizedAt
+                  ? `已授权（${formatDateTime(detail.wechatProfileAuthorizedAt)}）`
+                  : '未授权'}
+              </Descriptions.Item>
+              <Descriptions.Item label="关联微信身份">
+                {detail.wechatLinkedIdentityCount} 个（仅计数）
+              </Descriptions.Item>
+              <Descriptions.Item label="手机号">
+                {detail.maskedPhone || '未绑定'}
+              </Descriptions.Item>
+              <Descriptions.Item label="注册时间">
+                {formatDateTime(detail.createdAt)}
+              </Descriptions.Item>
+            </Descriptions>
+
+            <Descriptions size="small" column={1} bordered title="后台账户">
+              {detail.staffAccount ? (
+                <>
+                  <Descriptions.Item label="登录账号">
+                    {detail.staffAccount.username}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="状态">
+                    <Tag
+                      color={
+                        detail.staffAccount.status === 'active' ? 'success' : 'default'
+                      }
+                    >
+                      {detail.staffAccount.status === 'active' ? '正常' : '已停用'}
+                    </Tag>
+                  </Descriptions.Item>
+                  <Descriptions.Item label="授权社区">
+                    {detail.staffAccount.communities.length === 0 ? (
+                      '未授权任何社区'
+                    ) : (
+                      <Space size={4} wrap>
+                        {detail.staffAccount.communities.map((community) => (
+                          <Tag key={community.id} color="blue">
+                            {community.name}
+                          </Tag>
+                        ))}
+                      </Space>
+                    )}
+                  </Descriptions.Item>
+                </>
+              ) : (
+                <Descriptions.Item label="后台账户">
+                  无（该账号只有居民身份，不是后台工作人员）
+                </Descriptions.Item>
+              )}
+            </Descriptions>
+
+            <Descriptions size="small" column={1} bordered title="居民社区归属">
+              <Descriptions.Item label="归属社区">
+                {detail.residentCommunities.length === 0 ? (
+                  <Typography.Text type="secondary">
+                    未关联社区（账号真实存在，可正常登录）
+                  </Typography.Text>
+                ) : (
+                  <Space size={4} wrap>
+                    {detail.residentCommunities.map((community) => (
+                      <Tag key={community.id}>
+                        {community.name} · {formatDate(community.joinedAt)} 加入
+                      </Tag>
+                    ))}
+                  </Space>
+                )}
+              </Descriptions.Item>
+            </Descriptions>
+
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              本页只读，不提供编辑身份、社区归属或后台账户的操作。
+            </Typography.Text>
+          </Space>
+        ) : (
+          <Typography.Text type="secondary">暂无用户详情。</Typography.Text>
+        )}
+      </Drawer>
+    </div>
   )
 }

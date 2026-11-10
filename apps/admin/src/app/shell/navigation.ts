@@ -76,9 +76,17 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         roles: ['admin', 'operator'],
       },
       {
+        key: '/users',
+        label: '用户管理',
+        description:
+          '平台全部用户目录：按权限范围检索、筛选并查看只读详情；未关联社区的账号也在这里。',
+        status: 'ready',
+        planned: [],
+      },
+      {
         key: '/communities',
-        label: '账户与社区',
-        description: '真实社区、后台账户与当前账号可访问的居民列表。',
+        label: '社区管理',
+        description: '创建社区、设置服务点位置，并创建/授权运营员与网格员后台账户。',
         status: 'ready',
         planned: [],
       },
