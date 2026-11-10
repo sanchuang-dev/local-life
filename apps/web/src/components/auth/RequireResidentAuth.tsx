@@ -9,7 +9,7 @@ import { useResidentAuth } from '../../hooks/useResidentAuth'
 export function RequireResidentAuth({ children }: { children?: ReactNode }) {
   const auth = useResidentAuth()
   const location = useLocation()
-  const decision = decideResidentGate(auth.sessionStatus, Boolean(auth.session))
+  const decision = decideResidentGate(auth.sessionStatus, Boolean(auth.session && !auth.session.staff))
 
   if (decision === 'loading') {
     return <p className="px-4 py-10 text-center text-[13px] text-slate-500" role="status">正在验证居民身份…</p>

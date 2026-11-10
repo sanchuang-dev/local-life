@@ -38,7 +38,7 @@ export function ResidentLoginPage() {
   const phoneAvailable = auth.phoneStatus?.configured === true
 
   useEffect(() => {
-    if (auth.sessionStatus === 'authenticated' && auth.session) {
+    if (auth.sessionStatus === 'authenticated' && auth.session && !auth.session.staff) {
       navigate(returnTo, { replace: true })
     }
   }, [auth.sessionStatus, auth.session, navigate, returnTo])
@@ -56,12 +56,13 @@ export function ResidentLoginPage() {
   }
 
   const state =
-    auth.sessionStatus === 'error' ? 'error' as const :
-    auth.sessionStatus === 'authenticated' && auth.session ? 'redirecting' as const :
+    auth.sessionStatus === 'error' || Boolean(auth.session?.staff) ? 'error' as const :
+    auth.sessionStatus === 'authenticated' && auth.session && !auth.session.staff ? 'redirecting' as const :
     auth.sessionStatus === 'loading' || auth.methodsLoading ? 'loading' as const :
     'idle' as const
 
   const reason =
+    auth.session?.staff ? '当前登录的是工作人员账户，请退出工作台会话后使用居民身份登录。' :
     result?.status === 'error' ? result.message :
     auth.error ? auth.error :
     auth.methods && !auth.methods.wechat && !phoneAvailable
