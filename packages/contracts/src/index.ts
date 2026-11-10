@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { activityRewardPlanSchema } from './rewards.js'
+import { authCommunitySchema, staffRoleSchema } from './identity.js'
 
 /** Route identifiers shared by the API and every client that calls it. */
 export const API_ROUTES = {
@@ -148,9 +149,6 @@ export const apiErrorSchema = z.object({
 
 export type ApiError = z.infer<typeof apiErrorSchema>
 
-export const staffRoleSchema = z.enum(['admin', 'operator', 'grid_worker'])
-export type StaffRole = z.infer<typeof staffRoleSchema>
-
 export const staffLoginRequestSchema = z.object({
   username: z.string().trim().min(3).max(32),
   password: z.string().min(1).max(128),
@@ -243,11 +241,6 @@ export const createStaffAccountRequestSchema = z.object({
 export const authUserSchema = z.object({
   id: z.string().uuid(),
   displayName: z.string().nullable(),
-})
-
-export const authCommunitySchema = z.object({
-  id: z.string().uuid(),
-  name: z.string(),
 })
 
 export const authStaffSchema = z.object({
@@ -2004,9 +1997,11 @@ export type ActivityParticipationConfirmResponse = z.infer<
   typeof activityParticipationConfirmResponseSchema
 >
 
+export * from './identity.js'
 export * from './crmeb.js'
 export * from './rewards.js'
 export * from './ledger.js'
+export * from './user-directory.js'
 
 /* -------------------------------------------------------------------------- */
 /* Phone (SMS one-time code) resident identity (#93 LL-H5-002)                 */
