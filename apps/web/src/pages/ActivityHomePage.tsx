@@ -33,6 +33,7 @@ import { useActivityParticipation } from '../hooks/useActivityParticipation'
 import { usePublicActivity } from '../hooks/usePublicActivity'
 import { useResidentAuth } from '../hooks/useResidentAuth'
 import { useRewardProgress } from '../hooks/useRewardProgress'
+import { useWechatActivityShare } from '../hooks/useWechatActivityShare'
 
 const quickEntries = [
   { id: 'rewards', label: '我的奖励', hint: '真实奖励与核销凭据', to: '/me/rewards', icon: Gift },
@@ -95,15 +96,20 @@ export function ActivityHomePage() {
   const selfParticipation = participationData?.participation ?? null
   // The single invite URL used by the QR code, native share and copy-link. It
   // only exists for a member of an open team that still has a real invite code.
+  const shareableActivity =
+    activity && activity.status === 'published' && new Date(activity.endsAt).getTime() > now
+      ? activity
+      : null
   const shareUrl =
-    activity &&
+    shareableActivity &&
     team &&
     selfParticipation &&
     team.status === 'open' &&
     team.seatsFilled < team.seatsTotal &&
     team.inviteCode
-      ? buildActivityShareUrl(activity.id, team.inviteCode)
+      ? buildActivityShareUrl(shareableActivity.id, team.inviteCode)
       : null
+  const wechatShare = useWechatActivityShare(shareableActivity, shareUrl)
 
   const activityPageParams = new URLSearchParams()
   if (activity) activityPageParams.set('activityId', activity.id)
@@ -337,6 +343,7 @@ export function ActivityHomePage() {
         open={sheet === 'share'}
         activity={activity}
         shareUrl={shareUrl}
+        wechatShare={wechatShare}
         seatsFilled={team?.seatsFilled ?? null}
         seatsTotal={team?.seatsTotal ?? null}
         onClose={() => setSheet(null)}

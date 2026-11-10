@@ -39,6 +39,7 @@ import { useActivityParticipation } from '../hooks/useActivityParticipation'
 import { usePublicActivity, type PublicActivityLoadState } from '../hooks/usePublicActivity'
 import { useResidentAuth } from '../hooks/useResidentAuth'
 import { useRewardProgress } from '../hooks/useRewardProgress'
+import { useWechatActivityShare } from '../hooks/useWechatActivityShare'
 import { luckyPrizes, luckyGridSlots, type LuckyPrize } from '../mocks/silverLuckyPrizes'
 
 type TaskMode = 'checkin' | 'purchase'
@@ -54,7 +55,7 @@ type SheetKind =
   | 'merchant'
   | null
 
-type ShareStatus = 'idle' | 'shared' | 'copied' | 'cancelled' | 'error'
+type ShareStatus = 'idle' | 'shared' | 'copied' | 'cancelled' | 'error' | 'wechat-hint'
 
 const communityRanks = [
   { rank: 1, name: '悦和社区', teams: 52, score: '326人参与' },
@@ -384,15 +385,20 @@ export function SilverNeighborhoodCampaignPage() {
   // The single share URL used by QR, native share and copy-link. It only exists
   // when the resident is a member of an open team that still has a real invite
   // code; a locked 3/3 team gets no invite entry at all.
+  const shareableActivity =
+    activity && activity.status === 'published' && new Date(activity.endsAt).getTime() > Date.now()
+      ? activity
+      : null
   const shareUrl =
-    activity &&
+    shareableActivity &&
     team &&
     selfParticipation &&
     team.status === 'open' &&
     team.seatsFilled < team.seatsTotal &&
     team.inviteCode
-      ? buildActivityShareUrl(activity.id, team.inviteCode)
+      ? buildActivityShareUrl(shareableActivity.id, team.inviteCode)
       : null
+  const wechatShare = useWechatActivityShare(shareableActivity, shareUrl)
 
   const [taskMode, setTaskMode] = useState<TaskMode>('checkin')
   const [activeSheet, setActiveSheet] = useState<SheetKind>(null)
@@ -457,6 +463,10 @@ export function SilverNeighborhoodCampaignPage() {
   const handleSystemShare = async () => {
     if (!shareUrl) {
       setShareStatus('error')
+      return
+    }
+    if (wechatShare.isWechat) {
+      setShareStatus('wechat-hint')
       return
     }
     if (!canNativeShare) {
@@ -1134,7 +1144,7 @@ export function SilverNeighborhoodCampaignPage() {
                   className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-[13px] bg-teal-700 px-2 text-[13px] font-semibold text-white transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
                 >
                   <Share2 size={17} aria-hidden="true" />
-                  转发给好友
+                  {wechatShare.isWechat ? '微信内分享' : '转发给好友'}
                 </button>
                 <button
                   type="button"
@@ -1146,9 +1156,20 @@ export function SilverNeighborhoodCampaignPage() {
                 </button>
               </div>
               <p className="mt-2 text-center text-[11px] leading-4 text-slate-400">
-                二维码、转发与复制使用同一条链接；截图保存暂未开放。
+                {wechatShare.isWechat
+                  ? '请通过微信右上角「···」菜单发送给朋友或分享到朋友圈；也可复制链接或扫码。'
+                  : '二维码、转发与复制使用同一条链接；截图保存暂未开放。'}
               </p>
               <div className="text-center text-[12px] font-medium" aria-live="polite">
+                {wechatShare.isWechat && wechatShare.status === 'loading'
+                  ? <p className="mt-1 text-slate-500">正在准备微信分享；复制链接与二维码不受影响。</p>
+                  : null}
+                {wechatShare.isWechat && wechatShare.status === 'error'
+                  ? <p className="mt-1 text-orange-700">微信分享初始化失败，可复制链接或扫码。</p>
+                  : null}
+                {shareStatus === 'wechat-hint'
+                  ? <p className="mt-1 text-teal-700">点击右上角「···」，选择好友或朋友圈。</p>
+                  : null}
                 {shareStatus === 'shared' ? <p className="mt-1 text-teal-700">已调起系统分享，好友需登录并主动确认才会加入。</p> : null}
                 {shareStatus === 'copied' ? <p className="mt-1 text-teal-700">邀请链接已复制，包含当前活动与邀请参数。</p> : null}
                 {shareStatus === 'cancelled' ? <p className="mt-1 text-slate-500">已取消分享，可再次点击转发。</p> : null}
