@@ -72,7 +72,6 @@ export function CommunityDiscoveryPage() {
   const [searchResults, setSearchResults] = useState<AsyncList<PublicCommunity> | null>(null)
   const [locationError, setLocationError] = useState('')
   const lastTrigger = useRef<HTMLElement | null>(null)
-  const searchRef = useRef<HTMLInputElement | null>(null)
   const modalRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
@@ -80,8 +79,8 @@ export function CommunityDiscoveryPage() {
     setDirectory({ status: 'loading' })
     const query = new URLSearchParams()
     if (position) {
-      query.set('latitude', String(position.latitude))
-      query.set('longitude', String(position.longitude))
+      query.set('latitude', position.latitude.toFixed(3))
+      query.set('longitude', position.longitude.toFixed(3))
     }
     const suffix = query.toString()
     const url = `/api${PUBLIC_COMMUNITY_ROUTE}${suffix ? `?${suffix}` : ''}`
@@ -199,7 +198,8 @@ export function CommunityDiscoveryPage() {
     const main = document.getElementById('main-content')
     main?.setAttribute('inert', '')
     document.body.style.overflow = 'hidden'
-    const focusTimer = window.setTimeout(() => searchRef.current?.focus(), 0)
+    // Focus the dialog container, not the search input: opening a mobile sheet must not summon the keyboard.
+    const focusTimer = window.setTimeout(() => modalRef.current?.focus({ preventScroll: true }), 0)
     const keydown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { event.preventDefault(); closeSheet() }
       if (event.key !== 'Tab' || !modalRef.current) return
@@ -384,7 +384,7 @@ export function CommunityDiscoveryPage() {
       {sheetOpen && createPortal(
         <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center" role="presentation">
           <div className="absolute inset-0 bg-[#09201a]/45" onClick={closeSheet} aria-hidden="true"/>
-          <section ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="community-sheet-heading"
+          <section ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="community-sheet-heading"
             className="relative z-10 flex max-h-[90dvh] w-full max-w-[480px] flex-col overflow-hidden rounded-t-[24px] bg-[#f5f7f7] shadow-xl sm:max-h-[85dvh] sm:rounded-[24px]">
             <div className="flex justify-center pt-2 sm:hidden"><span className="h-1.5 w-10 rounded-full bg-[#d6e3de]"/></div>
             <div className="flex items-center justify-between px-5 pb-3 pt-3">
@@ -407,7 +407,7 @@ export function CommunityDiscoveryPage() {
               <label className="mt-4 flex min-h-12 items-center gap-2 rounded-xl border border-[#dce6e2] bg-white px-3">
                 <Search size={19} className="text-[#5b6c67]"/>
                 <span className="sr-only">搜索社区名称或地址</span>
-                <input ref={searchRef} type="search" value={search} onChange={(e)=>setSearch(e.target.value)}
+                <input type="search" value={search} onChange={(e)=>setSearch(e.target.value)}
                   maxLength={60} placeholder="搜索社区名称或地址"
                   className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[#82918c]"/>
               </label>
