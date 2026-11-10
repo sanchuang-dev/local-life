@@ -139,7 +139,7 @@ export function ResidentLoginPage() {
                 </p>
               ) : null}
 
-              {!auth.methods && !auth.loading ? (
+              {!auth.methods && !auth.methodsLoading ? (
                 <div role="alert" className="mt-4 rounded-[12px] bg-[#fff7f0] px-3.5 py-3 text-[12px] leading-5 text-[#7a4a2c]">
                   <p>{auth.error || '暂时无法读取登录方式，请稍后重试。'}</p>
                   <button

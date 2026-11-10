@@ -22,6 +22,7 @@ import {
 import { FilterChipRow } from '../components/crm/FilterChips'
 import { useBackTarget } from '../hooks/useBackTarget'
 import { useResidentAuth } from '../hooks/useResidentAuth'
+import { buildResidentLoginHref } from '../components/auth/residentLogin'
 import { useRewardWallet, type RewardWalletEntry } from '../hooks/useRewardWallet'
 
 const BUCKET_ORDER: RewardBucket[] = ['claimable', 'pending', 'redeemed', 'disputed', 'void']
@@ -110,42 +111,12 @@ export function MyRewardsPage() {
       ) : null}
 
       {wallet.state.status === 'unauthenticated' ? (
-        <section className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
-          <p className="text-[14px] font-bold text-slate-800">登录后查看我的奖励</p>
-          <p className="mt-1 text-[12px] leading-5 text-slate-500">
-            奖励与核销凭据绑定居民账户，登录后才能读取你真实获得的奖励。浏览不会生成任何奖励记录。
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {auth.methods?.wechat ? (
-              <button
-                type="button"
-                onClick={auth.startWechatLogin}
-                className="flex min-h-[48px] items-center justify-center rounded-[14px] bg-teal-700 px-4 text-[14px] font-bold text-white"
-              >
-                微信授权登录
-              </button>
-            ) : null}
-            {auth.methods?.developmentResidentLogin ? (
-              <button
-                type="button"
-                disabled={auth.busy}
-                onClick={() => void auth.developmentLogin()}
-                className="flex min-h-[48px] items-center justify-center rounded-[14px] border border-teal-200 bg-white px-4 text-[14px] font-semibold text-teal-700 disabled:cursor-wait disabled:opacity-60"
-              >
-                {auth.busy ? '登录中…' : '开发测试登录'}
-              </button>
-            ) : null}
-          </div>
-          {auth.methods && !auth.methods.wechat && !auth.methods.developmentResidentLogin ? (
-            <p className="mt-2 rounded-[12px] bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-500">
-              微信网页授权尚未配置，当前无法登录。
-            </p>
-          ) : null}
-          {auth.error ? (
-            <p role="alert" className="mt-2 break-words text-[12px] leading-5 text-rose-600">
-              {auth.error}
-            </p>
-          ) : null}
+        <section className="mt-4 rounded-[18px] bg-white p-4">
+          <p className="text-[13px] font-medium text-slate-700">登录状态已失效，请重新登录。</p>
+          <Link to={buildResidentLoginHref('/me/rewards', { activityId: null, inviteCode: null, inviteInvalid: false })}
+            className="mt-3 inline-flex min-h-[44px] items-center rounded-xl bg-teal-700 px-4 text-[13px] font-semibold text-white">
+            前往统一登录
+          </Link>
         </section>
       ) : null}
 
