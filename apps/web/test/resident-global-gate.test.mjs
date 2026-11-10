@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { isResidentGateExempt } from '../src/components/auth/residentGlobalGate.ts'
 import { decideResidentGate } from '../src/components/auth/residentGate.ts'
-import { buildResidentLoginHref, buildResidentWechatLoginRequest, resolveResidentLoginTarget } from '../src/components/auth/residentLogin.ts'
+import { buildResidentLoginHref, normalizeActivityId, resolveResidentLoginTarget } from '../src/components/auth/residentLoginUrl.ts'
 
 const emptyContext = { activityId: null, inviteCode: null, inviteInvalid: false }
 
@@ -33,12 +33,9 @@ test('login links retain original resident targets, activity query and reject un
 
 test('WeChat login start derives valid activityId from preserved target query', () => {
   const activityId = '123e4567-e89b-42d3-a456-426614174000'
-  const r = buildResidentWechatLoginRequest({
-    returnTo: '/?activityId=' + activityId,
-    context: emptyContext,
-    baseUrl: '/',
-    currentPathname: '/login',
-  })
-  assert.equal(new URL(r.url, 'https://local.proto.3cgroup.cn').searchParams.get('activityId'), activityId)
-  assert.equal(new URL(r.url, 'https://local.proto.3cgroup.cn').searchParams.get('returnTo'), '/?activityId=' + activityId)
+  const target = resolveResidentLoginTarget('/?activityId=' + activityId)
+  const params = new URL(target, 'https://local.proto.3cgroup.cn').searchParams
+  assert.equal(normalizeActivityId(params.get('activityId')), activityId)
+  assert.equal(normalizeActivityId('not-a-valid-id'), null)
+  assert.equal(resolveResidentLoginTarget('/login?next=/me'), '/me')
 })
