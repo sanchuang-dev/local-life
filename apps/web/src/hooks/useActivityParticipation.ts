@@ -1,3 +1,4 @@
+import { reportResidentSessionExpired } from '../services/residentSessionEvents'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   API_ERROR_CODES,
@@ -150,7 +151,10 @@ export function useActivityParticipation({
         })
 
         if (response.status === 401) {
-          if (active) setState({ status: 'unauthenticated' })
+          if (active) {
+            reportResidentSessionExpired()
+            setState({ status: 'unauthenticated' })
+          }
           return
         }
         if (!response.ok) throw new Error(await readErrorMessage(response))
@@ -232,7 +236,10 @@ export function useActivityParticipation({
           const serverMessage = parsedError.success
             ? parsedError.data.error.message
             : null
-          if (response.status === 401) setState({ status: 'unauthenticated' })
+          if (response.status === 401) {
+            reportResidentSessionExpired()
+            setState({ status: 'unauthenticated' })
+          }
           return {
             ok: false,
             message: confirmErrorMessage(response.status, code, serverMessage),

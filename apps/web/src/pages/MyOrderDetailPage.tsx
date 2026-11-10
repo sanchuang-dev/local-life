@@ -12,6 +12,7 @@ import {
 import { useBackTarget } from '../hooks/useBackTarget'
 import { useMyLocalOrder } from '../hooks/useLocalOrders'
 import { useResidentAuth } from '../hooks/useResidentAuth'
+import { buildResidentLoginHref } from '../components/auth/residentLogin'
 
 const eventLabels: Record<LocalOrderEvent['event'], string> = {
   'order.registered': '登记订单',
@@ -200,8 +201,10 @@ export function MyOrderDetailPage() {
             订单绑定居民账户，登录后才能读取这笔订单。
           </p>
           <Link
-            to="/me"
-            state={{ from: backTo }}
+            to={buildResidentLoginHref(
+              `/me/orders/${encodeURIComponent(localOrderId ?? '')}`,
+              { activityId: null, inviteCode: null, inviteInvalid: false },
+            )}
             className="mt-3 inline-flex min-h-[44px] items-center rounded-xl bg-teal-700 px-4 text-[13px] font-semibold text-white"
           >
             去登录

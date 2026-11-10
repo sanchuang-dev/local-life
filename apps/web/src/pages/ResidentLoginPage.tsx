@@ -20,6 +20,9 @@ export function ResidentLoginPage() {
   const navigate = useNavigate()
   const auth = useResidentAuth()
   const returnTo = resolveResidentLoginTarget(searchParams.get('next'))
+  // When next is private, a guest cannot navigate back there without bouncing
+  // straight to login again; offer the public homepage as an exit instead.
+  const backTo = !auth.session && /^\/me(?:\/|\?|$)/.test(returnTo) ? '/' : returnTo
   const target = new URL(returnTo, window.location.origin)
   const activityId = searchParams.get('activityId')
   const invite = parseInviteParam(searchParams.get('invite') ?? target.searchParams.get('invite'))
@@ -60,11 +63,11 @@ export function ResidentLoginPage() {
     <div className="flex min-h-[calc(100dvh-env(safe-area-inset-top,0px))] items-center justify-center px-4 py-8">
       <div className="w-full max-w-[400px]">
         <Link
-          to={returnTo}
+          to={backTo}
           className="mb-5 inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-2 text-[12px] font-medium text-slate-500 transition-colors hover:text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
         >
           <ArrowLeft size={15} aria-hidden="true" />
-          返回原页面
+          {backTo === '/' && returnTo !== '/' ? '返回首页' : '返回原页面'}
         </Link>
 
         <header className="mb-5 flex items-center gap-3 px-1">
@@ -139,7 +142,7 @@ export function ResidentLoginPage() {
                 </p>
               ) : null}
 
-              {!auth.methods && !auth.loading ? (
+              {!auth.methods && !auth.methodsLoading ? (
                 <div role="alert" className="mt-4 rounded-[12px] bg-[#fff7f0] px-3.5 py-3 text-[12px] leading-5 text-[#7a4a2c]">
                   <p>{auth.error || '暂时无法读取登录方式，请稍后重试。'}</p>
                   <button

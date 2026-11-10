@@ -15,6 +15,7 @@ import {
 import { useBackTarget } from '../hooks/useBackTarget'
 import { useMyLocalOrders } from '../hooks/useLocalOrders'
 import { useResidentAuth } from '../hooks/useResidentAuth'
+import { buildResidentLoginHref } from '../components/auth/residentLogin'
 
 const toneStyles = {
   mint: 'bg-[#e8f6f0] text-[#388b77]',
@@ -162,44 +163,12 @@ export function MyOrdersPage() {
       ) : null}
 
       {state.status === 'unauthenticated' ? (
-        <section className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
-          <p className="text-[14px] font-bold text-slate-800">登录后查看我的订单</p>
-          <p className="mt-1 text-[12px] leading-5 text-slate-500">
-            订单绑定居民账户，登录后才能读取你自己登记的订单。浏览商品不需要登录。
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {auth.methods?.wechat ? (
-              <button
-                type="button"
-                onClick={auth.startWechatLogin}
-                className="flex min-h-[48px] items-center justify-center rounded-[14px] bg-teal-700 px-4 text-[14px] font-bold text-white"
-              >
-                微信授权登录
-              </button>
-            ) : null}
-            {auth.methods?.developmentResidentLogin ? (
-              <button
-                type="button"
-                disabled={auth.busy}
-                onClick={() => void auth.developmentLogin()}
-                className="flex min-h-[48px] items-center justify-center rounded-[14px] border border-teal-200 bg-white px-4 text-[14px] font-semibold text-teal-700 disabled:opacity-60"
-              >
-                {auth.busy ? '登录中…' : '开发测试登录'}
-              </button>
-            ) : null}
-            <Link
-              to="/me"
-              state={{ from }}
-              className="flex min-h-[48px] items-center justify-center rounded-[14px] border border-slate-200 px-4 text-[14px] font-semibold text-slate-600"
-            >
-              去「我的」查看登录方式
-            </Link>
-          </div>
-          {auth.error ? (
-            <p role="alert" className="mt-2 break-words text-[12px] leading-5 text-rose-600">
-              {auth.error}
-            </p>
-          ) : null}
+        <section className="mt-4 rounded-[18px] bg-white p-4">
+          <p className="text-[13px] font-medium text-slate-700">登录状态已失效，请重新登录。</p>
+          <Link to={buildResidentLoginHref('/me/orders', { activityId: null, inviteCode: null, inviteInvalid: false })}
+            className="mt-3 inline-flex min-h-[44px] items-center rounded-xl bg-teal-700 px-4 text-[13px] font-semibold text-white">
+            前往统一登录
+          </Link>
         </section>
       ) : null}
 
