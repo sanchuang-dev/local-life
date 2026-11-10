@@ -113,7 +113,7 @@ export function registerExternalOfferRoutes(
         }).run()
         imported += 1
       }
-      insertAudit(tx, actor.userId, 'external_offer.imported', null, stamp, {
+      insertAudit(tx, actor.userId, 'external_offer.imported', randomUUID(), stamp, {
         imported: String(imported),
         skipped: String(skipped),
       })
