@@ -252,7 +252,7 @@ export function UsersPage({ session }: UsersPageProps) {
     try {
       const config = await apiRequest<{ available: boolean; key?: string; appName?: string }>('/api/admin/map-picker-config')
       if (!config.available || !config.key || !config.appName) {
-        throw new Error('腾讯地图尚未配置，请先在 API 服务设置 TENCENT_MAP_PICKER_KEY')
+        throw new Error('请先到「系统管理 → 腾讯地图」保存并启用 Key')
       }
       const initialLocation = mode === 'create'
         ? draftLocation ?? undefined
