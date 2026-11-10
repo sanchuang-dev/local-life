@@ -2367,6 +2367,7 @@ export const EXTERNAL_OFFER_ROUTES = {
   publicList: '/external-offers',
   adminList: '/admin/external-offers',
   adminDetail: '/admin/external-offers/:offerId',
+  importBatch: '/admin/external-offers/import',
 } as const
 
 /** Reject non-web schemes, local destinations, credentials, and parser ambiguities. */
@@ -2406,3 +2407,23 @@ export type CreateExternalOfferRequest = z.infer<typeof createExternalOfferReque
 export const updateExternalOfferRequestSchema =
   createExternalOfferRequestSchema.extend({ expectedUpdatedAt: isoTimestamp })
 export type UpdateExternalOfferRequest = z.infer<typeof updateExternalOfferRequestSchema>
+
+/**
+ * Spreadsheet import writes *drafts only*. Never let a spreadsheet choose
+ * enabled=true or create reward, order, stock or finance records.
+ */
+export const externalOfferImportItemSchema =
+  createExternalOfferRequestSchema.omit({ enabled: true })
+export type ExternalOfferImportItem = z.infer<typeof externalOfferImportItemSchema>
+
+export const externalOfferImportRequestSchema = z.strictObject({
+  items: z.array(externalOfferImportItemSchema).min(1).max(100),
+})
+export type ExternalOfferImportRequest = z.infer<typeof externalOfferImportRequestSchema>
+
+export const externalOfferImportResponseSchema = z.strictObject({
+  imported: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+})
+export type ExternalOfferImportResponse = z.infer<typeof externalOfferImportResponseSchema>
+
