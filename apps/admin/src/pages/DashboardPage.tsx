@@ -52,11 +52,14 @@ export function DashboardPage() {
           <Col xs={24} md={12}>
             <Card size="small" title="开始工作" style={{ height: '100%' }}>
               <Typography.Paragraph>
-                管理社区、网格员账户及授权范围内的居民信息。
+                管理社区与后台账户授权，并查看权限范围内的平台用户目录。
               </Typography.Paragraph>
-              <Button type="primary" onClick={() => navigate('/communities')}>
-                进入账户与社区
-              </Button>
+              <Space wrap>
+                <Button type="primary" onClick={() => navigate('/users')}>
+                  进入用户管理
+                </Button>
+                <Button onClick={() => navigate('/communities')}>进入社区管理</Button>
+              </Space>
               <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
                 活动、商品、订单、结算功能尚未接入真实服务。
               </Typography.Paragraph>

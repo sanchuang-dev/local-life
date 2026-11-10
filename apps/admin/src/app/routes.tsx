@@ -1,8 +1,9 @@
-import { Navigate, type RouteObject } from 'react-router'
+import type { RouteObject } from 'react-router'
 import { useAdminAuth } from './auth-context'
 import { AdminLayout } from '../layouts/AdminLayout'
 import { ActivitiesPage } from '../pages/ActivitiesPage'
 import { ActivityCheckinPage } from '../pages/ActivityCheckinPage'
+import { CommunitiesPage } from '../pages/CommunitiesPage'
 import { ComponentPreviewPage } from '../pages/ComponentPreviewPage'
 import { CrmPage } from '../pages/CrmPage'
 import { DashboardPage } from '../pages/DashboardPage'
@@ -21,7 +22,12 @@ import { NAV_PAGES } from './shell/navigation'
 
 const PLANNED_PAGES = NAV_PAGES.filter((page) => page.status === 'planned')
 
-function CommunityAccountsRoute() {
+function CommunitiesRoute() {
+  const { session } = useAdminAuth()
+  return <CommunitiesPage session={session} />
+}
+
+function UsersRoute() {
   const { session } = useAdminAuth()
   return <UsersPage session={session} />
 }
@@ -44,11 +50,11 @@ export const routes: RouteObject[] = [
       { path: 'orders', element: <OrdersPage /> },
       { path: 'performance', element: <PerformancePage /> },
       { path: 'settlements', element: <SettlementsPage /> },
-      { path: 'communities', element: <CommunityAccountsRoute /> },
+      { path: 'communities', element: <CommunitiesRoute /> },
       { path: 'system/runtime', element: <SystemInfoPage /> },
       { path: 'system/wechat', element: <WechatSettingsPage /> },
       { path: 'system/tencent-map', element: <TencentMapSettingsPage /> },
-      { path: 'users', element: <Navigate to='/communities' replace /> },
+      { path: 'users', element: <UsersRoute /> },
       { path: 'system/components', element: <ComponentPreviewPage /> },
       ...PLANNED_PAGES.map((page) => ({
         path: page.key.replace(/^\//, ''),

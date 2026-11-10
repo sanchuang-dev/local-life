@@ -41,7 +41,7 @@ it('never renders protected shell on an unauthenticated deep link', async () => 
   mount('/communities')
 
   expect(await screen.findByRole('heading', { name: '本地生活运营后台' })).toBeTruthy()
-  expect(screen.queryByRole('menuitem', { name: '账户与社区' })).toBeNull()
+  expect(screen.queryByRole('menuitem', { name: '社区管理' })).toBeNull()
   expect(fetchMock).toHaveBeenCalledWith('/api/auth/session', { credentials: 'include' })
 })
 
@@ -75,12 +75,12 @@ it('authenticates from a deep link and logs out through the real API contract', 
     target: { value: 'valid-test-only-password-2026' },
   })
   fireEvent.click(screen.getByRole('button', { name: /登\s*录/ }))
-  expect(await screen.findByRole('menuitem', { name: '账户与社区' })).toBeTruthy()
+  expect(await screen.findByRole('menuitem', { name: '社区管理' })).toBeTruthy()
   await waitFor(() => expect(screen.getAllByText('已授权管理员').length).toBeGreaterThan(0))
   await waitFor(() => expect(paths).toContain('/api/admin/communities'))
 
   fireEvent.click(screen.getByRole('button', { name: '退出登录' }))
   expect(await screen.findByRole('heading', { name: '本地生活运营后台' })).toBeTruthy()
-  expect(screen.queryByRole('menuitem', { name: '账户与社区' })).toBeNull()
+  expect(screen.queryByRole('menuitem', { name: '社区管理' })).toBeNull()
   expect(paths).toContain('/api/auth/logout')
 })
