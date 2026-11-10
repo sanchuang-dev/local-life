@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
+  Avatar,
   App as AntdApp,
   Button,
   Card,
@@ -15,6 +16,11 @@ import {
 } from 'antd'
 import { PlusOutlined, UserAddOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
+import {
+  CRM_ROUTES,
+  residentDirectoryResponseSchema,
+  type ResidentDirectoryEntry,
+} from '@sanchuang-dev/local-life-contracts'
 import type { AuthenticatedSession } from '../services/auth'
 import './users.css'
 
@@ -30,12 +36,6 @@ interface StaffAccount {
   role: 'admin' | 'operator' | 'grid_worker'
   status: 'active' | 'disabled'
   communities: Community[]
-}
-
-interface Resident {
-  id: string
-  displayName: string | null
-  createdAt: string
 }
 
 interface UsersPageProps {
@@ -95,7 +95,15 @@ export function UsersPage({ session }: UsersPageProps) {
   const [staffForm] = Form.useForm<StaffFormValues>()
   const [communities, setCommunities] = useState<Community[]>([])
   const [staff, setStaff] = useState<StaffAccount[]>([])
-  const [residents, setResidents] = useState<Resident[]>([])
+  const [residents, setResidents] = useState<ResidentDirectoryEntry[]>([])
+  const [residentTotal, setResidentTotal] = useState(0)
+  const [residentPage, setResidentPage] = useState(1)
+  const [residentPageSize, setResidentPageSize] = useState(20)
+  const [residentSearchDraft, setResidentSearchDraft] = useState('')
+  const [residentKeyword, setResidentKeyword] = useState('')
+  const [residentReload, setResidentReload] = useState(0)
+  const [residentLoading, setResidentLoading] = useState(false)
+  const [residentError, setResidentError] = useState<string | null>(null)
   const [selectedCommunityId, setSelectedCommunityId] = useState<string | undefined>(
     session.staff.communities[0]?.id,
   )
@@ -154,22 +162,64 @@ export function UsersPage({ session }: UsersPageProps) {
   useEffect(() => {
     if (!selectedCommunityId) {
       setResidents([])
+      setResidentTotal(0)
+      setResidentLoading(false)
+      setResidentError(null)
       return
     }
     let active = true
-    apiRequest<{ items: Resident[] }>(
-      `/api/crm/residents?communityId=${encodeURIComponent(selectedCommunityId)}`,
-    )
-      .then((result) => {
-        if (active) setResidents(result.items)
-      })
-      .catch((cause: unknown) => {
-        if (active) setError(cause instanceof Error ? cause.message : '无法读取社区居民')
-      })
+    const controller = new AbortController()
+    setResidentLoading(true)
+    setResidentError(null)
+    // Never show another community/page's old rows while this request loads.
+    setResidents([])
+
+    const params = new URLSearchParams({
+      communityId: selectedCommunityId,
+      page: String(residentPage),
+      pageSize: String(residentPageSize),
+    })
+    if (residentKeyword) params.set('keyword', residentKeyword)
+    void apiRequest<unknown>(`/api${CRM_ROUTES.residentList}?${params.toString()}`, {
+      signal: controller.signal,
+    }).then((raw) => {
+      if (!active) return
+      const result = residentDirectoryResponseSchema.parse(raw)
+      setResidents(result.items)
+      setResidentTotal(result.total)
+      // When entries are removed concurrently, restore a valid page.
+      const lastPage = Math.max(1, Math.ceil(result.total / result.pageSize))
+      if (residentPage > lastPage) setResidentPage(lastPage)
+    }).catch((cause: unknown) => {
+      if (!active || controller.signal.aborted) return
+      setResidentTotal(0)
+      setResidentError(cause instanceof Error ? cause.message : '无法读取社区居民')
+    }).finally(() => {
+      if (active) setResidentLoading(false)
+    })
     return () => {
       active = false
+      controller.abort()
     }
-  }, [selectedCommunityId])
+  }, [selectedCommunityId, residentPage, residentPageSize, residentKeyword, residentReload])
+
+  function changeResidentCommunity(communityId: string) {
+    setSelectedCommunityId(communityId)
+    setResidentPage(1)
+    setResidentKeyword('')
+    setResidentSearchDraft('')
+    setResidentTotal(0)
+    setResidents([])
+    setResidentError(null)
+  }
+
+  function searchResidents(value: string) {
+    const keyword = value.trim()
+    setResidentSearchDraft(keyword)
+    setResidentPage(1)
+    if (residentKeyword === keyword) setResidentReload((previous) => previous + 1)
+    else setResidentKeyword(keyword)
+  }
 
   function openCommunityDrawer() {
     setCommunityError(null)
@@ -330,11 +380,40 @@ export function UsersPage({ session }: UsersPageProps) {
     [],
   )
 
-  const residentColumns: ColumnsType<Resident> = useMemo(
+  const residentColumns: ColumnsType<ResidentDirectoryEntry> = useMemo(
     () => [
-      { title: '居民', dataIndex: 'displayName', key: 'displayName', render: (value: string | null) => value || '微信用户' },
+      {
+        title: '居民',
+        key: 'resident',
+        render: (_value: unknown, resident: ResidentDirectoryEntry) => (
+          <Space size={8}>
+            <Avatar src={resident.wechatAvatarUrl || undefined}>
+              {resident.displayName.slice(0, 1)}
+            </Avatar>
+            <div>
+              <Typography.Text strong>{resident.displayName}</Typography.Text>
+              {resident.wechatNickname?.trim() && resident.localDisplayName?.trim()
+                && resident.wechatNickname.trim() !== resident.localDisplayName.trim() ? (
+                  <div><Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    本地：{resident.localDisplayName}
+                  </Typography.Text></div>
+                ) : null}
+            </div>
+          </Space>
+        ),
+      },
+      {
+        title: '微信资料',
+        key: 'wechatProfile',
+        render: (_value: unknown, resident: ResidentDirectoryEntry) => (
+          <Tag color={resident.profileAuthorizedAt ? 'green' : 'default'}>
+            {resident.profileAuthorizedAt ? '已授权' : '未授权'}
+          </Tag>
+        ),
+      },
       { title: '平台用户 ID', dataIndex: 'id', key: 'id', render: (value: string) => <Typography.Text code copyable>{value}</Typography.Text> },
-      { title: '加入时间', dataIndex: 'createdAt', key: 'createdAt', render: (value: string) => new Date(value).toLocaleString('zh-CN') },
+      { title: '加入社区', dataIndex: 'joinedAt', key: 'joinedAt', render: (value: string) => new Date(value).toLocaleString('zh-CN') },
+      { title: '注册时间', dataIndex: 'createdAt', key: 'createdAt', render: (value: string) => new Date(value).toLocaleString('zh-CN') },
     ],
     [],
   )
@@ -370,7 +449,7 @@ export function UsersPage({ session }: UsersPageProps) {
                 </Button>
               </>
             )}
-            <Button size="small" onClick={() => void loadData()} loading={loading}>刷新</Button>
+            <Button size="small" onClick={() => { void loadData(); setResidentReload((n) => n + 1) }} loading={loading}>刷新</Button>
           </Space>
         }
       >
@@ -381,7 +460,7 @@ export function UsersPage({ session }: UsersPageProps) {
             value={selectedCommunityId}
             placeholder="选择社区"
             options={communities.map((item) => ({ value: item.id, label: item.name }))}
-            onChange={setSelectedCommunityId}
+            onChange={changeResidentCommunity}
           />
           <Tag color={isAdmin ? 'green' : 'blue'}>{ROLE_LABELS[session.staff.role]}</Tag>
           {!isAdmin && <Typography.Text type="secondary">仅显示管理员分配给你的社区范围。</Typography.Text>}
@@ -402,18 +481,59 @@ export function UsersPage({ session }: UsersPageProps) {
         </Card>
       )}
 
-      <Card size="small" title="社区居民" extra={<Tag>{residents.length} 条（最多展示 100 条）</Tag>}>
+      <Card size="small" title="社区居民" extra={<Tag>{residentTotal} 位居民</Tag>}>
         {selectedCommunityId ? (
-          <Table
-            rowKey="id"
-            size="small"
-            loading={loading}
-            columns={residentColumns}
-            dataSource={residents}
-            pagination={{ pageSize: 10 }}
-            scroll={{ x: 520 }}
-            locale={{ emptyText: '该社区暂时没有已关联的居民账户' }}
-          />
+          <>
+            <Space wrap style={{ width: '100%', marginBottom: 12 }}>
+              <Input.Search
+                aria-label="搜索居民"
+                placeholder="搜索微信昵称、本地名称或平台 UUID"
+                value={residentSearchDraft}
+                onChange={(event) => {
+                  setResidentSearchDraft(event.target.value)
+                  if (!event.target.value && residentKeyword) searchResidents('')
+                }}
+                onSearch={searchResidents}
+                allowClear
+                maxLength={80}
+                enterButton="搜索"
+                style={{ width: 'min(100%, 380px)' }}
+              />
+            </Space>
+            {residentError && (
+              <Alert
+                type="error"
+                showIcon
+                style={{ marginBottom: 12 }}
+                message="居民目录加载失败"
+                description={residentError}
+                action={<Button size="small" onClick={() => setResidentReload((n) => n + 1)}>重试</Button>}
+              />
+            )}
+            <Table
+              rowKey="id"
+              size="small"
+              loading={loading || residentLoading}
+              columns={residentColumns}
+              dataSource={residents}
+              pagination={{
+                current: residentPage,
+                pageSize: residentPageSize,
+                total: residentTotal,
+                showSizeChanger: true,
+                pageSizeOptions: ['10', '20', '50'],
+                showTotal: (total) => `共 ${total} 位居民`,
+                onChange: (page, size) => {
+                  setResidentPage(size !== residentPageSize ? 1 : page)
+                  setResidentPageSize(size)
+                },
+              }}
+              scroll={{ x: 790 }}
+              locale={{
+                emptyText: residentKeyword ? '没有找到匹配的居民' : '该社区暂时没有已关联的居民账户',
+              }}
+            />
+          </>
         ) : (
           <Typography.Text type="secondary">请先选择社区；管理员可以先创建社区并分配网格员。</Typography.Text>
         )}
