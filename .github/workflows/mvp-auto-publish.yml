@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: sanchuang-dev/proto-infra
-          ref: 69f33f9addb931ecee082c37a6aedacadc96abf5
+          ref: 6ddaa22c6ab2aa75310e416031cb4a04685c0b7e
           persist-credentials: false
       - name: Check installer syntax and bounded paths
         shell: bash
@@ -32,6 +32,9 @@ jobs:
           grep -Fq "AUTH_DEV_ENABLED=false" scripts/install-local-life-mvp-app.sh
           grep -Fq 'chmod -R a+rX' scripts/install-local-life-mvp-app.sh
           grep -Fq 'MVP_STATIC_READABLE_BY_CADDY=yes' scripts/install-local-life-mvp-app.sh
+          # Fail the release gate if a pinned installer loses the persistent WeChat secret mount.
+          grep -Fq 'target=/run/local-life-wechat,readonly' scripts/install-local-life-mvp-app.sh
+          grep -Fq 'WECHAT_CONFIG_MASTER_KEY_FILE=/run/local-life-wechat/master-key.b64' scripts/install-local-life-mvp-app.sh
           grep -Fq "test -z \"\$(read_old)\"" scripts/install-local-life-mvp-app.sh
           tmp="$(mktemp -d)"
           trap 'rm -rf "$tmp"' EXIT
@@ -131,7 +134,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: sanchuang-dev/proto-infra
-          ref: 69f33f9addb931ecee082c37a6aedacadc96abf5
+          ref: 6ddaa22c6ab2aa75310e416031cb4a04685c0b7e
           persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
