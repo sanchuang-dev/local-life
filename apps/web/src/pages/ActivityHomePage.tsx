@@ -191,7 +191,7 @@ export function ActivityHomePage() {
           onShare={() => setSheet('share')}
         />
       ) : (
-        <ActivityHomeStatus state={state} requestedActivityId={requestedActivityId} onRetry={retry} />
+        <ActivityHomeStatus state={state} onRetry={retry} />
       )}
 
       {activity ? (
@@ -346,11 +346,9 @@ export function ActivityHomePage() {
  */
 function ActivityHomeStatus({
   state,
-  requestedActivityId,
   onRetry,
 }: {
   state: ReturnType<typeof usePublicActivity>['state']
-  requestedActivityId: string | null
   onRetry: () => void
 }) {
   // `ready` is rendered by the parent; this component owns the three non-ready states.

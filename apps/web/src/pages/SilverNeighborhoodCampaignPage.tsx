@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import {
   AlertTriangle,
   ArrowLeft,
-  CheckCircle2,
   Check,
   LockKeyhole,
   ChevronRight,
