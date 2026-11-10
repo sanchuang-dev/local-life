@@ -74,6 +74,7 @@ import { registerLedgerRoutes } from './ledger/routes.js'
 import { registerReconciliationRoutes } from './ledger/reconciliation-routes.js'
 import { registerParticipationRoutes } from './participation/routes.js'
 import { registerRewardRoutes } from './rewards/routes.js'
+import { registerDrawRoutes } from './draw/routes.js'
 import { registerUserDirectoryRoutes } from './users/routes.js'
 import { registerCrmebRoutes } from './crmeb/routes.js'
 import { registerWechatAdminRoutes } from './wechat/routes.js'
@@ -1639,6 +1640,14 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
   })
 
   registerRewardRoutes(app, {
+    db,
+    config,
+    fail,
+    validCsrf,
+    bodySchemaError,
+  })
+
+  registerDrawRoutes(app, {
     db,
     config,
     fail,

@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { activityRewardPlanSchema } from './rewards.js'
-import { authCommunitySchema, staffRoleSchema } from './identity.js'
+import { activityStatusSchema, authCommunitySchema, staffRoleSchema } from './identity.js'
 
 /** Route identifiers shared by the API and every client that calls it. */
 export const API_ROUTES = {
@@ -66,6 +66,13 @@ export const API_ERROR_CODES = {
   phoneAlreadyBound: 'phone_already_bound',
   phoneInUse: 'phone_in_use',
   smsDeliveryFailed: 'sms_delivery_failed',
+  /**
+   * Real "today's draw" prize pool (LL-LOT-001). `draw_pool_not_ready` blocks
+   * enabling a pool without a real, in-stock, weighted prize; `draw_pool_not_configured`
+   * means a prize cannot be added before the base rule was saved.
+   */
+  drawPoolNotReady: 'draw_pool_not_ready',
+  drawPoolNotConfigured: 'draw_pool_not_configured',
   /**
    * Local catalogue (#109): an off-shelf product refuses *new* registrations.
    * Existing orders keep their frozen snapshot and are unaffected.
@@ -528,10 +535,11 @@ export const ACTIVITY_ROUTES = {
   adminAudit: '/admin/activities/:activityId/audit',
 } as const
 
-/** Lifecycle state of an activity. Only staff can change it, through explicit transitions. */
-export const activityStatusSchema = z.enum(['draft', 'published', 'paused', 'ended'])
-export type ActivityStatus = z.infer<typeof activityStatusSchema>
-
+/**
+ * Lifecycle state of an activity. Only staff can change it, through explicit
+ * transitions. The schema itself lives in `identity.ts` so domain modules can
+ * import it without a circular dependency; it is re-exported from here.
+ */
 /** Status values that may be exposed to residents; drafts are never public. */
 export const activityPublicStatusSchema = z.enum(['published', 'paused', 'ended'])
 export type ActivityPublicStatus = z.infer<typeof activityPublicStatusSchema>
@@ -2002,6 +2010,7 @@ export * from './crmeb.js'
 export * from './rewards.js'
 export * from './ledger.js'
 export * from './user-directory.js'
+export * from './draw.js'
 
 /* -------------------------------------------------------------------------- */
 /* Phone (SMS one-time code) resident identity (#93 LL-H5-002)                 */
