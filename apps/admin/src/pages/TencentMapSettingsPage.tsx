@@ -205,6 +205,7 @@ function TencentMapConsole({ session }: { session: AuthenticatedSession }) {
         title={data?.configured ? '更换腾讯地图 Key' : '配置腾讯地图 Key'}
         width="min(440px, 100vw)"
         open={editorOpen}
+        destroyOnHidden
         onClose={() => { if (!saving) { setDraftKey(''); setEditorOpen(false) } }}
         footer={<Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <Button disabled={saving} onClick={() => { setDraftKey(''); setEditorOpen(false) }}>取消</Button>
