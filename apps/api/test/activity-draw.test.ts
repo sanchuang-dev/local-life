@@ -677,6 +677,7 @@ test('community scope, role, session and CSRF are enforced on real HTTP', async 
     // Product and activity must still be a real pair; a missing product is 404.
     const missing = await addPrize(fixture, activityId, {
       productId: randomUUID(),
+      costCents: 2_345,
       totalQuantity: 1,
       weight: 10,
       enabled: true,
