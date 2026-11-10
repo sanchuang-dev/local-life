@@ -53,8 +53,8 @@ export const activityDrawPrizeSchema = z.strictObject({
   /** Snapshot of the product image at configuration time. */
   productImageUrl: z.string().nullable(),
   /**
-   * Snapshot of the catalogue price at configuration time. This is a recorded
-   * cost basis, NOT a live price commitment; the catalogue may change later.
+   * Explicit per-unit fulfilment cost entered by operations when configuring the prize.
+   * Never inferred from the product's selling price; the snapshot is immutable after award.
    */
   costCents: z.number().int().nonnegative(),
   /** The product's *current* catalogue shelf state, shown for operator awareness only. */
@@ -145,6 +145,8 @@ export type SaveActivityDrawPoolRequest = z.infer<typeof saveActivityDrawPoolReq
 
 export const createActivityDrawPrizeRequestSchema = z.strictObject({
   productId: z.string().uuid(),
+  /** Explicit fulfilment cost in cents; zero is allowed for a confirmed free gift. */
+  costCents: z.number().int().min(0).max(1_000_000_000),
   totalQuantity: quantity,
   weight,
   enabled: z.boolean(),

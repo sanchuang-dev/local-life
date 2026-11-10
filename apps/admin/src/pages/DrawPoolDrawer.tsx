@@ -15,7 +15,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ColumnsType } from 'antd/es/table'
 import type {
   ActivityDrawPool,
@@ -70,6 +70,7 @@ interface DrawPoolDrawerProps {
 
 interface PrizeFormValues {
   productId?: string
+  costYuan?: number
   totalQuantity: number
   weight: number
   enabled: boolean
@@ -77,6 +78,11 @@ interface PrizeFormValues {
 
 function formatCents(cents: number): string {
   return `¥${(cents / 100).toFixed(2)}`
+}
+
+function percentOf(weight: number, total: number): string {
+  if (total <= 0) return '0%'
+  return `${(weight * 100 / total).toFixed(2)}%`
 }
 
 export function DrawPoolDrawer({ open, activity, session, onClose }: DrawPoolDrawerProps) {
@@ -103,11 +109,20 @@ export function DrawPoolDrawer({ open, activity, session, onClose }: DrawPoolDra
   >([])
   const [productsLoading, setProductsLoading] = useState(false)
   const [productsError, setProductsError] = useState<string | null>(null)
+  const productRequestToken = useRef(0)
+  const productSearchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => () => {
+    productRequestToken.current += 1
+    if (productSearchTimer.current !== null) clearTimeout(productSearchTimer.current)
+  }, [])
 
   const activityId = activity?.id ?? null
   const readOnly = (pool?.activityStatus ?? activity?.status) === 'ended'
 
   function handleClose() {
+    productRequestToken.current += 1
+    if (productSearchTimer.current !== null) clearTimeout(productSearchTimer.current)
     setPrizeModalOpen(false)
     setEditingPrize(null)
     setPrizeError(null)
@@ -150,6 +165,20 @@ export function DrawPoolDrawer({ open, activity, session, onClose }: DrawPoolDra
     () => new Set(pool?.prizes.map((prize) => prize.productId) ?? []),
     [pool],
   )
+
+  // Weights are relative, not percentages. Recalculate as the operator edits the
+  // no-win weight; sold-out or disabled prizes must not inflate displayed odds.
+  const probability = useMemo(() => {
+    const availablePrizes = (pool?.prizes ?? []).filter(
+      (prize) => prize.enabled && prize.remainingQuantity > 0 && prize.weight > 0,
+    )
+    const prizeWeight = availablePrizes.reduce((sum, prize) => sum + prize.weight, 0)
+    return {
+      availablePrizes,
+      total: prizeWeight + noPrizeWeight,
+      prizeWeight,
+    }
+  }, [pool, noPrizeWeight])
 
   const productOptions = useMemo(
     () =>
@@ -219,21 +248,43 @@ export function DrawPoolDrawer({ open, activity, session, onClose }: DrawPoolDra
     }
   }
 
+  function searchProducts(keyword: string, immediate = false) {
+    if (!activity?.community.id) return
+    if (productSearchTimer.current !== null) clearTimeout(productSearchTimer.current)
+    const requestToken = ++productRequestToken.current
+    const communityId = activity.community.id
+    setProductsLoading(true)
+    setProductsError(null)
+    productSearchTimer.current = setTimeout(() => {
+      // Server-side keyword filtering works beyond the first 100 items in the
+      // community catalogue. Only the most recent response may update options.
+      void listAdminProducts({
+        page: 1,
+        pageSize: 100,
+        communityId,
+        keyword: keyword.trim() || undefined,
+      })
+        .then((result) => {
+          if (productRequestToken.current === requestToken) setProducts(result.items)
+        })
+        .catch((cause: unknown) => {
+          if (productRequestToken.current === requestToken) {
+            setProductsError(describeLocalError(cause, '本地商品列表加载失败'))
+          }
+        })
+        .finally(() => {
+          if (productRequestToken.current === requestToken) setProductsLoading(false)
+        })
+    }, immediate ? 0 : 250)
+  }
+
   function openAddPrize() {
     setEditingPrize(null)
     setPrizeError(null)
     form.resetFields()
     form.setFieldsValue({ totalQuantity: 1, weight: 10, enabled: true })
     setPrizeModalOpen(true)
-    if (!activity?.community.id) return
-    setProductsLoading(true)
-    setProductsError(null)
-    listAdminProducts({ page: 1, pageSize: 100, communityId: activity.community.id })
-      .then((result) => setProducts(result.items))
-      .catch((cause: unknown) =>
-        setProductsError(describeLocalError(cause, '本地商品列表加载失败')),
-      )
-      .finally(() => setProductsLoading(false))
+    searchProducts('', true)
   }
 
   function openEditPrize(prize: ActivityDrawPrize) {
@@ -251,6 +302,18 @@ export function DrawPoolDrawer({ open, activity, session, onClose }: DrawPoolDra
   async function submitPrize(values: PrizeFormValues) {
     if (!activityId) return
     const productId = values.productId
+    const explicitCostCents = values.costYuan === undefined
+      ? null
+      : Math.round(values.costYuan * 100)
+    if (!editingPrize && (
+      explicitCostCents === null ||
+      !Number.isSafeInteger(explicitCostCents) ||
+      explicitCostCents < 0 ||
+      explicitCostCents > 1_000_000_000
+    )) {
+      setPrizeError('请填写实际每份履约成本（元），免费赠品请明确填写 0')
+      return
+    }
     if (!editingPrize && !productId) {
       setPrizeError('请选择真实商品')
       return
@@ -269,6 +332,7 @@ export function DrawPoolDrawer({ open, activity, session, onClose }: DrawPoolDra
       } else if (productId) {
         await createActivityDrawPrize(session.csrfToken, activityId, {
           productId,
+          costCents: explicitCostCents!,
           totalQuantity: values.totalQuantity,
           weight: values.weight,
           enabled: values.enabled,
@@ -294,7 +358,7 @@ export function DrawPoolDrawer({ open, activity, session, onClose }: DrawPoolDra
         <Space orientation="vertical" size={0}>
           <Typography.Text strong>{prize.productName}</Typography.Text>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            成本快照 {formatCents(prize.costCents)}
+            已确认履约成本 {formatCents(prize.costCents)}
           </Typography.Text>
           <Tag color={prize.productStatus === 'on_shelf' ? 'green' : 'default'}>
             {PRODUCT_STATUS_LABEL[prize.productStatus]}
@@ -424,6 +488,20 @@ export function DrawPoolDrawer({ open, activity, session, onClose }: DrawPoolDra
                   />
                 </Space>
               </Space>
+              <Alert
+                type={probability.total > 0 && noPrizeWeight === 0 ? 'warning' : 'info'}
+                showIcon
+                title={probability.total > 0
+                  ? `当前理论中奖率 ${percentOf(probability.prizeWeight, probability.total)} · 未中奖率 ${percentOf(noPrizeWeight, probability.total)}`
+                  : '尚无可抽取的奖品，请先设置库存和权重'}
+                description={
+                  probability.total > 0
+                    ? `各奖品当前概率：${probability.availablePrizes.map((prize) =>
+                        `${prize.productName} ${percentOf(prize.weight, probability.total)}`,
+                      ).join(' · ') || '无'}。以当前启用奖品及剩余库存计算，库存变动会改变概率；无中奖权重 0 意味着有库存时必中奖。`
+                    : '概率权重不是百分比；系统不会自动设置或保证中奖率。'
+                }
+              />
               <Space wrap>
                 <Button
                   type="primary"
@@ -518,12 +596,23 @@ export function DrawPoolDrawer({ open, activity, session, onClose }: DrawPoolDra
             >
               <Select
                 showSearch
-                optionFilterProp="label"
+                filterOption={false}
+                onSearch={(value) => searchProducts(value)}
                 loading={productsLoading}
-                placeholder={productsError ?? '选择商品'}
+                placeholder={productsError ?? '输入商品名称搜索全部社区商品'}
                 options={productOptions}
-                notFoundContent={productsError ? '商品加载失败' : '该社区暂无其他可用商品'}
+                notFoundContent={productsError ? '商品加载失败' : '无匹配商品，请换个关键词'}
               />
+            </Form.Item>
+          )}
+          {editingPrize ? null : (
+            <Form.Item
+              name="costYuan"
+              label="每份奖品实际履约成本（元）"
+              rules={[{ required: true, message: '请输入实际成本；免费赠品请填写 0' }]}
+              tooltip="运营确认的采购或实际履约成本。不会自动使用商品售价；零成本赠品请明确填 0。"
+            >
+              <InputNumber min={0} max={10_000_000} precision={2} step={0.01} style={{ width: '100%' }} />
             </Form.Item>
           )}
           <Form.Item

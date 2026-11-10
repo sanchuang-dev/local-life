@@ -314,7 +314,7 @@ async function savePool(
 async function addPrize(
   fixture: Fixture,
   activityId: string,
-  body: { productId: string; totalQuantity: number; weight: number; enabled: boolean },
+  body: { productId: string; costCents: number; totalQuantity: number; weight: number; enabled: boolean },
 ) {
   return api(fixture.app, 'POST', path(ACTIVITY_DRAW_ROUTES.adminCreatePrize, activityId), {
     session: fixture.admin,
@@ -354,6 +354,7 @@ async function seedReadyPool(fixture: Fixture, activityId: string, productId: st
   assert.equal(saved.status, 200)
   const added = await addPrize(fixture, activityId, {
     productId,
+    costCents: 2_345,
     totalQuantity: 5,
     weight: 80,
     enabled: true,
@@ -411,7 +412,7 @@ test('a published pool persists real product snapshots and survives a restart', 
     productId = await createProduct(first, { name: '真实抽奖礼盒', priceCents: 8_888 })
     const prize = await seedReadyPool(first, activityId, productId)
     assert.equal(prize.productName, '真实抽奖礼盒')
-    assert.equal(prize.costCents, 8_888)
+    assert.equal(prize.costCents, 2_345, 'fulfilment cost is not the product retail price')
     assert.equal(prize.remainingQuantity, 5)
     assert.equal(prize.enabled, true)
 
@@ -451,7 +452,7 @@ test('a published pool persists real product snapshots and survives a restart', 
     assert.equal(pool.enabled, true)
     assert.equal(pool.prizes.length, 1)
     assert.equal(pool.prizes[0]?.productName, '真实抽奖礼盒')
-    assert.equal(pool.prizes[0]?.costCents, 8_888)
+    assert.equal(pool.prizes[0]?.costCents, 2_345)
 
     const events = reopened.db
       .select()
@@ -496,6 +497,7 @@ test('enabling requires a real, in-stock, weighted prize', async () => {
 
     const zeroWeight = await addPrize(fixture, activityId, {
       productId,
+      costCents: 2_345,
       totalQuantity: 2,
       weight: 0,
       enabled: true,
@@ -554,6 +556,7 @@ test('unavailable states never leak a fake prize', async () => {
     assert.equal(created.status, 200)
     const added = await addPrize(fixture, activityId, {
       productId,
+      costCents: 2_345,
       totalQuantity: 1,
       weight: 10,
       enabled: true,
@@ -646,6 +649,7 @@ test('community scope, role, session and CSRF are enforced on real HTTP', async 
     })
     const mismatch = await addPrize(fixture, activityId, {
       productId: otherProduct,
+      costCents: 2_345,
       totalQuantity: 1,
       weight: 10,
       enabled: true,
@@ -707,8 +711,26 @@ test('bad parameters, duplicates and inventory bounds are rejected', async () =>
     assert.equal(created.status, 200)
     const pool = activityDrawPoolSchema.parse(await created.json())
 
+    const missingCost = await api(
+      fixture.app,
+      'POST',
+      path(ACTIVITY_DRAW_ROUTES.adminCreatePrize, activityId),
+      { session: fixture.admin, body: { productId, totalQuantity: 1, weight: 10, enabled: true } },
+    )
+    assert.equal(missingCost.status, 400, 'cost must be supplied explicitly')
+
+    const negativeCost = await addPrize(fixture, activityId, {
+      productId,
+      costCents: -1,
+      totalQuantity: 1,
+      weight: 10,
+      enabled: true,
+    })
+    assert.equal(negativeCost.status, 400)
+
     const zeroStock = await addPrize(fixture, activityId, {
       productId,
+      costCents: 2_345,
       totalQuantity: 0,
       weight: 10,
       enabled: true,
@@ -717,6 +739,7 @@ test('bad parameters, duplicates and inventory bounds are rejected', async () =>
 
     const overflow = await addPrize(fixture, activityId, {
       productId,
+      costCents: 2_345,
       totalQuantity: 100_001,
       weight: 10,
       enabled: true,
@@ -725,6 +748,7 @@ test('bad parameters, duplicates and inventory bounds are rejected', async () =>
 
     const overflowWeight = await addPrize(fixture, activityId, {
       productId,
+      costCents: 2_345,
       totalQuantity: 1,
       weight: 1_000_001,
       enabled: true,
@@ -733,15 +757,18 @@ test('bad parameters, duplicates and inventory bounds are rejected', async () =>
 
     const added = await addPrize(fixture, activityId, {
       productId,
+      costCents: 2_345,
       totalQuantity: 4,
       weight: 10,
       enabled: true,
     })
     assert.equal(added.status, 201)
     const prize = activityDrawPrizeSchema.parse(await added.json())
+    assert.equal(prize.costCents, 2_345)
 
     const duplicate = await addPrize(fixture, activityId, {
       productId,
+      costCents: 2_345,
       totalQuantity: 1,
       weight: 1,
       enabled: true,

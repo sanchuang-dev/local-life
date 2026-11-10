@@ -141,6 +141,48 @@ describe('DrawPoolDrawer', () => {
     expect(await screen.findByText('抽奖配置已保存，当前未启用')).toBeTruthy()
   })
 
+  it('makes the theoretical all-win case explicit when no-prize weight is zero', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.endsWith(`/api/admin/activities/${ACTIVITY_ID}/draw-pool`)) {
+        return json(emptyPool({
+          configured: true,
+          enabled: true,
+          dailyDrawLimitPerResident: 1,
+          noPrizeWeight: 0,
+          updatedAt: '2026-11-10T10:00:00.000Z',
+          prizes: [{
+            id: '123e4567-e89b-42d3-a456-426614174abc',
+            activityId: ACTIVITY_ID,
+            productId: '123e4567-e89b-42d3-a456-426614174def',
+            productName: '实际礼品',
+            productImageUrl: null,
+            costCents: 1200,
+            productStatus: 'on_shelf',
+            totalQuantity: 5,
+            drawnQuantity: 0,
+            remainingQuantity: 5,
+            weight: 100,
+            enabled: true,
+            createdAt: '2026-11-10T10:00:00.000Z',
+            updatedAt: '2026-11-10T10:00:00.000Z',
+          }],
+          totals: {
+            totalQuantity: 5,
+            remainingQuantity: 5,
+            drawnQuantity: 0,
+            enabledPrizeCount: 1,
+          },
+        }))
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    renderDrawer()
+    expect(await screen.findByText(/当前理论中奖率 100.00%/)).toBeTruthy()
+    expect(screen.getByText(/无中奖权重 0 意味着有库存时必中奖/)).toBeTruthy()
+  })
+
   it('disables every write for an ended activity', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()

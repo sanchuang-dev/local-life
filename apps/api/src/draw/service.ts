@@ -357,7 +357,6 @@ export function createDrawPrize(
       communityId: localProducts.communityId,
       name: localProducts.name,
       imageUrl: localProducts.imageUrl,
-      unitPriceCents: localProducts.unitPriceCents,
     })
     .from(localProducts)
     .where(eq(localProducts.id, parsed.productId))
@@ -384,7 +383,7 @@ export function createDrawPrize(
           productId: product.id,
           productName: product.name,
           productImageUrl: product.imageUrl,
-          costCents: product.unitPriceCents,
+          costCents: parsed.costCents,
           totalQuantity: parsed.totalQuantity,
           drawnQuantity: 0,
           remainingQuantity: parsed.totalQuantity,
@@ -398,6 +397,7 @@ export function createDrawPrize(
         .run()
       insertEvent(tx, activityId, prizeId, 'draw_prize.created', actor.userId, now, {
         productId: product.id,
+        costCents: parsed.costCents,
         totalQuantity: parsed.totalQuantity,
         weight: parsed.weight,
         enabled: parsed.enabled,
