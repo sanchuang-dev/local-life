@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { activityDetailHref, isLegacyActivityHome } from '../src/lib/communityHomeRoute.ts'
-import { wgs84ToGcj02 } from '../src/lib/communityGeolocation.ts'
+import { wgs84ToGcj02 } from '../src/lib/communityCoordinates.ts'
 
 test('old activity and invite links continue to open the activity workflow', () => {
   assert.equal(isLegacyActivityHome(''), false)
