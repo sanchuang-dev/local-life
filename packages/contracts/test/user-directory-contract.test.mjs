@@ -185,10 +185,6 @@ describe('userDirectoryEntrySchema / response', () => {
       false,
     )
     assert.equal(
-      userDirectoryEntrySchema.safeParse({ ...unassignedEntry, identityMethods: [] }).success,
-      false,
-    )
-    assert.equal(
       userDirectoryEntrySchema.safeParse({
         ...unassignedEntry,
         identityMethods: ['wechat', 'wechat'],
@@ -199,6 +195,21 @@ describe('userDirectoryEntrySchema / response', () => {
       userDirectoryEntrySchema.safeParse({ ...unassignedEntry, staffRole: 'admin' }).success,
       false,
     )
+  })
+
+  it('can still represent a legacy account with no persistent identity row', () => {
+    // Dev login (#AUTH_DEV_ENABLED) can create a `users` row with no WeChat,
+    // phone or staff identity. The directory must list it, not 500 or hide it.
+    const parsed = userDirectoryEntrySchema.parse({
+      ...unassignedEntry,
+      displayName: '开发登录用户',
+      localDisplayName: '开发登录用户',
+      wechatNickname: null,
+      wechatAvatarUrl: null,
+      wechatProfileAuthorizedAt: null,
+      identityMethods: [],
+    })
+    assert.deepEqual(parsed.identityMethods, [])
   })
 
   it('rejects unknown fields so a leaked column cannot travel through a DTO', () => {
@@ -243,6 +254,20 @@ describe('userDirectoryDetailSchema', () => {
     })
     assert.equal(parsed.staffAccount, null)
     assert.equal(parsed.wechatLinkedIdentityCount, 2)
+  })
+
+  it('accepts a legacy account with no identity, phone or staff account', () => {
+    const parsed = userDirectoryDetailSchema.parse({
+      ...unassignedEntry,
+      wechatNickname: null,
+      wechatAvatarUrl: null,
+      wechatProfileAuthorizedAt: null,
+      identityMethods: [],
+      wechatLinkedIdentityCount: 0,
+      maskedPhone: null,
+      staffAccount: null,
+    })
+    assert.deepEqual(parsed.identityMethods, [])
   })
 
   it('refuses inconsistent identity flags', () => {

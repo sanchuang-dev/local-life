@@ -60,8 +60,10 @@ export const USER_DIRECTORY_FALLBACK_DISPLAY_NAME = '未命名用户' as const
 
 /**
  * How an account can be identified. The array in a DTO is ordered by this enum
- * (`wechat`, `phone`, `staff`) and is never empty: every `users` row exists for
- * at least one of these reasons.
+ * (`wechat`, `phone`, `staff`). It is empty only for a legacy account that has
+ * no persistent identity row at all (for example an account created by the
+ * explicit `AUTH_DEV_ENABLED` test login); such an account must still be listed
+ * so an administrator can see it instead of the row disappearing.
  */
 export const userIdentityMethodSchema = z.enum(['wechat', 'phone', 'staff'])
 export type UserIdentityMethod = z.infer<typeof userIdentityMethodSchema>
@@ -171,8 +173,8 @@ const userDirectoryBaseSchema = z.strictObject({
   wechatAvatarUrl: z.string().nullable(),
   /** Consent time under the current public account; `null` when not authorized. */
   wechatProfileAuthorizedAt: isoTimestamp.nullable(),
-  /** Ordered `wechat`, `phone`, `staff`; at least one entry, no duplicates. */
-  identityMethods: z.array(userIdentityMethodSchema).min(1).max(3),
+  /** Ordered `wechat`, `phone`, `staff`; no duplicates. See the enum docs. */
+  identityMethods: z.array(userIdentityMethodSchema).max(3),
   /** Back-office role, or `null` for a pure resident account. */
   staffRole: staffRoleSchema.nullable(),
   /**
