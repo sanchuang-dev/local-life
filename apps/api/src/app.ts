@@ -74,6 +74,7 @@ import { registerLedgerRoutes } from './ledger/routes.js'
 import { registerReconciliationRoutes } from './ledger/reconciliation-routes.js'
 import { registerParticipationRoutes } from './participation/routes.js'
 import { registerRewardRoutes } from './rewards/routes.js'
+import { registerUserDirectoryRoutes } from './users/routes.js'
 import { registerCrmebRoutes } from './crmeb/routes.js'
 import { registerWechatAdminRoutes } from './wechat/routes.js'
 import { registerWechatJsSdkRoutes } from './wechat/js-sdk.js'
@@ -1564,6 +1565,13 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     fail,
     validCsrf,
     bodySchemaError,
+  })
+
+  // Back-office user directory (#153 LL-USER-001): a users-table-rooted read
+  // surface next to the legacy, community-rooted `/crm/residents` directory.
+  registerUserDirectoryRoutes(app, {
+    db,
+    fail,
   })
 
   registerCrmRoutes(app, {
