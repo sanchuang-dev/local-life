@@ -1,3 +1,4 @@
+import { reportResidentSessionExpired } from '../services/residentSessionEvents'
 import { useCallback, useEffect, useState } from 'react'
 import {
   ACTIVITY_ROUTES,
@@ -120,6 +121,7 @@ export function useRewardWallet({
       } catch (cause) {
         if (!active || controller.signal.aborted) return
         if (isRewardApiError(cause) && cause.status === 401) {
+          reportResidentSessionExpired()
           setState({ status: 'unauthenticated' })
           return
         }

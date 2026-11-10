@@ -1,5 +1,7 @@
 import { Route, Routes } from 'react-router'
 import { AppShell } from './components/shell/AppShell'
+import { RequireResidentAuth } from './components/auth/RequireResidentAuth'
+import { ResidentAuthProvider } from './hooks/useResidentAuth'
 import { ActivityHomePage } from './pages/ActivityHomePage'
 import { CommunityActivityPage } from './pages/CommunityActivityPage'
 import { CommunityBroadcastPage } from './pages/CommunityBroadcastPage'
@@ -39,7 +41,8 @@ import { WorkbenchVerifyPage } from './pages/workbench/WorkbenchVerifyPage'
 
 export default function App() {
   return (
-    <AppShell>
+    <ResidentAuthProvider>
+      <AppShell>
       <Routes>
         <Route path="/" element={<ActivityHomePage />} />
         <Route path="/gd" element={<GdPage />} />
@@ -64,11 +67,13 @@ export default function App() {
         <Route path="/life/local-products/:productId" element={<LocalProductPage />} />
         <Route path="/life/product/:productId" element={<ProductPage />} />
         <Route path="/points" element={<PointsPage />} />
-        <Route path="/me/devices" element={<HealthDevicesPage />} />
-        <Route path="/me/orders" element={<MyOrdersPage />} />
-        <Route path="/me/orders/:localOrderId" element={<MyOrderDetailPage />} />
-        <Route path="/me/rewards" element={<MyRewardsPage />} />
-        <Route path="/me" element={<MePage />} />
+        <Route element={<RequireResidentAuth />}>
+          <Route path="/me" element={<MePage />} />
+          <Route path="/me/devices" element={<HealthDevicesPage />} />
+          <Route path="/me/orders" element={<MyOrdersPage />} />
+          <Route path="/me/orders/:localOrderId" element={<MyOrderDetailPage />} />
+          <Route path="/me/rewards" element={<MyRewardsPage />} />
+        </Route>
         <Route path="/login" element={<ResidentLoginPage />} />
         <Route path="/workbench" element={<WorkbenchLayout />}>
           <Route index element={<WorkbenchLoginPage />} />
@@ -84,6 +89,7 @@ export default function App() {
         </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
-    </AppShell>
+      </AppShell>
+    </ResidentAuthProvider>
   )
 }

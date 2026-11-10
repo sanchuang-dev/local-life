@@ -13,6 +13,8 @@ import { PageHeader } from '../components/PageHeader'
 import { useBackTarget } from '../hooks/useBackTarget'
 import { useLocalProduct } from '../hooks/useLocalCatalog'
 import { useResidentAuth } from '../hooks/useResidentAuth'
+import { buildResidentLoginHref } from '../components/auth/residentLogin'
+import { reportResidentSessionExpired } from '../services/residentSessionEvents'
 import { formatLocalPriceCents } from '../components/life/localOrderLabels'
 import { registerLocalOrder } from '../services/localOrders'
 import { describeLocalError, isLocalApiError, newIdempotencyKey } from '../services/localApi'
@@ -76,6 +78,12 @@ export function LocalProductPage() {
         // The snapshot or the shelf state changed, or the session expired: re-read
         // the product so the resident sees the real current state, not a stale one.
         if (cause.status === 409) reload()
+        if (cause.status === 401) {
+          reportResidentSessionExpired()
+          navigate(buildResidentLoginHref(`/life/local-products/${product.id}`, {
+            activityId: null, inviteCode: null, inviteInvalid: false,
+          }), { replace: true })
+        }
       }
     } finally {
       setSubmitting(false)
@@ -322,8 +330,10 @@ export function LocalProductPage() {
                 </p>
                 {!session ? (
                   <Link
-                    to="/me"
-                    state={{ from: `/life/local-products/${product.id}` }}
+                    to={buildResidentLoginHref(
+                       `/life/local-products/${product.id}`,
+                       { activityId: null, inviteCode: null, inviteInvalid: false },
+                     )}
                     className="mt-2 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[#138b79] px-4 text-[13px] font-semibold text-white"
                   >
                     去登录 / 查看登录方式
