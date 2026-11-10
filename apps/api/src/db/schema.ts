@@ -1902,6 +1902,160 @@ export const staffRelations = relations(staffAccounts, ({ one, many }) => ({
 
 
 /**
+ * Real "today's draw" pool (LL-LOT-001, Issue #173).
+ *
+ * Deliberately separate from `activity_prize_stocks`: that ledger belongs to the
+ * team-reward fulfilment (#62) and must not be reused. One row per activity is
+ * the single source of truth for the daily rule (draw limit, no-prize weight,
+ * one-click enablement). It starts disabled; enabling requires a real in-stock
+ * prize and is validated by the service before this row is written.
+ */
+export const activityDrawPools = sqliteTable(
+  'activity_draw_pools',
+  {
+    id: text('id').primaryKey(),
+    activityId: text('activity_id')
+      .notNull()
+      .unique()
+      .references(() => activities.id, { onDelete: 'restrict' }),
+    // Denormalised for scoped reads and enforced against the activity by trigger.
+    communityId: text('community_id')
+      .notNull()
+      .references(() => communities.id, { onDelete: 'restrict' }),
+    enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
+    dailyDrawLimitPerResident: integer('daily_draw_limit_per_resident').notNull(),
+    noPrizeWeight: integer('no_prize_weight').notNull().default(0),
+    createdByUserId: text('created_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    updatedByUserId: text('updated_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    index('activity_draw_pools_community_idx').on(table.communityId),
+    check('activity_draw_pools_enabled_check', sql`${table.enabled} IN (0, 1)`),
+    check(
+      'activity_draw_pools_daily_limit_check',
+      sql`${table.dailyDrawLimitPerResident} >= 1 AND ${table.dailyDrawLimitPerResident} <= 100`,
+    ),
+    check(
+      'activity_draw_pools_no_prize_weight_check',
+      sql`${table.noPrizeWeight} >= 0 AND ${table.noPrizeWeight} <= 1000000`,
+    ),
+  ],
+)
+
+/**
+ * One real product in the activity's draw pool with its own independent stock.
+ *
+ * The name / image / cost columns are a snapshot taken when the prize is
+ * configured. `local_products` may change later; nothing here follows it, and
+ * once `drawn_quantity > 0` a trigger rejects changing the snapshot. Catalogue
+ * shelf state is intentionally NOT part of redeemability: an off-shelf product
+ * can still back an already-configured prize, while the prize's own `enabled`
+ * and remaining stock decide whether it may be drawn.
+ */
+export const activityDrawPrizes = sqliteTable(
+  'activity_draw_prizes',
+  {
+    id: text('id').primaryKey(),
+    poolId: text('pool_id')
+      .notNull()
+      .references(() => activityDrawPools.id, { onDelete: 'restrict' }),
+    activityId: text('activity_id')
+      .notNull()
+      .references(() => activities.id, { onDelete: 'restrict' }),
+    communityId: text('community_id')
+      .notNull()
+      .references(() => communities.id, { onDelete: 'restrict' }),
+    productId: text('product_id')
+      .notNull()
+      .references(() => localProducts.id, { onDelete: 'restrict' }),
+    // Frozen snapshot; never re-read from `local_products` after insert.
+    productName: text('product_name').notNull(),
+    productImageUrl: text('product_image_url'),
+    costCents: integer('cost_cents').notNull(),
+    totalQuantity: integer('total_quantity').notNull(),
+    drawnQuantity: integer('drawn_quantity').notNull().default(0),
+    remainingQuantity: integer('remaining_quantity').notNull(),
+    weight: integer('weight').notNull().default(0),
+    enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
+    createdByUserId: text('created_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    updatedByUserId: text('updated_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('activity_draw_prizes_activity_product_uq').on(
+      table.activityId,
+      table.productId,
+    ),
+    index('activity_draw_prizes_pool_idx').on(table.poolId),
+    index('activity_draw_prizes_activity_idx').on(table.activityId),
+    check(
+      'activity_draw_prizes_quantity_check',
+      sql`${table.totalQuantity} > 0
+        AND ${table.totalQuantity} <= 100000
+        AND ${table.drawnQuantity} >= 0
+        AND ${table.remainingQuantity} >= 0
+        AND ${table.drawnQuantity} + ${table.remainingQuantity} = ${table.totalQuantity}`,
+    ),
+    check(
+      'activity_draw_prizes_weight_check',
+      sql`${table.weight} >= 0 AND ${table.weight} <= 1000000`,
+    ),
+    check('activity_draw_prizes_enabled_check', sql`${table.enabled} IN (0, 1)`),
+    check('activity_draw_prizes_cost_check', sql`${table.costCents} >= 0`),
+  ],
+)
+
+/**
+ * Append-only draw configuration audit. Triggers reject UPDATE/DELETE so the
+ * history of a published activity's prize/weight changes cannot be rewritten.
+ */
+export const activityDrawEvents = sqliteTable(
+  'activity_draw_events',
+  {
+    id: text('id').primaryKey(),
+    activityId: text('activity_id')
+      .notNull()
+      .references(() => activities.id, { onDelete: 'restrict' }),
+    prizeId: text('prize_id').references(() => activityDrawPrizes.id, {
+      onDelete: 'restrict',
+    }),
+    kind: text('kind').notNull(),
+    actorUserId: text('actor_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    metadataJson: text('metadata_json'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    index('activity_draw_events_activity_idx').on(table.activityId, table.createdAt),
+    check(
+      'activity_draw_events_kind_check',
+      sql`${table.kind} IN (
+        'draw_pool.created',
+        'draw_pool.updated',
+        'draw_pool.enabled',
+        'draw_pool.disabled',
+        'draw_prize.created',
+        'draw_prize.updated',
+        'draw_prize.enabled',
+        'draw_prize.disabled'
+      )`,
+    ),
+  ],
+)
+
+/**
  * Curated external platform promotions. Never a payable product or a reward.
  * An offer starts disabled; operators must verify the link before publication.
  */
@@ -1964,6 +2118,9 @@ export const schema = {
   activityPrizeStocks,
   activityRewardEvents,
   activityRewardDisputes,
+  activityDrawPools,
+  activityDrawPrizes,
+  activityDrawEvents,
   localProducts,
   localOrders,
   localOrderEvents,

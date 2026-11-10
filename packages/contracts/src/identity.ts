@@ -19,3 +19,10 @@ export const authCommunitySchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
 })
+
+/**
+ * Lifecycle state of an activity. Declared here (not in `index.ts`) so domain
+ * modules such as `draw.ts` can use it without a circular import.
+ */
+export const activityStatusSchema = z.enum(['draft', 'published', 'paused', 'ended'])
+export type ActivityStatus = z.infer<typeof activityStatusSchema>

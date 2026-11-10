@@ -503,7 +503,10 @@ pnpm --filter @sanchuang-dev/local-life-api test
 ## 10. 已知限制与后续
 
 - 签到目前只支持"一场活动一次有效签到"，不做多日连续签到；作废后可重新签到（见 §5）；
-- 只支持一类奖品；多奖品需要扩展 `rewardPlan` 为列表并调整库存唯一键，属后续卡；
+- 只支持一类奖品；多奖品需要扩展 `rewardPlan` 为列表并调整库存唯一键，属后续卡。
+  独立于本履约链的「今日抽奖」多奖品池见
+  [`activity-draw-pool.md`](activity-draw-pool.md)，它不复用 `activity_prize_stocks`，
+  也不改变本文件任何发放 / 核销口径；
 - 凭据 TTL 只按 `redemptionValidHours` 计算，不提供续期：过期只能重新签发（旧码置 `superseded`）；
 - `grant.expired` 与 `rewardEventKind.grant.expired` 是**不可达枚举值**，见 §5；
 - 一条授予只能发起一次争议（`activity_reward_disputes_open_first`），驳回后不可重开线程；
