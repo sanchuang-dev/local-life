@@ -130,7 +130,7 @@ jobs:
       contents: write
       issues: read
       pull-requests: write
-    uses: sanchuang-dev/.github/.github/workflows/sanchuang-paid-worker.yml@43a2aa17be3451c90cce6cb82425012b26096811
+    uses: sanchuang-dev/.github/.github/workflows/sanchuang-paid-worker.yml@e25f91094a993821767599ec02a9dc6f9ea981dd
     with:
       issue_number: ${{ fromJSON(needs.enrollment.outputs.issue_number) }}
       base_branch: dev
