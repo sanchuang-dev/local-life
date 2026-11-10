@@ -1,3 +1,4 @@
+import { reportResidentSessionExpired } from '../services/residentSessionEvents'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   LocalOrderDetail,
@@ -85,6 +86,7 @@ export function useMyLocalOrders({
       .catch((cause: unknown) => {
         if (version !== requestVersion.current || controller.signal.aborted) return
         if (isLocalApiError(cause) && cause.status === 401) {
+          reportResidentSessionExpired()
           setState({ status: 'unauthenticated' })
           return
         }
@@ -166,6 +168,7 @@ export function useMyLocalOrder({
       .catch((cause: unknown) => {
         if (controller.signal.aborted) return
         if (isLocalApiError(cause) && cause.status === 401) {
+          reportResidentSessionExpired()
           setState({ status: 'unauthenticated' })
           return
         }

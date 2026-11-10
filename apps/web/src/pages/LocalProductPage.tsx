@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import {
   AlertTriangle,
   CheckCircle2,
@@ -13,6 +13,8 @@ import { PageHeader } from '../components/PageHeader'
 import { useBackTarget } from '../hooks/useBackTarget'
 import { useLocalProduct } from '../hooks/useLocalCatalog'
 import { useResidentAuth } from '../hooks/useResidentAuth'
+import { buildResidentLoginHref } from '../components/auth/residentLogin'
+import { reportResidentSessionExpired } from '../services/residentSessionEvents'
 import { formatLocalPriceCents } from '../components/life/localOrderLabels'
 import { registerLocalOrder } from '../services/localOrders'
 import { describeLocalError, isLocalApiError, newIdempotencyKey } from '../services/localApi'
@@ -32,6 +34,8 @@ const MAX_QUANTITY = 99
 export function LocalProductPage() {
   const { productId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
+  const productReturnTo = location.pathname + location.search
   const { backTo, backLabel } = useBackTarget('/life', '返回惠生活')
   const { state, reload } = useLocalProduct(productId ?? null)
   const auth = useResidentAuth()
@@ -76,6 +80,12 @@ export function LocalProductPage() {
         // The snapshot or the shelf state changed, or the session expired: re-read
         // the product so the resident sees the real current state, not a stale one.
         if (cause.status === 409) reload()
+        if (cause.status === 401) {
+          reportResidentSessionExpired()
+          navigate(buildResidentLoginHref(productReturnTo, {
+            activityId: null, inviteCode: null, inviteInvalid: false,
+          }), { replace: true })
+        }
       }
     } finally {
       setSubmitting(false)
@@ -322,8 +332,10 @@ export function LocalProductPage() {
                 </p>
                 {!session ? (
                   <Link
-                    to="/me"
-                    state={{ from: `/life/local-products/${product.id}` }}
+                    to={buildResidentLoginHref(
+                       productReturnTo,
+                       { activityId: null, inviteCode: null, inviteInvalid: false },
+                     )}
                     className="mt-2 inline-flex min-h-[44px] items-center justify-center rounded-xl bg-[#138b79] px-4 text-[13px] font-semibold text-white"
                   >
                     去登录 / 查看登录方式

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { createContext, createElement, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import {
   API_ROUTES,
   PHONE_AUTH_ROUTES,
@@ -17,6 +17,7 @@ import {
 } from '@sanchuang-dev/local-life-contracts'
 import { apiErrorFromResponse } from './apiError'
 import { isWeChatBrowser } from '../components/auth/wechatEnvironment'
+import { RESIDENT_SESSION_EXPIRED_EVENT } from '../services/residentSessionEvents'
 
 type AuthenticatedSession = Extract<AuthSessionResponse, { authenticated: true }>
 
@@ -41,7 +42,7 @@ async function readError(response: Response): Promise<string> {
  * SMS sender at all, so the UI can present it as unavailable instead of offering
  * a button that can only fail. No code is ever auto-filled or cached.
  */
-export function useResidentAuth() {
+function useResidentAuthController() {
   const [session, setSession] = useState<AuthenticatedSession | null>(null)
   const [methods, setMethods] = useState<AuthMethods | null>(null)
   const [phoneStatus, setPhoneStatus] = useState<PhoneAuthStatusResponse | null>(null)
@@ -49,6 +50,9 @@ export function useResidentAuth() {
   const [wechatProfileError, setWechatProfileError] = useState<string | null>(null)
   const [phoneStatusLoading, setPhoneStatusLoading] = useState(true)
   const [loading, setLoading] = useState(true)
+  const [sessionStatus, setSessionStatus] = useState<'loading' | 'authenticated' | 'unauthenticated' | 'error'>('loading')
+  const [methodsLoading, setMethodsLoading] = useState(true)
+  const sessionRequestVersion = useRef(0)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // An old profile response must never be displayed after logout or account
@@ -102,22 +106,66 @@ export function useResidentAuth() {
     }
   }, [])
 
+  /** Session and login method capability are independent: a /auth/methods
+   * outage must never turn a real resident into an anonymous session. */
+  const refreshSession = useCallback(async () => {
+    const version = ++sessionRequestVersion.current
+    setLoading(true)
+    setSessionStatus('loading')
+    try {
+      const response = await fetch(`/api${API_ROUTES.authSession}`, {
+        credentials: 'include',
+        cache: 'no-store',
+      })
+      if (response.status === 401) {
+        if (version !== sessionRequestVersion.current) return
+        setProfileOwner(null)
+        setSession(null)
+        setSessionStatus('unauthenticated')
+        setError(null)
+        return
+      }
+      if (!response.ok) throw new Error(await readError(response))
+      const parsed = authSessionResponseSchema.parse(await response.json())
+      if (version !== sessionRequestVersion.current) return
+      const owner = parsed.authenticated && !parsed.staff ? parsed.user.id : null
+      if (profileOwnerRef.current !== owner) setProfileOwner(owner)
+      setSession(parsed.authenticated ? parsed : null)
+      setSessionStatus(parsed.authenticated ? 'authenticated' : 'unauthenticated')
+      if (owner) void loadWechatProfile()
+      setError(null)
+    } catch (cause) {
+      if (version !== sessionRequestVersion.current) return
+      // Fail closed on network, 5xx or malformed JSON. Do not redirect as visitor.
+      setProfileOwner(null)
+      setSession(null)
+      setSessionStatus('error')
+      setError(cause instanceof Error ? cause.message : '暂时无法读取账户状态')
+    } finally {
+      if (version === sessionRequestVersion.current) setLoading(false)
+    }
+  }, [loadWechatProfile, setProfileOwner])
+
+  const invalidateSession = useCallback(() => {
+    // 401 from a protected API supersedes the cached browser session.
+    sessionRequestVersion.current += 1
+    setProfileOwner(null)
+    setSession(null)
+    setSessionStatus('unauthenticated')
+    setLoading(false)
+  }, [setProfileOwner])
+
   useEffect(() => {
     let active = true
-
-    async function load() {
+    void refreshSession()
+    void loadPhoneStatus()
+    setMethodsLoading(true)
+    const loadMethods = async () => {
       try {
-        const [sessionResponse, methodsResponse] = await Promise.all([
-          fetch(`/api${API_ROUTES.authSession}`, { credentials: 'include' }),
-          fetch('/api/auth/methods', { credentials: 'include' }),
-        ])
-        if (!sessionResponse.ok) throw new Error(await readError(sessionResponse))
-        if (!methodsResponse.ok) throw new Error(await readError(methodsResponse))
-        const parsed = authSessionResponseSchema.parse(await sessionResponse.json())
-        const available = (await methodsResponse.json()) as Partial<AuthMethods>
+        const response = await fetch('/api/auth/methods', { credentials: 'include' })
+        if (!response.ok) throw new Error(await readError(response))
+        const available = (await response.json()) as Partial<AuthMethods>
         if (!active) return
-        setProfileOwner(parsed.authenticated && !parsed.staff ? parsed.user.id : null)
-        setSession(parsed.authenticated ? parsed : null)
         setMethods({
           wechat: available.wechat === true,
           wechatUnavailableReason:
@@ -126,25 +174,20 @@ export function useResidentAuth() {
               : null,
           developmentResidentLogin: available.developmentResidentLogin === true,
         })
-        if (parsed.authenticated && !parsed.staff) void loadWechatProfile()
-        setError(null)
-      } catch (cause) {
-        if (active) {
-          setMethods(null)
-          setError(cause instanceof Error ? cause.message : '暂时无法连接账户服务')
-        }
+      } catch {
+        if (active) setMethods(null)
       } finally {
-        if (active) setLoading(false)
+        if (active) setMethodsLoading(false)
       }
     }
-
-    void load()
-    void loadPhoneStatus()
+    void loadMethods()
+    window.addEventListener(RESIDENT_SESSION_EXPIRED_EVENT, invalidateSession)
     return () => {
       active = false
-      profileGenerationRef.current += 1
+      sessionRequestVersion.current += 1
+      window.removeEventListener(RESIDENT_SESSION_EXPIRED_EVENT, invalidateSession)
     }
-  }, [loadPhoneStatus, loadWechatProfile, setProfileOwner])
+  }, [refreshSession, loadPhoneStatus, invalidateSession])
 
   /** Fetch a fresh double-submit token; the resident session cookie is reused. */
   const csrfToken = useCallback(async (): Promise<string> => {
@@ -213,6 +256,7 @@ export function useResidentAuth() {
       const parsed = authSessionResponseSchema.parse(await response.json())
       setProfileOwner(parsed.authenticated && !parsed.staff ? parsed.user.id : null)
       setSession(parsed.authenticated ? parsed : null)
+      setSessionStatus(parsed.authenticated ? 'authenticated' : 'unauthenticated')
       await loadPhoneStatus()
       if (parsed.authenticated && !parsed.staff) await loadWechatProfile()
     } catch (cause) {
@@ -261,6 +305,7 @@ export function useResidentAuth() {
       const parsed = authSessionResponseSchema.parse(await response.json())
       setProfileOwner(parsed.authenticated && !parsed.staff ? parsed.user.id : null)
       setSession(parsed.authenticated ? parsed : null)
+      setSessionStatus(parsed.authenticated ? 'authenticated' : 'unauthenticated')
       setError(null)
       await loadPhoneStatus()
       if (parsed.authenticated && !parsed.staff) await loadWechatProfile()
@@ -301,6 +346,7 @@ export function useResidentAuth() {
       if (!response.ok) throw new Error(await readError(response))
       setProfileOwner(null)
       setSession(null)
+      setSessionStatus('unauthenticated')
       await loadPhoneStatus()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '退出登录失败')
@@ -311,7 +357,10 @@ export function useResidentAuth() {
 
   return {
     session,
+    sessionStatus,
     methods,
+    methodsLoading,
+    refreshSession,
     phoneStatus,
     wechatProfile,
     wechatProfileError,
@@ -329,4 +378,19 @@ export function useResidentAuth() {
     startWechatProfileAuthorization,
     logout,
   }
+}
+
+/** The guard and its child pages observe one session controller, not racing
+ * independent /auth/session calls or retaining separate account copies. */
+const ResidentAuthContext = createContext<ReturnType<typeof useResidentAuthController> | null>(null)
+
+export function ResidentAuthProvider({ children }: { children: ReactNode }) {
+  const value = useResidentAuthController()
+  return createElement(ResidentAuthContext.Provider, { value }, children)
+}
+
+export function useResidentAuth() {
+  const value = useContext(ResidentAuthContext)
+  if (!value) throw new Error('ResidentAuthProvider is required')
+  return value
 }
