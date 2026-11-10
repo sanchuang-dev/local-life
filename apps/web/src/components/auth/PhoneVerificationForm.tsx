@@ -69,7 +69,7 @@ export function PhoneVerificationForm({
           手机号验证码登录
         </p>
         <p className="mt-1 text-[11px] leading-5 text-slate-500">
-          短信服务未配置，公网手机号登录未启用。可改用微信授权登录，或联系社区运营人员。
+          短信服务未配置，公网手机号登录未启用。请使用页面提供的其他可用登录方式，或联系社区运营人员。
         </p>
       </div>
     )
@@ -166,13 +166,13 @@ export function PhoneVerificationForm({
               setError(null)
             }}
             placeholder="例如 13800138000"
-            className="min-h-10 w-full rounded-[12px] border border-slate-200 bg-slate-50 px-3 text-[13px] text-slate-800 outline-none focus:border-teal-400 focus:bg-white disabled:opacity-60"
+            className="min-h-[44px] w-full rounded-[12px] border border-slate-200 bg-slate-50 px-3 text-[13px] text-slate-800 outline-none focus:border-teal-400 focus:bg-white disabled:opacity-60"
           />
           <button
             type="button"
             onClick={() => void sendCode()}
             disabled={busy || countdown > 0 || !normalized}
-            className="min-h-10 shrink-0 rounded-[12px] border border-teal-200 bg-white px-3 text-[12px] font-semibold text-teal-700 disabled:opacity-50"
+            className="min-h-[44px] shrink-0 rounded-[12px] border border-teal-200 bg-white px-3 text-[12px] font-semibold text-teal-700 disabled:opacity-50"
           >
             {countdown > 0 ? `${countdown} 秒后重试` : sentTo ? '重新获取' : '获取验证码'}
           </button>
@@ -197,7 +197,7 @@ export function PhoneVerificationForm({
                 setError(null)
               }}
               placeholder="000000"
-              className="mt-1 min-h-10 w-full rounded-[12px] border border-slate-200 bg-slate-50 px-3 text-[13px] tracking-[0.3em] text-slate-800 outline-none focus:border-teal-400 focus:bg-white disabled:opacity-60"
+              className="mt-1 min-h-[44px] w-full rounded-[12px] border border-slate-200 bg-slate-50 px-3 text-[13px] tracking-[0.3em] text-slate-800 outline-none focus:border-teal-400 focus:bg-white disabled:opacity-60"
             />
           </div>
         ) : null}
@@ -216,7 +216,7 @@ export function PhoneVerificationForm({
         <button
           type="submit"
           disabled={busy || !normalized || !/^\d{6}$/.test(code)}
-          className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-full bg-[#138b79] px-4 text-[12px] font-semibold text-white transition-colors hover:bg-[#116d63] disabled:opacity-50"
+          className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-full bg-[#138b79] px-4 text-[12px] font-semibold text-white transition-colors hover:bg-[#116d63] disabled:opacity-50"
         >
           <ShieldCheck size={15} aria-hidden="true" />
           {busy ? '处理中…' : submitLabel}

@@ -4,6 +4,9 @@ import { Link, useSearchParams } from 'react-router'
 import { DemoNote } from '../components/DemoNote'
 import { PhoneVerificationForm } from '../components/auth/PhoneVerificationForm'
 import { isWeChatBrowser } from '../components/auth/wechatEnvironment'
+import { buildResidentLoginHref } from '../components/auth/residentLogin'
+import { parseInviteParam } from '../components/activity/share'
+import { parseActivityLoginResult } from '../components/activity/loginReturn'
 import { staffRoleLabels } from '../components/crm/crmLabels'
 import { useActivityParticipation } from '../hooks/useActivityParticipation'
 import { usePublicActivity } from '../hooks/usePublicActivity'
@@ -83,6 +86,18 @@ export function MePage() {
   const team = participationData?.team ?? null
   const rewardCount = wallet.state.status === 'ready' ? wallet.state.entries.length : null
   const activityHref = activity ? `/?activityId=${encodeURIComponent(activity.id)}` : '/'
+  const meReturnTo = '/me' + (searchParams.toString() ? '?' + searchParams.toString() : '')
+  const inviteContext = parseInviteParam(searchParams.get('invite'))
+  const loginResult = parseActivityLoginResult(searchParams.toString())
+  const loginHref = buildResidentLoginHref(
+    meReturnTo,
+    {
+      activityId: activity && requestedActivityId ? activity.id : null,
+      inviteCode: inviteContext.code,
+      inviteInvalid: inviteContext.invalid,
+    },
+    loginResult?.status === 'error' ? loginResult.code : null,
+  )
 
   const stats = [
     {
@@ -226,46 +241,23 @@ export function MePage() {
           <div className="mt-4 rounded-[16px] bg-[#f4f8f6] p-3.5">
             <p className="text-[13px] font-semibold text-slate-700">登录本地生活</p>
             <p className="mt-1 text-[11px] leading-5 text-slate-500">
-              登录后可使用与你的居民账户关联的活动和社区服务。
+              登录后可查看与你的居民账户关联的活动、社区服务与奖励。
             </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {auth.methods?.wechat && wechatBrowser && (
-                <button
-                  type="button"
-                  onClick={auth.startWechatLogin}
-                  className="min-h-10 rounded-full bg-[#138b79] px-4 text-[12px] font-semibold text-white transition-colors hover:bg-[#116d63]"
-                >
-                  微信授权登录
-                </button>
-              )}
-              {auth.methods?.developmentResidentLogin && (
-                <button
-                  type="button"
-                  disabled={auth.busy}
-                  onClick={() => void auth.developmentLogin()}
-                  className="min-h-10 rounded-full border border-teal-200 bg-white px-4 text-[12px] font-semibold text-teal-700 disabled:opacity-50"
-                >
-                  {auth.busy ? '登录中…' : '开发测试登录'}
-                </button>
-              )}
-              {auth.methods && !auth.methods.wechat && !auth.methods.developmentResidentLogin && !auth.phoneStatus?.configured && (
-                <span className="text-[11px] text-slate-500">微信网页授权尚未配置，当前无法登录。</span>
-              )}
-              {!auth.methods && !auth.loading && (
-                <span className="text-[11px] text-slate-500">账户服务暂不可用，请稍后重试。</span>
-              )}
-            </div>
-            {auth.phoneStatus ? (
-              <PhoneVerificationForm
-                purpose="login"
-                configured={auth.phoneStatus.configured}
-                title="手机号验证码登录"
-                description="使用本人手机号验证登录。登录方式不改变已有活动与奖励归属。"
-                submitLabel="手机号登录"
-                onRequestCode={(phone) => auth.requestPhoneCode(phone, 'login')}
-                onSubmit={(phone, code) => auth.loginWithPhone(phone, code)}
-              />
+            {loginResult?.status === 'error' ? (
+              <p role="alert" className="mt-2 rounded-[12px] bg-[#fff1ee] px-3 py-2 text-[11px] leading-5 text-rose-700">
+                {loginResult.message}
+              </p>
             ) : null}
+            <Link
+              to={loginHref}
+              className="mt-3 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] bg-[#138b79] px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#116d63] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+            >
+              <ShieldCheck size={16} aria-hidden="true" />
+              前往统一登录
+            </Link>
+            <p className="mt-2 text-[10px] leading-4 text-slate-400">
+              支持微信授权；手机号验证码登录按服务配置开放。
+            </p>
           </div>
         )}
 

@@ -16,6 +16,7 @@ import { HealthPage } from './pages/HealthPage'
 import { LifePage } from './pages/LifePage'
 import { LocalProductPage } from './pages/LocalProductPage'
 import { MePage } from './pages/MePage'
+import { ResidentLoginPage } from './pages/ResidentLoginPage'
 import { MyOrderDetailPage } from './pages/MyOrderDetailPage'
 import { MyOrdersPage } from './pages/MyOrdersPage'
 import { MyRewardsPage } from './pages/MyRewardsPage'
@@ -68,6 +69,7 @@ export default function App() {
         <Route path="/me/orders/:localOrderId" element={<MyOrderDetailPage />} />
         <Route path="/me/rewards" element={<MyRewardsPage />} />
         <Route path="/me" element={<MePage />} />
+        <Route path="/login" element={<ResidentLoginPage />} />
         <Route path="/workbench" element={<WorkbenchLayout />}>
           <Route index element={<WorkbenchLoginPage />} />
           <Route path="leads" element={<WorkbenchLeadsPage />} />
