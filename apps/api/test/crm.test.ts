@@ -2037,10 +2037,10 @@ test('a pre-CRM database upgrades in place, keeps existing rows and becomes usab
         .prepare("SELECT count(*) AS value FROM sqlite_master WHERE type = 'table' AND name GLOB 'crm_*'")
         .get() as { value: number }
       assert.equal(crmTables.value, 0, 'the pre-CRM database has no CRM tables')
-      legacy.db
-        .insert(communities)
-        .values({ id: legacyCommunityId, name: '升级前 CRM 社区', createdAt: now })
-        .run()
+      // Historical DB: location columns do not exist until migration 0013.
+      legacy.sqlite.prepare(
+        'INSERT INTO communities (id, name, created_at) VALUES (?, ?, ?)',
+      ).run(legacyCommunityId, '升级前 CRM 社区', now.getTime())
       legacy.db
         .insert(users)
         .values({ id: legacyUserId, displayName: '升级前居民', createdAt: now, updatedAt: now })

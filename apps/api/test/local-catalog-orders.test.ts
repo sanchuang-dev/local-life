@@ -1475,10 +1475,10 @@ test('a pre-0010 database upgrades in place, keeps its rows and becomes usable',
         !legacyTables.includes('reconciliation_batches'),
         'the pre-0010 database has no reconciliation batch table',
       )
-      legacy.db
-        .insert(communities)
-        .values({ id: legacyCommunityId, name: '升级前社区', createdAt: now })
-        .run()
+      // Use the pre-0010 schema; later location columns must arrive via migration.
+      legacy.sqlite.prepare(
+        'INSERT INTO communities (id, name, created_at) VALUES (?, ?, ?)',
+      ).run(legacyCommunityId, '升级前社区', now.getTime())
       legacy.db
         .insert(users)
         .values({ id: legacyUserId, displayName: '升级前居民', createdAt: now, updatedAt: now })
