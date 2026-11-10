@@ -1,12 +1,10 @@
-import { Route, Routes } from 'react-router'
+import { Navigate, Route, Routes, useLocation } from 'react-router'
 import { AppShell } from './components/shell/AppShell'
 import { RequireResidentAuth } from './components/auth/RequireResidentAuth'
 import { ResidentSiteGate } from './components/auth/ResidentSiteGate'
 import { ResidentAuthProvider } from './hooks/useResidentAuth'
-import { ActivityHomePage } from './pages/ActivityHomePage'
 import { CommunityDiscoveryPage } from './pages/CommunityDiscoveryPage'
-import { isLegacyActivityHome } from './lib/communityHomeRoute'
-import { useLocation } from 'react-router'
+import { ACTIVITY_DETAIL_PATH, communityRootRedirect } from './lib/communityHomeRoute'
 import { CommunityActivityPage } from './pages/CommunityActivityPage'
 import { CommunityBroadcastPage } from './pages/CommunityBroadcastPage'
 import { CommunityCulturePage } from './pages/CommunityCulturePage'
@@ -54,10 +52,7 @@ export default function App() {
         <Route path="/community" element={<CommunityPage />} />
         <Route path="/community/broadcast" element={<CommunityBroadcastPage />} />
         <Route path="/community/activity" element={<CommunityActivityPage />} />
-        <Route
-          path="/community/activity/silver-neighborhood"
-          element={<SilverNeighborhoodCampaignPage />}
-        />
+        <Route path={ACTIVITY_DETAIL_PATH} element={<SilverNeighborhoodCampaignPage />} />
         <Route path="/community/activity/silver-neighborhood/products" element={<SilverActivityProductsPage />} />
         <Route path="/community/activity/silver-neighborhood/products/:productId" element={<SilverActivityProductsPage />} />
         <Route path="/community/activity/:activityId" element={<CommunityActivityPage />} />
@@ -100,10 +95,16 @@ export default function App() {
   )
 }
 
-/** Keep old distributed invite links intact while the default root becomes discovery. */
+/**
+ * The root is always the community discovery home. Old distributed
+ * `/?activityId=...&invite=...` links are forwarded to the single activity
+ * detail page with their query untouched, so invitation attribution and the
+ * OAuth return markers survive; `replace` keeps the back button loop-free.
+ */
 function CommunityRoot() {
   const location = useLocation()
-  return isLegacyActivityHome(location.search)
-    ? <ActivityHomePage />
+  const redirect = communityRootRedirect(location.search, location.state)
+  return redirect
+    ? <Navigate to={redirect} replace />
     : <CommunityDiscoveryPage />
 }

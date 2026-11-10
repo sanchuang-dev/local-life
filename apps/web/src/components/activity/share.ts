@@ -1,7 +1,8 @@
 import { participationInviteCodeSchema } from '@sanchuang-dev/local-life-contracts'
+import { ACTIVITY_DETAIL_PATH } from '../../lib/communityHomeRoute'
 
 /** Route of the resident-facing silver-neighborhood campaign page. */
-export const SILVER_NEIGHBORHOOD_ACTIVITY_PATH = '/community/activity/silver-neighborhood'
+export const SILVER_NEIGHBORHOOD_ACTIVITY_PATH = ACTIVITY_DETAIL_PATH
 
 /**
  * One share URL for the QR code, the native share sheet and "copy link".
