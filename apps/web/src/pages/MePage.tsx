@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ChevronRight, ClipboardList, Gift, LogOut, ShieldCheck, ShoppingBasket, Smartphone, UserRound } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
-import { DemoNote } from '../components/DemoNote'
 import { PhoneVerificationForm } from '../components/auth/PhoneVerificationForm'
 import { isWeChatBrowser } from '../components/auth/wechatEnvironment'
 import { buildResidentLoginHref } from '../components/auth/residentLogin'
@@ -152,7 +151,7 @@ export function MePage() {
             ? '请重新登录'
             : rewardCount === null
               ? '读取中'
-              : '真实奖励条目',
+              : '奖励记录',
       to: '/me/rewards',
       tone: 'mint' as const,
     },
@@ -343,11 +342,6 @@ export function MePage() {
                 </Link>
               ))}
             </div>
-            <p className="mt-2 text-[11px] leading-4 text-slate-400">
-              以上状态读取自真实服务，展示当前活动的报名与三人团
-              {activity ? `（${activity.title}）` : ''}；其他活动的报名记录请在对应活动页查看。
-              活动暂无发布时不会显示示例报名或虚构团队。
-            </p>
           </>
         ) : null}
       </article>
@@ -366,7 +360,7 @@ export function MePage() {
         <span className="min-w-0 flex-1">
           <span className="block text-[14px] font-semibold text-slate-800">我的奖励</span>
           <span className="mt-0.5 block truncate text-[11px] leading-4 text-slate-400">
-            真实活动奖励 · 领取状态 · 核销凭据尾号
+            奖励记录 · 领取与核销状态
           </span>
         </span>
         <ChevronRight size={17} className="shrink-0 text-slate-300" aria-hidden="true" />
@@ -435,10 +429,6 @@ export function MePage() {
         </Link>
       )}
 
-      <DemoNote tone="warn">
-        本页只展示真实账户、当前活动的报名与三人团状态、以及我的奖励；「我的订单」读取本社区本地商品的真实登记记录。
-        积分、优惠券、收藏、健康档案与地址管理等尚未接入真实服务的入口，已从本页移除示例资料与示例统计。
-      </DemoNote>
     </div>
   )
 }

@@ -114,9 +114,9 @@ export function MyOrdersPage() {
         className="mt-4 rounded-[18px] border border-teal-200/70 bg-[#eef7f2] px-3.5 py-3"
         aria-label="订单说明"
       >
-        <p className="text-[12px] font-bold text-[#225c4c]">本页只登记办理意向</p>
+        <p className="text-[12px] font-bold text-[#225c4c]">商品办理登记</p>
         <p className="mt-1 text-[11px] leading-[1.7] text-[#52786c]">
-          平台不收款、不代下单。「人工核验通过」是运营人员对订单事实的人工确认，不代表已收款或业务办理已完成。
+          这里记录的是办理意向，不代表已付款或办理完成。
         </p>
       </section>
 

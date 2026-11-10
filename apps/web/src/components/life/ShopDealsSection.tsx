@@ -1,5 +1,4 @@
 import { AlertTriangle, ShoppingBag, Store } from 'lucide-react'
-import { Link } from 'react-router'
 import { useActivitySource, useShopProducts } from '../../hooks/useShopProducts'
 import { SectionHeading } from '../home/SectionHeading'
 import { ActivitySourceNote } from './ActivitySourceNote'
@@ -18,7 +17,7 @@ export function ShopDealsSection({ activityId }: { activityId: string | null }) 
 
   return (
     <section>
-      <SectionHeading title="优惠购" note="真实商城商品" />
+      <SectionHeading title="优惠购" />
 
       <ActivitySourceNote
         activityId={activityId}
@@ -48,17 +47,10 @@ export function ShopDealsSection({ activityId }: { activityId: string | null }) 
             icon={Store}
             tone="warn"
             title="优惠购尚未接入商城"
-            description={`${state.message} 配置完成前，这里不会展示模拟商品，也不提供模拟购买。`}
+            description="优惠购暂未开放，请稍后再试。"
             onRetry={retry}
             retryLabel="检查配置后重试"
-          >
-            <Link
-              to="/life?tab=points"
-              className="text-[12px] font-semibold text-teal-700 underline decoration-teal-300 underline-offset-4"
-            >
-              先去看看积分兑换（示例数据）
-            </Link>
-          </ShopStateCard>
+          />
         </div>
       ) : null}
 
@@ -80,7 +72,7 @@ export function ShopDealsSection({ activityId }: { activityId: string | null }) 
           <ShopStateCard
             icon={ShoppingBag}
             title="商城暂无可购商品"
-            description="CRMEB 商城当前没有面向居民上架的商品。为避免误导，这里不会用演示商品填充，也不会模拟下单。"
+            description="暂无上架商品，稍后再来看看。"
             onRetry={retry}
           />
         </div>
@@ -97,10 +89,6 @@ export function ShopDealsSection({ activityId }: { activityId: string | null }) 
               />
             ))}
           </div>
-          <p className="mt-2.5 break-words text-[11px] leading-5 text-slate-400">
-            当前展示 {state.data.items.length} 件已上架商品；商城返回的记录可能包含已下架商品。
-            商品、价格与图片来自 CRMEB 商城（outapi）。
-          </p>
           <p className="mt-1 break-words text-[11px] leading-5 text-slate-400">
             平台不代下单、不代支付，库存与可售状态以商城为准。
           </p>

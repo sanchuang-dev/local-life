@@ -268,7 +268,7 @@ export function ShopProductDetail({ rawProductId }: { rawProductId: string }) {
       backLabel={backLabel}
       icon={ShoppingBag}
       title="商品详情"
-      subtitle="真实 CRMEB 商城 · 价格与库存以商城为准"
+      subtitle="价格与库存以商城为准"
     />
   )
 
@@ -295,7 +295,7 @@ export function ShopProductDetail({ rawProductId }: { rawProductId: string }) {
             icon={Store}
             tone="warn"
             title="商城未配置"
-            description={`${state.message} 配置完成前，这里不会展示模拟商品，也不提供模拟购买。`}
+            description={`${state.message} `}
             onRetry={retry}
             retryLabel="检查配置后重试"
           />

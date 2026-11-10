@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import {
   AlertTriangle,
-  CheckCircle2,
   Gift,
   RefreshCw,
   Ticket,
@@ -65,21 +64,8 @@ export function MyRewardsPage() {
         backLabel={backLabel}
         icon={Wallet}
         title="我的奖励"
-        subtitle="真实活动奖励 · 核销凭据 · 核销状态"
+        subtitle="奖励 · 领取凭据 · 核销状态"
       />
-
-      <section
-        className="mt-4 rounded-[18px] border border-teal-200/70 bg-[#eef7f2] px-3.5 py-3"
-        aria-label="我的奖励数据说明"
-      >
-        <p className="flex items-center gap-1.5 text-[12px] font-bold text-[#225c4c]">
-          <CheckCircle2 size={15} className="shrink-0" aria-hidden="true" />
-          本页奖励与凭据来自服务端
-        </p>
-        <p className="mt-1 text-[11px] leading-[1.7] text-[#52786c]">
-          仅展示你在已发布活动中真实获得的奖励。抽奖、压轴大奖与社区里程碑不在此列，它们仍在活动页明确标注为演示。
-        </p>
-      </section>
 
       {wallet.state.status === 'ready' && entries.length > 0 ? (
         <div className="mt-4">
@@ -173,7 +159,7 @@ export function MyRewardsPage() {
       ) : null}
 
       <p className="mt-5 text-[11px] leading-[1.7] text-slate-400">
-        凭据码明文只在领取当次显示一次，服务端仅保存哈希；本页只显示尾号，便于现场核对。核销记录由工作人员在活动现场写入。
+        凭据码仅在领取时完整显示一次，请妥善保存。
       </p>
     </div>
   )

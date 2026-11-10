@@ -8,7 +8,6 @@ import {
   ChevronRight,
   CircleHelp,
   Copy,
-  Info,
   MapPin,
   Medal,
   RefreshCw,
@@ -598,20 +597,8 @@ export function SilverNeighborhoodCampaignPage() {
         onShare={openShareSheet}
       />
 
-      <section
-        className="mx-4 mt-5 rounded-[18px] border border-dashed border-[#e7c9a3] bg-[#fffaf1] px-3.5 py-3"
-        aria-label="演示内容说明"
-      >
-        <p className="flex items-center gap-1.5 text-[12px] font-bold text-[#8a6132]">
-          <Info size={15} className="shrink-0" aria-hidden="true" />
-          演示与真实内容说明
-        </p>
-        <p className="mt-1 text-[11px] leading-[1.7] text-[#8a6132]">
-          参与、三人团、邀请、<span className="font-bold">真实签到</span>与
-          <span className="font-bold">团队奖励领取/核销凭据</span>
-          已接入真实业务，状态来自服务端。以下内容仍为前端演示、不产生真实记录：今日抽奖、活动压轴大奖、社区里程碑与热力榜、消费组队。
-        </p>
-      </section>
+      <p className="mx-4 mt-4 text-[11px] leading-5 text-[#8a6132]">以下抽奖、排行榜与社区里程碑为演示玩法，不产生实际奖励。</p>
+
 
       <section className="mx-4 mt-4" aria-labelledby="team-gifts-heading">
         <div className="mb-2 flex items-center justify-between gap-2">
@@ -657,7 +644,7 @@ export function SilverNeighborhoodCampaignPage() {
             <p className="text-[11px] font-bold tracking-[0.16em] text-teal-700">TEAM QUEST</p>
             <h2 className="mt-1 text-[19px] font-bold tracking-tight text-slate-900">成团任务</h2>
           </div>
-          <span className="text-[12px] text-slate-400">签到为真实数据 · 消费仍为演示</span>
+          <span className="text-[12px] text-slate-400">消费任务暂为演示</span>
         </div>
 
         <div className="rounded-[20px] border border-slate-100 bg-white p-3 shadow-sm">
@@ -690,36 +677,12 @@ export function SilverNeighborhoodCampaignPage() {
                 <div className="min-w-0">
                   <p className="text-[14px] font-bold text-slate-800">三人有效签到</p>
                   <p className="mt-1 text-[12px] leading-5 text-slate-500">
-                    签到与奖励资格为真实数据；只有现场核验通过的签到计入进度。
+                    只有现场核验通过的签到计入进度。
                   </p>
                 </div>
-                <span className="shrink-0 rounded-full bg-[#e8f6f0] px-2.5 py-1 text-[11px] font-bold text-teal-700">
-                  真实接入
-                </span>
-              </div>
-              <RewardProgressCard
-                auth={auth}
-                progress={rewardProgress}
-                activityId={activity?.id ?? null}
-                inviteCode={inviteParam.code}
-                inviteInvalid={inviteParam.invalid}
-              />
-            </div>
-          ) : (
-            <div className="mt-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[14px] font-bold text-slate-800">三人有效购买 + 团队达标</p>
-                  <p className="mt-1 text-[12px] leading-5 text-slate-500">
-                    消费模块仍为演示，尚未接入真实订单与金额。
-                  </p>
-                </div>
-                <span className="shrink-0 rounded-full bg-[#f1edff] px-2.5 py-1 text-[11px] font-bold text-[#725aa9]">
-                  演示玩法
-                </span>
               </div>
               <div className="mt-3 rounded-[12px] border border-dashed border-slate-200 bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-500">
-                真实消费进度将在订单接入后显示，当前不虚构人数与金额。
+                消费任务尚未开放。
               </div>
               <Link
                 to="/community/activity/silver-neighborhood/products"
@@ -1057,18 +1020,6 @@ export function SilverNeighborhoodCampaignPage() {
         </div>
       </section>
 
-      <section className="mx-4 mt-6 rounded-[18px] border border-dashed border-teal-300/70 bg-[#eef7f2] p-4">
-        <div className="flex items-start gap-3">
-          <CheckCircle2 size={19} className="mt-0.5 shrink-0 text-teal-700" aria-hidden="true" />
-          <div>
-            <p className="text-[13px] font-bold text-slate-700">活动信息与参与状态来自真实服务，其余玩法仍是交互演示</p>
-            <p className="mt-1 text-[12px] leading-[1.7] text-slate-500">
-              标题、社区、地点、时间、活动规则与你的参与/三人团状态读取自真实服务；登录、确认参与与邀请分享会调用真实 API。
-              签到、消费、抽奖、排行榜、大奖与社区统计仍为样例，不会写入签到、订单、库存或兑奖记录。
-            </p>
-          </div>
-        </div>
-      </section>
 
       <div className="mx-4 mt-4 flex items-center justify-center gap-2 text-[11px] text-slate-400">
         <Medal size={14} aria-hidden="true" />
@@ -1310,7 +1261,7 @@ export function SilverNeighborhoodCampaignPage() {
           </div>
         </dl>
         <p className="mt-3 text-[12px] leading-5 text-slate-400">
-          以上奖品、窗口与进度均来自服务端冻结的奖励规则；凭据码仅在领取时显示一次，核销后不可重复使用。
+          凭据码仅在领取时显示一次，请妥善保存。
         </p>
       </CampaignSheet>
 
