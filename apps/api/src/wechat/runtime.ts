@@ -35,6 +35,8 @@ export type WechatRuntimeFailureReason =
 
 export interface WechatRuntimeConfig {
   configId: string
+  /** Changes on activation/retirement, including re-activating an earlier row. */
+  revision: number
   appId: string
   accountType: WechatAccountType
   /** Plaintext AppSecret. In-memory only; never serialize. */
@@ -107,6 +109,7 @@ export function resolveWechatRuntimeConfig(
       ok: true,
       config: {
         configId: row.id,
+        revision: row.updatedAt.getTime(),
         appId: row.appId,
         accountType: row.accountType,
         appSecret,
