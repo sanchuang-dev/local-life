@@ -61,6 +61,7 @@ import { registerActivityRoutes } from './activities/routes.js'
 import { resolvePublicActivityCommunityId } from './activities/service.js'
 import { registerCrmRoutes } from './crm/routes.js'
 import { registerLocalCatalogRoutes } from './local/routes.js'
+import { registerExternalOfferRoutes } from './external-offers/routes.js'
 import { registerLocalOrderRoutes } from './local/order-routes.js'
 import { registerLedgerRoutes } from './ledger/routes.js'
 import { registerReconciliationRoutes } from './ledger/reconciliation-routes.js'
@@ -1499,6 +1500,14 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     validCsrf,
     bodySchemaError,
   })
+
+  registerExternalOfferRoutes(app, {
+    db,
+    config,
+    fail,
+    validCsrf,
+    bodySchemaError,
+  }, options.now ? () => options.now!() : undefined)
 
   registerLocalOrderRoutes(app, {
     db,
