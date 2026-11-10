@@ -61,6 +61,7 @@ import { registerParticipationRoutes } from './participation/routes.js'
 import { registerRewardRoutes } from './rewards/routes.js'
 import { registerCrmebRoutes } from './crmeb/routes.js'
 import { registerWechatAdminRoutes } from './wechat/routes.js'
+import { registerWechatJsSdkRoutes } from './wechat/js-sdk.js'
 import { resolveWechatRuntimeConfig, type WechatRuntimeOptions } from './wechat/runtime.js'
 import type { AppBindings, AppContext, AuthSession, HttpErrorStatus } from './http.js'
 
@@ -1434,6 +1435,14 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     validCsrf,
     bodySchemaError,
     now: options.now ?? (() => new Date()),
+  })
+
+  registerWechatJsSdkRoutes(app, {
+    config,
+    fetcher,
+    resolveRuntime: wechatRuntime,
+    fail,
+    nowMs: options.now ? () => options.now!().getTime() : () => Date.now(),
   })
 
   registerPhoneAuthRoutes(app, {
