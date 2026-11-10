@@ -32,11 +32,11 @@ export async function readTencentMapSettings(signal?: AbortSignal): Promise<Tenc
   )
 }
 
-export async function saveTencentMapKey(key: string, csrfToken: string): Promise<TencentMapConfigStatus> {
+export async function saveTencentMapKey(key: string, appName: string, csrfToken: string): Promise<TencentMapConfigStatus> {
   return tencentMapConfigStatusSchema.parse(await request(TENCENT_MAP_ADMIN_ROUTES.config, {
     method: 'PUT',
     headers: { 'x-csrf-token': csrfToken },
-    body: JSON.stringify({ key }),
+    body: JSON.stringify({ key, appName }),
   }))
 }
 

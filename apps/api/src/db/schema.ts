@@ -63,6 +63,7 @@ export const communities = sqliteTable('communities', {
 export const tencentMapConfigs = sqliteTable('tencent_map_configs', {
   id: text('id').primaryKey(),
   apiKey: text('api_key').notNull(),
+  appName: text('app_name').notNull(),
   enabled: integer('enabled', { mode: 'boolean' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 })

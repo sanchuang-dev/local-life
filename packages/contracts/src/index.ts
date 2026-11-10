@@ -174,6 +174,7 @@ export const TENCENT_MAP_ADMIN_ROUTES = {
 export const tencentMapKeySchema = z.string().trim().regex(/^[A-Za-z0-9_-]{8,128}$/u)
 export const saveTencentMapConfigRequestSchema = z.strictObject({
   key: tencentMapKeySchema,
+  appName: z.string().trim().min(1).max(64),
 })
 export const setTencentMapEnabledRequestSchema = z.strictObject({
   enabled: z.boolean(),
@@ -182,12 +183,13 @@ export const tencentMapConfigStatusSchema = z.strictObject({
   configured: z.boolean(),
   enabled: z.boolean(),
   keyHint: z.string().nullable(),
+  appName: z.string().nullable(),
   updatedAt: z.string().nullable(),
 })
 export type TencentMapConfigStatus = z.infer<typeof tencentMapConfigStatusSchema>
 export const tencentMapPickerConfigSchema = z.discriminatedUnion('available', [
   z.strictObject({ available: z.literal(false) }),
-  z.strictObject({ available: z.literal(true), key: tencentMapKeySchema }),
+  z.strictObject({ available: z.literal(true), key: tencentMapKeySchema, appName: z.string().min(1) }),
 ])
 export type TencentMapPickerConfig = z.infer<typeof tencentMapPickerConfigSchema>
 

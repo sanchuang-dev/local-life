@@ -121,6 +121,7 @@ export function UsersPage({ session }: UsersPageProps) {
   const [draftLocation, setDraftLocation] = useState<CommunityLocation | null>(null)
   const [mapPicker, setMapPicker] = useState<{
     key: string
+    appName: string
     mode: 'create' | 'update'
     communityId?: string
     initialLocation?: CommunityLocation
@@ -249,8 +250,8 @@ export function UsersPage({ session }: UsersPageProps) {
     if (mode === 'update' && !selectedCommunity) return
     setMapLoading(true)
     try {
-      const config = await apiRequest<{ available: boolean; key?: string }>('/api/admin/map-picker-config')
-      if (!config.available || !config.key) {
+      const config = await apiRequest<{ available: boolean; key?: string; appName?: string }>('/api/admin/map-picker-config')
+      if (!config.available || !config.key || !config.appName) {
         throw new Error('腾讯地图尚未配置，请先在 API 服务设置 TENCENT_MAP_PICKER_KEY')
       }
       const initialLocation = mode === 'create'
@@ -264,6 +265,7 @@ export function UsersPage({ session }: UsersPageProps) {
           : undefined
       setMapPicker({
         key: config.key,
+        appName: config.appName,
         mode,
         ...(selectedCommunity ? { communityId: selectedCommunity.id } : {}),
         ...(initialLocation ? { initialLocation } : {}),
@@ -715,6 +717,7 @@ export function UsersPage({ session }: UsersPageProps) {
       <TencentLocationPicker
         open={mapPicker !== null}
         apiKey={mapPicker?.key ?? ''}
+        appName={mapPicker?.appName ?? ''}
         initialLocation={mapPicker?.initialLocation}
         onCancel={() => setMapPicker(null)}
         onSelect={(location) => { void acceptMapLocation(location) }}

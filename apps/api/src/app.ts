@@ -1193,6 +1193,7 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
       configured: Boolean(current),
       enabled: current?.enabled ?? false,
       keyHint: current ? `••••${current.apiKey.slice(-4)}` : null,
+      appName: current?.appName ?? null,
       updatedAt: current?.updatedAt.toISOString() ?? null,
     })
   }
@@ -1223,10 +1224,10 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '地图 Key 格式不正确')
     const now = new Date()
     db.insert(tencentMapConfigs).values({
-      id: 'default', apiKey: body.key, enabled: true, updatedAt: now,
+      id: 'default', apiKey: body.key, appName: body.appName, enabled: true, updatedAt: now,
     }).onConflictDoUpdate({
       target: tencentMapConfigs.id,
-      set: { apiKey: body.key, enabled: true, updatedAt: now },
+      set: { apiKey: body.key, appName: body.appName, enabled: true, updatedAt: now },
     }).run()
     recordAudit(db, session.userId, 'tencent_map.config_saved', 'default')
     c.header('Cache-Control', 'no-store')
@@ -1259,7 +1260,7 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     c.header('Cache-Control', 'no-store')
     const current = getTencentMapConfig()
     return c.json(tencentMapPickerConfigSchema.parse(
-      current?.enabled ? { available: true, key: current.apiKey } : { available: false },
+      current?.enabled ? { available: true, key: current.apiKey, appName: current.appName } : { available: false },
     ))
   })
 

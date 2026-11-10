@@ -7,6 +7,7 @@ const PICKER_ORIGIN = 'https://apis.map.qq.com'
 interface TencentLocationPickerProps {
   open: boolean
   apiKey: string
+  appName: string
   initialLocation?: CommunityLocation
   onCancel: () => void
   onSelect: (location: CommunityLocation) => void
@@ -20,6 +21,7 @@ interface TencentLocationPickerProps {
 export function TencentLocationPicker({
   open,
   apiKey,
+  appName,
   initialLocation,
   onCancel,
   onSelect,
@@ -32,14 +34,14 @@ export function TencentLocationPicker({
       type: '1',
       policy: '1',
       key: apiKey,
-      referer: 'local-life-admin',
+      referer: appName,
     })
     if (initialLocation) {
       params.set('coord', `${initialLocation.latitude},${initialLocation.longitude}`)
       params.set('coordtype', '5') // Tencent/GCJ-02 coordinates
     }
     return `${PICKER_ORIGIN}/tools/locpicker?${params.toString()}`
-  }, [open, apiKey, initialLocation])
+  }, [open, apiKey, appName, initialLocation])
 
   useEffect(() => {
     if (!open) return

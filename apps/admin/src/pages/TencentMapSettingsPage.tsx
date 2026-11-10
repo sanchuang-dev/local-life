@@ -51,10 +51,11 @@ function TencentMapConsole({ session }: { session: AuthenticatedSession }) {
   const [refreshCount, setRefreshCount] = useState(0)
   const [editorOpen, setEditorOpen] = useState(false)
   const [draftKey, setDraftKey] = useState('')
+  const [draftAppName, setDraftAppName] = useState('默认应用')
   const [saving, setSaving] = useState(false)
   const [editingError, setEditingError] = useState<string | null>(null)
   const [changing, setChanging] = useState(false)
-  const [previewKey, setPreviewKey] = useState<string | null>(null)
+  const [previewKey, setPreviewKey] = useState<{ key: string; appName: string } | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
 
   useEffect(() => {
@@ -74,6 +75,7 @@ function TencentMapConsole({ session }: { session: AuthenticatedSession }) {
 
   function openEditor() {
     setDraftKey('')
+    setDraftAppName(data?.appName || '默认应用')
     setEditingError(null)
     setEditorOpen(true)
   }
@@ -83,7 +85,7 @@ function TencentMapConsole({ session }: { session: AuthenticatedSession }) {
     setSaving(true)
     setEditingError(null)
     try {
-      const next = await saveTencentMapKey(draftKey.trim(), session.csrfToken)
+      const next = await saveTencentMapKey(draftKey.trim(), draftAppName.trim(), session.csrfToken)
       setData(next)
       setDraftKey('')
       setEditorOpen(false)
@@ -138,7 +140,7 @@ function TencentMapConsole({ session }: { session: AuthenticatedSession }) {
         message.warning('请先保存并启用 Key')
         return
       }
-      setPreviewKey(result.key)
+      setPreviewKey({ key: result.key, appName: result.appName })
     } catch (cause) {
       message.error(asMessage(cause))
     } finally {
@@ -171,6 +173,7 @@ function TencentMapConsole({ session }: { session: AuthenticatedSession }) {
                 items={[
                   { key: 'state', label: '状态', children: data.enabled ? '已配置并启用' : data.configured ? '已保存，当前停用' : '尚未配置' },
                   { key: 'key', label: 'Key', children: data.keyHint ? <Typography.Text code>{data.keyHint}</Typography.Text> : '未设置' },
+                  { key: 'appName', label: '腾讯应用名称', children: data.appName || '—' },
                   { key: 'updated', label: '最后修改', children: data.updatedAt ? new Date(data.updatedAt).toLocaleString('zh-CN') : '—' },
                   { key: 'source', label: '配置来源', children: '管理后台数据库' },
                 ]}
@@ -205,7 +208,7 @@ function TencentMapConsole({ session }: { session: AuthenticatedSession }) {
         onClose={() => { if (!saving) { setDraftKey(''); setEditorOpen(false) } }}
         footer={<Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <Button disabled={saving} onClick={() => { setDraftKey(''); setEditorOpen(false) }}>取消</Button>
-          <Button type="primary" loading={saving} onClick={confirmSave} disabled={!draftKey.trim()}>保存并启用</Button>
+          <Button type="primary" loading={saving} onClick={confirmSave} disabled={!draftKey.trim() || !draftAppName.trim()}>保存并启用</Button>
         </Space>}
       >
         {editingError && <Alert type="error" showIcon message="保存失败" description={editingError} style={{ marginBottom: 16 }} />}
@@ -220,6 +223,15 @@ function TencentMapConsole({ session }: { session: AuthenticatedSession }) {
               maxLength={128}
             />
           </Form.Item>
+          <Form.Item label="所属应用名称" required extra="腾讯控制台「添加 Key 到应用」中的应用名称；不是 Key 名称。">
+            <Input
+              aria-label="腾讯地图应用名称"
+              value={draftAppName}
+              onChange={(event) => setDraftAppName(event.target.value)}
+              placeholder="例如：默认应用"
+              maxLength={64}
+            />
+          </Form.Item>
           <Typography.Paragraph type="secondary">
             请确认该 Key 已在腾讯控制台配置合法域名。这里不需要填写微信 AppID 或 AppSecret。
           </Typography.Paragraph>
@@ -227,7 +239,8 @@ function TencentMapConsole({ session }: { session: AuthenticatedSession }) {
       </Drawer>
       <TencentLocationPicker
         open={previewKey !== null}
-        apiKey={previewKey ?? ''}
+        apiKey={previewKey?.key ?? ''}
+        appName={previewKey?.appName ?? ''}
         onCancel={() => setPreviewKey(null)}
         onSelect={previewSelected}
       />
