@@ -9,6 +9,7 @@
     "build:mvp": "tsc -b && vite build --base /",
     "build:prod-preview": "tsc -b && vite build --base /local-life/prod/",
     "typecheck": "tsc -b",
+    "test": "node --experimental-strip-types --test test/*.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

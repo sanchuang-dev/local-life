@@ -3,14 +3,16 @@ import { Copy, Share2 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import type { PublicActivityDetail } from '@sanchuang-dev/local-life-contracts'
 import { CampaignSheet } from '../CampaignSheet'
+import type { WechatShareStatus } from '../../hooks/useWechatActivityShare'
 
-type ShareStatus = 'idle' | 'shared' | 'copied' | 'cancelled' | 'error'
+type ShareStatus = 'idle' | 'shared' | 'copied' | 'cancelled' | 'error' | 'wechat-hint'
 
 type ActivityShareSheetProps = {
   open: boolean
   activity: PublicActivityDetail | null
   /** One URL for the QR code, native share and copy. `null` closes the invite path. */
   shareUrl: string | null
+  wechatShare: { isWechat: boolean; status: WechatShareStatus }
   seatsFilled: number | null
   seatsTotal: number | null
   onClose: () => void
@@ -41,6 +43,7 @@ export function ActivityShareSheet({
   open,
   activity,
   shareUrl,
+  wechatShare,
   seatsFilled,
   seatsTotal,
   onClose,
@@ -68,6 +71,10 @@ export function ActivityShareSheet({
   const handleSystemShare = async () => {
     if (!shareUrl) {
       setStatus('error')
+      return
+    }
+    if (wechatShare.isWechat) {
+      setStatus('wechat-hint')
       return
     }
     if (!canNativeShare) {
@@ -108,7 +115,7 @@ export function ActivityShareSheet({
                 className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-[13px] bg-teal-700 px-2 text-[13px] font-semibold text-white transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
               >
                 <Share2 size={17} aria-hidden="true" />
-                转发给好友
+                {wechatShare.isWechat ? '微信内分享' : '转发给好友'}
               </button>
               <button
                 type="button"
@@ -120,9 +127,20 @@ export function ActivityShareSheet({
               </button>
             </div>
             <p className="mt-2 text-center text-[11px] leading-4 text-slate-400">
-              二维码、转发与复制使用同一条链接，包含真实活动与邀请参数。
+              {wechatShare.isWechat
+                ? '请通过微信右上角「···」菜单选择发送给朋友或分享到朋友圈；二维码和复制使用同一邀请链接。'
+                : '二维码、转发与复制使用同一条链接，包含真实活动与邀请参数。'}
             </p>
             <div className="text-center text-[12px] font-medium" aria-live="polite">
+              {wechatShare.isWechat && wechatShare.status === 'loading' ? (
+                <p className="mt-1 text-slate-500">正在准备微信分享；也可以先复制链接或扫码。</p>
+              ) : null}
+              {wechatShare.isWechat && wechatShare.status === 'error' ? (
+                <p className="mt-1 text-orange-700">微信分享初始化失败，请使用复制链接或二维码。</p>
+              ) : null}
+              {status === 'wechat-hint' ? (
+                <p className="mt-1 text-teal-700">点击微信右上角「···」菜单，再选择好友或朋友圈。</p>
+              ) : null}
               {status === 'shared' ? (
                 <p className="mt-1 text-teal-700">已调起系统分享，好友需登录并主动确认才会加入。</p>
               ) : null}
