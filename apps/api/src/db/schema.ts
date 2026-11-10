@@ -1900,6 +1900,33 @@ export const staffRelations = relations(staffAccounts, ({ one, many }) => ({
   communities: many(staffCommunityAssignments),
 }))
 
+
+/**
+ * Curated external platform promotions. Never a payable product or a reward.
+ * An offer starts disabled; operators must verify the link before publication.
+ */
+export const externalOffers = sqliteTable(
+  'external_offers',
+  {
+    id: text('id').primaryKey(),
+    title: text('title').notNull(),
+    platform: text('platform').notNull(),
+    category: text('category').notNull(),
+    description: text('description'),
+    url: text('url').notNull(),
+    sortOrder: integer('sort_order').notNull().default(0),
+    enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+    createdByUserId: text('created_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+  },
+  (table) => [
+    index('external_offers_enabled_expiry_sort_idx').on(table.enabled, table.expiresAt, table.sortOrder),
+    check('external_offers_enabled_check', sql.raw('enabled IN (0, 1)')),
+  ],
+)
+
 export const schema = {
   communities,
   users,
@@ -1944,4 +1971,5 @@ export const schema = {
   ledgerEntries,
   ledgerEntrySources,
   ledgerAnomalies,
+  externalOffers,
 }

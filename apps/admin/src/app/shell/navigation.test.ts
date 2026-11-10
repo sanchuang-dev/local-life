@@ -27,7 +27,7 @@ describe('filterNavigation', () => {
     const { groups } = filterNavigation('商品与订单')
 
     expect(groups.map((group) => group.key)).toEqual(['commerce'])
-    expect(groups[0]?.pages.map((page) => page.label)).toEqual(['商品管理', '订单管理'])
+    expect(groups[0]?.pages.map((page) => page.label)).toEqual(['商品管理', '精选优惠', '订单管理'])
   })
 
   it('keeps every page when the group label itself matches', () => {
