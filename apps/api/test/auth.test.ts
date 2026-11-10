@@ -9,6 +9,7 @@ import { createDatabase } from '../src/db/client.js'
 import {
   activities,
   communities,
+  tencentMapConfigs,
   residentCommunityAssignments,
   staffAccounts,
   users,
@@ -389,5 +390,176 @@ test('WeChat OAuth binds one stable resident identity, validates state/nonce and
     )
   } finally {
     context.sqlite.close()
+  }
+})
+
+
+test('admin community location: map key is gated and GCJ-02 coordinates persist and update', async () => {
+  const { app, db, sqlite } = testContext()
+  try {
+    await createAdmin(db)
+    assert.equal((await app.request('/admin/map-picker-config')).status, 401)
+    const signedIn = await login(app, 'admin', 'Admin-Password-123!')
+    const token = signedIn.csrfToken!
+    const cookies = cookieHeader(
+      cookiePair(signedIn.response, 'll_session'),
+      cookiePair(signedIn.response, 'll_csrf'),
+    )
+
+    const emptyPicker = await app.request('/admin/map-picker-config', { headers: { cookie: cookies } })
+    assert.equal(emptyPicker.status, 200)
+    assert.deepEqual(await emptyPicker.json(), { available: false })
+    const save = await app.request('/admin/tencent-map/config', {
+      method: 'PUT',
+      headers: postHeaders(cookies, token),
+      body: JSON.stringify({ key: 'MAPKEY123456789ABC', appName: '默认应用' }),
+    })
+    assert.equal(save.status, 200)
+    assert.equal((await save.json() as { enabled: boolean }).enabled, true)
+    const picker = await app.request('/admin/map-picker-config', { headers: { cookie: cookies } })
+    assert.equal(picker.status, 200)
+    assert.deepEqual(await picker.json(), { available: true, key: 'MAPKEY123456789ABC', appName: '默认应用' })
+    assert.equal(picker.headers.get('cache-control'), 'no-store')
+
+    const newLocation = { address: '广东省韶关市社区服务中心', latitude: 24.8121, longitude: 113.5962 }
+    const created = await app.request('/admin/communities', {
+      method: 'POST',
+      headers: postHeaders(cookies, token),
+      body: JSON.stringify({ name: '幸福社区', location: newLocation }),
+    })
+    assert.equal(created.status, 201)
+    const { id } = (await created.json()) as { id: string }
+    const rows = await app.request('/admin/communities', { headers: { cookie: cookies } })
+    const list = (await rows.json()) as { items: Array<{
+      id: string, address: string | null, latitudeGcj02: number | null, longitudeGcj02: number | null
+    }> }
+    const row = list.items.find((item) => item.id === id)
+    assert.equal(row?.address, newLocation.address)
+    assert.equal(row?.latitudeGcj02, newLocation.latitude)
+    assert.equal(row?.longitudeGcj02, newLocation.longitude)
+    const stored = db.select().from(communities).where(eq(communities.id, id)).get()
+    assert.equal(stored?.latitudeGcj02, newLocation.latitude)
+
+    const updatedLocation = { address: '韶关市新服务点', latitude: 24.8, longitude: 113.6 }
+    const path = `/admin/communities/${id}/location`
+    const noCsrf = await app.request(path, {
+      method: 'PATCH', headers: { cookie: cookies, 'content-type': 'application/json' },
+      body: JSON.stringify(updatedLocation),
+    })
+    assert.equal(noCsrf.status, 403)
+    const invalid = await app.request(path, {
+      method: 'PATCH', headers: postHeaders(cookies, token),
+      body: JSON.stringify({ ...updatedLocation, latitude: 100 }),
+    })
+    assert.equal(invalid.status, 400)
+    assert.equal(db.select().from(communities).where(eq(communities.id, id)).get()?.address, newLocation.address)
+    const updated = await app.request(path, {
+      method: 'PATCH', headers: postHeaders(cookies, token),
+      body: JSON.stringify(updatedLocation),
+    })
+    assert.equal(updated.status, 200)
+    assert.equal(db.select().from(communities).where(eq(communities.id, id)).get()?.address, updatedLocation.address)
+
+    const legacy = await app.request('/admin/communities', {
+      method: 'POST', headers: postHeaders(cookies, token),
+      body: JSON.stringify({ name: '未定位社区' }),
+    })
+    assert.equal(legacy.status, 201)
+  } finally {
+    sqlite.close()
+  }
+})
+
+test('Tencent map settings are persistent, hot-swappable, masked and restricted to admins', async () => {
+  const { app, db, sqlite } = testContext()
+  try {
+    await createAdmin(db)
+    // No credentials and no role may read or change a map key.
+    for (const path of ['/admin/tencent-map/config', '/admin/map-picker-config']) {
+      assert.equal((await app.request(path)).status, 401)
+    }
+    const signedIn = await login(app, 'admin', 'Admin-Password-123!')
+    assert.equal(signedIn.response.status, 200)
+    const token = signedIn.csrfToken!
+    const cookies = cookieHeader(
+      cookiePair(signedIn.response, 'll_session'),
+      cookiePair(signedIn.response, 'll_csrf'),
+    )
+    const first = await app.request('/admin/tencent-map/config', { headers: { cookie: cookies } })
+    assert.deepEqual(await first.json(), { configured: false, enabled: false, keyHint: null, appName: null, updatedAt: null })
+    const path = '/admin/tencent-map/config'
+    const key1 = 'MAPKEY123456789ABCD'
+    const key2 = 'MAPKEY987654321ABCD'
+    const input = { key: key1, appName: '默认应用' }
+    const submit = (payload: unknown, headers = postHeaders(cookies, token)) => app.request(path, {
+      method: 'PUT', headers, body: JSON.stringify(payload),
+    })
+    assert.equal((await submit(input, { ...postHeaders(cookies, token), 'x-csrf-token': 'wrong' })).status, 403)
+    assert.equal((await submit(input, { ...postHeaders(cookies, token), origin: 'https://evil.example' })).status, 403)
+    assert.equal((await submit({ ...input, key: 'bad key' })).status, 400)
+    assert.equal((await submit({ ...input, appName: '' })).status, 400)
+    assert.equal((await submit({ ...input, extra: key1 })).status, 400)
+    const saved = await submit(input)
+    assert.equal(saved.status, 200)
+    const savedText = await saved.text()
+    assert.equal(savedText.includes(key1), false, 'status response must not leak the entire key')
+    const summary = JSON.parse(savedText) as { configured: boolean; enabled: boolean; keyHint: string; appName: string }
+    assert.equal(summary.configured, true)
+    assert.equal(summary.enabled, true)
+    assert.equal(summary.keyHint, '••••ABCD')
+    assert.equal(summary.appName, '默认应用')
+    assert.equal(db.select().from(tencentMapConfigs).get()?.apiKey, key1)
+
+    const picker = await app.request('/admin/map-picker-config', { headers: { cookie: cookies } })
+    assert.equal(picker.headers.get('cache-control'), 'no-store')
+    assert.deepEqual(await picker.json(), { available: true, key: key1, appName: '默认应用' })
+    // This endpoint is the only admin-only browser API that necessarily includes the public map key.
+    const replaced = await submit({ key: key2, appName: '另一个应用' })
+    assert.equal(replaced.status, 200)
+    assert.deepEqual(await (await app.request('/admin/map-picker-config', { headers: { cookie: cookies } })).json(),
+      { available: true, key: key2, appName: '另一个应用' })
+
+    const disable = await app.request('/admin/tencent-map/config/enabled', {
+      method: 'PATCH', headers: postHeaders(cookies, token),
+      body: JSON.stringify({ enabled: false }),
+    })
+    assert.equal(disable.status, 200)
+    assert.equal((await disable.json() as { enabled: boolean }).enabled, false)
+    assert.deepEqual(await (await app.request('/admin/map-picker-config', { headers: { cookie: cookies } })).json(),
+      { available: false })
+    const enable = await app.request('/admin/tencent-map/config/enabled', {
+      method: 'PATCH', headers: postHeaders(cookies, token),
+      body: JSON.stringify({ enabled: true }),
+    })
+    assert.equal(enable.status, 200)
+    assert.equal((await enable.json() as { enabled: boolean }).enabled, true)
+
+    const staffUserId = randomUUID()
+    const now = new Date()
+    db.insert(users).values({ id: staffUserId, displayName: '普通运营员', createdAt: now, updatedAt: now }).run()
+    db.insert(staffAccounts).values({
+      id: randomUUID(), userId: staffUserId, username: 'operator-test',
+      passwordHash: await hashPassword('OperatorPassword123!'),
+      role: 'operator', status: 'active', createdAt: now, updatedAt: now,
+    }).run()
+    const operatorLogin = await login(app, 'operator-test', 'OperatorPassword123!')
+    const operatorCookies = cookieHeader(
+      cookiePair(operatorLogin.response, 'll_session'),
+      cookiePair(operatorLogin.response, 'll_csrf'),
+    )
+    for (const route of ['/admin/tencent-map/config', '/admin/map-picker-config']) {
+      assert.equal((await app.request(route, { headers: { cookie: operatorCookies } })).status, 403)
+    }
+    assert.equal((await app.request(path, {
+      method: 'PUT', headers: postHeaders(operatorCookies, operatorLogin.csrfToken!),
+      body: JSON.stringify(input),
+    })).status, 403)
+    assert.equal((await app.request('/admin/tencent-map/config/enabled', {
+      method: 'PATCH', headers: postHeaders(operatorCookies, operatorLogin.csrfToken!),
+      body: JSON.stringify({ enabled: false }),
+    })).status, 403)
+    assert.equal(db.select().from(tencentMapConfigs).get()?.apiKey, key2)
+  } finally {
+    sqlite.close()
   }
 })

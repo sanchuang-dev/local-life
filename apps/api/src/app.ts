@@ -12,6 +12,12 @@ import {
   wechatProfileStartResponseSchema,
   wechatProfileStatusSchema,
   createCommunityRequestSchema,
+  communityLocationSchema,
+  TENCENT_MAP_ADMIN_ROUTES,
+  saveTencentMapConfigRequestSchema,
+  setTencentMapEnabledRequestSchema,
+  tencentMapConfigStatusSchema,
+  tencentMapPickerConfigSchema,
   createStaffAccountRequestSchema,
   healthResponseSchema,
   isActivityId,
@@ -26,6 +32,7 @@ import { createDatabase, type AppDatabase } from './db/client.js'
 import {
   auditLogs,
   communities,
+  tencentMapConfigs,
   oauthStates,
   rateLimits,
   residentCommunityAssignments,
@@ -1155,11 +1162,101 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
   app.get('/admin/communities', (c) => {
     const session = c.get('authSession')
     if (!session?.staff) return fail(c, 401, API_ERROR_CODES.unauthorized, '请先登录管理后台')
+    const selection = {
+      id: communities.id,
+      name: communities.name,
+      address: communities.address,
+      latitudeGcj02: communities.latitudeGcj02,
+      longitudeGcj02: communities.longitudeGcj02,
+    }
     const result =
       session.staff.role === 'admin'
-        ? db.select({ id: communities.id, name: communities.name }).from(communities).all()
-        : staffCommunities(db, session.staff.id)
+        ? db.select(selection).from(communities).all()
+        : db.select(selection).from(communities)
+          .innerJoin(staffCommunityAssignments, eq(staffCommunityAssignments.communityId, communities.id))
+          .where(eq(staffCommunityAssignments.staffAccountId, session.staff.id)).all()
     return c.json({ items: result })
+  })
+
+  // Tencent map picker keys are browser-visible identifiers, not AppSecrets.
+  // SQLite is the sole runtime source; admin changes are effective without restart.
+  const getTencentMapConfig = () => db.select().from(tencentMapConfigs)
+    .where(eq(tencentMapConfigs.id, 'default')).get()
+  const mapSummary = () => {
+    const current = getTencentMapConfig()
+    return tencentMapConfigStatusSchema.parse({
+      configured: Boolean(current),
+      enabled: current?.enabled ?? false,
+      keyHint: current ? `••••${current.apiKey.slice(-4)}` : null,
+      appName: current?.appName ?? null,
+      updatedAt: current?.updatedAt.toISOString() ?? null,
+    })
+  }
+  const requireMapAdmin = (c: AppContext): Response | null => {
+    const session = c.get('authSession')
+    if (!session?.staff) return fail(c, 401, API_ERROR_CODES.unauthorized, '请先登录管理后台')
+    if (session.staff.role !== 'admin') {
+      return fail(c, 403, API_ERROR_CODES.forbidden, '只有管理员可以配置腾讯地图')
+    }
+    return null
+  }
+
+  app.get(TENCENT_MAP_ADMIN_ROUTES.config, (c) => {
+    const denied = requireMapAdmin(c)
+    if (denied) return denied
+    c.header('Cache-Control', 'no-store')
+    return c.json(mapSummary())
+  })
+
+  app.put(TENCENT_MAP_ADMIN_ROUTES.config, async (c) => {
+    const denied = requireMapAdmin(c)
+    if (denied) return denied
+    const session = c.get('authSession')!
+    if (!validCsrf(c, config, session)) {
+      return fail(c, 403, API_ERROR_CODES.forbidden, 'CSRF 校验失败')
+    }
+    const body = bodySchemaError(await c.req.json().catch(() => null), saveTencentMapConfigRequestSchema)
+    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '地图 Key 格式不正确')
+    const now = new Date()
+    db.insert(tencentMapConfigs).values({
+      id: 'default', apiKey: body.key, appName: body.appName, enabled: true, updatedAt: now,
+    }).onConflictDoUpdate({
+      target: tencentMapConfigs.id,
+      set: { apiKey: body.key, appName: body.appName, enabled: true, updatedAt: now },
+    }).run()
+    recordAudit(db, session.userId, 'tencent_map.config_saved', 'default')
+    c.header('Cache-Control', 'no-store')
+    return c.json(mapSummary())
+  })
+
+  app.patch(TENCENT_MAP_ADMIN_ROUTES.enabled, async (c) => {
+    const denied = requireMapAdmin(c)
+    if (denied) return denied
+    const session = c.get('authSession')!
+    if (!validCsrf(c, config, session)) {
+      return fail(c, 403, API_ERROR_CODES.forbidden, 'CSRF 校验失败')
+    }
+    const body = bodySchemaError(await c.req.json().catch(() => null), setTencentMapEnabledRequestSchema)
+    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '地图配置状态不正确')
+    if (!getTencentMapConfig()) return fail(c, 409, API_ERROR_CODES.conflict, '请先保存腾讯地图 Key')
+    db.update(tencentMapConfigs).set({
+      enabled: body.enabled,
+      updatedAt: new Date(),
+    }).where(eq(tencentMapConfigs.id, 'default')).run()
+    recordAudit(db, session.userId, body.enabled
+      ? 'tencent_map.enabled' : 'tencent_map.disabled', 'default')
+    c.header('Cache-Control', 'no-store')
+    return c.json(mapSummary())
+  })
+
+  app.get(TENCENT_MAP_ADMIN_ROUTES.pickerConfig, (c) => {
+    const denied = requireMapAdmin(c)
+    if (denied) return denied
+    c.header('Cache-Control', 'no-store')
+    const current = getTencentMapConfig()
+    return c.json(tencentMapPickerConfigSchema.parse(
+      current?.enabled ? { available: true, key: current.apiKey, appName: current.appName } : { available: false },
+    ))
   })
 
   app.post('/admin/communities', async (c) => {
@@ -1168,12 +1265,39 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     if (session.staff.role !== 'admin') return fail(c, 403, API_ERROR_CODES.forbidden, '只有管理员可以创建社区')
     if (!validCsrf(c, config, session)) return fail(c, 403, API_ERROR_CODES.forbidden, 'CSRF 校验失败')
     const body = bodySchemaError(await c.req.json().catch(() => null), createCommunityRequestSchema)
-    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '社区名称不正确')
+    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '社区信息不正确')
 
     const id = randomUUID()
-    db.insert(communities).values({ id, name: body.name, createdAt: new Date() }).run()
+    db.insert(communities).values({
+      id,
+      name: body.name,
+      address: body.location?.address ?? null,
+      latitudeGcj02: body.location?.latitude ?? null,
+      longitudeGcj02: body.location?.longitude ?? null,
+      createdAt: new Date(),
+    }).run()
     recordAudit(db, session.userId, 'community.created', id)
     return c.json({ id, name: body.name }, 201)
+  })
+
+  app.patch('/admin/communities/:communityId/location', async (c) => {
+    const session = c.get('authSession')
+    if (!session?.staff) return fail(c, 401, API_ERROR_CODES.unauthorized, '请先登录管理后台')
+    if (session.staff.role !== 'admin') return fail(c, 403, API_ERROR_CODES.forbidden, '只有管理员可以管理社区位置')
+    if (!validCsrf(c, config, session)) return fail(c, 403, API_ERROR_CODES.forbidden, 'CSRF 校验失败')
+    const communityId = c.req.param('communityId')
+    const current = db.select({ id: communities.id }).from(communities)
+      .where(eq(communities.id, communityId)).get()
+    if (!current) return fail(c, 404, API_ERROR_CODES.notFound, '社区不存在')
+    const location = bodySchemaError(await c.req.json().catch(() => null), communityLocationSchema)
+    if (!location) return fail(c, 400, API_ERROR_CODES.invalidRequest, '社区位置不正确')
+    db.update(communities).set({
+      address: location.address,
+      latitudeGcj02: location.latitude,
+      longitudeGcj02: location.longitude,
+    }).where(eq(communities.id, communityId)).run()
+    recordAudit(db, session.userId, 'community.location_updated', communityId)
+    return c.json({ id: communityId, location })
   })
 
   app.get('/admin/staff', (c) => {

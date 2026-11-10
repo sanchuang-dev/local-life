@@ -138,8 +138,46 @@ export const staffLoginRequestSchema = z.object({
   password: z.string().min(1).max(128),
 })
 
-export const createCommunityRequestSchema = z.object({
+/** Tencent's location-picker returns GCJ-02. Keep that coordinate system explicit. */
+export const communityLocationSchema = z.strictObject({
+  address: z.string().trim().min(1).max(200),
+  latitude: z.number().finite().min(-90).max(90),
+  longitude: z.number().finite().min(-180).max(180),
+})
+export type CommunityLocation = z.infer<typeof communityLocationSchema>
+
+/** Admin-only Tencent map configuration; saved Key is never included in status responses. */
+export const TENCENT_MAP_ADMIN_ROUTES = {
+  config: '/admin/tencent-map/config',
+  enabled: '/admin/tencent-map/config/enabled',
+  pickerConfig: '/admin/map-picker-config',
+} as const
+
+export const tencentMapKeySchema = z.string().trim().regex(/^[A-Za-z0-9_-]{8,128}$/u)
+export const saveTencentMapConfigRequestSchema = z.strictObject({
+  key: tencentMapKeySchema,
+  appName: z.string().trim().min(1).max(64),
+})
+export const setTencentMapEnabledRequestSchema = z.strictObject({
+  enabled: z.boolean(),
+})
+export const tencentMapConfigStatusSchema = z.strictObject({
+  configured: z.boolean(),
+  enabled: z.boolean(),
+  keyHint: z.string().nullable(),
+  appName: z.string().nullable(),
+  updatedAt: z.string().nullable(),
+})
+export type TencentMapConfigStatus = z.infer<typeof tencentMapConfigStatusSchema>
+export const tencentMapPickerConfigSchema = z.discriminatedUnion('available', [
+  z.strictObject({ available: z.literal(false) }),
+  z.strictObject({ available: z.literal(true), key: tencentMapKeySchema, appName: z.string().min(1) }),
+])
+export type TencentMapPickerConfig = z.infer<typeof tencentMapPickerConfigSchema>
+
+export const createCommunityRequestSchema = z.strictObject({
   name: z.string().trim().min(2).max(60),
+  location: communityLocationSchema.optional(),
 })
 
 export const createStaffAccountRequestSchema = z.object({
