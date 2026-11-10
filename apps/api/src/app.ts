@@ -1,12 +1,15 @@
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { and, eq, gt, inArray, isNull, lt } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gt, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import {
   API_ERROR_CODES,
   API_ROUTES,
+  CRM_ROUTES,
+  residentDirectoryQuerySchema,
+  residentDirectoryResponseSchema,
   SERVICE_NAME,
   authSessionResponseSchema,
   wechatProfileStartResponseSchema,
@@ -41,6 +44,7 @@ import {
   staffCommunityAssignments,
   users,
   wechatIdentities,
+  wechatOauthConfigs,
 } from './db/schema.js'
 import { constantTimeTextEqual, hashPassword, hashToken, randomToken, verifyPassword } from './auth/security.js'
 import {
@@ -69,6 +73,7 @@ import { registerParticipationRoutes } from './participation/routes.js'
 import { registerRewardRoutes } from './rewards/routes.js'
 import { registerCrmebRoutes } from './crmeb/routes.js'
 import { registerWechatAdminRoutes } from './wechat/routes.js'
+import { registerWechatJsSdkRoutes } from './wechat/js-sdk.js'
 import { resolveWechatRuntimeConfig, type WechatRuntimeOptions } from './wechat/runtime.js'
 import type { AppBindings, AppContext, AuthSession, HttpErrorStatus } from './http.js'
 
@@ -1429,44 +1434,111 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     )
   })
 
-  app.get('/crm/residents', (c) => {
+  app.get(CRM_ROUTES.residentList, (c) => {
     const session = c.get('authSession')
     if (!session?.staff) return fail(c, 401, API_ERROR_CODES.unauthorized, '请先登录管理后台')
-    const communityId = c.req.query('communityId')
-    if (!communityId) return fail(c, 400, API_ERROR_CODES.invalidRequest, '必须指定社区')
 
+    const parsed = residentDirectoryQuerySchema.safeParse(
+      Object.fromEntries(new URL(c.req.url).searchParams),
+    )
+    if (!parsed.success) {
+      return fail(c, 400, API_ERROR_CODES.invalidRequest, '社区、页码或搜索条件无效')
+    }
+    const { communityId, page, pageSize, keyword } = parsed.data
+
+    // Permission checking must happen before any directory count, search or
+    // profile join. Never broaden the requested community for staff users.
     if (session.staff.role !== 'admin') {
       const assignment = db
-        .select()
+        .select({ staffAccountId: staffCommunityAssignments.staffAccountId })
         .from(staffCommunityAssignments)
-        .where(
-          and(
-            eq(staffCommunityAssignments.staffAccountId, session.staff.id),
-            eq(staffCommunityAssignments.communityId, communityId),
-          ),
-        )
+        .where(and(
+          eq(staffCommunityAssignments.staffAccountId, session.staff.id),
+          eq(staffCommunityAssignments.communityId, communityId),
+        ))
         .get()
       if (!assignment) return fail(c, 403, API_ERROR_CODES.forbidden, '无权查看该社区居民')
-    } else if (!db.select().from(communities).where(eq(communities.id, communityId)).get()) {
+    } else if (!db.select({ id: communities.id }).from(communities).where(eq(communities.id, communityId)).get()) {
       return fail(c, 404, API_ERROR_CODES.notFound, '社区不存在')
     }
 
-    const items = db
-      .select({
+    // #121 consents to profiles for a specific public-account identity. Show
+    // only the currently active AppID, consistent with /auth/wechat/profile.
+    // Scalar subqueries avoid multiplying residents when a user has multiple
+    // identities; (user_id) already has a SQLite index.
+    const activeAppId = db
+      .select({ appId: wechatOauthConfigs.appId })
+      .from(wechatOauthConfigs)
+      .where(eq(wechatOauthConfigs.status, 'active'))
+      .get()?.appId ?? null
+    const profileWhere = sql`wi.user_id = ${users.id} AND wi.app_id = ${activeAppId}
+      AND wi.profile_authorized_at IS NOT NULL`
+    const nickname = sql<string | null>`(
+      SELECT wi.nickname FROM wechat_identities wi WHERE ${profileWhere}
+      ORDER BY wi.profile_authorized_at DESC, wi.id ASC LIMIT 1
+    )`
+    const avatarUrl = sql<string | null>`(
+      SELECT wi.avatar_url FROM wechat_identities wi WHERE ${profileWhere}
+      ORDER BY wi.profile_authorized_at DESC, wi.id ASC LIMIT 1
+    )`
+    const authorizedAt = sql<number | null>`(
+      SELECT wi.profile_authorized_at FROM wechat_identities wi WHERE ${profileWhere}
+      ORDER BY wi.profile_authorized_at DESC, wi.id ASC LIMIT 1
+    )`
+
+    // LIKE is a literal substring search: %, _ and backslash in the user
+    // keyword must not become wildcards. All values are parameter-bound.
+    const escaped = keyword?.replace(/[\\%_]/g, (char) => String.fromCharCode(92) + char)
+    const pattern = escaped ? `%${escaped}%` : null
+    const search = pattern
+      ? or(
+          sql`${users.id} LIKE ${pattern} ESCAPE ${'\\'}`,
+          sql`${users.displayName} LIKE ${pattern} ESCAPE ${'\\'}`,
+          sql`EXISTS (
+            SELECT 1 FROM wechat_identities wi
+            WHERE ${profileWhere} AND wi.nickname LIKE ${pattern} ESCAPE ${'\\'}
+          )`,
+        )
+      : undefined
+    const scope = and(eq(residentCommunityAssignments.communityId, communityId), search)
+    const total = db.select({ total: count() })
+      .from(residentCommunityAssignments)
+      .innerJoin(users, eq(residentCommunityAssignments.userId, users.id))
+      .where(scope)
+      .get()?.total ?? 0
+    const rows = db.select({
         id: users.id,
-        displayName: users.displayName,
+        localDisplayName: users.displayName,
         createdAt: users.createdAt,
+        joinedAt: residentCommunityAssignments.createdAt,
+        wechatNickname: nickname,
+        wechatAvatarUrl: avatarUrl,
+        profileAuthorizedAt: authorizedAt,
       })
       .from(residentCommunityAssignments)
       .innerJoin(users, eq(residentCommunityAssignments.userId, users.id))
-      .where(eq(residentCommunityAssignments.communityId, communityId))
-      .limit(100)
+      .where(scope)
+      .orderBy(desc(residentCommunityAssignments.createdAt), asc(users.id))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize)
       .all()
-      .map((resident) => ({
+    return c.json(residentDirectoryResponseSchema.parse({
+      items: rows.map((resident) => ({
         ...resident,
+        displayName: resident.wechatNickname?.trim()
+          || resident.localDisplayName?.trim() || '微信用户',
+        // Do not display a profile unless the resident authorized it.
+        wechatNickname: resident.profileAuthorizedAt ? resident.wechatNickname : null,
+        wechatAvatarUrl: resident.profileAuthorizedAt ? resident.wechatAvatarUrl : null,
+        profileAuthorizedAt: resident.profileAuthorizedAt
+          ? new Date(resident.profileAuthorizedAt).toISOString() : null,
         createdAt: resident.createdAt.toISOString(),
-      }))
-    return c.json({ items })
+        joinedAt: resident.joinedAt.toISOString(),
+      })),
+      total,
+      page,
+      pageSize,
+    }))
   })
 
   registerActivityRoutes(app, {
@@ -1567,6 +1639,14 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     validCsrf,
     bodySchemaError,
     now: options.now ?? (() => new Date()),
+  })
+
+  registerWechatJsSdkRoutes(app, {
+    config,
+    fetcher,
+    resolveRuntime: wechatRuntime,
+    fail,
+    nowMs: options.now ? () => options.now!().getTime() : () => Date.now(),
   })
 
   registerPhoneAuthRoutes(app, {

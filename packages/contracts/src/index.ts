@@ -13,6 +13,8 @@ export const API_ROUTES = {
   authWechatStart: '/auth/wechat/start',
   authWechatProfile: '/auth/wechat/profile',
   authWechatProfileStart: '/auth/wechat/profile/start',
+  /** Residents' same-origin JS-SDK configuration (no browser secrets). */
+  wechatJsSdkSignature: '/wechat/js-sdk/signature',
 } as const
 
 export const SERVICE_NAME = 'local-life-api' as const
@@ -100,6 +102,7 @@ export const API_ERROR_CODES = {
   wechatConfigMasterKeyUnavailable: 'wechat_config_master_key_unavailable',
   wechatConfigDecryptFailed: 'wechat_config_decrypt_failed',
   wechatProfileIdentityMismatch: 'wechat_profile_identity_mismatch',
+  wechatJsSdkUnavailable: 'wechat_js_sdk_unavailable',
 } as const
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES]
@@ -118,6 +121,21 @@ export const healthResponseSchema = z.object({
 })
 
 export type HealthResponse = z.infer<typeof healthResponseSchema>
+
+/** The H5 supplies its *current* absolute URL; the server pins the origin. */
+export const wechatJsSdkSignatureRequestSchema = z.strictObject({
+  url: z.string().min(1).max(4096),
+})
+
+/** Exact safe JS-SDK config fields, without access token, ticket or secret. */
+export const wechatJsSdkSignatureResponseSchema = z.strictObject({
+  appId: z.string().min(1),
+  timestamp: z.number().int().positive(),
+  nonceStr: z.string().regex(/^[a-f0-9]{32}$/),
+  signature: z.string().regex(/^[a-f0-9]{40}$/),
+})
+export type WechatJsSdkSignatureRequest = z.infer<typeof wechatJsSdkSignatureRequestSchema>
+export type WechatJsSdkSignatureResponse = z.infer<typeof wechatJsSdkSignatureResponseSchema>
 
 /** Structured error envelope. Clients must be able to distinguish real errors from demo states. */
 export const apiErrorSchema = z.object({
@@ -805,6 +823,38 @@ export type ActivityAuditEntryListResponse = z.infer<
 >
 
 /* -------------------------------------------------------------------------- */
+/* Resident directory (#125 LL-MVP-013)                                        */
+/* -------------------------------------------------------------------------- */
+
+/** Queries are server-scoped to one authorized community, never global. */
+export const residentDirectoryQuerySchema = z.strictObject({
+  communityId: z.string().uuid(),
+  page: z.coerce.number().int().min(1).max(10_000).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  keyword: z.string().trim().min(1).max(80).optional(),
+})
+
+export const residentDirectoryEntrySchema = z.strictObject({
+  id: z.string().uuid(),
+  /** Display-only precedence: consented WeChat > local name > 微信用户. */
+  displayName: z.string().min(1),
+  localDisplayName: z.string().nullable(),
+  wechatNickname: z.string().nullable(),
+  wechatAvatarUrl: z.string().nullable(),
+  profileAuthorizedAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+  joinedAt: z.string().datetime(),
+})
+export const residentDirectoryResponseSchema = z.strictObject({
+  items: z.array(residentDirectoryEntrySchema),
+  total: z.number().int().nonnegative(),
+  page: z.number().int().positive(),
+  pageSize: z.number().int().positive(),
+})
+export type ResidentDirectoryEntry = z.infer<typeof residentDirectoryEntrySchema>
+export type ResidentDirectoryResponse = z.infer<typeof residentDirectoryResponseSchema>
+
+/* -------------------------------------------------------------------------- */
 /* CRM domain (#61 LL-MVP-005)                                                */
 /* -------------------------------------------------------------------------- */
 
@@ -831,6 +881,7 @@ export const CRM_ROUTES = {
   orderStatus: '/crm/orders/:orderId/status',
   orderAudit: '/crm/orders/:orderId/audit',
   // Back office
+  residentList: '/crm/residents',
   adminLeadList: '/admin/crm/leads',
   adminLeadDetail: '/admin/crm/leads/:leadId',
   adminLeadAudit: '/admin/crm/leads/:leadId/audit',
