@@ -607,6 +607,36 @@ test('scope is authorized server-side: no session 401, out-of-scope accounts inv
   }
 })
 
+test('scoped staff do not receive other-community relationships of otherwise visible users', async () => {
+  const f = await fixture()
+  try {
+    // One resident belongs to A+B; the caller only has A authority.
+    for (const who of ['operator', 'grid'] as const) {
+      const list = parseList(await f.list({ pageSize: '100' }, who))
+      const row = list.items.find((item) => item.id === multiCommunityUser)
+      assert.ok(row)
+      assert.deepEqual(row.residentCommunities.map((item) => item.id), [communityA])
+      const detail = parseDetail(await f.detail(multiCommunityUser, who))
+      assert.deepEqual(detail.residentCommunities.map((item) => item.id), [communityA])
+      assert.ok(!(await f.detail(multiCommunityUser, who)).raw.includes('B 社区'))
+    }
+
+    // Another staff member may operate in B, but an A-scoped viewer must not
+    // learn this unrelated authorization through the detail response.
+    f.db.insert(staffCommunityAssignments).values({
+      staffAccountId: f.staffIds.operator,
+      communityId: communityB,
+      createdAt: date,
+    }).run()
+    const scoped = parseDetail(await f.detail(staffOperatorUser, 'grid'))
+    assert.deepEqual(scoped.staffAccount?.communities.map((item) => item.id), [communityA])
+    const admin = parseDetail(await f.detail(staffOperatorUser, 'admin'))
+    assert.deepEqual(admin.staffAccount?.communities.map((item) => item.id), [communityA, communityB])
+  } finally {
+    await f.close()
+  }
+})
+
 test('detail exposes identity, consent, resident membership and staff authority separately', async () => {
   const f = await fixture()
   try {
