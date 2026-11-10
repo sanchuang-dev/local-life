@@ -16,6 +16,11 @@ import {
   wechatProfileStatusSchema,
   createCommunityRequestSchema,
   communityLocationSchema,
+  TENCENT_MAP_ADMIN_ROUTES,
+  saveTencentMapConfigRequestSchema,
+  setTencentMapEnabledRequestSchema,
+  tencentMapConfigStatusSchema,
+  tencentMapPickerConfigSchema,
   createStaffAccountRequestSchema,
   healthResponseSchema,
   isActivityId,
@@ -30,6 +35,7 @@ import { createDatabase, type AppDatabase } from './db/client.js'
 import {
   auditLogs,
   communities,
+  tencentMapConfigs,
   oauthStates,
   rateLimits,
   residentCommunityAssignments,
@@ -1177,14 +1183,84 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     return c.json({ items: result })
   })
 
-  app.get('/admin/map-picker-config', (c) => {
+  // Tencent map picker keys are browser-visible identifiers, not AppSecrets.
+  // SQLite is the sole runtime source; admin changes are effective without restart.
+  const getTencentMapConfig = () => db.select().from(tencentMapConfigs)
+    .where(eq(tencentMapConfigs.id, 'default')).get()
+  const mapSummary = () => {
+    const current = getTencentMapConfig()
+    return tencentMapConfigStatusSchema.parse({
+      configured: Boolean(current),
+      enabled: current?.enabled ?? false,
+      keyHint: current ? `••••${current.apiKey.slice(-4)}` : null,
+      updatedAt: current?.updatedAt.toISOString() ?? null,
+    })
+  }
+  const requireMapAdmin = (c: AppContext): Response | null => {
     const session = c.get('authSession')
     if (!session?.staff) return fail(c, 401, API_ERROR_CODES.unauthorized, '请先登录管理后台')
-    if (session.staff.role !== 'admin') return fail(c, 403, API_ERROR_CODES.forbidden, '只有管理员可以管理社区位置')
+    if (session.staff.role !== 'admin') {
+      return fail(c, 403, API_ERROR_CODES.forbidden, '只有管理员可以配置腾讯地图')
+    }
+    return null
+  }
+
+  app.get(TENCENT_MAP_ADMIN_ROUTES.config, (c) => {
+    const denied = requireMapAdmin(c)
+    if (denied) return denied
     c.header('Cache-Control', 'no-store')
-    return c.json(config.tencentMapPickerKey
-      ? { available: true, key: config.tencentMapPickerKey }
-      : { available: false })
+    return c.json(mapSummary())
+  })
+
+  app.put(TENCENT_MAP_ADMIN_ROUTES.config, async (c) => {
+    const denied = requireMapAdmin(c)
+    if (denied) return denied
+    const session = c.get('authSession')!
+    if (!validCsrf(c, config, session)) {
+      return fail(c, 403, API_ERROR_CODES.forbidden, 'CSRF 校验失败')
+    }
+    const body = bodySchemaError(await c.req.json().catch(() => null), saveTencentMapConfigRequestSchema)
+    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '地图 Key 格式不正确')
+    const now = new Date()
+    db.insert(tencentMapConfigs).values({
+      id: 'default', apiKey: body.key, enabled: true, updatedAt: now,
+    }).onConflictDoUpdate({
+      target: tencentMapConfigs.id,
+      set: { apiKey: body.key, enabled: true, updatedAt: now },
+    }).run()
+    recordAudit(db, session.userId, 'tencent_map.config_saved', 'default')
+    c.header('Cache-Control', 'no-store')
+    return c.json(mapSummary())
+  })
+
+  app.patch(TENCENT_MAP_ADMIN_ROUTES.enabled, async (c) => {
+    const denied = requireMapAdmin(c)
+    if (denied) return denied
+    const session = c.get('authSession')!
+    if (!validCsrf(c, config, session)) {
+      return fail(c, 403, API_ERROR_CODES.forbidden, 'CSRF 校验失败')
+    }
+    const body = bodySchemaError(await c.req.json().catch(() => null), setTencentMapEnabledRequestSchema)
+    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '地图配置状态不正确')
+    if (!getTencentMapConfig()) return fail(c, 409, API_ERROR_CODES.conflict, '请先保存腾讯地图 Key')
+    db.update(tencentMapConfigs).set({
+      enabled: body.enabled,
+      updatedAt: new Date(),
+    }).where(eq(tencentMapConfigs.id, 'default')).run()
+    recordAudit(db, session.userId, body.enabled
+      ? 'tencent_map.enabled' : 'tencent_map.disabled', 'default')
+    c.header('Cache-Control', 'no-store')
+    return c.json(mapSummary())
+  })
+
+  app.get(TENCENT_MAP_ADMIN_ROUTES.pickerConfig, (c) => {
+    const denied = requireMapAdmin(c)
+    if (denied) return denied
+    c.header('Cache-Control', 'no-store')
+    const current = getTencentMapConfig()
+    return c.json(tencentMapPickerConfigSchema.parse(
+      current?.enabled ? { available: true, key: current.apiKey } : { available: false },
+    ))
   })
 
   app.post('/admin/communities', async (c) => {

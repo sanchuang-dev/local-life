@@ -59,6 +59,14 @@ export const communities = sqliteTable('communities', {
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 })
 
+/** Browser-visible Tencent LBS key, admin-managed in SQLite (no environment snapshot). */
+export const tencentMapConfigs = sqliteTable('tencent_map_configs', {
+  id: text('id').primaryKey(),
+  apiKey: text('api_key').notNull(),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+})
+
 export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
   displayName: text('display_name'),

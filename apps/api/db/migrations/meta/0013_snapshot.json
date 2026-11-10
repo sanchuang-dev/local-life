@@ -6275,6 +6275,44 @@
           "value": "(\"wechat_oauth_configs\".\"status\" = 'active'\n          AND \"wechat_oauth_configs\".\"verified_at\" IS NOT NULL\n          AND \"wechat_oauth_configs\".\"activated_at\" IS NOT NULL\n          AND \"wechat_oauth_configs\".\"retired_at\" IS NULL)\n        OR (\"wechat_oauth_configs\".\"status\" = 'retired'\n          AND \"wechat_oauth_configs\".\"retired_at\" IS NOT NULL)\n        OR (\"wechat_oauth_configs\".\"status\" = 'verified'\n          AND \"wechat_oauth_configs\".\"verified_at\" IS NOT NULL\n          AND \"wechat_oauth_configs\".\"activated_at\" IS NULL\n          AND \"wechat_oauth_configs\".\"retired_at\" IS NULL)\n        OR (\"wechat_oauth_configs\".\"status\" IN ('draft', 'failed')\n          AND \"wechat_oauth_configs\".\"verified_at\" IS NULL\n          AND \"wechat_oauth_configs\".\"activated_at\" IS NULL\n          AND \"wechat_oauth_configs\".\"retired_at\" IS NULL)"
         }
       }
+    },
+    "tencent_map_configs": {
+      "name": "tencent_map_configs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "api_key": {
+          "name": "api_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
     }
   },
   "views": {},
