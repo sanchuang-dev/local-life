@@ -385,10 +385,11 @@ test('a pre-activity database upgrades in place and keeps existing community row
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'activities'")
         .get()
       assert.equal(hasActivities, undefined, 'the pre-activity database has no activities table')
-      legacy.db
-        .insert(communities)
-        .values({ id: legacyCommunityId, name: '升级前社区', createdAt: new Date() })
-        .run()
+      // Seed using the historical table shape, not the current Drizzle schema.
+      // The new location columns must not exist before the full upgrade.
+      legacy.sqlite.prepare(
+        'INSERT INTO communities (id, name, created_at) VALUES (?, ?, ?)',
+      ).run(legacyCommunityId, '升级前社区', Date.now())
     } finally {
       legacy.sqlite.close()
     }
