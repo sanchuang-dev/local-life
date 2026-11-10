@@ -12,9 +12,10 @@ import {
 } from '@sanchuang-dev/local-life-contracts'
 import {
   ArrowRight, CalendarDays, CalendarX, ChevronDown, ChevronRight,
-  CircleAlert, Clock3, LocateFixed, MapPin, RefreshCw, Search, X,
+  CircleAlert, Clock3, LocateFixed, MapPin, Search, X,
 } from 'lucide-react'
-import { requestCommunityLocation, type Gcj02Point } from '../lib/communityGeolocation'
+import { requestCommunityLocation } from '../lib/communityGeolocation'
+import type { Gcj02Point } from '../lib/communityCoordinates'
 import { activityDetailHref, SELECTED_COMMUNITY_KEY } from '../lib/communityHomeRoute'
 
 type AsyncList<T> = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; items: T[] }
