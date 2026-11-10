@@ -85,6 +85,13 @@
       "when": 1794035346392,
       "tag": "0011_ledger_facts",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1794210000000,
+      "tag": "0012_wechat_profile_authorization",
+      "breakpoints": true
     }
   ]
 }

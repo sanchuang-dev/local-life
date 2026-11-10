@@ -11,6 +11,10 @@ export const API_ROUTES = {
   authLogin: '/auth/login',
   authLogout: '/auth/logout',
   authWechatStart: '/auth/wechat/start',
+  authWechatProfile: '/auth/wechat/profile',
+  authWechatProfileStart: '/auth/wechat/profile/start',
+  /** Residents' same-origin JS-SDK configuration (no browser secrets). */
+  wechatJsSdkSignature: '/wechat/js-sdk/signature',
 } as const
 
 export const SERVICE_NAME = 'local-life-api' as const
@@ -97,6 +101,8 @@ export const API_ERROR_CODES = {
   wechatConfigVerifyFailed: 'wechat_config_verify_failed',
   wechatConfigMasterKeyUnavailable: 'wechat_config_master_key_unavailable',
   wechatConfigDecryptFailed: 'wechat_config_decrypt_failed',
+  wechatProfileIdentityMismatch: 'wechat_profile_identity_mismatch',
+  wechatJsSdkUnavailable: 'wechat_js_sdk_unavailable',
 } as const
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES]
@@ -115,6 +121,21 @@ export const healthResponseSchema = z.object({
 })
 
 export type HealthResponse = z.infer<typeof healthResponseSchema>
+
+/** The H5 supplies its *current* absolute URL; the server pins the origin. */
+export const wechatJsSdkSignatureRequestSchema = z.strictObject({
+  url: z.string().min(1).max(4096),
+})
+
+/** Exact safe JS-SDK config fields, without access token, ticket or secret. */
+export const wechatJsSdkSignatureResponseSchema = z.strictObject({
+  appId: z.string().min(1),
+  timestamp: z.number().int().positive(),
+  nonceStr: z.string().regex(/^[a-f0-9]{32}$/),
+  signature: z.string().regex(/^[a-f0-9]{40}$/),
+})
+export type WechatJsSdkSignatureRequest = z.infer<typeof wechatJsSdkSignatureRequestSchema>
+export type WechatJsSdkSignatureResponse = z.infer<typeof wechatJsSdkSignatureResponseSchema>
 
 /** Structured error envelope. Clients must be able to distinguish real errors from demo states. */
 export const apiErrorSchema = z.object({
@@ -179,6 +200,36 @@ export const authSessionResponseSchema = z.discriminatedUnion('authenticated', [
 ])
 
 export type AuthSessionResponse = z.infer<typeof authSessionResponseSchema>
+
+/**
+ * Resident-consented WeChat profile state. The response intentionally contains
+ * no OpenID, access token, AppID, or provider credential.
+ */
+export const wechatProfileStatusSchema = z.union([
+  z.object({
+    available: z.literal(false),
+    reason: z.enum(['not_configured', 'configuration_unavailable', 'identity_not_bound']),
+  }),
+  z.object({
+    available: z.literal(true),
+    authorized: z.literal(false),
+  }),
+  z.object({
+    available: z.literal(true),
+    authorized: z.literal(true),
+    nickname: z.string().nullable(),
+    avatarUrl: z.string().url().nullable(),
+    authorizedAt: isoTimestamp,
+  }),
+])
+
+export type WechatProfileStatusResponse = z.infer<typeof wechatProfileStatusSchema>
+
+export const wechatProfileStartResponseSchema = z.object({
+  authorizationUrl: z.string().url(),
+})
+
+export type WechatProfileStartResponse = z.infer<typeof wechatProfileStartResponseSchema>
 
 /* -------------------------------------------------------------------------- */
 /* Resident login return target (#92)                                         */

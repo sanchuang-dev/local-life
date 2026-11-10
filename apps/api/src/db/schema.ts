@@ -70,6 +70,10 @@ export const wechatIdentities = sqliteTable(
     appId: text('app_id').notNull(),
     openId: text('open_id').notNull(),
     unionId: text('union_id'),
+    /** Optional resident-consented profile fields; never copied to users.displayName. */
+    nickname: text('nickname'),
+    avatarUrl: text('avatar_url'),
+    profileAuthorizedAt: integer('profile_authorized_at', { mode: 'timestamp_ms' }),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   },
   (table) => [
@@ -267,6 +271,10 @@ export const oauthStates = sqliteTable(
     configId: text('config_id').references(() => wechatOauthConfigs.id, {
       onDelete: 'set null',
     }),
+    /** Null on legacy rows, which remain ordinary login attempts. */
+    purpose: text('purpose').$type<'login' | 'profile'>(),
+    /** Present only for an explicitly user-consented profile authorization. */
+    userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
     expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
     consumedAt: integer('consumed_at', { mode: 'timestamp_ms' }),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
@@ -275,6 +283,11 @@ export const oauthStates = sqliteTable(
     uniqueIndex('oauth_state_hash_uq').on(table.stateHash),
     index('oauth_state_expiry_idx').on(table.expiresAt),
     index('oauth_state_config_idx').on(table.configId),
+    index('oauth_state_user_purpose_idx').on(table.userId, table.purpose),
+    check(
+      'oauth_state_purpose_check',
+      sql`${table.purpose} IS NULL OR ${table.purpose} IN ('login', 'profile')`,
+    ),
   ],
 )
 

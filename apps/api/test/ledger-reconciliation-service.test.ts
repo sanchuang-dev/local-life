@@ -976,13 +976,15 @@ test('CSV rows, batch page entries and entry_count/total_cents tell one story (æ
       amountCents: 2_000,
       occurredAt: new Date('2026-11-04T09:00:00.000+08:00'),
     })
+    // Pin both instants: the fixture's AFTER_LOCK is 2026-11-09 10:00 +08.
+    // A wall-clock lock can run later than this date and misclassify the fact.
     const created = createBatch(world.db, adminActor(world), {
       periodFrom: '2026-11-01',
       periodTo: '2026-11-07',
-    })
+    }, { now: new Date('2026-11-08T08:00:00.000+08:00') })
     const locked = lockBatch(world.db, adminActor(world), created.batchId, {
       expectedUpdatedAt: created.updatedAt,
-    })
+    }, { now: new Date('2026-11-08T09:00:00.000+08:00') })
     // A fact recorded after the lock: outside all three surfaces, but counted.
     insertEntry(world, {
       factKind: 'order_registered',

@@ -177,6 +177,23 @@ test('an empty database migrates to the encrypted config schema and single-activ
     assert.ok(configId, 'oauth_states.config_id is missing')
     assert.equal(configId.notnull, 0, 'oauth_states.config_id must be nullable')
     assert.equal(configId.dflt_value, null)
+    const purpose = oauthColumns.find((column) => column.name === 'purpose')
+    const profileUserId = oauthColumns.find((column) => column.name === 'user_id')
+    assert.ok(purpose, 'oauth_states.purpose is missing')
+    assert.equal(purpose.notnull, 0, 'legacy OAuth states must keep a nullable purpose')
+    assert.ok(profileUserId, 'oauth_states.user_id is missing')
+    assert.equal(profileUserId.notnull, 0, 'legacy OAuth states must keep a nullable user binding')
+
+    const identityColumns = sqlite
+      .prepare('PRAGMA table_info(wechat_identities)')
+      .all() as TableInfoRow[]
+    const identityColumnNames = identityColumns.map((column) => column.name)
+    for (const expected of ['nickname', 'avatar_url', 'profile_authorized_at']) {
+      assert.ok(identityColumnNames.includes(expected), `missing WeChat profile column ${expected}`)
+    }
+    for (const forbidden of ['sex', 'province', 'city', 'country', 'location']) {
+      assert.equal(identityColumnNames.includes(forbidden), false, `unexpected profile column ${forbidden}`)
+    }
 
     const foreignKeys = sqlite
       .prepare('PRAGMA foreign_key_list(oauth_states)')
@@ -186,29 +203,35 @@ test('an empty database migrates to the encrypted config schema and single-activ
     assert.equal(configFk.table, 'wechat_oauth_configs')
     assert.equal(configFk.to, 'id')
     assert.equal(configFk.on_delete, 'SET NULL')
+    const profileUserFk = foreignKeys.find((foreignKey) => foreignKey.from === 'user_id')
+    assert.ok(profileUserFk, 'oauth_states.user_id has no foreign key')
+    assert.equal(profileUserFk.table, 'users')
+    assert.equal(profileUserFk.to, 'id')
+    assert.equal(profileUserFk.on_delete, 'SET NULL')
 
     const oauthIndexes = sqlite
       .prepare('PRAGMA index_list(oauth_states)')
       .all() as IndexListRow[]
     assert.ok(oauthIndexes.some((index) => index.name === 'oauth_state_config_idx'))
+    assert.ok(oauthIndexes.some((index) => index.name === 'oauth_state_user_purpose_idx'))
   })
 })
 
-test('a 0009 database upgrades incrementally, preserving oauth attempts', () => {
+test('a 0011 database upgrades incrementally, preserving legacy login OAuth attempts', () => {
   const directory = mkdtempSync(join(tmpdir(), 'll-wechat-migrate-'))
   try {
-    // Stage the migrations that existed before this slice (0000..0009).
-    const legacyFolder = join(directory, 'migrations-0009')
+    // Stage the complete pre-profile schema (0000..0011).
+    const legacyFolder = join(directory, 'migrations-0011')
     mkdirSync(join(legacyFolder, 'meta'), { recursive: true })
     const journal = JSON.parse(
       readFileSync(join(migrationsFolder, 'meta', '_journal.json'), 'utf8'),
     ) as { entries: Array<{ idx: number }> }
-    // Not hard-coded: a later migration (T2/T3, …) must not break this test.
+    // Keep the source schema pinned to 0011; the upgrade target follows the full journal.
     const fullJournalCount = journal.entries.length
-    journal.entries = journal.entries.filter((entry) => entry.idx <= 9)
+    journal.entries = journal.entries.filter((entry) => entry.idx <= 11)
     writeFileSync(join(legacyFolder, 'meta', '_journal.json'), JSON.stringify(journal))
     for (const file of readdirSync(migrationsFolder)) {
-      if (/^000\d_.*\.sql$/u.test(file)) {
+      if (/^\d{4}_.*\.sql$/u.test(file)) {
         copyFileSync(join(migrationsFolder, file), join(legacyFolder, file))
       }
     }
@@ -223,13 +246,13 @@ test('a 0009 database upgrades incrementally, preserving oauth attempts', () => 
         .insert(users)
         .values({ id: userId, displayName: null, createdAt: now, updatedAt: now })
         .run()
-      // Written with raw SQL on purpose: the current Drizzle table object now
-      // includes `config_id`, which does not exist in the pre-#113 database yet.
+      // Written with raw SQL to model the pre-#121 table. The current Drizzle
+      // schema object already includes the new purpose and user_id columns.
       legacy.sqlite
         .prepare(
           `INSERT INTO oauth_states
-             (id, state_hash, nonce_hash, community_id, expires_at, consumed_at, created_at)
-           VALUES (?, ?, ?, NULL, ?, NULL, ?)`,
+             (id, state_hash, nonce_hash, community_id, config_id, expires_at, consumed_at, created_at)
+           VALUES (?, ?, ?, NULL, NULL, ?, NULL, ?)`,
         )
         .run(
           stateId,
@@ -238,11 +261,13 @@ test('a 0009 database upgrades incrementally, preserving oauth attempts', () => 
           now.getTime() + 10 * 60 * 1000,
           now.getTime(),
         )
-      // The pre-#113 schema has no config_id column yet.
+      // The 0011 schema has config_id but not the new consent purpose/user binding.
       const legacyColumns = legacy.sqlite
         .prepare('PRAGMA table_info(oauth_states)')
         .all() as TableInfoRow[]
-      assert.equal(legacyColumns.some((column) => column.name === 'config_id'), false)
+      assert.equal(legacyColumns.some((column) => column.name === 'config_id'), true)
+      assert.equal(legacyColumns.some((column) => column.name === 'purpose'), false)
+      assert.equal(legacyColumns.some((column) => column.name === 'user_id'), false)
     } finally {
       legacy.sqlite.close()
     }
@@ -255,15 +280,22 @@ test('a 0009 database upgrades incrementally, preserving oauth attempts', () => 
       assert.equal(
         applied.count,
         fullJournalCount,
-        'every journal entry (0000..0010 today) must be recorded after the upgrade',
+        'every journal entry (0000..0012 today) must be recorded after the upgrade',
       )
 
       const stateRows = upgraded.sqlite
-        .prepare('SELECT id, config_id FROM oauth_states')
-        .all() as Array<{ id: string; config_id: string | null }>
+        .prepare('SELECT id, config_id, purpose, user_id FROM oauth_states')
+        .all() as Array<{
+          id: string
+          config_id: string | null
+          purpose: string | null
+          user_id: string | null
+        }>
       assert.equal(stateRows.length, 1)
       assert.equal(stateRows[0]?.id, stateId)
       assert.equal(stateRows[0]?.config_id, null, 'existing rows keep config_id = NULL')
+      assert.equal(stateRows[0]?.purpose, null, 'legacy login states remain distinguishable from profile consent')
+      assert.equal(stateRows[0]?.user_id, null, 'legacy login states have no bound resident user')
 
       const saved = saveCandidate(upgraded.db)
       assert.equal(saved.status, 'draft')
