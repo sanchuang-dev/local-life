@@ -36,7 +36,7 @@ export function registerSettlementRuleRoutes(
   app: Hono<AppBindings>,
   { db, config, fail, validCsrf, now }: SettlementRuleRouteDeps,
 ): void {
-  function guard(c: AppContext, write: boolean): { actor: LocalActor } | Response {
+  function guard(c: AppContext, write: boolean): { actor: LocalActor; session: AuthSession } | Response {
     const session = c.get('authSession')
     if (!session?.staff) {
       return fail(c, 401, API_ERROR_CODES.unauthorized, '请先登录管理后台')
@@ -48,6 +48,7 @@ export function registerSettlementRuleRoutes(
       return fail(c, 403, API_ERROR_CODES.forbidden, 'CSRF 或来源校验失败')
     }
     return {
+      session,
       actor: { userId: session.userId, staffId: session.staff.id, role: session.staff.role },
     }
   }
@@ -81,9 +82,12 @@ export function registerSettlementRuleRoutes(
   })
 
   app.post(LEDGER_ROUTES.adminSettlementQuote, async (c) => {
-    // This is POST to avoid exposing order IDs in caching/query logs; read-only.
-    const auth = guard(c, true)
+    // Read-only trial available to scoped operators; POST still checks CSRF.
+    const auth = guard(c, false)
     if (auth instanceof Response) return auth
+    if (!validCsrf(c, config, auth.session)) {
+      return fail(c, 403, API_ERROR_CODES.forbidden, 'CSRF 或来源校验失败')
+    }
     const body = settlementQuoteRequestSchema.safeParse(await c.req.json().catch(() => null))
     if (!body.success) return fail(c, 400, API_ERROR_CODES.invalidRequest, '订单 ID 不正确')
     try {
