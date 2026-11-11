@@ -184,7 +184,7 @@ test('a direct INSERT that bypasses the API cannot create a second confirmed bin
     // The migration file itself must carry both layers, because they are what make
     // the invariant physical rather than a convention.
     const migration = readFileSync(
-      resolve(repoRoot, 'apps/api/db/migrations/0020_ll_identity_001_binding.sql'),
+      resolve(repoRoot, 'apps/api/db/migrations/0022_ll_identity_001_binding.sql'),
       'utf8',
     )
     assert.match(migration, /CREATE UNIQUE INDEX `resident_community_bindings_user_confirmed_uq`/u)
