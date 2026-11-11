@@ -40,7 +40,6 @@ import {
   tencentMapConfigs,
   oauthStates,
   rateLimits,
-  residentCommunityAssignments,
   sessions,
   staffAccounts,
   staffCommunityAssignments,
@@ -1538,31 +1537,56 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
           )`,
         )
       : undefined
-    const scope = and(eq(residentCommunityAssignments.communityId, communityId), search)
+    // #171 LL-IDENTITY-001: this directory must not present a historical relation
+    // as a confirmed permanent community. A resident is listed for a community
+    // either because they confirmed it themself (the binding table, the single
+    // source of truth) or because a historical `resident_community_assignments`
+    // row exists (an observation, including the rows the retired #123 login wrote
+    // automatically). Each item therefore carries `communityRelationSource` plus
+    // the timestamp of *that* relation, so the back office can tell the two apart
+    // and never shows "已确认" for a legacy row.
+    const confirmedAt = sql<number | null>`(
+      SELECT b.confirmed_at FROM resident_community_bindings b
+      WHERE b.user_id = ${users.id} AND b.community_id = ${communityId}
+      LIMIT 1
+    )`
+    const legacyAt = sql<number | null>`(
+      SELECT a.created_at FROM resident_community_assignments a
+      WHERE a.user_id = ${users.id} AND a.community_id = ${communityId}
+      LIMIT 1
+    )`
+    const relationAt = sql<number>`COALESCE(${confirmedAt}, ${legacyAt})`
+    const relationSource = sql<'confirmed_binding' | 'historical_assignment'>`(
+      CASE WHEN ${confirmedAt} IS NOT NULL THEN 'confirmed_binding'
+           ELSE 'historical_assignment' END
+    )`
+    const relationFilter = or(sql`${confirmedAt} IS NOT NULL`, sql`${legacyAt} IS NOT NULL`)
+
+    const scope = and(relationFilter, search)
     const total = db.select({ total: count() })
-      .from(residentCommunityAssignments)
-      .innerJoin(users, eq(residentCommunityAssignments.userId, users.id))
+      .from(users)
       .where(scope)
       .get()?.total ?? 0
     const rows = db.select({
         id: users.id,
         localDisplayName: users.displayName,
         createdAt: users.createdAt,
-        joinedAt: residentCommunityAssignments.createdAt,
+        relationAt,
+        communityRelationSource: relationSource,
         wechatNickname: nickname,
         wechatAvatarUrl: avatarUrl,
         profileAuthorizedAt: authorizedAt,
       })
-      .from(residentCommunityAssignments)
-      .innerJoin(users, eq(residentCommunityAssignments.userId, users.id))
+      .from(users)
       .where(scope)
-      .orderBy(desc(residentCommunityAssignments.createdAt), asc(users.id))
+      .orderBy(desc(relationAt), asc(users.id))
       .limit(pageSize)
       .offset((page - 1) * pageSize)
       .all()
     return c.json(residentDirectoryResponseSchema.parse({
       items: rows.map((resident) => ({
-        ...resident,
+        id: resident.id,
+        localDisplayName: resident.localDisplayName,
         displayName: resident.wechatNickname?.trim()
           || resident.localDisplayName?.trim() || '微信用户',
         // Do not display a profile unless the resident authorized it.
@@ -1571,7 +1595,8 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
         profileAuthorizedAt: resident.profileAuthorizedAt
           ? new Date(resident.profileAuthorizedAt).toISOString() : null,
         createdAt: resident.createdAt.toISOString(),
-        joinedAt: resident.joinedAt.toISOString(),
+        joinedAt: new Date(resident.relationAt).toISOString(),
+        communityRelationSource: resident.communityRelationSource,
       })),
       total,
       page,

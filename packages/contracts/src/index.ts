@@ -879,6 +879,17 @@ export const residentDirectoryQuerySchema = z.strictObject({
   keyword: z.string().trim().min(1).max(80).optional(),
 })
 
+/**
+ * How the resident is related to the queried community (#171 LL-IDENTITY-001):
+ * `confirmed_binding` — the resident confirmed this community themself, the only
+ * permanent fact; `historical_assignment` — a legacy relation was observed (also
+ * what the retired #123 login wrote automatically) and it is NOT a confirmation.
+ */
+export const residentDirectoryRelationSourceSchema = z.enum([
+  'confirmed_binding',
+  'historical_assignment',
+])
+
 export const residentDirectoryEntrySchema = z.strictObject({
   id: z.string().uuid(),
   /** Display-only precedence: consented WeChat > local name > 微信用户. */
@@ -888,7 +899,10 @@ export const residentDirectoryEntrySchema = z.strictObject({
   wechatAvatarUrl: z.string().nullable(),
   profileAuthorizedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
+  /** When this particular relation to the queried community began. */
   joinedAt: z.string().datetime(),
+  /** Never render a `historical_assignment` as a confirmed permanent community. */
+  communityRelationSource: residentDirectoryRelationSourceSchema,
 })
 export const residentDirectoryResponseSchema = z.strictObject({
   items: z.array(residentDirectoryEntrySchema),
