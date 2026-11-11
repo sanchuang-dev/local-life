@@ -1611,7 +1611,7 @@ test('settlement party API: no configured seller, explicit verified mapping and 
     ).run('hijack', world.localOrderId), /immutable/)
     assert.equal((world.sqlite.prepare(
       "SELECT count(*) AS n FROM audit_logs WHERE event LIKE 'settlement.%'",
-    ).get() as { n: number }).n, 5)
+    ).get() as { n: number }).n, 6)
 
     const nextPeriod = await api(world.app, 'POST', prefix + '/mappings', {
       session, body: { ...body, effectiveFrom: '2026-12-01', effectiveTo: '2026-12-31' },
