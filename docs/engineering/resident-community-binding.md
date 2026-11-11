@@ -1,4 +1,4 @@
-﻿# LL-IDENTITY-001 (#171) · 常驻社区唯一绑定：迁移风险与历史归属预检
+# LL-IDENTITY-001 (#171) · 常驻社区唯一绑定：迁移风险与历史归属预检
 
 > 对应 [Issue #171](https://github.com/sanchuang-dev/local-life/issues/171)。本文只描述**当前代码与迁移的真实行为**、**历史数据的只读预检方法**和**必须人工裁决的条件**。它不代表任何线上数据库已被检查或清理。
 
@@ -156,9 +156,20 @@ INSERT resident_community_bindings     -> ERR_SQLITE_ERROR attempt to write a re
 
 统一拒绝语义（`ResidentCommunityError`，由各路由映射为标准 `{ error: { code, message, requestId } }`）：
 
-- `403 resident_community_not_bound`：「请先在『我的』中确认常驻社区，再进行本操作」
+- `403 resident_community_not_bound`：「请先在「我的」中确认常驻社区，再进行本操作」
 - `403 resident_community_conflict`：「你的常驻社区是「A」，不能在该社区操作」
 - `404 resident_community_not_found`：社区不存在
+
+**四个入口都必须把 `ResidentCommunityError` 映射成标准信封**，否则拒绝会冒泡到 `app.onError` 变成 `500 internal_error`，居民端看到的是服务器故障而不是「先确认常驻社区」。具体映射位置：
+
+| 路由文件 | 映射函数 |
+| --- | --- |
+| `apps/api/src/participation/routes.ts` | `failWithParticipationError` |
+| `apps/api/src/local/order-routes.ts` | `failWithLocalError`（订单） |
+| `apps/api/src/draw/routes.ts` | `failWithDrawError`（抽奖） |
+| `apps/api/src/crmeb/routes.ts` | `failWithCrmebError` |
+
+（`apps/api/src/local/routes.ts` 刻意**不**加：商品目录浏览与后台商品管理不做社区范围约束，永远不会抛这个错误。）
 
 登录侧同卡收口：
 
