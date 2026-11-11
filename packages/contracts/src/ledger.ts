@@ -580,12 +580,21 @@ export const confirmSettlementOrderPartyRequestSchema = z.strictObject({
 /* Pending settlement candidates: read-only evidence, NEVER payable (#184).   */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Date.parse normalizes impossible calendar days such as 2026-02-31.
+ * Never silently shift a requested financial evidence period.
+ */
+const settlementBusinessDateSchema = businessDate.refine((value) => {
+  const ms = Date.parse(`${value}T00:00:00.000Z`)
+  return Number.isFinite(ms) && new Date(ms).toISOString().slice(0, 10) === value
+}, '必须是实际存在的公历日期')
+
 export const settlementCandidateQuerySchema = z.strictObject({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   communityId: uuid.optional(),
-  from: businessDate.optional(),
-  to: businessDate.optional(),
+  from: settlementBusinessDateSchema.optional(),
+  to: settlementBusinessDateSchema.optional(),
   keyword: z.string().trim().max(80).optional(),
 }).refine((v) => !v.from || !v.to || v.from <= v.to, {
   path: ['to'],
