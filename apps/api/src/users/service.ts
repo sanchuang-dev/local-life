@@ -6,6 +6,7 @@ import {
   eq,
   exists,
   inArray,
+  notInArray,
   or,
   sql,
   type SQL,
@@ -17,23 +18,28 @@ import {
   userDirectoryEntrySchema,
   userDirectoryResponseSchema,
   type ApiErrorCode,
+  type ResidentCommunityBindingSource,
   type StaffRole,
+  type UserCommunityRelationSource,
   type UserDirectoryDetail,
   type UserDirectoryEntry,
   type UserDirectoryQuery,
   type UserDirectoryResponse,
+  type UserResidentCommunityState,
 } from '@sanchuang-dev/local-life-contracts'
 import type { AppDatabase } from '../db/client.js'
 import type { HttpErrorStatus } from '../http.js'
 import {
   communities,
   residentCommunityAssignments,
+  residentCommunityBindings,
   residentPhoneIdentities,
   staffAccounts,
   staffCommunityAssignments,
   users,
   wechatOauthConfigs,
 } from '../db/schema.js'
+import { getResidentCommunityStatus } from '../resident-community/service.js'
 
 /**
  * Back-office user directory (#153 LL-USER-001 T2).
@@ -76,6 +82,18 @@ interface ResidentMembership {
   joinedAt: Date
 }
 
+/**
+ * The resident's own confirmed permanent community (#171), as read for the
+ * directory. Only rows the caller is authorized for are ever selected.
+ */
+interface ConfirmedCommunityRow {
+  userId: string
+  communityId: string
+  communityName: string
+  confirmedAt: Date
+  source: ResidentCommunityBindingSource
+}
+
 interface DirectoryRow {
   id: string
   localDisplayName: string | null
@@ -114,9 +132,35 @@ function assignedCommunityIds(db: AppDatabase, staffId: string): string[] {
 }
 
 /**
+ * "This account is related to community X" (#171).
+ *
+ * Since migration 0018 a resident's permanent community lives in
+ * `resident_community_bindings`, while `resident_community_assignments` holds the
+ * historical relations. Both are relation facts about the account, so every
+ * community-scoped read here treats them as a union — otherwise a resident who
+ * confirmed a community after #171 (and therefore has no legacy row at all) would
+ * be invisible to the very operators responsible for that community.
+ *
+ * Both arms are EXISTS subqueries, so the union can never duplicate an account
+ * row or inflate `total`: one account is still exactly one row.
+ */
+function relatedToCommunity(communityId: string | SQL): SQL {
+  return or(
+    sql`EXISTS (
+      SELECT 1 FROM resident_community_assignments rca
+      WHERE rca.user_id = ${users.id} AND rca.community_id = ${communityId}
+    )`,
+    sql`EXISTS (
+      SELECT 1 FROM resident_community_bindings rcb
+      WHERE rcb.user_id = ${users.id} AND rcb.community_id = ${communityId}
+    )`,
+  )!
+}
+
+/**
  * Accounts a non-admin may see. `undefined` means "no restriction" (admin).
- * The two EXISTS arms are intentionally account-level: they decide visibility
- * once and are then ANDed with every search/filter, so no filter can widen it.
+ * The two arms are intentionally account-level: they decide visibility once and
+ * are then ANDed with every search/filter, so no filter can widen it.
  */
 function visibleAccountCondition(
   db: AppDatabase,
@@ -134,6 +178,17 @@ function visibleAccountCondition(
           and(
             eq(residentCommunityAssignments.userId, users.id),
             inArray(residentCommunityAssignments.communityId, communityIds),
+          ),
+        ),
+    ),
+    exists(
+      db
+        .select({ one: sql`1` })
+        .from(residentCommunityBindings)
+        .where(
+          and(
+            eq(residentCommunityBindings.userId, users.id),
+            inArray(residentCommunityBindings.communityId, communityIds),
           ),
         ),
     ),
@@ -193,7 +248,9 @@ function roleCondition(role: NonNullable<UserDirectoryQuery['role']>): SQL {
 /**
  * Community filter. This filters on the resident relation only (matching the
  * contract wording); staff authorization is part of *visibility*, not of this
- * filter. `unassigned` means zero resident community memberships.
+ * filter. `unassigned` means no resident community relation at all — neither a
+ * confirmed binding nor a historical relation, because after #171 a confirmed
+ * resident may have no legacy row at all and must not be reported as 未关联.
  */
 function communityCondition(
   community: NonNullable<UserDirectoryQuery['community']>,
@@ -201,12 +258,11 @@ function communityCondition(
   if (community === 'unassigned') {
     return sql`NOT EXISTS (
       SELECT 1 FROM resident_community_assignments rca WHERE rca.user_id = ${users.id}
+    ) AND NOT EXISTS (
+      SELECT 1 FROM resident_community_bindings rcb WHERE rcb.user_id = ${users.id}
     )`
   }
-  return sql`EXISTS (
-    SELECT 1 FROM resident_community_assignments rca
-    WHERE rca.user_id = ${users.id} AND rca.community_id = ${community}
-  )`
+  return relatedToCommunity(community)
 }
 
 /** Profile scalar subqueries: only the active AppID and only explicit consent. */
@@ -300,6 +356,98 @@ function residentCommunities(list: ResidentMembership[]) {
   }))
 }
 
+/**
+ * The confirmed permanent binding per resident (#171), read from
+ * `resident_community_bindings` only.
+ *
+ * This is deliberately a SEPARATE read from `residentMembershipMap`: the two
+ * facts are never merged, so 「已确认常驻社区」 cannot be produced from a
+ * historical relation. `allowedCommunityIds` applies here too — a non-admin
+ * must not learn a resident's out-of-scope confirmed community just because the
+ * account itself is visible through an authorized one.
+ */
+function confirmedCommunityMap(
+  db: AppDatabase,
+  userIds: string[],
+  allowedCommunityIds?: string[],
+): Map<string, ConfirmedCommunityRow> {
+  const map = new Map<string, ConfirmedCommunityRow>()
+  if (userIds.length === 0) return map
+  const rows = db
+    .select({
+      userId: residentCommunityBindings.userId,
+      communityId: residentCommunityBindings.communityId,
+      communityName: communities.name,
+      confirmedAt: residentCommunityBindings.confirmedAt,
+      source: residentCommunityBindings.source,
+    })
+    .from(residentCommunityBindings)
+    .innerJoin(communities, eq(communities.id, residentCommunityBindings.communityId))
+    .where(and(
+      inArray(residentCommunityBindings.userId, userIds),
+      allowedCommunityIds === undefined
+        ? undefined
+        : inArray(residentCommunityBindings.communityId, allowedCommunityIds),
+    ))
+    .orderBy(asc(residentCommunityBindings.userId))
+    .all()
+  for (const row of rows) {
+    map.set(row.userId, row)
+  }
+  return map
+}
+
+/**
+ * Residents who DO have a confirmation the caller may not see.
+ *
+ * Only the account id crosses into the response (`communityRelationSource:
+ * 'out_of_scope'`); the community id/name is never selected, so a scoped
+ * operator learns "this resident already belongs to a community you are not
+ * responsible for" — which prevents the harmful opposite claim 「未绑定」 —
+ * without learning which community.
+ */
+function hiddenBindingUserIds(
+  db: AppDatabase,
+  userIds: string[],
+  allowedCommunityIds?: string[],
+): Set<string> {
+  if (userIds.length === 0 || allowedCommunityIds === undefined) return new Set()
+  const rows = db
+    .select({ userId: residentCommunityBindings.userId })
+    .from(residentCommunityBindings)
+    .where(and(
+      inArray(residentCommunityBindings.userId, userIds),
+      allowedCommunityIds.length === 0
+        ? undefined
+        : notInArray(residentCommunityBindings.communityId, allowedCommunityIds),
+    ))
+    .all()
+  return new Set(rows.map((row) => row.userId))
+}
+
+/**
+ * The resident-facing #171 state, reused verbatim so an operator and the
+ * resident can never disagree about 「未绑定 / 已确认 / 待核查 / 冲突」.
+ *
+ * Only an unrestricted caller (admin) gets it: the state is derived from every
+ * historical relation, so computing it for a community-scoped operator would
+ * leak relations outside that operator's authorization. `null` therefore means
+ * precisely "not derivable for this caller", not "unbound".
+ */
+function residentCommunityStateFor(
+  db: AppDatabase,
+  actor: UserDirectoryActor,
+  userIds: string[],
+): Map<string, UserResidentCommunityState> {
+  const map = new Map<string, UserResidentCommunityState>()
+  if (actor.role !== 'admin') return map
+  const now = new Date()
+  for (const userId of userIds) {
+    map.set(userId, getResidentCommunityStatus(db, userId, now).status)
+  }
+  return map
+}
+
 function identityMethodsOf(row: DirectoryRow) {
   const methods: Array<'wechat' | 'phone' | 'staff'> = []
   if (row.wechatIdentityCount > 0) methods.push('wechat')
@@ -312,16 +460,36 @@ function identityMethodsOf(row: DirectoryRow) {
  * Authorized profile values are nulled unless the current public account has a
  * recorded consent, so the stable fallback chain (consented WeChat nickname >
  * local name > shared placeholder) is enforced in one place for list + detail.
+ *
+ * #171: the confirmed permanent community and the historical relations are
+ * emitted as two independent fields. `confirmedCommunity` comes exclusively from
+ * the binding map, `residentCommunities` exclusively from the historical map, and
+ * `communityRelationSource` states which fact is present — so no reader (UI,
+ * export, operator) can promote history into a confirmation.
  */
 function toEntry(
   row: DirectoryRow,
   memberships: ResidentMembership[],
+  facts: {
+    confirmed: ConfirmedCommunityRow | null
+    /** A confirmation exists but its community is outside the caller's scope. */
+    hiddenConfirmed: boolean
+    state: UserResidentCommunityState | null
+  },
 ): UserDirectoryEntry {
   const authorizedAt =
     row.profileAuthorizedAt === null ? null : new Date(row.profileAuthorizedAt).toISOString()
   const wechatNickname = authorizedAt === null ? null : row.wechatNickname
   const wechatAvatarUrl = authorizedAt === null ? null : row.wechatAvatarUrl
   const localDisplayName = row.localDisplayName
+  const relationSource: UserCommunityRelationSource =
+    facts.confirmed !== null
+      ? 'confirmed_binding'
+      : facts.hiddenConfirmed
+        ? 'out_of_scope'
+        : memberships.length > 0
+          ? 'historical_assignment'
+          : 'none'
   return userDirectoryEntrySchema.parse({
     id: row.id,
     displayName:
@@ -333,7 +501,41 @@ function toEntry(
     identityMethods: identityMethodsOf(row),
     staffRole: row.staffRole,
     residentCommunities: residentCommunities(memberships),
+    confirmedCommunity:
+      facts.confirmed === null
+        ? null
+        : {
+            id: facts.confirmed.communityId,
+            name: facts.confirmed.communityName,
+            confirmedAt: iso(facts.confirmed.confirmedAt),
+            source: facts.confirmed.source,
+          },
+    communityRelationSource: relationSource,
+    residentCommunityState: facts.state,
     createdAt: iso(row.createdAt),
+  })
+}
+
+/**
+ * Loads the #171 facts for one page (or one account) in three separate reads and
+ * keeps them separate on the way out. Nothing here writes; nothing here is
+ * derived from `residentMembershipMap`.
+ */
+function communityFacts(
+  db: AppDatabase,
+  actor: UserDirectoryActor,
+  userIds: string[],
+): (userId: string) => Parameters<typeof toEntry>[2] {
+  const allowedCommunityIds =
+    actor.role === 'admin' ? undefined : assignedCommunityIds(db, actor.staffId)
+  const confirmed = confirmedCommunityMap(db, userIds, allowedCommunityIds)
+  const hidden = hiddenBindingUserIds(db, userIds, allowedCommunityIds)
+  const states = residentCommunityStateFor(db, actor, userIds)
+  return (userId: string) => ({
+    confirmed: confirmed.get(userId) ?? null,
+    // Never both: a visible confirmation wins over the "withheld" hint.
+    hiddenConfirmed: confirmed.has(userId) ? false : hidden.has(userId),
+    state: states.get(userId) ?? null,
   })
 }
 
@@ -425,8 +627,15 @@ export function listUserDirectory(
     rows.map((row) => row.id),
     allowedCommunityIds,
   )
+  const facts = communityFacts(
+    db,
+    actor,
+    rows.map((row) => row.id),
+  )
   return userDirectoryResponseSchema.parse({
-    items: rows.map((row) => toEntry(row, memberships.get(row.id) ?? [])),
+    items: rows.map((row) =>
+      toEntry(row, memberships.get(row.id) ?? [], facts(row.id)),
+    ),
     total,
     page: query.page,
     pageSize: query.pageSize,
@@ -450,10 +659,8 @@ export function getUserDirectory(
 
   const allowedCommunityIds =
     actor.role === 'admin' ? undefined : assignedCommunityIds(db, actor.staffId)
-  const entry = toEntry(
-    row,
-    residentMembershipMap(db, [userId], allowedCommunityIds).get(userId) ?? [],
-  )
+  const memberships = residentMembershipMap(db, [userId], allowedCommunityIds).get(userId) ?? []
+  const entry = toEntry(row, memberships, communityFacts(db, actor, [userId])(userId))
   const phone = db
     .select({ phone: residentPhoneIdentities.phone })
     .from(residentPhoneIdentities)
