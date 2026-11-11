@@ -175,3 +175,96 @@
   align-items: baseline;
   gap: 4px 12px;
 }
+
+/* ---------------------- 分成结算单: tabs, KPI, 阻塞原因 -------------------- */
+
+/*
+ * The two page tabs keep both panels mounted once visited (the reconciliation
+ * view keeps its drafts and the candidate view keeps its list), but the hidden
+ * one must not leave a gap in the `.page-stack` column flex layout.
+ */
+.ledger-tabpanel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.ledger-tabpanel[hidden] {
+  display: none;
+}
+
+/* KPI value: a server number or an explicit sentence — never a fake zero. */
+.ledger-candidate-kpi-value {
+  display: block;
+  margin-top: 4px;
+  font-size: 24px;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+  word-break: break-word;
+}
+
+.ledger-candidate-kpi-value[data-tone='pending'] {
+  font-size: 20px;
+}
+
+.ledger-candidate-kpi-value[data-tone='muted'] {
+  font-size: 16px;
+  color: var(--ant-color-text-secondary, #475569);
+}
+
+/* Filter row: label above control so the hint and the input stay readable. */
+.ledger-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ledger-filter-field label {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ant-color-text-description, #64748b);
+}
+
+/* Input constraints (for example the 80-character keyword limit) stay visible. */
+.ledger-filter-hint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ant-color-text-description, #64748b);
+}
+
+.ledger-candidate-loading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-height: 96px;
+}
+
+/* One item per server blocking reason: message first, next step below. */
+.ledger-candidate-blocking {
+  margin: 12px 0 0;
+  padding-left: 20px;
+}
+
+.ledger-candidate-blocking > li {
+  margin-bottom: 12px;
+}
+
+.ledger-candidate-blocking > li:last-child {
+  margin-bottom: 0;
+}
+
+.ledger-candidate-blocking-message {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ant-color-text, #1f2937);
+}
+
+.ledger-candidate-blocking-next {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ant-color-text-description, #64748b);
+}
