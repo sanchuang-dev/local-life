@@ -70,7 +70,7 @@ function constrain(error: unknown): never {
 const sha256 = (value: string): string =>
   createHash('sha256').update(value).digest('hex')
 const proofFingerprint = (value: string): string =>
-  sha256(value.trim().replace(/\s+/gu, ' ').toLowerCase())
+  sha256(value.normalize('NFKC').trim().replace(/\s+/gu, ' ').toLowerCase())
 
 function statementFor(db: AppDatabase, actor: LocalActor, statementId: string): StatementRow {
   requireOffice(actor)
@@ -277,7 +277,7 @@ export function recordSettlementPayment(
   now = new Date(),
 ): SettlementPaymentOverview {
   requireAdmin(actor)
-  if (/\d{12,}/u.test(request.proofRefMasked)) {
+  if (/\d{12,}/u.test(request.proofRefMasked.normalize('NFKC'))) {
     invalid('付款凭据只保存脱敏引用，禁止填写完整银行卡号或账号')
   }
   const paidAt = new Date(request.paidAt)
