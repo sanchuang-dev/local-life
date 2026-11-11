@@ -265,6 +265,7 @@ export function getSettlementPaymentOverview(
   actor: LocalActor,
   statementId: string,
 ): SettlementPaymentOverview {
+  requireAdmin(actor)
   return overviewOf(db, statementFor(db, actor, statementId))
 }
 

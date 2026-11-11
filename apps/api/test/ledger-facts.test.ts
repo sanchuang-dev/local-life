@@ -2958,7 +2958,12 @@ test('payment proof rejects duplicate proof, wrong beneficiary, overpay, unsafe 
     })
     assert.equal(badOrigin.status,403)
 
-    const {recordSettlementPayment}=await import('../src/ledger/settlement-payments.js')
+    const {recordSettlementPayment,getSettlementPaymentOverview}=
+      await import('../src/ledger/settlement-payments.js')
+    assert.throws(()=>getSettlementPaymentOverview(
+      world.db,adminActor(world),locked.statementId,
+    ),(error:unknown)=>error instanceof Error && 'status' in error &&
+      (error as {status:number}).status===403,'operator must not read finance payment evidence')
     assert.throws(()=>recordSettlementPayment(world.db,adminActor(world),locked.statementId,{
       ...sellerRequest,idempotencyKey:randomUUID(),proofRefMasked:'TEST-OPERATOR-BLOCKED',
     },CLOCK),(error:unknown)=>error instanceof Error && 'status' in error &&
