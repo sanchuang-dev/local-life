@@ -87,7 +87,10 @@ export function ExternalOffersPage() {
       setLoading(false)
     }
   }, [])
-  useEffect(() => { void refresh() }, [refresh])
+  useEffect(() => {
+    if (session.staff.role === 'grid_worker') return
+    void refresh()
+  }, [refresh, session.staff.role])
 
   if (session.staff.role === 'grid_worker') {
     return <Result status="403" title="无权管理精选优惠" subTitle="仅管理员和运营员可维护第三方活动链接。" />
