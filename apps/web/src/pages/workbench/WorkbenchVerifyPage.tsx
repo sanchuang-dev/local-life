@@ -115,7 +115,7 @@ function VerifyView() {
         <div className="min-w-0">
           <h1 className="text-[20px] font-semibold tracking-tight text-slate-900">现场核验核销</h1>
           <p className="mt-0.5 text-[12px] text-slate-500">
-            核销凭据 · 现场签到
+            团队核销 · 抽奖核销 · 现场签到
           </p>
         </div>
       </div>

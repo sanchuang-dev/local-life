@@ -51,6 +51,7 @@ export function DailyDrawCard({
   const [reload, setReload] = useState(0)
   const [busy, setBusy] = useState(false)
   const busyRef = useRef(false)
+  const pendingKeyRef = useRef<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [lastResult, setLastResult] = useState<ResidentDrawAttempt | null>(null)
   const [copied, setCopied] = useState(false)
@@ -94,11 +95,16 @@ export function DailyDrawCard({
     setError(null)
     setCopied(false)
     // Reuse an unresolved key on network failure instead of creating a second draw.
-    const key = window.sessionStorage.getItem(storageKey) || newIdempotencyKey()
+    // Some embedded WebViews deny sessionStorage: a ref protects in-page retries.
+    let storedKey: string | null = null
+    try { storedKey = window.sessionStorage.getItem(storageKey) } catch { /* storage denied */ }
+    const key = storedKey || pendingKeyRef.current || newIdempotencyKey()
+    pendingKeyRef.current = key
     try {
-      window.sessionStorage.setItem(storageKey, key)
+      try { window.sessionStorage.setItem(storageKey, key) } catch { /* storage denied */ }
       const outcome = await enterResidentDraw(activityId, csrfToken, key)
-      window.sessionStorage.removeItem(storageKey)
+      pendingKeyRef.current = null
+      try { window.sessionStorage.removeItem(storageKey) } catch { /* storage denied */ }
       setLastResult(outcome)
       setReload((value) => value + 1)
     } catch (cause) {
