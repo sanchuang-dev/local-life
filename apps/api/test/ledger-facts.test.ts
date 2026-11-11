@@ -31,6 +31,7 @@ import {
   localProducts,
   staffAccounts,
   staffCommunityAssignments,
+  settlementStatements,
   users,
 } from '../src/db/schema.js'
 import { listLedgerEntries } from '../src/ledger/shared.js'
@@ -2741,6 +2742,264 @@ test('statement rejects unauthorized roles, bad dates, CSRF/origin and stale or 
   } finally { world.cleanup() }
 })
 
+
+
+/* -------------------------------------------------------------------------- */
+/* #187 · offline proof registration, independent review and immutable events  */
+/* -------------------------------------------------------------------------- */
+
+const paymentsUrl187 = (statementId: string) =>
+  statementUrl186 + '/' + statementId + '/payments'
+const verifyPaymentUrl187 = (statementId: string, paymentId: string) =>
+  paymentsUrl187(statementId) + '/' + paymentId + '/verify'
+
+async function lockedStatement187(world: World) {
+  const {session,mappingId}=await ruleSetup185(world)
+  assert.equal((await api(world.app,'POST','/admin/settlement/rules',{
+    session,body:ruleInput185(mappingId),
+  })).status,201)
+  const draft=await api(world.app,'POST',statementUrl186,{
+    session,body:statementBody186(world),
+  })
+  assert.equal(draft.status,201)
+  const created=await draft.json() as {
+    statement:{id:string};
+    lines:Array<{
+      sellerPartyId:string;sanchuangPartyId:string;guangdianPartyId:string;
+      allocation:{sellerNetCents:number;sanchuangNetCents:number;guangdianNetCents:number}
+    }>
+  }
+  const reviewer=await secondAdminSession186(world)
+  assert.equal((await api(world.app,'POST',reviewUrl186(created.statement.id),{
+    session:reviewer,body:{expectedRevision:1,evidenceRef:'TEST-SET-007-STATEMENT-REVIEW'},
+  })).status,200)
+  assert.equal((await api(world.app,'POST',lockUrl186(created.statement.id),{
+    session,body:{expectedRevision:2,evidenceRef:'TEST-SET-007-STATEMENT-LOCK'},
+  })).status,200)
+  return {session,reviewer,statementId:created.statement.id,line:created.lines[0]!}
+}
+
+test('offline payment proof stays partial until independently verified and never mutates ledger/statement facts',async()=>{
+  const world=await makeWorld()
+  try {
+    const locked=await lockedStatement187(world)
+    const beforeLedger=entryCount(world.sqlite)
+    const beforeStatement=world.sqlite.prepare(
+      'SELECT revision,snapshot_digest FROM settlement_statements WHERE id=?',
+    ).get(locked.statementId) as {revision:number;snapshot_digest:string}
+
+    const initial=await api(world.app,'GET',paymentsUrl187(locked.statementId),{
+      session:locked.session,
+    })
+    assert.equal(initial.status,200)
+    const empty=await initial.json() as {
+      state:string;payableCents:number;records:unknown[];
+      beneficiaries:Array<{partyId:string;payableCents:number;state:string}>
+    }
+    assert.equal(empty.state,'awaiting_payment')
+    assert.equal(empty.records.length,0)
+    assert.equal(empty.payableCents,
+      locked.line.allocation.sellerNetCents+
+      locked.line.allocation.sanchuangNetCents+
+      locked.line.allocation.guangdianNetCents)
+
+    const request={
+      beneficiaryPartyId:locked.line.sellerPartyId,
+      amountCents:300,
+      paidAt:CLOCK.toISOString(),
+      proofRefMasked:'TEST-BANK-RECEIPT-SET007-A-尾号1234',
+      idempotencyKey:randomUUID(),
+    }
+    const recorded=await api(world.app,'POST',paymentsUrl187(locked.statementId),{
+      session:locked.session,body:request,
+    })
+    assert.equal(recorded.status,201)
+    const pending=await recorded.json() as {
+      state:string;records:Array<{id:string;state:string;amountCents:number}>;
+      beneficiaries:Array<{partyId:string;state:string;recordedCents:number;verifiedCents:number}>
+    }
+    assert.equal(pending.state,'pending_review')
+    assert.equal(pending.records[0]?.state,'pending_review')
+    assert.equal(pending.records[0]?.amountCents,300)
+    const paymentId=pending.records[0]!.id
+
+    const replay=await api(world.app,'POST',paymentsUrl187(locked.statementId),{
+      session:locked.session,body:request,
+    })
+    assert.equal(replay.status,201)
+    assert.equal((world.sqlite.prepare('SELECT count(*) AS n FROM settlement_payment_records')
+      .get() as {n:number}).n,1,'same idempotency key must not duplicate payment evidence')
+
+    const self=await api(world.app,'POST',verifyPaymentUrl187(locked.statementId,paymentId),{
+      session:locked.session,body:{
+        eventIdempotencyKey:randomUUID(),evidenceRef:'TEST-SELF-VERIFY-BLOCKED',
+      },
+    })
+    assert.equal(self.status,403,'recorder cannot review own payment evidence')
+
+    const verified=await api(world.app,'POST',verifyPaymentUrl187(locked.statementId,paymentId),{
+      session:locked.reviewer,body:{
+        eventIdempotencyKey:randomUUID(),evidenceRef:'TEST-INDEPENDENT-PAYMENT-REVIEW-A',
+      },
+    })
+    assert.equal(verified.status,200)
+    const partial=await verified.json() as {
+      state:string;verifiedCents:number;
+      records:Array<{state:string}>;
+      beneficiaries:Array<{partyId:string;state:string;verifiedCents:number}>
+    }
+    assert.equal(partial.state,'partial')
+    assert.equal(partial.verifiedCents,300)
+    assert.equal(partial.records[0]?.state,'verified')
+    const seller=partial.beneficiaries.find(x=>x.partyId===locked.line.sellerPartyId)
+    assert.equal(seller?.state,'partial')
+    assert.equal(seller?.verifiedCents,300)
+
+    assert.equal(entryCount(world.sqlite),beforeLedger,'payment proof must not add or rewrite #64 ledger facts')
+    const afterStatement=world.sqlite.prepare(
+      'SELECT revision,snapshot_digest FROM settlement_statements WHERE id=?',
+    ).get(locked.statementId) as {revision:number;snapshot_digest:string}
+    assert.deepEqual(afterStatement,beforeStatement,'payment proof must not mutate locked statement snapshot')
+    assert.throws(()=>world.sqlite.prepare(
+      'UPDATE settlement_payment_records SET amount_cents=1 WHERE id=?',
+    ).run(paymentId),/immutable/)
+    assert.throws(()=>world.sqlite.prepare(
+      'DELETE FROM settlement_payment_events WHERE payment_record_id=?',
+    ).run(paymentId),/immutable/)
+
+    const statement=await api(world.app,'GET',statementUrl186+'/'+locked.statementId,{
+      session:locked.session,
+    })
+    assert.equal(statement.status,200)
+    assert.equal((await statement.json() as {statement:{paymentState:string}})
+      .statement.paymentState,'partial')
+  } finally { world.cleanup() }
+})
+
+test('payment proof rejects duplicate proof, wrong beneficiary, overpay, unsafe refs, weak auth and concurrent verification replay',async()=>{
+  const world=await makeWorld()
+  try {
+    const locked=await lockedStatement187(world)
+    const sellerRequest={
+      beneficiaryPartyId:locked.line.sellerPartyId,
+      amountCents:100,
+      paidAt:CLOCK.toISOString(),
+      proofRefMasked:'TEST-BANK-RECEIPT-SET007-B-尾号5678',
+      idempotencyKey:randomUUID(),
+    }
+    const first=await api(world.app,'POST',paymentsUrl187(locked.statementId),{
+      session:locked.session,body:sellerRequest,
+    })
+    assert.equal(first.status,201)
+    const firstBody=await first.json() as {records:Array<{id:string}>}
+    const sellerPaymentId=firstBody.records[0]!.id
+
+    assert.equal((await api(world.app,'POST',paymentsUrl187(locked.statementId),{
+      session:locked.session,body:{
+        ...sellerRequest,
+        beneficiaryPartyId:locked.line.sanchuangPartyId,
+        idempotencyKey:randomUUID(),
+      },
+    })).status,409,'same external proof cannot move to another beneficiary')
+
+    assert.equal((await api(world.app,'POST',paymentsUrl187(locked.statementId),{
+      session:locked.session,body:{
+        ...sellerRequest,
+        beneficiaryPartyId:randomUUID(),
+        proofRefMasked:'TEST-BANK-RECEIPT-SET007-WRONG-PARTY',
+        idempotencyKey:randomUUID(),
+      },
+    })).status,409)
+
+    assert.equal((await api(world.app,'POST',paymentsUrl187(locked.statementId),{
+      session:locked.session,body:{
+        ...sellerRequest,
+        amountCents:locked.line.allocation.sellerNetCents,
+        proofRefMasked:'TEST-BANK-RECEIPT-SET007-OVERPAY',
+        idempotencyKey:randomUUID(),
+      },
+    })).status,409,'existing evidence plus new evidence cannot exceed locked beneficiary amount')
+
+    assert.equal((await api(world.app,'POST',paymentsUrl187(locked.statementId),{
+      session:locked.session,body:{
+        ...sellerRequest,
+        proofRefMasked:'银行卡 6222021234567890123',
+        idempotencyKey:randomUUID(),
+      },
+    })).status,400,'full-looking account/card references must be rejected')
+
+    const grid=await gridSession(world.app)
+    assert.equal((await api(world.app,'POST',paymentsUrl187(locked.statementId),{
+      session:grid,body:{...sellerRequest,idempotencyKey:randomUUID(),
+        proofRefMasked:'TEST-GRID-WRITE-BLOCKED'},
+    })).status,403)
+
+    const noCsrf=await world.app.request(paymentsUrl187(locked.statementId),{
+      method:'POST',headers:{
+        cookie:locked.session.cookies,origin:ADMIN_ORIGIN,'content-type':'application/json',
+      },body:JSON.stringify({...sellerRequest,idempotencyKey:randomUUID(),
+        proofRefMasked:'TEST-NO-CSRF-BLOCKED'}),
+    })
+    assert.equal(noCsrf.status,403)
+    const badOrigin=await world.app.request(paymentsUrl187(locked.statementId),{
+      method:'POST',headers:{
+        cookie:locked.session.cookies,origin:'https://evil.example',
+        'x-csrf-token':locked.session.csrfToken,'content-type':'application/json',
+      },body:JSON.stringify({...sellerRequest,idempotencyKey:randomUUID(),
+        proofRefMasked:'TEST-BAD-ORIGIN-BLOCKED'}),
+    })
+    assert.equal(badOrigin.status,403)
+
+    const {recordSettlementPayment}=await import('../src/ledger/settlement-payments.js')
+    assert.throws(()=>recordSettlementPayment(world.db,adminActor(world),locked.statementId,{
+      ...sellerRequest,idempotencyKey:randomUUID(),proofRefMasked:'TEST-OPERATOR-BLOCKED',
+    },CLOCK),(error:unknown)=>error instanceof Error && 'status' in error &&
+      (error as {status:number}).status===403,'operator service write must be rejected')
+
+    const sanchuang=await api(world.app,'POST',paymentsUrl187(locked.statementId),{
+      session:locked.session,body:{
+        beneficiaryPartyId:locked.line.sanchuangPartyId,
+        amountCents:locked.line.allocation.sanchuangNetCents,
+        paidAt:CLOCK.toISOString(),
+        proofRefMasked:'TEST-BANK-RECEIPT-SET007-CONCURRENT',
+        idempotencyKey:randomUUID(),
+      },
+    })
+    assert.equal(sanchuang.status,201)
+    const body=await sanchuang.json() as {records:Array<{id:string;beneficiaryPartyId:string}>}
+    const concurrentPayment=body.records.find(
+      x=>x.beneficiaryPartyId===locked.line.sanchuangPartyId)!.id
+    const responses=await Promise.all([
+      api(world.app,'POST',verifyPaymentUrl187(locked.statementId,concurrentPayment),{
+        session:locked.reviewer,body:{
+          eventIdempotencyKey:randomUUID(),evidenceRef:'TEST-CONCURRENT-VERIFY-A',
+        },
+      }),
+      api(world.app,'POST',verifyPaymentUrl187(locked.statementId,concurrentPayment),{
+        session:locked.reviewer,body:{
+          eventIdempotencyKey:randomUUID(),evidenceRef:'TEST-CONCURRENT-VERIFY-B',
+        },
+      }),
+    ])
+    assert.deepEqual(responses.map(r=>r.status).sort((a,b)=>a-b),[200,409],
+      'simultaneous verification attempts must produce exactly one terminal verification')
+    assert.equal((world.sqlite.prepare(
+      "SELECT count(*) AS n FROM settlement_payment_events WHERE payment_record_id=? AND kind='verified'",
+    ).get(concurrentPayment) as {n:number}).n,1)
+
+    const disputeAfterVerify=await api(world.app,'POST',
+      paymentsUrl187(locked.statementId)+'/'+sellerPaymentId+'/dispute',{
+        session:locked.reviewer,body:{
+          eventIdempotencyKey:randomUUID(),evidenceRef:'TEST-DISPUTE-PENDING-EVIDENCE',
+        },
+      })
+    assert.equal(disputeAfterVerify.status,200)
+    const disputed=await disputeAfterVerify.json() as {state:string}
+    assert.equal(disputed.state,'disputed')
+  } finally { world.cleanup() }
+})
+
+
 test('statement CSV neutralizes formulas and masks resident phones',async()=>{
   const {settlementCsvCell}=await import('../src/ledger/settlement-statement-csv.js')
   assert.equal(settlementCsvCell('=CMD()'),'"\'=CMD()"')
@@ -2750,35 +3009,51 @@ test('statement CSV neutralizes formulas and masks resident phones',async()=>{
   assert.equal(settlementCsvCell('a"b\r\nc'),'"a""b\r\nc"')
 })
 
-test('SQLite 0019→0020 migration preserves prior contract and identity facts',async()=>{
+test('SQLite 0020→0021 migration preserves locked-settlement era facts and adds empty payment evidence tables',async()=>{
   const {copyFileSync,mkdirSync,readFileSync,readdirSync,writeFileSync}=
     await import('node:fs')
-  const dir=mkdtempSync(join(tmpdir(),'ll-settlement-0020-'))
+  const dir=mkdtempSync(join(tmpdir(),'ll-settlement-0021-'))
   try {
     const oldDir=join(dir,'legacy')
     mkdirSync(join(oldDir,'meta'),{recursive:true})
     for (const n of readdirSync(migrationsFolder)) {
-      if (/^[0-9]{4}_.*\.sql$/u.test(n) && Number(n.slice(0,4))<20) {
+      if (/^[0-9]{4}_.*\.sql$/u.test(n) && Number(n.slice(0,4))<21) {
         copyFileSync(join(migrationsFolder,n),join(oldDir,n))
       }
     }
     const journal=JSON.parse(readFileSync(join(migrationsFolder,'meta/_journal.json'),'utf8')) as {
       entries:Array<{idx:number;tag:string}>
     }
-    assert.equal(journal.entries.find(x=>x.idx===20)?.tag,'0020_settlement_statements')
-    journal.entries=journal.entries.filter(x=>x.idx<20)
+    assert.equal(journal.entries.find(x=>x.idx===21)?.tag,'0021_settlement_payment_evidence')
+    journal.entries=journal.entries.filter(x=>x.idx<21)
     writeFileSync(join(oldDir,'meta/_journal.json'),JSON.stringify(journal))
     const file=join(dir,'prior.sqlite')
     const previous=createDatabase(file,oldDir)
     const id=randomUUID()
+    const userId=randomUUID()
+    const statementId=randomUUID()
+    const createdAt=new Date('2026-11-01T00:00:00.000Z')
     previous.db.insert(communities).values({
-      id,name:'0020迁移前社区',createdAt:new Date('2026-11-01T00:00:00.000Z'),
+      id,name:'0021迁移前社区',createdAt,
+    }).run()
+    previous.db.insert(users).values({
+      id:userId,displayName:'迁移前制单人',createdAt,updatedAt:createdAt,
+    }).run()
+    previous.db.insert(settlementStatements).values({
+      id:statementId,statementNo:'SET-UPGRADE-0020',communityId:id,
+      periodFrom:'2026-11-01',periodTo:'2026-11-01',generation:1,revision:1,
+      status:'draft',snapshotDigest:'0'.repeat(64),asOf:createdAt,
+      lineCount:0,calculatedCount:0,blockedCount:0,eligibleGrossCents:0,feeCents:0,
+      sellerNetCents:0,sanchuangNetCents:0,guangdianNetCents:0,
+      createdByUserId:userId,createdAt,updatedAt:createdAt,
+      reviewedByUserId:null,reviewEvidenceRef:null,reviewedAt:null,
+      lockedByUserId:null,lockEvidenceRef:null,lockedAt:null,
     }).run()
     previous.sqlite.close()
     const current=createDatabase(file,migrationsFolder)
     try {
       assert.equal((current.sqlite.prepare('SELECT name FROM communities WHERE id=?')
-        .get(id) as {name:string}).name,'0020迁移前社区')
+        .get(id) as {name:string}).name,'0021迁移前社区')
       assert.ok(current.sqlite.prepare(
         "SELECT name FROM sqlite_master WHERE type='table' AND name='settlement_statements'",
       ).get())
@@ -2786,7 +3061,11 @@ test('SQLite 0019→0020 migration preserves prior contract and identity facts',
         "SELECT name FROM sqlite_master WHERE type='table' AND name='settlement_rule_versions'",
       ).get())
       assert.equal((current.sqlite.prepare('SELECT count(*) AS n FROM settlement_statements')
-        .get() as {n:number}).n,0,'no fake payout rows after upgrade')
+        .get() as {n:number}).n,1,'existing settlement snapshot survives payment migration')
+      assert.equal((current.sqlite.prepare('SELECT count(*) AS n FROM settlement_payment_records')
+        .get() as {n:number}).n,0,'upgrade must not fabricate paid evidence')
+      assert.equal((current.sqlite.prepare('SELECT count(*) AS n FROM settlement_payment_events')
+        .get() as {n:number}).n,0,'upgrade must not fabricate verification events')
     } finally {current.sqlite.close()}
   } finally {rmSync(dir,{recursive:true,force:true})}
 })

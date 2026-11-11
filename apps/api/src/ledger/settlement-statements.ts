@@ -25,6 +25,7 @@ import { ledgerEntrySelection, shanghaiDayEndExclusiveMs,
   shanghaiDayStartMs, toLedgerEntry } from './shared.js'
 import { listSettlementCandidates, readSettlementCandidate } from './settlement-candidates.js'
 import { quoteSettlementOrder } from './settlement-rules.js'
+import { settlementPaymentStateForStatement } from './settlement-payments.js'
 
 const MAX_SNAPSHOT_LINES = 1_000
 type StatementRow = typeof settlementStatements.$inferSelect
@@ -70,7 +71,7 @@ function summaryOf(row: StatementRow): SettlementStatementSummary {
       ? row.sellerNetCents + row.sanchuangNetCents + row.guangdianNetCents : null,
   }
 }
-function statementDto(row: StatementRow): SettlementStatement {
+function statementDto(db: AppDatabase, row: StatementRow): SettlementStatement {
   return {
     id: row.id, statementNo: row.statementNo, communityId: row.communityId,
     periodFrom: row.periodFrom, periodTo: row.periodTo, generation: row.generation,
@@ -81,7 +82,7 @@ function statementDto(row: StatementRow): SettlementStatement {
     reviewedAt: row.reviewedAt ? iso(row.reviewedAt) : null,
     lockedByUserId: row.lockedByUserId, lockEvidenceRef: row.lockEvidenceRef,
     lockedAt: row.lockedAt ? iso(row.lockedAt) : null,
-    summary: summaryOf(row), paymentState: 'not_recorded',
+    summary: summaryOf(row), paymentState: settlementPaymentStateForStatement(db, row.id, row.status),
   }
 }
 function lineDto(row: LineRow): SettlementStatementLine {
@@ -395,7 +396,7 @@ function detailOf(db: AppDatabase, actor: LocalActor, id: string): SettlementSta
     }
   }
   return {
-    statement: statementDto(row), lines: lines.map(lineDto),
+    statement: statementDto(db, row), lines: lines.map(lineDto),
     performance:performanceFor(db,id).map(performanceDto),
     events: eventsFor(db, id).map(eventDto), postLockDisputes,
   }
@@ -510,6 +511,6 @@ export function performanceLinesForActor(
     actor.role !== 'grid_worker' || l.gridStaffId === actor.staffId)
   const performance = performanceFor(db, row.id).filter(p =>
     actor.role !== 'grid_worker' || p.staffId === actor.staffId)
-  return { statement: statementDto(row), lines: lines.map(lineDto),
+  return { statement: statementDto(db, row), lines: lines.map(lineDto),
     performance:performance.map(performanceDto) }
 }
