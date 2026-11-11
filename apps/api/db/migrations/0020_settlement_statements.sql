@@ -94,6 +94,24 @@ CREATE INDEX settlement_statement_line_receipt_idx ON settlement_statement_lines
 --> statement-breakpoint
 CREATE INDEX settlement_statement_line_grid_idx ON settlement_statement_lines (statement_id, grid_staff_id);
 --> statement-breakpoint
+CREATE TABLE settlement_statement_performance (
+  id text PRIMARY KEY NOT NULL,
+  statement_id text NOT NULL REFERENCES settlement_statements(id) ON DELETE restrict,
+  entry_id text NOT NULL REFERENCES ledger_entries(id) ON DELETE restrict,
+  source_id text NOT NULL REFERENCES crm_service_orders(id) ON DELETE restrict,
+  source_display_no text NOT NULL,
+  community_id text NOT NULL REFERENCES communities(id) ON DELETE restrict,
+  staff_id text NOT NULL REFERENCES staff_accounts(id) ON DELETE restrict,
+  confirmed_by_user_id text REFERENCES users(id) ON DELETE restrict,
+  confirmed_at integer NOT NULL,
+  evidence_ref text,
+  source_digest text NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX settlement_performance_statement_entry_uq ON settlement_statement_performance (statement_id,entry_id);
+--> statement-breakpoint
+CREATE INDEX settlement_performance_worker_idx ON settlement_statement_performance (statement_id,staff_id);
+--> statement-breakpoint
 CREATE TABLE settlement_statement_events (
   id text PRIMARY KEY NOT NULL,
   statement_id text NOT NULL REFERENCES settlement_statements(id) ON DELETE restrict,
@@ -157,6 +175,27 @@ BEGIN
     SELECT 1 FROM settlement_statements s WHERE s.id=NEW.statement_id
       AND s.status='draft' AND s.community_id=NEW.community_id
   ) THEN RAISE(ABORT,'statement line not in originating draft community') END;
+END;
+--> statement-breakpoint
+CREATE TRIGGER settlement_performance_no_update BEFORE UPDATE ON settlement_statement_performance
+BEGIN SELECT RAISE(ABORT,'settlement performance snapshots are immutable'); END;
+--> statement-breakpoint
+CREATE TRIGGER settlement_performance_no_delete BEFORE DELETE ON settlement_statement_performance
+BEGIN SELECT RAISE(ABORT,'settlement performance snapshots are immutable'); END;
+--> statement-breakpoint
+CREATE TRIGGER settlement_performance_guard BEFORE INSERT ON settlement_statement_performance
+BEGIN
+  SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM settlement_statements s JOIN ledger_entries e
+      ON e.id=NEW.entry_id
+    WHERE s.id=NEW.statement_id AND s.status='draft'
+      AND s.community_id=NEW.community_id
+      AND e.source_system='crm_service_order' AND e.fact_kind='order_verified'
+      AND e.amount_cents=0 AND e.source_id=NEW.source_id
+      AND e.community_id=NEW.community_id
+      AND e.attribution_state='attributed'
+      AND e.attributed_staff_id=NEW.staff_id
+  ) THEN RAISE(ABORT,'unverified CRM performance cannot enter settlement appendix') END;
 END;
 --> statement-breakpoint
 CREATE TRIGGER settlement_statement_events_no_update BEFORE UPDATE ON settlement_statement_events
