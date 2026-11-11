@@ -1696,7 +1696,7 @@ test('settlement identity migration 0018 upgrades a populated 0017 DB without to
     const oldMigrations = join(root, 'old')
     mkdirSync(join(oldMigrations, 'meta'), { recursive: true })
     for (const name of readdirSync(migrationsFolder)) {
-      if (/^[0-9]{4}_.*\\.sql$/u.test(name) && !name.startsWith('0018_')) {
+      if (/^[0-9]{4}_.*\.sql$/u.test(name) && !name.startsWith('0018_')) {
         copyFileSync(join(migrationsFolder, name), join(oldMigrations, name))
       }
     }
