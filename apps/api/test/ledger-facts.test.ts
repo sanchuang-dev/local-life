@@ -1738,3 +1738,232 @@ test('settlement identity migration 0018 upgrades a populated 0017 DB without to
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+/* -------------------------------------------------------------------------- */
+/* #184 · read-only pending settlement candidate projection                     */
+/* -------------------------------------------------------------------------- */
+
+test('settlement candidate API: no contracts, no receipt, correct scoped pending amounts', async () => {
+  const world = await makeWorld()
+  try {
+    const session = await adminSession(world.app)
+    const response = await api(world.app, 'GET',
+      '/admin/settlement/candidates?page=1&pageSize=20&communityId=' + world.communityId,
+      { session })
+    assert.equal(response.status, 200)
+    const result = await response.json() as {
+      items: Array<{ orderId: string; receipt: unknown;
+        blockingReasons: string[]; payableAmountCents: number | null;
+        sellerStatus: string }>;
+      total: number; payableAmountCents: number | null;
+      summaryScope: string;
+      summary: { recordedReceiptGrossCents: number; blockedItems: number }
+    }
+    assert.equal(result.total, 1, 'the other community is excluded')
+    assert.equal(result.items[0]?.orderId, world.localOrderId)
+    assert.equal(result.items[0]?.receipt, null)
+    assert.equal(result.items[0]?.payableAmountCents, null)
+    assert.equal(result.payableAmountCents, null)
+    assert.equal(result.summaryScope, 'page')
+    assert.equal(result.summary.recordedReceiptGrossCents, 0)
+    assert.equal(result.summary.blockedItems, 1)
+    assert.equal(result.items[0]?.sellerStatus, 'missing_seller')
+    assert.equal((result.items[0] as {periodSource?:string})?.periodSource, 'order_registration')
+    assert.ok(result.items[0]?.blockingReasons.includes('missing_receipt'))
+    assert.ok(result.items[0]?.blockingReasons.includes('missing_seller'))
+    assert.ok(result.items[0]?.blockingReasons.includes('missing_approved_rule'))
+    const empty = await api(world.app, 'GET',
+      '/admin/settlement/candidates?from=2026-12-01&to=2026-12-31', { session })
+    assert.equal(empty.status, 200)
+    assert.equal((await empty.json() as { total: number }).total, 0)
+    assert.equal((await api(world.app, 'GET',
+      '/admin/settlement/candidates?from=2026-11-30&to=2026-11-01',
+      { session })).status, 400)
+    for (const badDay of ['2026-02-31', '2026-11-00', '2026-04-31', '2025-02-29']) {
+      for (const key of ['from', 'to']) {
+        const rejected = await api(world.app, 'GET',
+          '/admin/settlement/candidates?' + key + '=' + badDay, { session })
+        assert.equal(rejected.status, 400,
+          'impossible calendar day ' + key + '=' + badDay + ' must not roll into another month')
+      }
+    }
+    const leapDay = await api(world.app, 'GET',
+      '/admin/settlement/candidates?from=2028-02-29&to=2028-02-29', { session })
+    assert.equal(leapDay.status, 200, 'valid leap date must be accepted')
+  } finally {
+    world.cleanup()
+  }
+})
+
+test('settlement candidate: linked receipt, confirmed grid, locked facts and reversal never create payout', async () => {
+  const world = await makeWorld()
+  try {
+    const session = await adminSession(world.app)
+    markOrderVerified(world, world.localOrderId)
+    const saved = await api(world.app, 'POST', '/admin/ledger/payments', {
+      session, body: linkedReceiptRequest(world),
+    })
+    assert.equal(saved.status, 201)
+    const payment = ledgerEntrySchema.parse(await saved.json())
+    // Created Nov 2, but receipt actually received Nov 9: the NOV 9 period
+    // must show this order, not silently lose it by using registration date.
+    const crossPeriod = await api(world.app, 'GET',
+      '/admin/settlement/candidates?communityId=' + world.communityId +
+      '&from=2026-11-09&to=2026-11-09', { session })
+    assert.equal(crossPeriod.status, 200)
+    const crossing = await crossPeriod.json() as {
+      total: number; items: Array<{periodSource: string; periodAt: string}>;
+      periodPolicy: string;
+    }
+    assert.equal(crossing.total, 1)
+    assert.equal(crossing.items[0]?.periodSource, 'linked_receipt')
+    assert.equal(crossing.periodPolicy, 'linked_receipt_else_order_registration')
+    assert.equal(crossing.items[0]?.periodAt, '2026-11-09T01:00:00.000Z')
+    const path = '/admin/settlement/candidates?communityId=' + world.communityId
+    const before = await api(world.app, 'GET', path, { session })
+    const pending = (await before.json() as { items: Array<{ blockingReasons: string[] }> }).items[0]
+    assert.ok(pending?.blockingReasons.includes('attribution_pending'))
+    assert.ok(pending?.blockingReasons.includes('receipt_unreconciled'))
+
+    const confirmed = await api(world.app, 'POST', '/admin/ledger/attributions', {
+      session, body: {
+        entryId: payment.entryId, staffId: world.gridStaffId,
+        note: '测试：推广记录及邀请来源交叉核验',
+      },
+    })
+    assert.equal(confirmed.status, 201)
+    syncLedgerFacts(world.db, adminActor(world), {
+      from: '2026-11-01', to: '2026-11-10',
+    }, { now: CLOCK })
+    const batch = createBatch(world.db, adminActor(world), {
+      periodFrom: '2026-11-01', periodTo: '2026-11-10',
+    }, { now: CLOCK })
+    const locked = lockBatch(world.db, adminActor(world), batch.batchId,
+      { expectedUpdatedAt: batch.updatedAt },
+      { now: new Date(CLOCK.getTime() + 60_000) })
+    assert.equal(locked.status, 'locked')
+    const after = await api(world.app, 'GET', path, { session })
+    assert.equal(after.status, 200)
+    const item = (await after.json() as { items: Array<{
+      receipt: { amountCents: number; entryId: string };
+      receiptReconciliationState: string; blockingReasons: string[];
+      payableAmountCents: number | null; settlementAmountStatus: string;
+    }>; summary: { recordedReceiptGrossCents: number } }).items[0]
+    assert.equal(item?.receipt.entryId, payment.entryId)
+    assert.equal(item?.receipt.amountCents, 900)
+    assert.equal(item?.receiptReconciliationState, 'reconciled')
+    assert.equal(item?.blockingReasons.includes('receipt_unreconciled'), false)
+    assert.equal(item?.blockingReasons.includes('attribution_pending'), false)
+    assert.ok(item?.blockingReasons.includes('missing_seller'))
+    assert.ok(item?.blockingReasons.includes('missing_approved_rule'))
+    assert.equal(item?.payableAmountCents, null)
+    assert.equal(item?.settlementAmountStatus, 'pending_rule')
+
+    const reversed = await api(world.app, 'POST',
+      '/admin/ledger/payments/' + payment.entryId + '/reverse', {
+        session, body: { staffId: world.operatorStaffId, reason: '测试：原凭据被证实无效' },
+      })
+    assert.equal(reversed.status, 201)
+    const afterReverse = await api(world.app, 'GET', path, { session })
+    const reversedItem = (await afterReverse.json() as {
+      items: Array<{ blockingReasons: string[]; payableAmountCents: null }>;
+      summary: { reversedReceiptCents: number; recordedReceiptGrossCents: number }
+    })
+    assert.ok(reversedItem.items[0]?.blockingReasons.includes('receipt_reversed'))
+    assert.equal(reversedItem.summary.recordedReceiptGrossCents, 900,
+      'gross registered money does not silently disappear')
+    assert.equal(reversedItem.summary.reversedReceiptCents, 900)
+    assert.equal(reversedItem.items[0]?.payableAmountCents, null)
+  } finally {
+    world.cleanup()
+  }
+})
+
+test('settlement candidate role scope, pagination and malformed filters reject leakage', async () => {
+  const world = await makeWorld()
+  try {
+    const session = await adminSession(world.app)
+    const grid = await gridSession(world.app)
+    assert.equal((await api(world.app, 'GET', '/admin/settlement/candidates',
+      { session: grid })).status, 403)
+    assert.equal((await api(world.app, 'GET', '/admin/settlement/candidates')).status, 401)
+    const one = await api(world.app, 'GET',
+      '/admin/settlement/candidates?page=1&pageSize=1', { session })
+    const two = await api(world.app, 'GET',
+      '/admin/settlement/candidates?page=2&pageSize=1', { session })
+    assert.equal(one.status, 200)
+    assert.equal(two.status, 200)
+    assert.equal((await one.json() as { total: number; items: unknown[] }).total, 2)
+    assert.equal((await two.json() as { total: number; items: unknown[] }).items.length, 1)
+    const { listSettlementCandidates } =
+      await import('../src/ledger/settlement-candidates.js')
+    const operator = {
+      userId: world.operatorUserId, staffId: world.operatorStaffId,
+      role: 'operator' as const,
+    }
+    const scoped = listSettlementCandidates(world.db, operator, { page: 1, pageSize: 50 })
+    assert.equal(scoped.total, 1)
+    assert.equal(scoped.items[0]?.communityId, world.communityId)
+    assert.throws(() => listSettlementCandidates(world.db, operator, {
+      page: 1, pageSize: 50, communityId: world.otherCommunityId,
+    }), /无权访问/)
+    assert.equal((await api(world.app, 'GET',
+      '/admin/settlement/candidates?pageSize=1000', { session })).status, 400)
+  } finally {
+    world.cleanup()
+  }
+})
+
+test('settlement candidates consume a confirmed real merchant but still refuse fabricated payout', async () => {
+  const world = await makeWorld()
+  try {
+    const session = await adminSession(world.app)
+    markOrderVerified(world, world.localOrderId)
+    const ids: Record<string, string> = {}
+    for (const role of ['seller', 'sanchuang', 'guangdian']) {
+      const r = await api(world.app, 'POST', '/admin/settlement/parties', {
+        session, body: {
+          role, legalName: '测试' + role, registryRef: 'TEST-REG-' + role,
+          verificationRef: 'TEST-EVIDENCE-' + role,
+        },
+      })
+      assert.equal(r.status, 201)
+      ids[role] = (await r.json() as { id: string }).id
+    }
+    const product = world.sqlite.prepare('SELECT product_id AS id FROM local_orders WHERE id=?')
+      .get(world.localOrderId) as { id: string }
+    const map = await api(world.app, 'POST', '/admin/settlement/mappings', {
+      session, body: {
+        communityId: world.communityId, productId: product.id,
+        sellerPartyId: ids.seller, sanchuangPartyId: ids.sanchuang,
+        guangdianPartyId: ids.guangdian,
+        agreementRef: 'TEST-MERCHANT-AGREEMENT',
+        effectiveFrom: '2026-11-01', effectiveTo: '2026-11-30',
+      },
+    })
+    assert.equal(map.status, 201)
+    const mappingId = (await map.json() as { id: string }).id
+    const confirmed = await api(world.app, 'POST',
+      '/admin/settlement/orders/' + world.localOrderId + '/party', {
+        session, body: { mappingId, confirmationRef: 'TEST-HUMAN-CONFIRMATION' },
+      })
+    assert.equal(confirmed.status, 201)
+
+    const response = await api(world.app, 'GET',
+      '/admin/settlement/candidates?communityId=' + world.communityId, { session })
+    assert.equal(response.status, 200)
+    const data = await response.json() as {
+      items: Array<{
+        sellerStatus: string; orderParty: { sellerPartyId: string } | null;
+        blockingReasons: string[]; payableAmountCents: number | null
+      }>;
+    }
+    assert.equal(data.items[0]?.sellerStatus, 'verified')
+    assert.equal(data.items[0]?.orderParty?.sellerPartyId, ids.seller)
+    assert.equal(data.items[0]?.payableAmountCents, null)
+    assert.ok(data.items[0]?.blockingReasons.includes('missing_approved_rule'),
+      'even verified entities without approved rates must remain 待核定')
+  } finally {
+    world.cleanup()
+  }
+})

@@ -104,6 +104,8 @@ export const LEDGER_ROUTES = {
   adminSettlementParties: '/admin/settlement/parties',
   adminSettlementMappings: '/admin/settlement/mappings',
   adminSettlementOrderParty: '/admin/settlement/orders/:orderId/party',
+  /** Read-only line-by-line evidence for pending offline settlement. */
+  adminSettlementCandidates: '/admin/settlement/candidates',
 } as const
 
 /**
@@ -572,6 +574,84 @@ export const confirmSettlementOrderPartyRequestSchema = z.strictObject({
   /** Human must explicitly attest the source document before snapshot creation. */
   confirmationRef: z.string().trim().min(2).max(200),
 })
+
+
+/* -------------------------------------------------------------------------- */
+/* Pending settlement candidates: read-only evidence, NEVER payable (#184).   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Date.parse normalizes impossible calendar days such as 2026-02-31.
+ * Never silently shift a requested financial evidence period.
+ */
+const settlementBusinessDateSchema = businessDate.refine((value) => {
+  const ms = Date.parse(`${value}T00:00:00.000Z`)
+  return Number.isFinite(ms) && new Date(ms).toISOString().slice(0, 10) === value
+}, '必须是实际存在的公历日期')
+
+export const settlementCandidateQuerySchema = z.strictObject({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  communityId: uuid.optional(),
+  from: settlementBusinessDateSchema.optional(),
+  to: settlementBusinessDateSchema.optional(),
+  keyword: z.string().trim().max(80).optional(),
+}).refine((v) => !v.from || !v.to || v.from <= v.to, {
+  path: ['to'],
+  message: '起止期间不正确',
+})
+export type SettlementCandidateQuery = z.infer<typeof settlementCandidateQuerySchema>
+
+export const settlementCandidateReasonSchema = z.enum([
+  'order_not_verified', 'missing_receipt', 'receipt_reversed',
+  'amount_mismatch', 'attribution_pending',
+  'receipt_unreconciled', 'receipt_late_recorded', 'order_fact_unreconciled',
+  'unresolved_anomaly', 'missing_seller', 'counterparty_incomplete',
+  'missing_approved_rule',
+])
+export type SettlementCandidateReason = z.infer<typeof settlementCandidateReasonSchema>
+
+export const settlementCandidateSchema = z.strictObject({
+  orderId: uuid,
+  orderDisplayNo: z.string().min(1),
+  communityId: uuid,
+  productId: uuid,
+  productName: z.string().min(1),
+  orderStatus: z.string().min(1),
+  registeredAmountCents: cents,
+  periodAt: isoTimestamp,
+  periodSource: z.enum(['linked_receipt', 'order_registration']),
+  sellerStatus: settlementOrderPartyResponseSchema.shape.sellerStatus,
+  orderParty: settlementOrderPartySnapshotSchema.nullable(),
+  receipt: ledgerOrderEvidenceSchema.shape.payment,
+  receiptReconciliationState: z.enum(['unreconciled', 'batched', 'reconciled']).nullable(),
+  /** The service never turns gross/manual proof into an approved distribution. */
+  payableAmountCents: z.null(),
+  settlementAmountStatus: z.literal('pending_rule'),
+  blockingReasons: z.array(settlementCandidateReasonSchema),
+  blockingMessages: z.array(z.string().min(1)),
+})
+export type SettlementCandidate = z.infer<typeof settlementCandidateSchema>
+
+export const settlementCandidateListResponseSchema = z.strictObject({
+  items: z.array(settlementCandidateSchema),
+  total: count,
+  page: z.number().int().min(1),
+  pageSize: z.number().int().min(1).max(100),
+  asOf: isoTimestamp,
+  /** Totals below apply ONLY to the returned page, not the whole date range. */
+  summaryScope: z.literal('page'),
+  periodPolicy: z.literal('linked_receipt_else_order_registration'),
+  summary: z.strictObject({
+    recordedReceiptGrossCents: cents,
+    reversedReceiptCents: cents,
+    blockedItems: count,
+    visibleItems: count,
+  }),
+  payableAmountCents: z.null(),
+  settlementAmountStatus: z.literal('pending_rule'),
+})
+export type SettlementCandidateListResponse = z.infer<typeof settlementCandidateListResponseSchema>
 
 /* -------------------------------------------------------------------------- */
 /* Overview                                                                   */
