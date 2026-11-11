@@ -1967,3 +1967,361 @@ test('settlement candidates consume a confirmed real merchant but still refuse f
     world.cleanup()
   }
 })
+
+
+/* -------------------------------------------------------------------------- */
+/* #185 · admin-attested immutable rules + integer-cent trial settlement       */
+/* -------------------------------------------------------------------------- */
+
+const TEST_TERMS_185 = {
+  feeBase: 'actual_received' as const,
+  processorFeeBps: 100,
+  processorFeeOwner: 'seller' as const,
+  ratesBps: { seller: 7000, sanchuang: 1000, guangdian: 2000 },
+  roundingRecipient: 'seller' as const,
+  roundingPolicy: 'floor_then_named_remainder' as const,
+  processorFeeRounding: 'floor' as const,
+  reversalPolicy: 'full_reversal_blocks' as const,
+  partialRefundPolicy: 'unsupported_blocks' as const,
+}
+
+test('pure settlement calculator conserves every cent and rejects unapproved money assumptions', async () => {
+  const { allocateSettlementCents } = await import('../src/ledger/settlement-calculator.js')
+  const regular = allocateSettlementCents(900, TEST_TERMS_185)
+  assert.deepEqual(regular, {
+    blockingReason: null,
+    allocation: {
+      grossReceivedCents: 900,
+      processorFeeCents: 9,
+      sellerNetCents: 621,
+      sanchuangNetCents: 90,
+      guangdianNetCents: 180,
+      totalNetCents: 891,
+      conservedTotalCents: 900,
+      roundingResidualCents: 0,
+    },
+  })
+  const oneCent = allocateSettlementCents(1, {
+    ...TEST_TERMS_185, processorFeeBps: 0, processorFeeOwner: 'none',
+    ratesBps: { seller: 3333, sanchuang: 3333, guangdian: 3334 },
+  })
+  assert.equal(oneCent.allocation?.sellerNetCents, 1)
+  assert.equal(oneCent.allocation?.roundingResidualCents, 1)
+  assert.equal(oneCent.allocation?.conservedTotalCents, 1)
+  const twoCents = allocateSettlementCents(2, {
+    ...TEST_TERMS_185, processorFeeBps: 0, processorFeeOwner: 'none',
+    ratesBps: { seller: 3333, sanchuang: 3333, guangdian: 3334 },
+    roundingRecipient: 'guangdian',
+  })
+  assert.equal(twoCents.allocation?.guangdianNetCents, 2)
+  assert.equal(twoCents.allocation?.roundingResidualCents, 2)
+
+  const large = allocateSettlementCents(Number.MAX_SAFE_INTEGER, {
+    ...TEST_TERMS_185, processorFeeBps: 0, processorFeeOwner: 'none',
+  })
+  assert.equal(large.allocation?.conservedTotalCents, Number.MAX_SAFE_INTEGER)
+  assert.equal((large.allocation?.sellerNetCents ?? 0) +
+    (large.allocation?.sanchuangNetCents ?? 0) +
+    (large.allocation?.guangdianNetCents ?? 0),
+    Number.MAX_SAFE_INTEGER)
+  const impossibleFee = allocateSettlementCents(900, {
+    ...TEST_TERMS_185, processorFeeBps: 5000,
+    processorFeeOwner: 'sanchuang',
+  })
+  assert.equal(impossibleFee.allocation, null)
+  assert.equal(impossibleFee.blockingReason, 'fee_exceeds_owner_share')
+  assert.throws(() => allocateSettlementCents(0, TEST_TERMS_185), RangeError)
+  assert.throws(() => allocateSettlementCents(-1, TEST_TERMS_185), RangeError)
+  assert.throws(() => allocateSettlementCents(0.5, TEST_TERMS_185), RangeError)
+  assert.throws(() => allocateSettlementCents(Number.MAX_SAFE_INTEGER + 1, TEST_TERMS_185), RangeError)
+  assert.throws(() => allocateSettlementCents(900, {
+    ...TEST_TERMS_185, ratesBps: { seller: 7000, sanchuang: 1000, guangdian: 1999 },
+  }), RangeError)
+})
+
+async function ruleSetup185(world: World) {
+  const session = await adminSession(world.app)
+  const parties: Record<string, string> = {}
+  for (const role of ['seller', 'sanchuang', 'guangdian']) {
+    const r = await api(world.app, 'POST', '/admin/settlement/parties', {
+      session, body: {
+        role, legalName: 'TEST 185 ' + role,
+        registryRef: 'TEST-185-REG-' + role,
+        verificationRef: 'TEST-185-VERIFIED-' + role,
+      },
+    })
+    assert.equal(r.status, 201)
+    parties[role] = (await r.json() as { id: string }).id
+  }
+  const productId = (world.sqlite.prepare('SELECT product_id AS id FROM local_orders WHERE id=?')
+    .get(world.localOrderId) as { id: string }).id
+  const mapping = await api(world.app, 'POST', '/admin/settlement/mappings', {
+    session, body: {
+      communityId: world.communityId, productId,
+      sellerPartyId: parties.seller, sanchuangPartyId: parties.sanchuang,
+      guangdianPartyId: parties.guangdian,
+      agreementRef: 'TEST-185-THREE-PARTY-CONTRACT',
+      effectiveFrom: '2026-11-01', effectiveTo: '2026-11-30',
+    },
+  })
+  assert.equal(mapping.status, 201)
+  const mappingId = (await mapping.json() as { id: string }).id
+  markOrderVerified(world, world.localOrderId)
+  const confirmation = await api(world.app, 'POST',
+    '/admin/settlement/orders/' + world.localOrderId + '/party', {
+      session, body: { mappingId, confirmationRef: 'TEST-185-HUMAN-IDENTITY-CHECK' },
+    })
+  assert.equal(confirmation.status, 201)
+  const receipt = await api(world.app, 'POST', '/admin/ledger/payments', {
+    session, body: linkedReceiptRequest(world, {
+      evidenceRef: 'TEST-185-RECEIPT-001',
+      sourceId: 'TEST-185-RECEIPT-SOURCE-001',
+    }),
+  })
+  assert.equal(receipt.status, 201)
+  const payment = ledgerEntrySchema.parse(await receipt.json())
+  const attribution = await api(world.app, 'POST', '/admin/ledger/attributions', {
+    session, body: {
+      entryId: payment.entryId,
+      staffId: world.gridStaffId,
+      note: '测试：网格员推广来源经业务核验确认',
+    },
+  })
+  assert.equal(attribution.status, 201)
+  syncLedgerFacts(world.db, adminActor(world),
+    { from: '2026-11-01', to: '2026-11-10' }, { now: CLOCK })
+  const batch = createBatch(world.db, adminActor(world),
+    { periodFrom: '2026-11-01', periodTo: '2026-11-10' }, { now: CLOCK })
+  const locked = lockBatch(world.db, adminActor(world), batch.batchId,
+    { expectedUpdatedAt: batch.updatedAt },
+    { now: new Date(CLOCK.getTime() + 60_000) })
+  assert.equal(locked.status, 'locked')
+  return { session, mappingId, paymentEntryId: payment.entryId }
+}
+
+function ruleInput185(mappingId: string) {
+  return {
+    mappingId,
+    agreementRef: 'TEST-185-THREE-PARTY-CONTRACT',
+    approvalEvidenceRef: 'TEST-185-CONTRACT-APPROVAL-V1',
+    approvalOn: '2026-10-30',
+    effectiveFrom: '2026-11-01', effectiveTo: '2026-11-10',
+    ...TEST_TERMS_185,
+  }
+}
+
+test('real Hono/SQLite approved rule: 0 defaults, locked verified receipt quote, immutable two versions', async () => {
+  const world = await makeWorld()
+  try {
+    const { session, mappingId, paymentEntryId } = await ruleSetup185(world)
+    const list = await api(world.app, 'GET', '/admin/settlement/rules', { session })
+    assert.equal(list.status, 200)
+    assert.deepEqual((await list.json() as { items: unknown[] }).items, [],
+      'zero business rates in production database, never seed approved defaults')
+    const quoteUrl = '/admin/settlement/quotes'
+    const initial = await api(world.app, 'POST', quoteUrl, {
+      session, body: { orderId: world.localOrderId },
+    })
+    assert.equal(initial.status, 200)
+    const pending = await initial.json() as {
+      status: string; allocation: unknown; rule: unknown; payableAmountCents: unknown
+    }
+    assert.equal(pending.status, 'pending_rule')
+    assert.equal(pending.allocation, null)
+    assert.equal(pending.rule, null)
+    assert.equal(pending.payableAmountCents, null)
+
+    const first = await api(world.app, 'POST', '/admin/settlement/rules', {
+      session, body: ruleInput185(mappingId),
+    })
+    assert.equal(first.status, 201)
+    const rule = await first.json() as {
+      id: string; version: number; approvalStatus: string; approvedByUserId: string
+    }
+    assert.equal(rule.version, 1)
+    assert.equal(rule.approvalStatus, 'admin_attested')
+    assert.equal(rule.approvedByUserId, world.adminUserId)
+
+    const simulated = await api(world.app, 'POST', quoteUrl, {
+      session, body: { orderId: world.localOrderId },
+    })
+    assert.equal(simulated.status, 200)
+    const result = await simulated.json() as {
+      quoteOnly: boolean; status: string; payableAmountCents: null;
+      receiptEntryId: string; rule: { id: string; version: number };
+      allocation: { grossReceivedCents: number; processorFeeCents: number;
+        sellerNetCents: number; sanchuangNetCents: number; guangdianNetCents: number;
+        conservedTotalCents: number }
+    }
+    assert.equal(result.quoteOnly, true)
+    assert.equal(result.status, 'calculated')
+    assert.equal(result.payableAmountCents, null, 'quote never claims money is payable')
+    assert.equal(result.receiptEntryId, paymentEntryId)
+    assert.equal(result.rule.id, rule.id)
+    assert.equal(result.allocation.grossReceivedCents, 900)
+    assert.equal(result.allocation.sellerNetCents, 621)
+    assert.equal(result.allocation.sanchuangNetCents, 90)
+    assert.equal(result.allocation.guangdianNetCents, 180)
+    assert.equal(result.allocation.processorFeeCents, 9)
+    assert.equal(result.allocation.conservedTotalCents, 900)
+
+    const samePeriod = await api(world.app, 'POST', '/admin/settlement/rules', {
+      session, body: { ...ruleInput185(mappingId),
+        approvalEvidenceRef: 'TEST-185-OVERLAPPING-APPROVAL', effectiveFrom: '2026-11-08' },
+    })
+    assert.equal(samePeriod.status, 409)
+    const duplicate = await api(world.app, 'POST', '/admin/settlement/rules', {
+      session, body: ruleInput185(mappingId),
+    })
+    assert.equal(duplicate.status, 409)
+    const future = await api(world.app, 'POST', '/admin/settlement/rules', {
+      session, body: {
+        ...ruleInput185(mappingId),
+        approvalEvidenceRef: 'TEST-185-CONTRACT-APPROVAL-V2',
+        effectiveFrom: '2026-11-11', effectiveTo: '2026-11-30',
+        processorFeeBps: 0, processorFeeOwner: 'none',
+        ratesBps: { seller: 6000, sanchuang: 2000, guangdian: 2000 },
+      },
+    })
+    assert.equal(future.status, 201)
+    assert.equal((await future.json() as { version: number }).version, 2)
+    const replay = await api(world.app, 'POST', quoteUrl, {
+      session, body: { orderId: world.localOrderId },
+    })
+    assert.equal(replay.status, 200)
+    const replayBody = await replay.json() as { rule: { id: string }; allocation: unknown }
+    assert.equal(replayBody.rule.id, rule.id, 'future rule must not reinterpret historic receipt')
+    assert.deepEqual(replayBody.allocation, result.allocation)
+    assert.throws(() => world.sqlite.prepare(
+      'UPDATE settlement_rule_versions SET seller_rate_bps=10000 WHERE id=?',
+    ).run(rule.id), /immutable/)
+    assert.throws(() => world.sqlite.prepare(
+      'DELETE FROM settlement_rule_versions WHERE id=?',
+    ).run(rule.id), /immutable/)
+
+    const reversed = await api(world.app, 'POST',
+      '/admin/ledger/payments/' + paymentEntryId + '/reverse', {
+        session, body: { staffId: world.operatorStaffId, reason: '测试：凭据作废需拦截分成' },
+      })
+    assert.equal(reversed.status, 201)
+    const blocked = await api(world.app, 'POST', quoteUrl, {
+      session, body: { orderId: world.localOrderId },
+    })
+    assert.equal(blocked.status, 200)
+    const blockedBody = await blocked.json() as {
+      status: string; allocation: unknown; blockingReasons: string[] }
+    assert.equal(blockedBody.status, 'blocked')
+    assert.equal(blockedBody.allocation, null)
+    assert.ok(blockedBody.blockingReasons.includes('receipt_reversed'))
+    assert.equal((world.sqlite.prepare(
+      'SELECT count(*) AS n FROM settlement_rule_versions',
+    ).get() as { n: number }).n, 2)
+  } finally { world.cleanup() }
+})
+
+test('approved rule HTTP rejects invalid terms, unverified mapping, unauthorized actor and forged origin', async () => {
+  const world = await makeWorld()
+  try {
+    const { session, mappingId } = await ruleSetup185(world)
+    const grid = await gridSession(world.app)
+    const valid = ruleInput185(mappingId)
+    for (const body of [
+      { ...valid, approvalEvidenceRef: '' },
+      { ...valid, ratesBps: { seller: 7000, sanchuang: 1000, guangdian: 1999 } },
+      { ...valid, approvalOn: '2026-11-02' },
+      { ...valid, effectiveFrom: '2026-02-31' },
+      { ...valid, processorFeeBps: 100, processorFeeOwner: 'none' },
+      { ...valid, feeBase: 'registered_order' },
+    ]) {
+      const rejected = await api(world.app, 'POST', '/admin/settlement/rules', {
+        session, body,
+      })
+      assert.equal(rejected.status, 400, JSON.stringify(body))
+    }
+    const missingMapping = await api(world.app, 'POST', '/admin/settlement/rules', {
+      session, body: { ...valid, mappingId: randomUUID() },
+    })
+    assert.equal(missingMapping.status, 404)
+    const crossAgreement = await api(world.app, 'POST', '/admin/settlement/rules', {
+      session, body: { ...valid, agreementRef: 'WRONG-CONTRACT' },
+    })
+    assert.equal(crossAgreement.status, 409)
+
+    assert.equal((await api(world.app, 'GET', '/admin/settlement/rules', {
+      session: grid,
+    })).status, 403)
+    assert.equal((await api(world.app, 'POST', '/admin/settlement/rules', {
+      session: grid, body: valid,
+    })).status, 403)
+    assert.equal((await api(world.app, 'POST', '/admin/settlement/quotes', {
+      session: grid, body: { orderId: world.localOrderId },
+    })).status, 403)
+    assert.equal((await api(world.app, 'GET', '/admin/settlement/rules')).status, 401)
+    const noCsrf = await world.app.request('/admin/settlement/rules', {
+      method: 'POST', headers: {
+        cookie: session.cookies, origin: ADMIN_ORIGIN, 'content-type': 'application/json',
+      }, body: JSON.stringify(valid),
+    })
+    assert.equal(noCsrf.status, 403)
+    const hostile = await world.app.request('/admin/settlement/rules', {
+      method: 'POST', headers: {
+        cookie: session.cookies, 'x-csrf-token': session.csrfToken,
+        origin: 'https://evil.example', 'content-type': 'application/json',
+      }, body: JSON.stringify(valid),
+    })
+    assert.equal(hostile.status, 403)
+    const { createSettlementRule, listSettlementRules, quoteSettlementOrder } =
+      await import('../src/ledger/settlement-rules.js')
+    assert.throws(() => createSettlementRule(world.db, adminActor(world), valid),
+      /仅管理员/)
+    assert.deepEqual(listSettlementRules(world.db, adminActor(world), world.communityId).items, [])
+    assert.throws(() => listSettlementRules(world.db, adminActor(world),
+      world.otherCommunityId), /无权访问/)
+    assert.throws(() => quoteSettlementOrder(world.db, adminActor(world),
+      world.otherOrderId), /无权访问/)
+    assert.equal((world.sqlite.prepare('SELECT count(*) AS n FROM settlement_rule_versions')
+      .get() as { n: number }).n, 0)
+  } finally { world.cleanup() }
+})
+
+test('new 0019 settlement rule migration upgrades real populated 0018 DB without rewriting ledger facts', async () => {
+  const { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } =
+    await import('node:fs')
+  const root = mkdtempSync(join(tmpdir(), 'll-rule-upgrade-'))
+  try {
+    const oldDir = join(root, 'old')
+    mkdirSync(join(oldDir, 'meta'), { recursive: true })
+    for (const name of readdirSync(migrationsFolder)) {
+      if (/^[0-9]{4}_.*\.sql$/u.test(name) && !name.startsWith('0019_')) {
+        copyFileSync(join(migrationsFolder, name), join(oldDir, name))
+      }
+    }
+    const current = JSON.parse(readFileSync(join(migrationsFolder, 'meta/_journal.json'), 'utf8')) as {
+      entries: Array<{ idx: number; tag: string }>
+    }
+    assert.equal(current.entries.at(-1)?.tag, '0019_settlement_rules')
+    current.entries = current.entries.filter((entry) => entry.idx < 19)
+    writeFileSync(join(oldDir, 'meta/_journal.json'), JSON.stringify(current))
+    const dbFile = join(root, 'legacy.sqlite')
+    const old = createDatabase(dbFile, oldDir)
+    const communityId = randomUUID()
+    old.db.insert(communities).values({
+      id: communityId, name: '升级前 0018 社区',
+      createdAt: new Date('2026-11-01T00:00:00.000Z'),
+    }).run()
+    old.sqlite.close()
+    const upgraded = createDatabase(dbFile, migrationsFolder)
+    try {
+      const prior = upgraded.sqlite.prepare(
+        'SELECT name FROM communities WHERE id=?',
+      ).get(communityId) as { name: string }
+      assert.equal(prior.name, '升级前 0018 社区')
+      const ruleTable = upgraded.sqlite.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='settlement_rule_versions'",
+      ).get() as { name: string }
+      assert.equal(ruleTable.name, 'settlement_rule_versions')
+      assert.equal((upgraded.sqlite.prepare('SELECT count(*) AS n FROM settlement_rule_versions')
+        .get() as { n: number }).n, 0, 'production migration seeds no fake contract')
+    } finally { upgraded.sqlite.close() }
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
