@@ -16,6 +16,10 @@ CREATE TABLE settlement_parties (
 --> statement-breakpoint
 CREATE INDEX settlement_parties_role_registry_idx ON settlement_parties (role, registry_ref);
 --> statement-breakpoint
+CREATE UNIQUE INDEX settlement_parties_verified_version_uq ON settlement_parties (role, registry_ref, verification_ref) WHERE verification_ref IS NOT NULL;
+--> statement-breakpoint
+CREATE UNIQUE INDEX settlement_parties_pending_version_uq ON settlement_parties (role, registry_ref) WHERE verification_ref IS NULL;
+--> statement-breakpoint
 CREATE TABLE settlement_product_mappings (
   id text PRIMARY KEY NOT NULL,
   community_id text NOT NULL REFERENCES communities(id) ON DELETE restrict,
