@@ -76,7 +76,45 @@ export function listSettlementCandidates(
     .orderBy(desc(localOrders.createdAt), desc(localOrders.id))
     .limit(query.pageSize).offset((query.page - 1) * query.pageSize).all()
 
-  const items = orders.map((order): SettlementCandidate => {
+  const items = orders.map((order) => projectSettlementCandidate(db, actor, order))
+  return {
+    items, total, page: query.page, pageSize: query.pageSize,
+    asOf: iso(now), summaryScope: 'page',
+    periodPolicy: 'linked_receipt_else_order_registration',
+    summary: {
+      recordedReceiptGrossCents: items.reduce((sum, x) => sum + (x.receipt?.amountCents ?? 0), 0),
+      reversedReceiptCents: items.reduce((sum, x) =>
+        sum + (x.receipt?.reversedEntryId ? x.receipt.amountCents : 0), 0),
+      blockedItems: items.filter((x) => x.blockingReasons.length > 0).length,
+      visibleItems: items.length,
+    },
+    payableAmountCents: null, settlementAmountStatus: 'pending_rule',
+  }
+}
+
+/**
+ * Exact-ID projection for #185: never page/search by a UUID substring when
+ * deciding financial eligibility. Reuses the same evidence logic as #184.
+ */
+export function readSettlementCandidate(
+  db: AppDatabase,
+  actor: LocalActor,
+  orderId: string,
+): SettlementCandidate {
+  if (!actor.role || actor.role === 'grid_worker') {
+    throw new LocalError(403, API_ERROR_CODES.forbidden, '无权查看结算订单')
+  }
+  const order = db.select().from(localOrders).where(eq(localOrders.id, orderId)).get()
+  if (!order) throw new LocalError(404, API_ERROR_CODES.notFound, '本地订单不存在')
+  assertCommunityAccess(db, actor, order.communityId)
+  return projectSettlementCandidate(db, actor, order)
+}
+
+function projectSettlementCandidate(
+  db: AppDatabase,
+  actor: LocalActor,
+  order: typeof localOrders.$inferSelect,
+): SettlementCandidate {
     const evidence = readOrderPaymentEvidence(db, actor, order.id)
     const parties = readOrderPartySnapshot(db, actor, order.id)
     const receiptFact = evidence.payment
@@ -173,21 +211,6 @@ export function listSettlementCandidates(
       settlementAmountStatus: 'pending_rule',
       blockingReasons: reasons, blockingMessages: messages,
     }
-  })
-
-  return {
-    items, total, page: query.page, pageSize: query.pageSize,
-    asOf: iso(now), summaryScope: 'page',
-    periodPolicy: 'linked_receipt_else_order_registration',
-    summary: {
-      recordedReceiptGrossCents: items.reduce((sum, x) => sum + (x.receipt?.amountCents ?? 0), 0),
-      reversedReceiptCents: items.reduce((sum, x) =>
-        sum + (x.receipt?.reversedEntryId ? x.receipt.amountCents : 0), 0),
-      blockedItems: items.filter((x) => x.blockingReasons.length > 0).length,
-      visibleItems: items.length,
-    },
-    payableAmountCents: null, settlementAmountStatus: 'pending_rule',
-  }
 }
 
 function emptyPage(query: SettlementCandidateQuery, now: Date): SettlementCandidateListResponse {
