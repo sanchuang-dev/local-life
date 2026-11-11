@@ -1800,6 +1800,30 @@ export const settlementStatementLines = sqliteTable('settlement_statement_lines'
       AND ${table.ruleId} IS NOT NULL AND ${table.receiptEntryId} IS NOT NULL)`),
 ])
 
+/** Non-monetary Guangdian CRM-confirmed performance; never becomes a payout line. */
+export const settlementStatementPerformance = sqliteTable('settlement_statement_performance', {
+  id: text('id').primaryKey(),
+  statementId: text('statement_id').notNull()
+    .references(() => settlementStatements.id, { onDelete: 'restrict' }),
+  entryId: text('entry_id').notNull()
+    .references(() => ledgerEntries.id, { onDelete: 'restrict' }),
+  sourceId: text('source_id').notNull()
+    .references(() => crmServiceOrders.id, { onDelete: 'restrict' }),
+  sourceDisplayNo: text('source_display_no').notNull(),
+  communityId: text('community_id').notNull()
+    .references(() => communities.id, { onDelete: 'restrict' }),
+  staffId: text('staff_id').notNull()
+    .references(() => staffAccounts.id, { onDelete: 'restrict' }),
+  confirmedByUserId: text('confirmed_by_user_id')
+    .references(() => users.id, { onDelete: 'restrict' }),
+  confirmedAt: integer('confirmed_at', { mode: 'timestamp_ms' }).notNull(),
+  evidenceRef: text('evidence_ref'),
+  sourceDigest: text('source_digest').notNull(),
+}, (table) => [
+  uniqueIndex('settlement_performance_statement_entry_uq').on(table.statementId, table.entryId),
+  index('settlement_performance_worker_idx').on(table.statementId, table.staffId),
+])
+
 /** Independent append-only audit of who created, reviewed, locked or replaced. */
 export const settlementStatementEvents = sqliteTable('settlement_statement_events', {
   id: text('id').primaryKey(),
@@ -2496,6 +2520,7 @@ export const schema = {
   settlementRuleVersions,
   settlementStatements,
   settlementStatementLines,
+  settlementStatementPerformance,
   settlementStatementEvents,
   settlementReceiptClaims,
   localOrderEvents,
