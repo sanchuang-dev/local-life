@@ -8,8 +8,8 @@
 - `wechat_identities` 保存公众号身份映射，唯一约束为 `(app_id, open_id)`；`union_id` 可选。重复 OAuth 使用同一平台用户，不创建重复居民。
 - `staff_accounts.user_id` 指向同一 `users` 主表。管理员可将已有微信居民用户关联为运营员/网格员；绑定要求该用户已有微信身份，且该用户尚未绑定后台身份。冲突返回 409，不做静默合并。
 - 后台角色为 `admin`、`operator`、`grid_worker`。管理员拥有全局后台权限；运营员和网格员必须通过 `staff_community_assignments` 分配一个或多个社区。
-- 居民与社区的关系由 `resident_community_assignments` 保存，主键为 `(user_id, community_id)`，因此同一居民在同一社区重复登录只会命中已有行（`ON CONFLICT DO NOTHING`），天然幂等。
-- 社区归属只能由服务端推导（#123）。只有入口 URL 明确携带 `activityId` 时，活动 H5 才把该 ID 带入微信登录；首页为了展示而从公开列表选出的默认活动不构成归属上下文。`GET /auth/wechat/start` 读取该活动行、复用公开可见性规则（`published` / `paused` / `ended`）得到社区，再写入 OAuth state。客户端显式传 `communityId` 会被 400 拒绝——即使该 UUID 确实存在，也不构成归属依据；否则任何人都能凭一个存在的社区 UUID 给自己挂上任意归属。活动缺失、ID 形状非法或不可公开访问时直接拒绝，不做"登录成功但未归属"的静默降级。不带活动上下文的普通登录（如 `/me` 入口）不建立任何社区归属。
+- 居民与社区的**历史**关系由 `resident_community_assignments` 保存，主键为 `(user_id, community_id)`。**#171 起这张表不再被登录流程写入**，它只是历史事实的只读留存；常驻社区的唯一真相是 `resident_community_bindings`（本人确认），详见 `docs/engineering/resident-community-binding.md`。
+- 活动上下文只能产生一条**绑定候选**（#171 supersedes #123 的自动归属）。只有入口 URL 明确携带 `activityId` 时，活动 H5 才把该 ID 带入微信登录；首页为了展示而从公开列表选出的默认活动不构成归属上下文。`GET /auth/wechat/start` 读取该活动行、复用公开可见性规则（`published` / `paused` / `ended`）得到社区，再写入 OAuth state。客户端显式传 `communityId` 会被 400 拒绝——即使该 UUID 确实存在，也不构成归属依据；否则任何人都能凭一个存在的社区 UUID 给自己挂上任意归属。活动缺失、ID 形状非法或不可公开访问时直接拒绝，不做"登录成功但未归属"的静默降级。**回调成功后最多写一条 `resident_community_binding_candidates`（`source = 'activity_oauth_candidate'`，7 天 TTL），仍需本人在「我的」中确认；已确认常驻社区的居民不会再得到候选。**不带活动上下文的普通登录（如 `/me` 入口）既不建立归属，也不产生候选。
 - 活动上下文与邀请、网格员业绩归属是三条独立链路：`invite` 只在参与确认时校验，登录既不写入参与/报名，也不改变邀请归属或 CRM 线索负责人。
 
 ## 2. 会话与安全边界
@@ -31,7 +31,7 @@
 3. nonce 通过 HttpOnly、SameSite=Lax Cookie 绑定当前浏览器。
 4. `GET /auth/wechat/callback` 先校验 state、nonce、过期时间，并通过原子更新将 state 标记为 consumed；重放拒绝。随后按 `state.config_id` 读取该配置行（允许 `active` 或 `retired`，以支持切换期间的在途回调），用该行的 appId + secret 换 openid：绝不使用回调时新 active 配置的 secret。老 state 无 configId → `wechat_state_invalid`；行不存在/不可解密 → 清 OAuth cookie 并 `wechat_config_unavailable`，不跨账号重试。
 5. 服务端使用 code 向微信接口换取 openid；凭证仅在 API 服务端使用，不返回给浏览器、不写日志、不持久化 access token。
-6. 按 `(appid, openid)` 查找或创建居民用户，按 OAuth state 中已验证的社区归属建立 `resident_community_assignments`（已存在则跳过），再签发平台 session 并回到 H5；切换 AppID 不会合并不同账号的身份。start 与 callback 之间活动即使被下架，也以已签发 state 为准完成这次在途归属。登录不写入参与/报名/组队/订单/奖励，邀请回跳仍由显式确认触发。
+6. 按 `(appid, openid)` 查找或创建居民用户，若这次登录携带了活动上下文（OAuth state 中已验证的社区），最多写入一条 `resident_community_binding_candidates` 绑定候选，再签发平台 session 并回到 H5；**不再写 `resident_community_assignments`**，也不建立任何常驻绑定。切换 AppID 不会合并不同账号的身份。start 与 callback 之间活动即使被下架，也以已签发 state 为准完成这次在途候选写入。登录不写入参与/报名/组队/订单/奖励，邀请回跳仍由显式确认触发。
 
 真实公众号 AppID/AppSecret、网页授权域名、回调 URL 与线上 HTTPS Cookie 尚未配置/实测。缺配置或配置不可解密时，`/auth/wechat/start` 返回明确 503；只能把本地 stub fetch 测试视为代码边界验证，不能当作真实微信验收。
 
@@ -57,6 +57,7 @@
 开发居民测试登录：
 
 - `POST /auth/dev/login` 仅在非生产且 `AUTH_DEV_ENABLED=true` 时注册可用；默认关闭。生产环境即使设置为 true，配置校验也会拒绝启动。
+- 请求体自 #171 起只接受 `{ displayName }`（`z.strictObject`）。**传 `communityId` 会得到 400**，且该接口不再写 `resident_community_assignments`：开发登录只认证身份，常驻社区仍需本人在「我的」中显式确认（`POST /resident-community/confirm`）。
 
 ## 5. 初始化与配置
 
