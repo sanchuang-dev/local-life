@@ -277,7 +277,7 @@ export function recordSettlementPayment(
   now = new Date(),
 ): SettlementPaymentOverview {
   requireAdmin(actor)
-  if (/\d{12,}/u.test(request.proofRefMasked)) {
+  if (/\d{12,}/u.test(request.proofRefMasked.normalize('NFKC'))) {
     invalid('付款凭据只保存脱敏引用，禁止填写完整银行卡号或账号')
   }
   const paidAt = new Date(request.paidAt)
