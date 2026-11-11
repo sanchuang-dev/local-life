@@ -953,7 +953,10 @@ export const settlementPaymentBeneficiaryStateSchema =
  * storage of full account/card numbers.
  */
 export const maskedSettlementPaymentProofRefSchema = z.string().trim().min(4).max(160)
-  .refine((value) => !/\d{12,}/u.test(value), '不得填写完整银行卡号、账号或其他长数字凭据')
+  .refine(
+    (value) => !/\d{12,}/u.test(value.normalize('NFKC')),
+    '不得填写完整银行卡号、账号或其他长数字凭据',
+  )
 
 export const recordSettlementPaymentRequestSchema = z.strictObject({
   beneficiaryPartyId: uuid,
