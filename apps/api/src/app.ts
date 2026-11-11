@@ -601,26 +601,24 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     if (!validCsrf(c, config)) {
       return fail(c, 403, API_ERROR_CODES.forbidden, 'CSRF 校验失败')
     }
+    // #171 LL-IDENTITY-001: the development login creates an identity and a
+    // session, nothing else. It used to accept `communityId` and insert a
+    // residence row, which meant the test-only entry point could create exactly
+    // the permanent attribution the product now forbids — and it made local tests
+    // pass against behaviour production does not have. A caller that needs a
+    // resident community must perform the same explicit
+    // `POST /resident-community/confirm` a real resident does.
     const body = bodySchemaError(
       await c.req.json().catch(() => null),
-      z.object({
+      z.strictObject({
         displayName: z.string().trim().min(1).max(40),
-        communityId: z.string().uuid().optional(),
       }),
     )
     if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '测试登录信息不正确')
-    if (body.communityId && !db.select().from(communities).where(eq(communities.id, body.communityId)).get()) {
-      return fail(c, 404, API_ERROR_CODES.notFound, '社区不存在')
-    }
 
     const now = new Date()
     const userId = randomUUID()
     db.insert(users).values({ id: userId, displayName: body.displayName, createdAt: now, updatedAt: now }).run()
-    if (body.communityId) {
-      db.insert(residentCommunityAssignments)
-        .values({ userId, communityId: body.communityId, createdAt: now })
-        .run()
-    }
     const created = createSession(db, config, userId, null)
     setSessionCookies(c, config, created.token, created.csrfToken)
     return c.json(
@@ -1141,16 +1139,18 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
             })
             .run()
         }
-        if (stateRecord.communityId) {
-          tx.insert(residentCommunityAssignments)
-            .values({ userId: resolvedUserId, communityId: stateRecord.communityId, createdAt: now })
-            .onConflictDoNothing()
-            .run()
-        }
-        // Deliberately no participation write here: logging in only establishes
-        // identity. Joining an activity (and its invite attribution) stays an
-        // explicit `POST /activities/:activityId/participation` confirmed by the
-        // resident, so opening an invite link never auto-enrols anyone.
+        // #171 LL-IDENTITY-001: logging in authenticates the person, it does NOT
+        // create a permanent community. The retired #123 behaviour inserted a
+        // `resident_community_assignments` row here, which silently made every
+        // activity login look like a residence claim. The community derived from
+        // the `activityId` is now at most a one-time *candidate* that the resident
+        // must confirm themself; see `POST /resident-community/confirm`.
+        //
+        // Deliberately no participation write here either: logging in only
+        // establishes identity. Joining an activity (and its invite attribution)
+        // stays an explicit `POST /activities/:activityId/participation`
+        // confirmed by the resident, so opening an invite link never auto-enrols
+        // anyone.
         return resolvedUserId
       })
 
