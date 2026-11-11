@@ -1696,14 +1696,14 @@ test('settlement identity migration 0018 upgrades a populated 0017 DB without to
     const oldMigrations = join(root, 'old')
     mkdirSync(join(oldMigrations, 'meta'), { recursive: true })
     for (const name of readdirSync(migrationsFolder)) {
-      if (/^[0-9]{4}_.*\.sql$/u.test(name) && !name.startsWith('0018_')) {
+      if (/^[0-9]{4}_.*\.sql$/u.test(name) && Number(name.slice(0, 4)) < 18) {
         copyFileSync(join(migrationsFolder, name), join(oldMigrations, name))
       }
     }
     const current = JSON.parse(readFileSync(join(migrationsFolder, 'meta/_journal.json'), 'utf8')) as {
       entries: Array<{ idx: number; tag: string }>
     }
-    assert.equal(current.entries.at(-1)?.tag, '0018_settlement_parties')
+    assert.equal(current.entries.find((entry) => entry.idx === 18)?.tag, '0018_settlement_parties')
     current.entries = current.entries.filter((entry) => entry.idx < 18)
     writeFileSync(join(oldMigrations, 'meta/_journal.json'), JSON.stringify(current))
     const dbPath = join(root, 'legacy.sqlite')
@@ -1723,11 +1723,17 @@ test('settlement identity migration 0018 upgrades a populated 0017 DB without to
       const tables = upgraded.sqlite.prepare(
         "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'settlement_%'",
       ).all() as Array<{ name: string }>
-      assert.deepEqual(tables.map((row) => row.name).sort(), [
+      const originalIdentityTables = [
         'settlement_order_party_snapshots',
         'settlement_parties',
         'settlement_product_mappings',
-      ])
+      ]
+      assert.deepEqual(
+        tables.map((row) => row.name)
+          .filter((name) => originalIdentityTables.includes(name)).sort(),
+        originalIdentityTables.slice().sort(),
+        '0018 identity tables must survive migration to the current schema',
+      )
       assert.equal((upgraded.sqlite.prepare(
         'SELECT count(*) AS n FROM ledger_entries',
       ).get() as { n: number }).n, 0)
