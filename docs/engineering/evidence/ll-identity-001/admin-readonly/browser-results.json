@@ -1,0 +1,931 @@
+{
+  "generatedAt": "2026-11-11T08:38:23.412Z",
+  "adminOrigin": "http://127.0.0.1:5174",
+  "checks": [
+    {
+      "name": "管理台登录页可达（真实 Vite dev server）",
+      "ok": true,
+      "detail": "http://127.0.0.1:5174"
+    },
+    {
+      "name": "真实账号登录成功并进入后台布局",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "用户管理页打开",
+      "ok": true,
+      "detail": "/users"
+    },
+    {
+      "name": "页头写明只读：常驻社区由居民本人确认、管理台不可代为变更",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "页头把历史归属与「已确认」分开：历史归属只是观察记录，不代表已确认",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "列名为「常驻社区 / 历史归属」",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "已确认居民显示「已确认常驻」+ 绿色「常驻：梧桐里社区」",
+      "ok": true,
+      "detail": "陈陈梧桐ce49264d-eba2-4afc-b516-18be1cfdf8a8无持久身份居民已确认常驻常驻：梧桐里社区2026/11/1116:30详情"
+    },
+    {
+      "name": "单条历史归属显示「历史归属（未确认）」而不是已确认常驻社区",
+      "ok": true,
+      "detail": "林林柳岸0571caba-90a7-4b50-ab81-0599347fbcf2无持久身份居民历史归属（未确认）历史归属：柳岸花城社区2026/11/1116:30详情"
+    },
+    {
+      "name": "单条历史归属的社区名带「历史归属：」前缀，没有被写成「常驻：」",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "两条历史归属标记为「历史待核查」并且没有任何已确认措辞",
+      "ok": true,
+      "detail": "周周双记9a0d7c62-2eba-4f82-abdc-8b44a478c75d无持久身份居民历史归属（未确认）历史归属：柳岸花城社区历史归属：梧桐里社区历史待核查2026/11/1116:30详情"
+    },
+    {
+      "name": "无任何关系的账号显示「未关联社区」",
+      "ok": true,
+      "detail": "吴吴空白51fb2b4c-c1a3-4cef-8b8f-bc633718a9e8无持久身份居民未关联社区2026/11/1116:30详情"
+    },
+    {
+      "name": "确认与历史记录不一致的账号既显示已确认常驻社区又标出「常驻社区冲突」",
+      "ok": true,
+      "detail": "郑郑冲突d43c4fbb-e078-4cc2-8ce4-c9e22c15beeb无持久身份居民已确认常驻常驻：梧桐里社区历史归属：柳岸花城社区常驻社区冲突2026/11/1116:30详情"
+    },
+    {
+      "name": "列表页没有任何改绑/解绑/重绑/转移控件",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "列表页行操作只有「详情」",
+      "ok": true,
+      "detail": "[\"收起侧边栏\",\"搜索菜单\",\"退出登录\",\"remove\",\"页签操作\",\"刷新\",\"text\",\"text\",\"text\",\"查询\",\"重置\",\"刷新\",\"列设置\",\"复制\",\"详情\",\"复制\",\"详情\",\"复制\",\"详情\",\"复制\"]"
+    },
+    {
+      "name": "抽屉区段标题声明只读：#171 只读",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "抽屉明确写出尚未确认常驻社区、历史记录不能当作常驻社区",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "抽屉历史行标注「（只读，不代表已确认）」",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "抽屉历史行同时显示「历史归属（未确认）」与记录日期",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "抽屉脚注声明没有改绑、解绑或代确认入口",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "抽屉内没有任何改绑/解绑/代确认控件",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "抽屉内没有表单与提交按钮（只读）",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "待核查抽屉标出「历史待核查」并说明需人工核查、不视为已确认常驻社区",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "待核查抽屉没有「帮他选一个」之类的代选控件",
+      "ok": true,
+      "detail": "[\"复制\"]"
+    },
+    {
+      "name": "已确认账号抽屉显示已确认常驻社区、确认日期与来源「本人在居民端确认」",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "已确认账号抽屉同样没有改绑/解绑入口（只读说明里出现「改绑」不算控件）",
+      "ok": true,
+      "detail": "[\"复制\"]"
+    },
+    {
+      "name": "冲突账号抽屉标出「常驻社区冲突」并说明历史记录与确认不一致",
+      "ok": true,
+      "detail": "郑郑冲突无持久身份居民身份资料平台用户IDd43c4fbb-e078-4cc2-8ce4-c9e22c15beeb本地显示名郑冲突微信昵称未授权或未设置微信资料授权未授权关联微信身份0个（仅计数）手机号未绑定注册时间2026/11/1116:30后台账户后台账户无（该账号只有居民身份，不是后台工作人员）居民常驻社区（#171只读）常驻社区梧桐里社区本人确认时间2026年11月11日·本人在居民端确认归属判定已确认常驻本人确认的常驻社区：梧桐里社区（确认时间2026年11月11日）。历史社区归属（只读，不代表已确认）柳岸花城社区·2026/10/12记录居民端状态常驻社区冲突历史关系与确认结果不一致，需人工核查；后台不提供改绑入口。本页只读，不提供编辑身份、社区归属或后台账户的操作；成员的常驻社区只能由本人在居民端首次确认，后台没有改绑、解绑或代确认入口。如需纠正录入错误或处理身份纠纷，请走"
+    },
+    {
+      "name": "列表与详情都通过真实 GET /admin/users 读取（有真实网络请求）",
+      "ok": true,
+      "detail": "6 个请求"
+    },
+    {
+      "name": "整轮没有发出任何写请求（POST/PUT/PATCH/DELETE 到 /admin 或 /resident-community）",
+      "ok": true,
+      "detail": "[\"POST http://127.0.0.1:5174/api/auth/login\"]"
+    },
+    {
+      "name": "1440 宽无横向溢出",
+      "ok": true,
+      "detail": "{\"width\":1440,\"scrollWidth\":1440,\"overflow\":false}"
+    }
+  ],
+  "passed": 29,
+  "total": 29,
+  "requests": [
+    {
+      "url": "http://127.0.0.1:5174/",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@vite/client",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/main.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@react-refresh",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/antd.js?v=40147efe",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/antd_locale_zh___CN.js?v=d1bb8508",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/react.js?v=3a36cb7f",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/react-dom_client.js?v=c9b8c6eb",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/react-router.js?v=ad4dad0c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/App.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/app/theme.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/index.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=3a36cb7f",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/node_modules/.pnpm/vite@8.3.4_@types+node@24.1_31550c061482022cb50f0774f2c55186/node_modules/vite/dist/client/env.mjs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/client-CtF9ocLn.js?v=0e93ea65",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/react-XU9BOcOH.js?v=0e93ea65",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/rolldown-runtime-SbdDWaPq.js?v=0e93ea65",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/app/auth-context.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/app/routes.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/LoginPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/shared/lib/work-tabs.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/auth.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/index.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/layouts/AdminLayout.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/ActivitiesPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/ActivityCheckinPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/CommunitiesPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/ComponentPreviewPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/CrmPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/DashboardPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/NotFoundPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/OrdersPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/PerformancePage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/PlaceholderPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/ProductsPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/ExternalOffersPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/SettlementsPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/UsersPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/SystemInfoPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/WechatSettingsPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/TencentMapSettingsPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/app/shell/navigation.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/app/shell/AppShell.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/zod.js?v=a456e5fb",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/rewards.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/identity.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/crmeb.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/ledger.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/user-directory.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/resident-community.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/draw.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/components/PageHeader.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/activities.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/rewards.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/activities.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/@ant-design_icons.js?v=1fe85a8c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/dayjs.js?v=5f6a32ef",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/dayjs_plugin_utc.js?v=a363bed9",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/shared/components/DataPanel.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/DrawPoolDrawer.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/components/TencentLocationPicker.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/communities.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/localApi.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/localOrders.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/local-console.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/crm.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/crm.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/localCatalog.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/externalOffers.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/utils/externalOffersExcel.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/components/PaymentEvidencePanel.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/ledger.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/ledger.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/shared/lib/resident-community-view.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/users.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/users.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/api.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/tencent-map.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/app/shell/AppSidebar.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/app/shell/shell.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/wechat.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/wechat.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/react-dom-DHbhrdcq.js?v=0e93ea65",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/shared/lib/data-panel-state.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/shared/lib/data-panel-prefs.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/shared/components/DataPanel.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/drawPool.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/draw-pool.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/app/shell/sidebar.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/ZoomOutOutlined-Dgo1fEkL.js?v=0e93ea65",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/api/auth/session",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/api/auth/session",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/api/auth/csrf",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/api/auth/login",
+      "method": "POST"
+    },
+    {
+      "url": "http://127.0.0.1:5174/users",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@vite/client",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/main.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@react-refresh",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/antd.js?v=40147efe",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/antd_locale_zh___CN.js?v=d1bb8508",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/react.js?v=3a36cb7f",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/react-dom_client.js?v=c9b8c6eb",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/react-router.js?v=ad4dad0c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/App.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/app/theme.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/index.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=3a36cb7f",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/rolldown-runtime-SbdDWaPq.js?v=0e93ea65",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/react-XU9BOcOH.js?v=0e93ea65",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/client-CtF9ocLn.js?v=0e93ea65",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/react-dom-DHbhrdcq.js?v=0e93ea65",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/ZoomOutOutlined-Dgo1fEkL.js?v=0e93ea65",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/dayjs.js?v=5f6a32ef",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/node_modules/.pnpm/vite@8.3.4_@types+node@24.1_31550c061482022cb50f0774f2c55186/node_modules/vite/dist/client/env.mjs",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/app/auth-context.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/app/routes.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/LoginPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/shared/lib/work-tabs.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/auth.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/index.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/layouts/AdminLayout.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/ActivitiesPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/ActivityCheckinPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/CommunitiesPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/ComponentPreviewPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/CrmPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/DashboardPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/NotFoundPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/OrdersPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/PerformancePage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/PlaceholderPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/ProductsPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/ExternalOffersPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/SettlementsPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/UsersPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/SystemInfoPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/WechatSettingsPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/TencentMapSettingsPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/app/shell/navigation.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/components/PageHeader.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/app/shell/AppShell.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/@ant-design_icons.js?v=1fe85a8c",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/components/TencentLocationPicker.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/communities.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/shared/components/DataPanel.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/activities.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/rewards.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/activities.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/externalOffers.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/localApi.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/utils/externalOffersExcel.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/local-console.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/api.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/dayjs_plugin_utc.js?v=a363bed9",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/DrawPoolDrawer.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/localCatalog.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/crm.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/crm.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/localOrders.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/shared/lib/resident-community-view.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/users.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/users.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/tencent-map.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/node_modules/.vite/deps/zod.js?v=a456e5fb",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/rewards.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/identity.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/crmeb.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/ledger.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/user-directory.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/resident-community.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/draw.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/wechat.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/wechat.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/components/PaymentEvidencePanel.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/ledger.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/ledger.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/app/shell/AppSidebar.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/app/shell/shell.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/shared/lib/data-panel-state.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/shared/lib/data-panel-prefs.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/shared/components/DataPanel.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/services/drawPool.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/pages/draw-pool.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/src/app/shell/sidebar.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/api/auth/session",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/api/auth/session",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/api/admin/communities",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/api/admin/users?page=1&pageSize=20",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/api/admin/communities",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/api/admin/users?page=1&pageSize=20",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/api/admin/users/0571caba-90a7-4b50-ab81-0599347fbcf2",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/api/admin/users/9a0d7c62-2eba-4f82-abdc-8b44a478c75d",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/api/admin/users/ce49264d-eba2-4afc-b516-18be1cfdf8a8",
+      "method": "GET"
+    },
+    {
+      "url": "http://127.0.0.1:5174/api/admin/users/d43c4fbb-e078-4cc2-8ce4-c9e22c15beeb",
+      "method": "GET"
+    }
+  ]
+}
