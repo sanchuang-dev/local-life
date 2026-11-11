@@ -94,7 +94,22 @@ export function getMyDrawHistory(db: AppDatabase, activityId: string, userId: st
     .orderBy(desc(activityDrawAttempts.createdAt))
     .limit(MAX_HISTORY)
     .all()
-  return residentDrawHistorySchema.parse({ attempts: attempts.map(a => toResident(db, a, secret)) })
+  // An active award must never disappear behind the recent-history cap.
+  // Keep outstanding prize claims independent from the bounded attempt feed.
+  const activeAwards = db.select().from(activityDrawAttempts)
+    .innerJoin(activityDrawCredentials, eq(activityDrawCredentials.attemptId, activityDrawAttempts.id))
+    .where(and(
+      eq(activityDrawAttempts.activityId, activityId),
+      eq(activityDrawAttempts.userId, userId),
+      eq(activityDrawCredentials.status, 'active'),
+    ))
+    .orderBy(desc(activityDrawAttempts.createdAt))
+    .all()
+    .map(row => toResident(db, row.activity_draw_attempts, secret))
+  return residentDrawHistorySchema.parse({
+    attempts: attempts.map(a => toResident(db, a, secret)),
+    activeAwards,
+  })
 }
 
 export function getMyDrawState(db: AppDatabase, activityId: string, userId: string | null, secret?: string, now = new Date()): ResidentDrawState {

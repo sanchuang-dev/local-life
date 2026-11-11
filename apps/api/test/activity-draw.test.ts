@@ -1283,6 +1283,52 @@ test('LL-LOT-002: missing credential secret refuses awards without consuming sto
   } finally { fixture.sqlite.close() }
 })
 
+
+test('LL-LOT-002: outstanding winner stays accessible beyond 200 recent attempts', async () => {
+  const fixture = await createFixture()
+  try {
+    const activityId = await createActivity(fixture)
+    const productId = await createProduct(fixture)
+    await seedReadyPool(fixture, activityId, productId)
+    const userId = await bindStaffUser(fixture, 'admin')
+    const prize = enterDailyDraw(fixture.db, {
+      activityId, userId, secret: DRAW_SECRET, idempotencyKey: randomUUID(),
+      pick: () => 0,
+    })
+    assert.equal(prize.outcome, 'won')
+    const pool = fixture.sqlite.prepare('SELECT id FROM activity_draw_pools WHERE activity_id = ?')
+      .get(activityId) as { id: string }
+    const insert = fixture.sqlite.prepare(
+      'INSERT INTO activity_draw_attempts (id,activity_id,pool_id,user_id,day,sequence,idempotency_key,outcome,created_at) VALUES (?,?,?,?,?,?,?,\'missed\',?)',
+    )
+    // Seed a long historical feed directly: unlike a real draw, this avoids
+    // 201 separate fake public requests while exercising the real SQLite index.
+    const now = Date.now()
+    for (let index = 1; index <= 201; index += 1) {
+      insert.run(randomUUID(), activityId, pool.id, userId, drawBeijingDay(new Date(now)),
+        index + 1, randomUUID(), now + index * 1000)
+    }
+    const history = await api(fixture.app, 'GET', path(ACTIVITY_DRAW_ROUTES.history, activityId), {
+      session: fixture.admin,
+    })
+    assert.equal(history.status, 200)
+    const data = await history.json() as {
+      attempts: Array<{ id: string }>
+      activeAwards: Array<{ id: string; credential: { code: string | null } | null }>
+    }
+    assert.equal(data.attempts.length, 200)
+    assert.equal(data.attempts.some(a => a.id === prize.id), false)
+    assert.equal(data.activeAwards.length, 1)
+    assert.equal(data.activeAwards[0]?.id, prize.id)
+    assert.equal(data.activeAwards[0]?.credential?.code, prize.credential?.code)
+    const operatorHistory = await api(fixture.app, 'GET', path(ACTIVITY_DRAW_ROUTES.history, activityId), {
+      session: fixture.operator,
+    })
+    assert.equal(operatorHistory.status, 200)
+    assert.equal((await operatorHistory.json() as { activeAwards: unknown[] }).activeAwards.length, 0)
+  } finally { fixture.sqlite.close() }
+})
+
 /** Minimal recursive mkdir without importing more fs surface than needed. */
 function mkdirp(target: string): void {
   mkdirSync(target, { recursive: true })

@@ -296,7 +296,10 @@ export const residentDrawStateSchema = z.strictObject({
   day: drawDay,
 })
 export const residentDrawHistorySchema = z.strictObject({
+  /** Recent attempts are bounded to avoid unbounded history responses. */
   attempts: z.array(residentDrawAttemptSchema),
+  /** All outstanding awards, even when the winning draw is older than the history window. */
+  activeAwards: z.array(residentDrawAttemptSchema),
 })
 export const drawStaffCodeRequestSchema = z.strictObject({
   code: drawCodeSchema,

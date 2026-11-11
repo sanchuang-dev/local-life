@@ -12,7 +12,7 @@ Issue #174 的服务端实现；建立在 #173 的真实奖品池上。H5 入口
 
 - GET /activities/:activityId/draw-state：允许匿名查看登录状态与不可用原因，已登录用户可看到北京时间当日次数与剩余次数。
 - POST /activities/:activityId/draw：居民登录、CSRF、可信 Origin，body 必须仅含 idempotencyKey UUID。系统自己判断用户、社区、活动、库存、随机结果；返回持久化中奖或未中奖。
-- GET /activities/:activityId/draw-history：仅当前登录用户自己的历史和中奖凭据（最多最近 200 条）。只有 active 凭据返回完整码，核销后只返回尾号。
+- GET /activities/:activityId/draw-history：仅当前登录用户自己的历史和中奖凭据（最近 200 条抽奖记录，同时独立返回所有尚未核销的中奖凭据，不受历史条数限制）。只有 active 凭据返回完整码，核销后只返回尾号。
 - POST /admin/activities/:activityId/draw-verify：授权员工验证码的有效性与状态，验证不会核销。
 - POST /admin/activities/:activityId/draw-redeem：授权员工核销 active 中奖码，成功且只能一次，重复为 409。
 - POST /admin/activities/:activityId/draw-revoke：有奖品池管理权限的工作人员撤销尚未使用的码并留下审计理由；已经核销的中奖只能追加 disputed 事件，不得抹除既有核销。
