@@ -1469,10 +1469,15 @@ test('linked receipt attribution refuses an operator instead of treating recorde
   }
 })
 
-test('locked reconciliation periods refuse newly linked receipts, preserving frozen totals', async () => {
+test('a locked registration period refuses newly linked receipts even if verification was on another day', async () => {
   const world = await makeWorld()
   try {
     markOrderVerified(world, world.localOrderId)
+    // Registered Nov 2 inside the locked period, verified Nov 8 outside it.
+    // Looking only at verifiedAt would illegally bypass the frozen original.
+    world.sqlite.prepare('UPDATE local_orders SET verified_at=?, updated_at=? WHERE id=?')
+      .run(Date.parse('2026-11-08T03:00:00Z'), Date.parse('2026-11-08T03:00:00Z'),
+        world.localOrderId)
     syncLedgerFacts(world.db, adminActor(world), { from: PERIOD_FROM, to: PERIOD_TO }, { now: CLOCK })
     const batch = createBatch(world.db, adminActor(world),
       { periodFrom: PERIOD_FROM, periodTo: PERIOD_TO }, { now: CLOCK })
@@ -1493,6 +1498,27 @@ test('locked reconciliation periods refuse newly linked receipts, preserving fro
       .get() as { n: number }).n, 0)
     const after = getBatchEntries(world.db, batch.batchId, { now: CLOCK })
     assert.equal(after.stored.totalCents, locked.totalCents)
+  } finally {
+    world.cleanup()
+  }
+})
+
+test('long receipt evidence retains the full proof while keeping response display number bounded', async () => {
+  const world = await makeWorld()
+  try {
+    markOrderVerified(world, world.localOrderId)
+    const session = await adminSession(world.app)
+    const proof = 'BANK-' + 'A'.repeat(130)
+    const response = await api(world.app, 'POST', '/admin/ledger/payments', {
+      session, body: linkedReceiptRequest(world, {
+        evidenceRef: proof,
+        sourceId: 'long-proof-166',
+      }),
+    })
+    assert.equal(response.status, 201)
+    const entry = ledgerEntrySchema.parse(await response.json())
+    assert.equal(entry.sourceDisplayNo.length, 80)
+    assert.equal(entry.evidence.ref, proof)
   } finally {
     world.cleanup()
   }

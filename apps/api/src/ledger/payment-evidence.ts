@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte } from 'drizzle-orm'
+import { and, desc, eq, gte, lte, or } from 'drizzle-orm'
 import {
   API_ERROR_CODES,
   ledgerOrderEvidenceSchema,
@@ -29,13 +29,22 @@ export function isOrderInLockedPeriod(
   db: AppDatabase,
   order: { verifiedAt: Date | null; createdAt: Date },
 ): boolean {
-  const day = toShanghaiBusinessDate(order.verifiedAt ?? order.createdAt)
+  const registeredDay = toShanghaiBusinessDate(order.createdAt)
+  const verifiedDay = order.verifiedAt
+    ? toShanghaiBusinessDate(order.verifiedAt)
+    : registeredDay
   return Boolean(db.select({ id: reconciliationBatches.id })
     .from(reconciliationBatches)
     .where(and(
       eq(reconciliationBatches.status, 'locked'),
-      lte(reconciliationBatches.periodFrom, day),
-      gte(reconciliationBatches.periodTo, day),
+      // A frozen *registration* cannot be amended by a verification on a
+      // different business date. Check both days, not just the last one.
+      or(
+        and(lte(reconciliationBatches.periodFrom, registeredDay),
+          gte(reconciliationBatches.periodTo, registeredDay)),
+        and(lte(reconciliationBatches.periodFrom, verifiedDay),
+          gte(reconciliationBatches.periodTo, verifiedDay)),
+      ),
       gte(reconciliationBatches.lockedAt, order.createdAt),
     )).get())
 }

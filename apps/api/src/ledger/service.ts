@@ -52,6 +52,7 @@ import {
   type LocalTransaction,
 } from './shared.js'
 import { cutoffMsOf, membershipConditions } from './reconciliation-service.js'
+import { isOrderInLockedPeriod } from './payment-evidence.js'
 
 /**
  * Write side of the ledger (LL-MVP-008, Issue #64): fact ingestion, manual
@@ -790,16 +791,7 @@ export function recordPayment(
           .where(eq(ledgerPaymentOrderLinks.evidenceKey, evidenceKey)).get()) {
           throw new LocalError(409, API_ERROR_CODES.conflict, '该收款凭据已被另一笔订单使用')
         }
-        const orderBusinessDay = toShanghaiBusinessDate(order.verifiedAt ?? order.createdAt)
-        const locked = tx.select({ id: reconciliationBatches.id })
-          .from(reconciliationBatches)
-          .where(and(
-            eq(reconciliationBatches.status, 'locked'),
-            lte(reconciliationBatches.periodFrom, orderBusinessDay),
-            gte(reconciliationBatches.periodTo, orderBusinessDay),
-            gte(reconciliationBatches.lockedAt, order.createdAt),
-          )).get()
-        if (locked) {
+        if (isOrderInLockedPeriod(db, order)) {
           throw new LocalError(409, API_ERROR_CODES.ledgerBatchLocked,
             '订单已处于锁定对账期间，不能补记关联收款')
         }
@@ -808,7 +800,9 @@ export function recordPayment(
         factKind: 'payment_received',
         sourceSystem: 'manual',
         sourceId,
-        sourceDisplayNo: body.sourceDisplayNo ?? body.evidenceRef,
+        // API detail contract caps the human display number at 80 chars;
+        // retain the complete proof number separately in evidenceRef.
+        sourceDisplayNo: body.sourceDisplayNo ?? body.evidenceRef.slice(0, 80),
         communityId: body.communityId,
         productId: null,
         // A receipt names who took the money, not who it belongs to. Attribution
