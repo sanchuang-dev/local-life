@@ -1779,6 +1779,17 @@ test('settlement candidate API: no contracts, no receipt, correct scoped pending
     assert.equal((await api(world.app, 'GET',
       '/admin/settlement/candidates?from=2026-11-30&to=2026-11-01',
       { session })).status, 400)
+    for (const badDay of ['2026-02-31', '2026-11-00', '2026-04-31', '2025-02-29']) {
+      for (const key of ['from', 'to']) {
+        const rejected = await api(world.app, 'GET',
+          '/admin/settlement/candidates?' + key + '=' + badDay, { session })
+        assert.equal(rejected.status, 400,
+          'impossible calendar day ' + key + '=' + badDay + ' must not roll into another month')
+      }
+    }
+    const leapDay = await api(world.app, 'GET',
+      '/admin/settlement/candidates?from=2028-02-29&to=2028-02-29', { session })
+    assert.equal(leapDay.status, 200, 'valid leap date must be accepted')
   } finally {
     world.cleanup()
   }
