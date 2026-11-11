@@ -2938,6 +2938,14 @@ test('payment proof rejects duplicate proof, wrong beneficiary, overpay, unsafe 
     assert.equal((await api(world.app,'POST',paymentsUrl187(locked.statementId),{
       session:locked.session,body:{
         ...sellerRequest,
+        proofRefMasked:'银行卡 ６２２２０２１２３４５６７８９０１２３',
+        idempotencyKey:randomUUID(),
+      },
+    })).status,400,'Unicode-width full account/card references must be rejected')
+
+    assert.equal((await api(world.app,'POST',paymentsUrl187(locked.statementId),{
+      session:locked.session,body:{
+        ...sellerRequest,
         proofRefMasked:'',
         idempotencyKey:randomUUID(),
       },
