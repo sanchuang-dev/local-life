@@ -915,6 +915,7 @@ export const settlementStatementListResponseSchema = z.strictObject({
   page: z.number().int().min(1),
   pageSize: z.number().int().min(1).max(100),
 })
+export type SettlementStatementListResponse = z.infer<typeof settlementStatementListResponseSchema>
 
 /* -------------------------------------------------------------------------- */
 /* Overview                                                                   */
