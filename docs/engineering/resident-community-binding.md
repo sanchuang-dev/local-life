@@ -1,4 +1,4 @@
-# LL-IDENTITY-001 (#171) · 常驻社区唯一绑定：迁移风险与历史归属预检
+﻿# LL-IDENTITY-001 (#171) · 常驻社区唯一绑定：迁移风险与历史归属预检
 
 > 对应 [Issue #171](https://github.com/sanchuang-dev/local-life/issues/171)。本文只描述**当前代码与迁移的真实行为**、**历史数据的只读预检方法**和**必须人工裁决的条件**。它不代表任何线上数据库已被检查或清理。
 
@@ -22,7 +22,7 @@
 | `resident_community_binding_candidates` | **新增**服务端派生的一次性「绑定候选」，`user_id` 为主键 | 登录时可写、确认时删除、7 天后读不到 |
 | `audit_logs` | 确认与候选的审计证据 | 只追加 |
 
-关键约束（数据库层，不依赖应用判断，见 `apps/api/db/migrations/0018_smiling_stardust.sql`）：
+关键约束（数据库层，不依赖应用判断，见 `apps/api/db/migrations/0020_ll_identity_001_binding.sql`）：
 
 - `resident_community_bindings_user_confirmed_uq`：对 `(user_id)` 的**部分唯一索引**，条件 `WHERE status = 'confirmed'`；
 - `resident_community_bindings_status_check`：`status` 目前只允许 `'confirmed'`，因此上面那条部分索引实际覆盖全表，任何第二条 confirmed 都不可能存在；
@@ -44,7 +44,7 @@
 
 迁移只做两件事：
 
-1. 建两张新表与索引（`0018_smiling_stardust.sql`）；
+1. 建两张新表与索引（`0020_ll_identity_001_binding.sql`）；
 2. **不做任何**从 `resident_community_assignments` 到 `resident_community_bindings` 的批量转换、不复制、不删除、不改列。
 
 因此迁移后：

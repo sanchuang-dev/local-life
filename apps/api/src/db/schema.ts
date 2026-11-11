@@ -1665,6 +1665,125 @@ export const localOrders = sqliteTable(
   ],
 )
 
+
+/* -------------------------------------------------------------------------- */
+/* Independently identified settlement parties and immutable sales provenance */
+/* (#183). Never derive a seller from product community or the order creator. */
+/* -------------------------------------------------------------------------- */
+
+export const settlementParties = sqliteTable('settlement_parties', {
+  id: text('id').primaryKey(),
+  role: text('role').$type<'seller' | 'sanchuang' | 'guangdian'>().notNull(),
+  legalName: text('legal_name').notNull(),
+  registryRef: text('registry_ref').notNull(),
+  verificationRef: text('verification_ref'),
+  verifiedAt: integer('verified_at', { mode: 'timestamp_ms' }),
+  createdByUserId: text('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  index('settlement_parties_role_registry_idx').on(table.role, table.registryRef),
+  uniqueIndex('settlement_parties_verified_version_uq')
+    .on(table.role, table.registryRef, table.verificationRef)
+    .where(sql.raw('verification_ref IS NOT NULL')),
+  uniqueIndex('settlement_parties_pending_version_uq')
+    .on(table.role, table.registryRef)
+    .where(sql.raw('verification_ref IS NULL')),
+  check('settlement_parties_role_check',
+    sql.raw("role IN ('seller','sanchuang','guangdian')")),
+  check('settlement_parties_verification_check',
+    sql.raw("(verified_at IS NULL AND verification_ref IS NULL) OR (verified_at IS NOT NULL AND verification_ref IS NOT NULL)")),
+])
+
+/** Effective-dated, disjoint mapping versions; no retroactive UPDATE/DELETE. */
+export const settlementProductMappings = sqliteTable('settlement_product_mappings', {
+  id: text('id').primaryKey(),
+  communityId: text('community_id').notNull().references(() => communities.id, { onDelete: 'restrict' }),
+  productId: text('product_id').notNull().references(() => localProducts.id, { onDelete: 'restrict' }),
+  sellerPartyId: text('seller_party_id').notNull().references(() => settlementParties.id, { onDelete: 'restrict' }),
+  sanchuangPartyId: text('sanchuang_party_id').references(() => settlementParties.id, { onDelete: 'restrict' }),
+  guangdianPartyId: text('guangdian_party_id').references(() => settlementParties.id, { onDelete: 'restrict' }),
+  agreementRef: text('agreement_ref').notNull(),
+  effectiveFrom: text('effective_from').notNull(),
+  effectiveTo: text('effective_to').notNull(),
+  createdByUserId: text('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  index('settlement_mapping_community_product_idx').on(table.communityId, table.productId),
+  index('settlement_mapping_seller_idx').on(table.sellerPartyId),
+  check('settlement_mapping_period_check', sql.raw('effective_from <= effective_to')),
+])
+
+/**
+ * Human-confirmed order-to-merchant snapshot. Missing row means missing seller;
+ * adding a backdated product mapping never silently changes an existing order.
+ */
+export const settlementOrderPartySnapshots = sqliteTable('settlement_order_party_snapshots', {
+  orderId: text('order_id').primaryKey().references(() => localOrders.id, { onDelete: 'restrict' }),
+  mappingId: text('mapping_id').notNull().references(() => settlementProductMappings.id, { onDelete: 'restrict' }),
+  sellerPartyId: text('seller_party_id').notNull().references(() => settlementParties.id, { onDelete: 'restrict' }),
+  sanchuangPartyId: text('sanchuang_party_id').references(() => settlementParties.id, { onDelete: 'restrict' }),
+  guangdianPartyId: text('guangdian_party_id').references(() => settlementParties.id, { onDelete: 'restrict' }),
+  agreementRef: text('agreement_ref').notNull(),
+  confirmationRef: text('confirmation_ref').notNull(),
+  confirmedByUserId: text('confirmed_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  confirmedAt: integer('confirmed_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  index('settlement_order_party_mapping_idx').on(table.mappingId),
+])
+
+/**
+ * A contract RATE is a separate, immutable, admin-attested version, scoped
+ * to a fully verified #183 sales mapping. No rate is seeded at startup.
+ * Final payable statements belong to #186, not this table.
+ */
+export const settlementRuleVersions = sqliteTable('settlement_rule_versions', {
+  id: text('id').primaryKey(),
+  mappingId: text('mapping_id').notNull()
+    .references(() => settlementProductMappings.id, { onDelete: 'restrict' }),
+  version: integer('version').notNull(),
+  communityId: text('community_id').notNull()
+    .references(() => communities.id, { onDelete: 'restrict' }),
+  productId: text('product_id').notNull()
+    .references(() => localProducts.id, { onDelete: 'restrict' }),
+  sellerPartyId: text('seller_party_id').notNull()
+    .references(() => settlementParties.id, { onDelete: 'restrict' }),
+  sanchuangPartyId: text('sanchuang_party_id').notNull()
+    .references(() => settlementParties.id, { onDelete: 'restrict' }),
+  guangdianPartyId: text('guangdian_party_id').notNull()
+    .references(() => settlementParties.id, { onDelete: 'restrict' }),
+  agreementRef: text('agreement_ref').notNull(),
+  approvalEvidenceRef: text('approval_evidence_ref').notNull(),
+  approvalOn: text('approval_on').notNull(),
+  effectiveFrom: text('effective_from').notNull(),
+  effectiveTo: text('effective_to').notNull(),
+  feeBase: text('fee_base').$type<'actual_received'>().notNull(),
+  processorFeeBps: integer('processor_fee_bps').notNull(),
+  processorFeeOwner: text('processor_fee_owner')
+    .$type<'none' | 'seller' | 'sanchuang' | 'guangdian'>().notNull(),
+  sellerRateBps: integer('seller_rate_bps').notNull(),
+  sanchuangRateBps: integer('sanchuang_rate_bps').notNull(),
+  guangdianRateBps: integer('guangdian_rate_bps').notNull(),
+  roundingRecipient: text('rounding_recipient')
+    .$type<'seller' | 'sanchuang' | 'guangdian'>().notNull(),
+  roundingPolicy: text('rounding_policy').$type<'floor_then_named_remainder'>().notNull(),
+  processorFeeRounding: text('processor_fee_rounding').$type<'floor'>().notNull(),
+  reversalPolicy: text('reversal_policy').$type<'full_reversal_blocks'>().notNull(),
+  partialRefundPolicy: text('partial_refund_policy').$type<'unsupported_blocks'>().notNull(),
+  approvalStatus: text('approval_status').$type<'admin_attested'>().notNull(),
+  approvedByUserId: text('approved_by_user_id').notNull()
+    .references(() => users.id, { onDelete: 'restrict' }),
+  approvedAt: integer('approved_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  uniqueIndex('settlement_rule_mapping_version_uq').on(table.mappingId, table.version),
+  uniqueIndex('settlement_rule_mapping_approval_uq').on(table.mappingId, table.approvalEvidenceRef),
+  index('settlement_rule_period_idx').on(table.communityId, table.productId, table.effectiveFrom, table.effectiveTo),
+  check('settlement_rule_version_positive', sql`${table.version} >= 1`),
+  check('settlement_rule_dates_check', sql`${table.approvalOn} <= ${table.effectiveFrom} AND ${table.effectiveFrom} <= ${table.effectiveTo}`),
+  check('settlement_rule_rate_sum_check', sql`${table.sellerRateBps} >= 0 AND ${table.sanchuangRateBps} >= 0 AND ${table.guangdianRateBps} >= 0 AND ${table.sellerRateBps} + ${table.sanchuangRateBps} + ${table.guangdianRateBps} = 10000`),
+  check('settlement_rule_fee_check', sql`${table.processorFeeBps} BETWEEN 0 AND 10000 AND ((${table.processorFeeBps} = 0 AND ${table.processorFeeOwner} = 'none') OR (${table.processorFeeBps} > 0 AND ${table.processorFeeOwner} IN ('seller','sanchuang','guangdian')))`),
+  check('settlement_rule_terms_check', sql`${table.feeBase} = 'actual_received' AND ${table.roundingRecipient} IN ('seller','sanchuang','guangdian') AND ${table.roundingPolicy} = 'floor_then_named_remainder' AND ${table.processorFeeRounding} = 'floor' AND ${table.reversalPolicy} = 'full_reversal_blocks' AND ${table.partialRefundPolicy} = 'unsupported_blocks' AND ${table.approvalStatus} = 'admin_attested'`),
+])
+
 /**
  * Append-only local-order timeline. `source_type` + `source_id` are the stable
  * consumption contract for downstream work (#64): a consumer must be able to
@@ -2329,6 +2448,10 @@ export const schema = {
   activityDrawFulfilmentEvents,
   localProducts,
   localOrders,
+  settlementParties,
+  settlementProductMappings,
+  settlementOrderPartySnapshots,
+  settlementRuleVersions,
   localOrderEvents,
   reconciliationBatches,
   ledgerEntries,

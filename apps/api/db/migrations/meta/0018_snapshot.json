@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "c98fd47d-2e28-455c-b43a-b08fc5fdfd78",
+  "id": "b4f3a382-6c1d-4e0c-b170-c35dd309be18",
   "prevId": "e47d8a90-83e1-4a2e-a096-f47f074c00e1",
   "tables": {
     "activities": {
@@ -5578,86 +5578,6 @@
         }
       }
     },
-    "ledger_payment_order_links": {
-      "name": "ledger_payment_order_links",
-      "columns": {
-        "order_id": {
-          "name": "order_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "entry_id": {
-          "name": "entry_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "evidence_key": {
-          "name": "evidence_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "ledger_payment_order_links_entry_uq": {
-          "name": "ledger_payment_order_links_entry_uq",
-          "columns": [
-            "entry_id"
-          ],
-          "isUnique": true
-        },
-        "ledger_payment_order_links_evidence_uq": {
-          "name": "ledger_payment_order_links_evidence_uq",
-          "columns": [
-            "evidence_key"
-          ],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {
-        "ledger_payment_order_links_order_id_local_orders_id_fk": {
-          "name": "ledger_payment_order_links_order_id_local_orders_id_fk",
-          "tableFrom": "ledger_payment_order_links",
-          "tableTo": "local_orders",
-          "columnsFrom": [
-            "order_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "ledger_payment_order_links_entry_id_ledger_entries_id_fk": {
-          "name": "ledger_payment_order_links_entry_id_ledger_entries_id_fk",
-          "tableFrom": "ledger_payment_order_links",
-          "tableTo": "ledger_entries",
-          "columnsFrom": [
-            "entry_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "local_order_events": {
       "name": "local_order_events",
       "columns": {
@@ -6859,245 +6779,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "resident_community_binding_candidates": {
-      "name": "resident_community_binding_candidates",
-      "columns": {
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "community_id": {
-          "name": "community_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "source": {
-          "name": "source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "suggested_at": {
-          "name": "suggested_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "resident_community_candidates_community_idx": {
-          "name": "resident_community_candidates_community_idx",
-          "columns": [
-            "community_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "resident_community_binding_candidates_user_id_users_id_fk": {
-          "name": "resident_community_binding_candidates_user_id_users_id_fk",
-          "tableFrom": "resident_community_binding_candidates",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "resident_community_binding_candidates_community_id_communities_id_fk": {
-          "name": "resident_community_binding_candidates_community_id_communities_id_fk",
-          "tableFrom": "resident_community_binding_candidates",
-          "tableTo": "communities",
-          "columnsFrom": [
-            "community_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "resident_community_candidates_source_check": {
-          "name": "resident_community_candidates_source_check",
-          "value": "\"resident_community_binding_candidates\".\"source\" IN ('activity_oauth_candidate')"
-        },
-        "resident_community_candidates_expiry_check": {
-          "name": "resident_community_candidates_expiry_check",
-          "value": "\"resident_community_binding_candidates\".\"expires_at\" > \"resident_community_binding_candidates\".\"suggested_at\""
-        }
-      }
-    },
-    "resident_community_bindings": {
-      "name": "resident_community_bindings",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "community_id": {
-          "name": "community_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'confirmed'"
-        },
-        "confirmed_at": {
-          "name": "confirmed_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "source": {
-          "name": "source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "confirmed_by_user_id": {
-          "name": "confirmed_by_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "evidence_ref": {
-          "name": "evidence_ref",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "resident_community_bindings_user_confirmed_uq": {
-          "name": "resident_community_bindings_user_confirmed_uq",
-          "columns": [
-            "user_id"
-          ],
-          "isUnique": true,
-          "where": "\"resident_community_bindings\".\"status\" = 'confirmed'"
-        },
-        "resident_community_bindings_community_idx": {
-          "name": "resident_community_bindings_community_idx",
-          "columns": [
-            "community_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "resident_community_bindings_user_id_users_id_fk": {
-          "name": "resident_community_bindings_user_id_users_id_fk",
-          "tableFrom": "resident_community_bindings",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "resident_community_bindings_community_id_communities_id_fk": {
-          "name": "resident_community_bindings_community_id_communities_id_fk",
-          "tableFrom": "resident_community_bindings",
-          "tableTo": "communities",
-          "columnsFrom": [
-            "community_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "resident_community_bindings_confirmed_by_user_id_users_id_fk": {
-          "name": "resident_community_bindings_confirmed_by_user_id_users_id_fk",
-          "tableFrom": "resident_community_bindings",
-          "tableTo": "users",
-          "columnsFrom": [
-            "confirmed_by_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "resident_community_bindings_status_check": {
-          "name": "resident_community_bindings_status_check",
-          "value": "\"resident_community_bindings\".\"status\" = 'confirmed'"
-        },
-        "resident_community_bindings_source_check": {
-          "name": "resident_community_bindings_source_check",
-          "value": "\"resident_community_bindings\".\"source\" IN ('resident_h5_confirmed', 'admin_compliance_correction')"
-        },
-        "resident_community_bindings_evidence_check": {
-          "name": "resident_community_bindings_evidence_check",
-          "value": "length(\"resident_community_bindings\".\"evidence_ref\") > 0"
-        }
-      }
-    },
     "resident_phone_identities": {
       "name": "resident_phone_identities",
       "columns": {
@@ -7839,6 +7520,550 @@
           "value": "(\"wechat_oauth_configs\".\"status\" = 'active'\n          AND \"wechat_oauth_configs\".\"verified_at\" IS NOT NULL\n          AND \"wechat_oauth_configs\".\"activated_at\" IS NOT NULL\n          AND \"wechat_oauth_configs\".\"retired_at\" IS NULL)\n        OR (\"wechat_oauth_configs\".\"status\" = 'retired'\n          AND \"wechat_oauth_configs\".\"retired_at\" IS NOT NULL)\n        OR (\"wechat_oauth_configs\".\"status\" = 'verified'\n          AND \"wechat_oauth_configs\".\"verified_at\" IS NOT NULL\n          AND \"wechat_oauth_configs\".\"activated_at\" IS NULL\n          AND \"wechat_oauth_configs\".\"retired_at\" IS NULL)\n        OR (\"wechat_oauth_configs\".\"status\" IN ('draft', 'failed')\n          AND \"wechat_oauth_configs\".\"verified_at\" IS NULL\n          AND \"wechat_oauth_configs\".\"activated_at\" IS NULL\n          AND \"wechat_oauth_configs\".\"retired_at\" IS NULL)"
         }
       }
+    },
+    "ledger_payment_order_links": {
+      "name": "ledger_payment_order_links",
+      "columns": {
+        "order_id": {
+          "name": "order_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entry_id": {
+          "name": "entry_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "evidence_key": {
+          "name": "evidence_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "ledger_payment_order_links_entry_uq": {
+          "name": "ledger_payment_order_links_entry_uq",
+          "columns": [
+            "entry_id"
+          ],
+          "isUnique": true
+        },
+        "ledger_payment_order_links_evidence_uq": {
+          "name": "ledger_payment_order_links_evidence_uq",
+          "columns": [
+            "evidence_key"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "ledger_payment_order_links_order_id_local_orders_id_fk": {
+          "name": "ledger_payment_order_links_order_id_local_orders_id_fk",
+          "tableFrom": "ledger_payment_order_links",
+          "tableTo": "local_orders",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "ledger_payment_order_links_entry_id_ledger_entries_id_fk": {
+          "name": "ledger_payment_order_links_entry_id_ledger_entries_id_fk",
+          "tableFrom": "ledger_payment_order_links",
+          "tableTo": "ledger_entries",
+          "columnsFrom": [
+            "entry_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "settlement_parties": {
+      "name": "settlement_parties",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "legal_name": {
+          "name": "legal_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "registry_ref": {
+          "name": "registry_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "verification_ref": {
+          "name": "verification_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "verified_at": {
+          "name": "verified_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "settlement_parties_role_registry_idx": {
+          "name": "settlement_parties_role_registry_idx",
+          "columns": [
+            "role",
+            "registry_ref"
+          ],
+          "isUnique": false
+        },
+        "settlement_parties_verified_version_uq": {
+          "name": "settlement_parties_verified_version_uq",
+          "columns": [
+            "role",
+            "registry_ref",
+            "verification_ref"
+          ],
+          "isUnique": true,
+          "where": "verification_ref IS NOT NULL"
+        },
+        "settlement_parties_pending_version_uq": {
+          "name": "settlement_parties_pending_version_uq",
+          "columns": [
+            "role",
+            "registry_ref"
+          ],
+          "isUnique": true,
+          "where": "verification_ref IS NULL"
+        }
+      },
+      "foreignKeys": {
+        "settlement_parties_created_by_user_id_users_id_fk": {
+          "name": "settlement_parties_created_by_user_id_users_id_fk",
+          "tableFrom": "settlement_parties",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "settlement_parties_role_check": {
+          "name": "settlement_parties_role_check",
+          "value": "role IN ('seller','sanchuang','guangdian')"
+        },
+        "settlement_parties_verification_check": {
+          "name": "settlement_parties_verification_check",
+          "value": "(verified_at IS NULL AND verification_ref IS NULL) OR (verified_at IS NOT NULL AND verification_ref IS NOT NULL)"
+        }
+      }
+    },
+    "settlement_product_mappings": {
+      "name": "settlement_product_mappings",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "community_id": {
+          "name": "community_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "product_id": {
+          "name": "product_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "seller_party_id": {
+          "name": "seller_party_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sanchuang_party_id": {
+          "name": "sanchuang_party_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "guangdian_party_id": {
+          "name": "guangdian_party_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "agreement_ref": {
+          "name": "agreement_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "effective_from": {
+          "name": "effective_from",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "effective_to": {
+          "name": "effective_to",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "settlement_mapping_community_product_idx": {
+          "name": "settlement_mapping_community_product_idx",
+          "columns": [
+            "community_id",
+            "product_id"
+          ],
+          "isUnique": false
+        },
+        "settlement_mapping_seller_idx": {
+          "name": "settlement_mapping_seller_idx",
+          "columns": [
+            "seller_party_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "settlement_product_mappings_community_id_communities_id_fk": {
+          "name": "settlement_product_mappings_community_id_communities_id_fk",
+          "tableFrom": "settlement_product_mappings",
+          "tableTo": "communities",
+          "columnsFrom": [
+            "community_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "settlement_product_mappings_product_id_local_products_id_fk": {
+          "name": "settlement_product_mappings_product_id_local_products_id_fk",
+          "tableFrom": "settlement_product_mappings",
+          "tableTo": "local_products",
+          "columnsFrom": [
+            "product_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "settlement_product_mappings_seller_party_id_settlement_parties_id_fk": {
+          "name": "settlement_product_mappings_seller_party_id_settlement_parties_id_fk",
+          "tableFrom": "settlement_product_mappings",
+          "tableTo": "settlement_parties",
+          "columnsFrom": [
+            "seller_party_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "settlement_product_mappings_sanchuang_party_id_settlement_parties_id_fk": {
+          "name": "settlement_product_mappings_sanchuang_party_id_settlement_parties_id_fk",
+          "tableFrom": "settlement_product_mappings",
+          "tableTo": "settlement_parties",
+          "columnsFrom": [
+            "sanchuang_party_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "settlement_product_mappings_guangdian_party_id_settlement_parties_id_fk": {
+          "name": "settlement_product_mappings_guangdian_party_id_settlement_parties_id_fk",
+          "tableFrom": "settlement_product_mappings",
+          "tableTo": "settlement_parties",
+          "columnsFrom": [
+            "guangdian_party_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "settlement_product_mappings_created_by_user_id_users_id_fk": {
+          "name": "settlement_product_mappings_created_by_user_id_users_id_fk",
+          "tableFrom": "settlement_product_mappings",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "settlement_mapping_period_check": {
+          "name": "settlement_mapping_period_check",
+          "value": "effective_from <= effective_to"
+        }
+      }
+    },
+    "settlement_order_party_snapshots": {
+      "name": "settlement_order_party_snapshots",
+      "columns": {
+        "order_id": {
+          "name": "order_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "mapping_id": {
+          "name": "mapping_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "seller_party_id": {
+          "name": "seller_party_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sanchuang_party_id": {
+          "name": "sanchuang_party_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "guangdian_party_id": {
+          "name": "guangdian_party_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "agreement_ref": {
+          "name": "agreement_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "confirmation_ref": {
+          "name": "confirmation_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "confirmed_by_user_id": {
+          "name": "confirmed_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "confirmed_at": {
+          "name": "confirmed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "settlement_order_party_mapping_idx": {
+          "name": "settlement_order_party_mapping_idx",
+          "columns": [
+            "mapping_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "settlement_order_party_snapshots_order_id_local_orders_id_fk": {
+          "name": "settlement_order_party_snapshots_order_id_local_orders_id_fk",
+          "tableFrom": "settlement_order_party_snapshots",
+          "tableTo": "local_orders",
+          "columnsFrom": [
+            "order_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "settlement_order_party_snapshots_mapping_id_settlement_product_mappings_id_fk": {
+          "name": "settlement_order_party_snapshots_mapping_id_settlement_product_mappings_id_fk",
+          "tableFrom": "settlement_order_party_snapshots",
+          "tableTo": "settlement_product_mappings",
+          "columnsFrom": [
+            "mapping_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "settlement_order_party_snapshots_seller_party_id_settlement_parties_id_fk": {
+          "name": "settlement_order_party_snapshots_seller_party_id_settlement_parties_id_fk",
+          "tableFrom": "settlement_order_party_snapshots",
+          "tableTo": "settlement_parties",
+          "columnsFrom": [
+            "seller_party_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "settlement_order_party_snapshots_sanchuang_party_id_settlement_parties_id_fk": {
+          "name": "settlement_order_party_snapshots_sanchuang_party_id_settlement_parties_id_fk",
+          "tableFrom": "settlement_order_party_snapshots",
+          "tableTo": "settlement_parties",
+          "columnsFrom": [
+            "sanchuang_party_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "settlement_order_party_snapshots_guangdian_party_id_settlement_parties_id_fk": {
+          "name": "settlement_order_party_snapshots_guangdian_party_id_settlement_parties_id_fk",
+          "tableFrom": "settlement_order_party_snapshots",
+          "tableTo": "settlement_parties",
+          "columnsFrom": [
+            "guangdian_party_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "settlement_order_party_snapshots_confirmed_by_user_id_users_id_fk": {
+          "name": "settlement_order_party_snapshots_confirmed_by_user_id_users_id_fk",
+          "tableFrom": "settlement_order_party_snapshots",
+          "tableTo": "users",
+          "columnsFrom": [
+            "confirmed_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
     }
   },
   "views": {},

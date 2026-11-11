@@ -131,8 +131,22 @@
     {
       "idx": 18,
       "version": "6",
-      "when": 1794377245225,
-      "tag": "0018_smiling_stardust",
+      "when": 1794368000000,
+      "tag": "0018_settlement_parties",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1794369000000,
+      "tag": "0019_settlement_rules",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1794380290612,
+      "tag": "0020_ll_identity_001_binding",
       "breakpoints": true
     }
   ]

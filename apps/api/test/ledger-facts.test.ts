@@ -1523,3 +1523,859 @@ test('long receipt evidence retains the full proof while keeping response displa
     world.cleanup()
   }
 })
+
+
+/* -------------------------------------------------------------------------- */
+/* #183 · real seller identity is never inferred from an order/community      */
+/* -------------------------------------------------------------------------- */
+
+test('settlement party API: no configured seller, explicit verified mapping and immutable order snapshot', async () => {
+  const world = await makeWorld()
+  try {
+    const session = await adminSession(world.app)
+    const prefix = '/admin/settlement'
+    const initial = await api(world.app, 'GET',
+      prefix + '/orders/' + world.localOrderId + '/party', { session })
+    assert.equal(initial.status, 200)
+    assert.equal((await initial.json() as { sellerStatus: string }).sellerStatus, 'missing_seller')
+    const empty = await api(world.app, 'GET', prefix + '/parties', { session })
+    assert.deepEqual((await empty.json() as { items: unknown[] }).items, [])
+
+    const createParty = async (role: string, label: string, proof: string | null) => {
+      const response = await api(world.app, 'POST', prefix + '/parties', {
+        session, body: { role, legalName: label, registryRef: 'TEST-REG-' + role, verificationRef: proof },
+      })
+      assert.equal(response.status, 201)
+      return await response.json() as { id: string; verifiedAt: string | null }
+    }
+    const seller = await createParty('seller', '测试商品销售主体', 'TEST-SELLER-REGISTRY-APPROVAL')
+    const platform = await createParty('sanchuang', '测试三创主体', 'TEST-PLATFORM-APPROVAL')
+    const carrier = await createParty('guangdian', '测试广电主体', 'TEST-CARRIER-APPROVAL')
+    const unverified = await createParty('seller', '尚未核验的商户', null)
+    assert.equal(unverified.verifiedAt, null)
+    const replayParty = await api(world.app, 'POST', prefix + '/parties', {
+      session, body: {
+        role: 'seller', legalName: '重复商户版本',
+        registryRef: 'TEST-REG-seller', verificationRef: 'TEST-SELLER-REGISTRY-APPROVAL',
+      },
+    })
+    assert.equal(replayParty.status, 409, 'same verified identity and evidence cannot produce two versions')
+
+    const productId = (world.sqlite.prepare('SELECT product_id AS id FROM local_orders WHERE id=?')
+      .get(world.localOrderId) as { id: string }).id
+    const body = {
+      communityId: world.communityId, productId,
+      sellerPartyId: seller.id, sanchuangPartyId: platform.id,
+      guangdianPartyId: carrier.id, agreementRef: 'TEST-CONTRACT-2026-001',
+      effectiveFrom: '2026-11-01', effectiveTo: '2026-11-30',
+    }
+    const pendingParty = await api(world.app, 'POST', prefix + '/mappings', {
+      session, body: { ...body, sellerPartyId: unverified.id },
+    })
+    assert.equal(pendingParty.status, 409)
+    const wrongScope = await api(world.app, 'POST', prefix + '/mappings', {
+      session, body: { ...body, communityId: world.otherCommunityId },
+    })
+    assert.equal(wrongScope.status, 403)
+    const mappingResponse = await api(world.app, 'POST', prefix + '/mappings', {
+      session, body,
+    })
+    assert.equal(mappingResponse.status, 201)
+    const mapping = await mappingResponse.json() as { id: string }
+
+    const samePeriod = await api(world.app, 'POST', prefix + '/mappings', {
+      session, body: { ...body, effectiveFrom: '2026-11-15', effectiveTo: '2026-12-15' },
+    })
+    assert.equal(samePeriod.status, 409)
+    const beforeVerified = await api(world.app, 'POST',
+      prefix + '/orders/' + world.localOrderId + '/party', {
+        session, body: { mappingId: mapping.id, confirmationRef: 'TEST-HUMAN-REVIEW-001' },
+      })
+    assert.equal(beforeVerified.status, 409)
+
+    markOrderVerified(world, world.localOrderId)
+    const confirm = await api(world.app, 'POST',
+      prefix + '/orders/' + world.localOrderId + '/party', {
+        session, body: { mappingId: mapping.id, confirmationRef: 'TEST-HUMAN-REVIEW-001' },
+      })
+    assert.equal(confirm.status, 201)
+    const data = await confirm.json() as { sellerPartyId: string; mappingId: string; confirmationRef: string }
+    assert.equal(data.sellerPartyId, seller.id)
+    assert.equal(data.mappingId, mapping.id)
+    assert.equal(data.confirmationRef, 'TEST-HUMAN-REVIEW-001')
+
+    const saved = await api(world.app, 'GET',
+      prefix + '/orders/' + world.localOrderId + '/party', { session })
+    assert.equal(saved.status, 200)
+    assert.equal((await saved.json() as { sellerStatus: string }).sellerStatus, 'verified')
+    const repeated = await api(world.app, 'POST',
+      prefix + '/orders/' + world.localOrderId + '/party', {
+        session, body: { mappingId: mapping.id, confirmationRef: 'TEST-REPLAY' },
+      })
+    assert.equal(repeated.status, 409)
+    assert.throws(() => world.sqlite.prepare(
+      'UPDATE settlement_order_party_snapshots SET agreement_ref=? WHERE order_id=?',
+    ).run('hijack', world.localOrderId), /immutable/)
+    assert.equal((world.sqlite.prepare(
+      "SELECT count(*) AS n FROM audit_logs WHERE event LIKE 'settlement.%'",
+    ).get() as { n: number }).n, 6)
+
+    const nextPeriod = await api(world.app, 'POST', prefix + '/mappings', {
+      session, body: { ...body, effectiveFrom: '2026-12-01', effectiveTo: '2026-12-31' },
+    })
+    assert.equal(nextPeriod.status, 201)
+    const historic = await api(world.app, 'GET',
+      prefix + '/orders/' + world.localOrderId + '/party', { session })
+    assert.equal((await historic.json() as { snapshot: { mappingId: string } }).snapshot.mappingId,
+      mapping.id, 'later product mapping must never change historic order identity')
+  } finally {
+    world.cleanup()
+  }
+})
+
+test('settlement party routes enforce admin writes, CSRF+Origin, grid rejection and scoped reads', async () => {
+  const world = await makeWorld()
+  try {
+    const session = await adminSession(world.app)
+    const grid = await gridSession(world.app)
+    assert.equal((await api(world.app, 'GET', '/admin/settlement/parties', {
+      session: grid,
+    })).status, 403)
+    assert.equal((await api(world.app, 'POST', '/admin/settlement/parties', {
+      session: grid, body: {
+        role: 'seller', legalName: '伪商户', registryRef: 'FAKE', verificationRef: 'FAKE',
+      },
+    })).status, 403)
+    const withoutCsrf = await world.app.request('/admin/settlement/parties', {
+      method: 'POST',
+      headers: {
+        cookie: session.cookies, origin: ADMIN_ORIGIN, 'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        role: 'seller', legalName: '没有防伪令牌', registryRef: 'FAKE',
+        verificationRef: 'FAKE',
+      }),
+    })
+    assert.equal(withoutCsrf.status, 403)
+    const hostileOrigin = await world.app.request('/admin/settlement/parties', {
+      method: 'POST',
+      headers: {
+        cookie: session.cookies,
+        origin: 'https://evil.example',
+        'x-csrf-token': session.csrfToken,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        role: 'seller', legalName: '跨域伪主体', registryRef: 'FAKE',
+        verificationRef: 'FAKE',
+      }),
+    })
+    assert.equal(hostileOrigin.status, 403)
+    const absentOrder = await api(world.app, 'GET',
+      '/admin/settlement/orders/' + randomUUID() + '/party', { session })
+    assert.equal(absentOrder.status, 404)
+    const stranger = { userId: world.operatorUserId,
+      staffId: world.operatorStaffId, role: 'operator' as const }
+    const { listSettlementMappings, listSettlementParties, readOrderPartySnapshot } =
+      await import('../src/ledger/settlement-parties.js')
+    assert.deepEqual(listSettlementMappings(world.db, stranger, world.communityId).items, [])
+    assert.deepEqual(listSettlementParties(world.db, stranger, world.communityId).items, [])
+    assert.throws(() => listSettlementParties(world.db, stranger), /请选择有权社区/)
+    assert.throws(() => readOrderPartySnapshot(world.db, stranger, world.otherOrderId), /无权访问/)
+  } finally {
+    world.cleanup()
+  }
+})
+
+
+test('settlement identity migration 0018 upgrades a populated 0017 DB without touching old facts', async () => {
+  const { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } =
+    await import('node:fs')
+  const root = mkdtempSync(join(tmpdir(), 'll-settlement-upgrade-'))
+  try {
+    const oldMigrations = join(root, 'old')
+    mkdirSync(join(oldMigrations, 'meta'), { recursive: true })
+    for (const name of readdirSync(migrationsFolder)) {
+      if (/^[0-9]{4}_.*\.sql$/u.test(name) && Number(name.slice(0, 4)) < 18) {
+        copyFileSync(join(migrationsFolder, name), join(oldMigrations, name))
+      }
+    }
+    const current = JSON.parse(readFileSync(join(migrationsFolder, 'meta/_journal.json'), 'utf8')) as {
+      entries: Array<{ idx: number; tag: string }>
+    }
+    assert.equal(current.entries.find((entry) => entry.idx === 18)?.tag, '0018_settlement_parties')
+    current.entries = current.entries.filter((entry) => entry.idx < 18)
+    writeFileSync(join(oldMigrations, 'meta/_journal.json'), JSON.stringify(current))
+    const dbPath = join(root, 'legacy.sqlite')
+    const legacy = createDatabase(dbPath, oldMigrations)
+    const communityId = randomUUID()
+    legacy.db.insert(communities).values({
+      id: communityId, name: '升级前已有社区',
+      createdAt: new Date('2026-11-01T00:00:00Z'),
+    }).run()
+    legacy.sqlite.close()
+
+    const upgraded = createDatabase(dbPath, migrationsFolder)
+    try {
+      const name = upgraded.sqlite.prepare('SELECT name FROM communities WHERE id=?')
+        .get(communityId) as { name: string }
+      assert.equal(name.name, '升级前已有社区')
+      const tables = upgraded.sqlite.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'settlement_%'",
+      ).all() as Array<{ name: string }>
+      const originalIdentityTables = [
+        'settlement_order_party_snapshots',
+        'settlement_parties',
+        'settlement_product_mappings',
+      ]
+      assert.deepEqual(
+        tables.map((row) => row.name)
+          .filter((name) => originalIdentityTables.includes(name)).sort(),
+        originalIdentityTables.slice().sort(),
+        '0018 identity tables must survive migration to the current schema',
+      )
+      assert.equal((upgraded.sqlite.prepare(
+        'SELECT count(*) AS n FROM ledger_entries',
+      ).get() as { n: number }).n, 0)
+    } finally {
+      upgraded.sqlite.close()
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+/* -------------------------------------------------------------------------- */
+/* #184 · read-only pending settlement candidate projection                     */
+/* -------------------------------------------------------------------------- */
+
+test('settlement candidate API: no contracts, no receipt, correct scoped pending amounts', async () => {
+  const world = await makeWorld()
+  try {
+    const session = await adminSession(world.app)
+    const response = await api(world.app, 'GET',
+      '/admin/settlement/candidates?page=1&pageSize=20&communityId=' + world.communityId,
+      { session })
+    assert.equal(response.status, 200)
+    const result = await response.json() as {
+      items: Array<{ orderId: string; receipt: unknown;
+        blockingReasons: string[]; payableAmountCents: number | null;
+        sellerStatus: string }>;
+      total: number; payableAmountCents: number | null;
+      summaryScope: string;
+      summary: { recordedReceiptGrossCents: number; blockedItems: number }
+    }
+    assert.equal(result.total, 1, 'the other community is excluded')
+    assert.equal(result.items[0]?.orderId, world.localOrderId)
+    assert.equal(result.items[0]?.receipt, null)
+    assert.equal(result.items[0]?.payableAmountCents, null)
+    assert.equal(result.payableAmountCents, null)
+    assert.equal(result.summaryScope, 'page')
+    assert.equal(result.summary.recordedReceiptGrossCents, 0)
+    assert.equal(result.summary.blockedItems, 1)
+    assert.equal(result.items[0]?.sellerStatus, 'missing_seller')
+    assert.equal((result.items[0] as {periodSource?:string})?.periodSource, 'order_registration')
+    assert.ok(result.items[0]?.blockingReasons.includes('missing_receipt'))
+    assert.ok(result.items[0]?.blockingReasons.includes('missing_seller'))
+    assert.ok(result.items[0]?.blockingReasons.includes('missing_approved_rule'))
+    const empty = await api(world.app, 'GET',
+      '/admin/settlement/candidates?from=2026-12-01&to=2026-12-31', { session })
+    assert.equal(empty.status, 200)
+    assert.equal((await empty.json() as { total: number }).total, 0)
+    assert.equal((await api(world.app, 'GET',
+      '/admin/settlement/candidates?from=2026-11-30&to=2026-11-01',
+      { session })).status, 400)
+    for (const badDay of ['2026-02-31', '2026-11-00', '2026-04-31', '2025-02-29']) {
+      for (const key of ['from', 'to']) {
+        const rejected = await api(world.app, 'GET',
+          '/admin/settlement/candidates?' + key + '=' + badDay, { session })
+        assert.equal(rejected.status, 400,
+          'impossible calendar day ' + key + '=' + badDay + ' must not roll into another month')
+      }
+    }
+    const leapDay = await api(world.app, 'GET',
+      '/admin/settlement/candidates?from=2028-02-29&to=2028-02-29', { session })
+    assert.equal(leapDay.status, 200, 'valid leap date must be accepted')
+  } finally {
+    world.cleanup()
+  }
+})
+
+test('settlement candidate: linked receipt, confirmed grid, locked facts and reversal never create payout', async () => {
+  const world = await makeWorld()
+  try {
+    const session = await adminSession(world.app)
+    markOrderVerified(world, world.localOrderId)
+    const saved = await api(world.app, 'POST', '/admin/ledger/payments', {
+      session, body: linkedReceiptRequest(world),
+    })
+    assert.equal(saved.status, 201)
+    const payment = ledgerEntrySchema.parse(await saved.json())
+    // Created Nov 2, but receipt actually received Nov 9: the NOV 9 period
+    // must show this order, not silently lose it by using registration date.
+    const crossPeriod = await api(world.app, 'GET',
+      '/admin/settlement/candidates?communityId=' + world.communityId +
+      '&from=2026-11-09&to=2026-11-09', { session })
+    assert.equal(crossPeriod.status, 200)
+    const crossing = await crossPeriod.json() as {
+      total: number; items: Array<{periodSource: string; periodAt: string}>;
+      periodPolicy: string;
+    }
+    assert.equal(crossing.total, 1)
+    assert.equal(crossing.items[0]?.periodSource, 'linked_receipt')
+    assert.equal(crossing.periodPolicy, 'linked_receipt_else_order_registration')
+    assert.equal(crossing.items[0]?.periodAt, '2026-11-09T01:00:00.000Z')
+    const path = '/admin/settlement/candidates?communityId=' + world.communityId
+    const before = await api(world.app, 'GET', path, { session })
+    const pending = (await before.json() as { items: Array<{ blockingReasons: string[] }> }).items[0]
+    assert.ok(pending?.blockingReasons.includes('attribution_pending'))
+    assert.ok(pending?.blockingReasons.includes('receipt_unreconciled'))
+
+    const confirmed = await api(world.app, 'POST', '/admin/ledger/attributions', {
+      session, body: {
+        entryId: payment.entryId, staffId: world.gridStaffId,
+        note: '测试：推广记录及邀请来源交叉核验',
+      },
+    })
+    assert.equal(confirmed.status, 201)
+    syncLedgerFacts(world.db, adminActor(world), {
+      from: '2026-11-01', to: '2026-11-10',
+    }, { now: CLOCK })
+    const batch = createBatch(world.db, adminActor(world), {
+      periodFrom: '2026-11-01', periodTo: '2026-11-10',
+    }, { now: CLOCK })
+    const locked = lockBatch(world.db, adminActor(world), batch.batchId,
+      { expectedUpdatedAt: batch.updatedAt },
+      { now: new Date(CLOCK.getTime() + 60_000) })
+    assert.equal(locked.status, 'locked')
+    const after = await api(world.app, 'GET', path, { session })
+    assert.equal(after.status, 200)
+    const item = (await after.json() as { items: Array<{
+      receipt: { amountCents: number; entryId: string };
+      receiptReconciliationState: string; blockingReasons: string[];
+      payableAmountCents: number | null; settlementAmountStatus: string;
+    }>; summary: { recordedReceiptGrossCents: number } }).items[0]
+    assert.equal(item?.receipt.entryId, payment.entryId)
+    assert.equal(item?.receipt.amountCents, 900)
+    assert.equal(item?.receiptReconciliationState, 'reconciled')
+    assert.equal(item?.blockingReasons.includes('receipt_unreconciled'), false)
+    assert.equal(item?.blockingReasons.includes('attribution_pending'), false)
+    assert.ok(item?.blockingReasons.includes('missing_seller'))
+    assert.ok(item?.blockingReasons.includes('missing_approved_rule'))
+    assert.equal(item?.payableAmountCents, null)
+    assert.equal(item?.settlementAmountStatus, 'pending_rule')
+
+    const reversed = await api(world.app, 'POST',
+      '/admin/ledger/payments/' + payment.entryId + '/reverse', {
+        session, body: { staffId: world.operatorStaffId, reason: '测试：原凭据被证实无效' },
+      })
+    assert.equal(reversed.status, 201)
+    const afterReverse = await api(world.app, 'GET', path, { session })
+    const reversedItem = (await afterReverse.json() as {
+      items: Array<{ blockingReasons: string[]; payableAmountCents: null }>;
+      summary: { reversedReceiptCents: number; recordedReceiptGrossCents: number }
+    })
+    assert.ok(reversedItem.items[0]?.blockingReasons.includes('receipt_reversed'))
+    assert.equal(reversedItem.summary.recordedReceiptGrossCents, 900,
+      'gross registered money does not silently disappear')
+    assert.equal(reversedItem.summary.reversedReceiptCents, 900)
+    assert.equal(reversedItem.items[0]?.payableAmountCents, null)
+  } finally {
+    world.cleanup()
+  }
+})
+
+test('settlement candidate role scope, pagination and malformed filters reject leakage', async () => {
+  const world = await makeWorld()
+  try {
+    const session = await adminSession(world.app)
+    const grid = await gridSession(world.app)
+    assert.equal((await api(world.app, 'GET', '/admin/settlement/candidates',
+      { session: grid })).status, 403)
+    assert.equal((await api(world.app, 'GET', '/admin/settlement/candidates')).status, 401)
+    const one = await api(world.app, 'GET',
+      '/admin/settlement/candidates?page=1&pageSize=1', { session })
+    const two = await api(world.app, 'GET',
+      '/admin/settlement/candidates?page=2&pageSize=1', { session })
+    assert.equal(one.status, 200)
+    assert.equal(two.status, 200)
+    assert.equal((await one.json() as { total: number; items: unknown[] }).total, 2)
+    assert.equal((await two.json() as { total: number; items: unknown[] }).items.length, 1)
+    const { listSettlementCandidates } =
+      await import('../src/ledger/settlement-candidates.js')
+    const operator = {
+      userId: world.operatorUserId, staffId: world.operatorStaffId,
+      role: 'operator' as const,
+    }
+    const scoped = listSettlementCandidates(world.db, operator, { page: 1, pageSize: 50 })
+    assert.equal(scoped.total, 1)
+    assert.equal(scoped.items[0]?.communityId, world.communityId)
+    assert.throws(() => listSettlementCandidates(world.db, operator, {
+      page: 1, pageSize: 50, communityId: world.otherCommunityId,
+    }), /无权访问/)
+    assert.equal((await api(world.app, 'GET',
+      '/admin/settlement/candidates?pageSize=1000', { session })).status, 400)
+  } finally {
+    world.cleanup()
+  }
+})
+
+test('settlement candidates consume a confirmed real merchant but still refuse fabricated payout', async () => {
+  const world = await makeWorld()
+  try {
+    const session = await adminSession(world.app)
+    markOrderVerified(world, world.localOrderId)
+    const ids: Record<string, string> = {}
+    for (const role of ['seller', 'sanchuang', 'guangdian']) {
+      const r = await api(world.app, 'POST', '/admin/settlement/parties', {
+        session, body: {
+          role, legalName: '测试' + role, registryRef: 'TEST-REG-' + role,
+          verificationRef: 'TEST-EVIDENCE-' + role,
+        },
+      })
+      assert.equal(r.status, 201)
+      ids[role] = (await r.json() as { id: string }).id
+    }
+    const product = world.sqlite.prepare('SELECT product_id AS id FROM local_orders WHERE id=?')
+      .get(world.localOrderId) as { id: string }
+    const map = await api(world.app, 'POST', '/admin/settlement/mappings', {
+      session, body: {
+        communityId: world.communityId, productId: product.id,
+        sellerPartyId: ids.seller, sanchuangPartyId: ids.sanchuang,
+        guangdianPartyId: ids.guangdian,
+        agreementRef: 'TEST-MERCHANT-AGREEMENT',
+        effectiveFrom: '2026-11-01', effectiveTo: '2026-11-30',
+      },
+    })
+    assert.equal(map.status, 201)
+    const mappingId = (await map.json() as { id: string }).id
+    const confirmed = await api(world.app, 'POST',
+      '/admin/settlement/orders/' + world.localOrderId + '/party', {
+        session, body: { mappingId, confirmationRef: 'TEST-HUMAN-CONFIRMATION' },
+      })
+    assert.equal(confirmed.status, 201)
+
+    const response = await api(world.app, 'GET',
+      '/admin/settlement/candidates?communityId=' + world.communityId, { session })
+    assert.equal(response.status, 200)
+    const data = await response.json() as {
+      items: Array<{
+        sellerStatus: string; orderParty: { sellerPartyId: string } | null;
+        blockingReasons: string[]; payableAmountCents: number | null
+      }>;
+    }
+    assert.equal(data.items[0]?.sellerStatus, 'verified')
+    assert.equal(data.items[0]?.orderParty?.sellerPartyId, ids.seller)
+    assert.equal(data.items[0]?.payableAmountCents, null)
+    assert.ok(data.items[0]?.blockingReasons.includes('missing_approved_rule'),
+      'even verified entities without approved rates must remain 待核定')
+  } finally {
+    world.cleanup()
+  }
+})
+
+
+/* -------------------------------------------------------------------------- */
+/* #185 · admin-attested immutable rules + integer-cent trial settlement       */
+/* -------------------------------------------------------------------------- */
+
+const TEST_TERMS_185 = {
+  feeBase: 'actual_received' as const,
+  processorFeeBps: 100,
+  processorFeeOwner: 'seller' as const,
+  ratesBps: { seller: 7000, sanchuang: 1000, guangdian: 2000 },
+  roundingRecipient: 'seller' as const,
+  roundingPolicy: 'floor_then_named_remainder' as const,
+  processorFeeRounding: 'floor' as const,
+  reversalPolicy: 'full_reversal_blocks' as const,
+  partialRefundPolicy: 'unsupported_blocks' as const,
+}
+
+test('pure settlement calculator conserves every cent and rejects unapproved money assumptions', async () => {
+  const { allocateSettlementCents } = await import('../src/ledger/settlement-calculator.js')
+  const regular = allocateSettlementCents(900, TEST_TERMS_185)
+  assert.deepEqual(regular, {
+    blockingReason: null,
+    allocation: {
+      grossReceivedCents: 900,
+      processorFeeCents: 9,
+      sellerNetCents: 621,
+      sanchuangNetCents: 90,
+      guangdianNetCents: 180,
+      totalNetCents: 891,
+      conservedTotalCents: 900,
+      roundingResidualCents: 0,
+    },
+  })
+  const oneCent = allocateSettlementCents(1, {
+    ...TEST_TERMS_185, processorFeeBps: 0, processorFeeOwner: 'none',
+    ratesBps: { seller: 3333, sanchuang: 3333, guangdian: 3334 },
+  })
+  assert.equal(oneCent.allocation?.sellerNetCents, 1)
+  assert.equal(oneCent.allocation?.roundingResidualCents, 1)
+  assert.equal(oneCent.allocation?.conservedTotalCents, 1)
+  const twoCents = allocateSettlementCents(2, {
+    ...TEST_TERMS_185, processorFeeBps: 0, processorFeeOwner: 'none',
+    ratesBps: { seller: 3333, sanchuang: 3333, guangdian: 3334 },
+    roundingRecipient: 'guangdian',
+  })
+  assert.equal(twoCents.allocation?.guangdianNetCents, 2)
+  assert.equal(twoCents.allocation?.roundingResidualCents, 2)
+
+  const large = allocateSettlementCents(Number.MAX_SAFE_INTEGER, {
+    ...TEST_TERMS_185, processorFeeBps: 0, processorFeeOwner: 'none',
+  })
+  assert.equal(large.allocation?.conservedTotalCents, Number.MAX_SAFE_INTEGER)
+  assert.equal((large.allocation?.sellerNetCents ?? 0) +
+    (large.allocation?.sanchuangNetCents ?? 0) +
+    (large.allocation?.guangdianNetCents ?? 0),
+    Number.MAX_SAFE_INTEGER)
+  const impossibleFee = allocateSettlementCents(900, {
+    ...TEST_TERMS_185, processorFeeBps: 5000,
+    processorFeeOwner: 'sanchuang',
+  })
+  assert.equal(impossibleFee.allocation, null)
+  assert.equal(impossibleFee.blockingReason, 'fee_exceeds_owner_share')
+  assert.throws(() => allocateSettlementCents(0, TEST_TERMS_185), RangeError)
+  assert.throws(() => allocateSettlementCents(-1, TEST_TERMS_185), RangeError)
+  assert.throws(() => allocateSettlementCents(0.5, TEST_TERMS_185), RangeError)
+  assert.throws(() => allocateSettlementCents(Number.MAX_SAFE_INTEGER + 1, TEST_TERMS_185), RangeError)
+  assert.throws(() => allocateSettlementCents(900, {
+    ...TEST_TERMS_185, ratesBps: { seller: 7000, sanchuang: 1000, guangdian: 1999 },
+  }), RangeError)
+})
+
+async function ruleSetup185(world: World, receiptCents = 900) {
+  const session = await adminSession(world.app)
+  const parties: Record<string, string> = {}
+  for (const role of ['seller', 'sanchuang', 'guangdian']) {
+    const r = await api(world.app, 'POST', '/admin/settlement/parties', {
+      session, body: {
+        role, legalName: 'TEST 185 ' + role,
+        registryRef: 'TEST-185-REG-' + role,
+        verificationRef: 'TEST-185-VERIFIED-' + role,
+      },
+    })
+    assert.equal(r.status, 201)
+    parties[role] = (await r.json() as { id: string }).id
+  }
+  const productId = (world.sqlite.prepare('SELECT product_id AS id FROM local_orders WHERE id=?')
+    .get(world.localOrderId) as { id: string }).id
+  const mapping = await api(world.app, 'POST', '/admin/settlement/mappings', {
+    session, body: {
+      communityId: world.communityId, productId,
+      sellerPartyId: parties.seller, sanchuangPartyId: parties.sanchuang,
+      guangdianPartyId: parties.guangdian,
+      agreementRef: 'TEST-185-THREE-PARTY-CONTRACT',
+      effectiveFrom: '2026-11-01', effectiveTo: '2026-11-30',
+    },
+  })
+  assert.equal(mapping.status, 201)
+  const mappingId = (await mapping.json() as { id: string }).id
+  markOrderVerified(world, world.localOrderId)
+  const confirmation = await api(world.app, 'POST',
+    '/admin/settlement/orders/' + world.localOrderId + '/party', {
+      session, body: { mappingId, confirmationRef: 'TEST-185-HUMAN-IDENTITY-CHECK' },
+    })
+  assert.equal(confirmation.status, 201)
+  const receipt = await api(world.app, 'POST', '/admin/ledger/payments', {
+    session, body: linkedReceiptRequest(world, {
+      evidenceRef: 'TEST-185-RECEIPT-001',
+      sourceId: 'TEST-185-RECEIPT-SOURCE-001',
+      amountCents: receiptCents,
+    }),
+  })
+  assert.equal(receipt.status, 201)
+  const payment = ledgerEntrySchema.parse(await receipt.json())
+  const attribution = await api(world.app, 'POST', '/admin/ledger/attributions', {
+    session, body: {
+      entryId: payment.entryId,
+      staffId: world.gridStaffId,
+      note: '测试：网格员推广来源经业务核验确认',
+    },
+  })
+  assert.equal(attribution.status, 201)
+  syncLedgerFacts(world.db, adminActor(world),
+    { from: '2026-11-01', to: '2026-11-10' }, { now: CLOCK })
+  const batch = createBatch(world.db, adminActor(world),
+    { periodFrom: '2026-11-01', periodTo: '2026-11-10' }, { now: CLOCK })
+  const locked = lockBatch(world.db, adminActor(world), batch.batchId,
+    { expectedUpdatedAt: batch.updatedAt },
+    { now: new Date(CLOCK.getTime() + 60_000) })
+  assert.equal(locked.status, 'locked')
+  return { session, mappingId, paymentEntryId: payment.entryId }
+}
+
+function ruleInput185(mappingId: string) {
+  return {
+    mappingId,
+    agreementRef: 'TEST-185-THREE-PARTY-CONTRACT',
+    approvalEvidenceRef: 'TEST-185-CONTRACT-APPROVAL-V1',
+    approvalOn: '2026-10-30',
+    effectiveFrom: '2026-11-01', effectiveTo: '2026-11-10',
+    ...TEST_TERMS_185,
+  }
+}
+
+test('real Hono/SQLite approved rule: 0 defaults, locked verified receipt quote, immutable two versions', async () => {
+  const world = await makeWorld()
+  try {
+    const { session, mappingId, paymentEntryId } = await ruleSetup185(world)
+    const list = await api(world.app, 'GET', '/admin/settlement/rules', { session })
+    assert.equal(list.status, 200)
+    assert.deepEqual((await list.json() as { items: unknown[] }).items, [],
+      'zero business rates in production database, never seed approved defaults')
+    const quoteUrl = '/admin/settlement/quotes'
+    const initial = await api(world.app, 'POST', quoteUrl, {
+      session, body: { orderId: world.localOrderId },
+    })
+    assert.equal(initial.status, 200)
+    const pending = await initial.json() as {
+      status: string; allocation: unknown; rule: unknown; payableAmountCents: unknown
+    }
+    assert.equal(pending.status, 'pending_rule')
+    assert.equal(pending.allocation, null)
+    assert.equal(pending.rule, null)
+    assert.equal(pending.payableAmountCents, null)
+
+    const first = await api(world.app, 'POST', '/admin/settlement/rules', {
+      session, body: ruleInput185(mappingId),
+    })
+    assert.equal(first.status, 201)
+    const rule = await first.json() as {
+      id: string; version: number; approvalStatus: string; approvedByUserId: string
+    }
+    assert.equal(rule.version, 1)
+    assert.equal(rule.approvalStatus, 'admin_attested')
+    assert.equal(rule.approvedByUserId, world.adminUserId)
+
+    const simulated = await api(world.app, 'POST', quoteUrl, {
+      session, body: { orderId: world.localOrderId },
+    })
+    assert.equal(simulated.status, 200)
+    const result = await simulated.json() as {
+      quoteOnly: boolean; status: string; payableAmountCents: null;
+      receiptEntryId: string; rule: { id: string; version: number };
+      allocation: { grossReceivedCents: number; processorFeeCents: number;
+        sellerNetCents: number; sanchuangNetCents: number; guangdianNetCents: number;
+        conservedTotalCents: number }
+    }
+    assert.equal(result.quoteOnly, true)
+    assert.equal(result.status, 'calculated')
+    assert.equal(result.payableAmountCents, null, 'quote never claims money is payable')
+    assert.equal(result.receiptEntryId, paymentEntryId)
+    assert.equal(result.rule.id, rule.id)
+    assert.equal(result.allocation.grossReceivedCents, 900)
+    assert.equal(result.allocation.sellerNetCents, 621)
+    assert.equal(result.allocation.sanchuangNetCents, 90)
+    assert.equal(result.allocation.guangdianNetCents, 180)
+    assert.equal(result.allocation.processorFeeCents, 9)
+    assert.equal(result.allocation.conservedTotalCents, 900)
+
+    const samePeriod = await api(world.app, 'POST', '/admin/settlement/rules', {
+      session, body: { ...ruleInput185(mappingId),
+        approvalEvidenceRef: 'TEST-185-OVERLAPPING-APPROVAL', effectiveFrom: '2026-11-08' },
+    })
+    assert.equal(samePeriod.status, 409)
+    const duplicate = await api(world.app, 'POST', '/admin/settlement/rules', {
+      session, body: ruleInput185(mappingId),
+    })
+    assert.equal(duplicate.status, 409)
+    const future = await api(world.app, 'POST', '/admin/settlement/rules', {
+      session, body: {
+        ...ruleInput185(mappingId),
+        approvalEvidenceRef: 'TEST-185-CONTRACT-APPROVAL-V2',
+        effectiveFrom: '2026-11-11', effectiveTo: '2026-11-30',
+        processorFeeBps: 0, processorFeeOwner: 'none',
+        ratesBps: { seller: 6000, sanchuang: 2000, guangdian: 2000 },
+      },
+    })
+    assert.equal(future.status, 201)
+    assert.equal((await future.json() as { version: number }).version, 2)
+    const replay = await api(world.app, 'POST', quoteUrl, {
+      session, body: { orderId: world.localOrderId },
+    })
+    assert.equal(replay.status, 200)
+    const replayBody = await replay.json() as { rule: { id: string }; allocation: unknown }
+    assert.equal(replayBody.rule.id, rule.id, 'future rule must not reinterpret historic receipt')
+    assert.deepEqual(replayBody.allocation, result.allocation)
+    assert.throws(() => world.sqlite.prepare(
+      'UPDATE settlement_rule_versions SET seller_rate_bps=10000 WHERE id=?',
+    ).run(rule.id), /immutable/)
+    assert.throws(() => world.sqlite.prepare(
+      'DELETE FROM settlement_rule_versions WHERE id=?',
+    ).run(rule.id), /immutable/)
+
+    const reversed = await api(world.app, 'POST',
+      '/admin/ledger/payments/' + paymentEntryId + '/reverse', {
+        session, body: { staffId: world.operatorStaffId, reason: '测试：凭据作废需拦截分成' },
+      })
+    assert.equal(reversed.status, 201)
+    const blocked = await api(world.app, 'POST', quoteUrl, {
+      session, body: { orderId: world.localOrderId },
+    })
+    assert.equal(blocked.status, 200)
+    const blockedBody = await blocked.json() as {
+      status: string; allocation: unknown; blockingReasons: string[] }
+    assert.equal(blockedBody.status, 'blocked')
+    assert.equal(blockedBody.allocation, null)
+    assert.ok(blockedBody.blockingReasons.includes('receipt_reversed'))
+    assert.equal((world.sqlite.prepare(
+      'SELECT count(*) AS n FROM settlement_rule_versions',
+    ).get() as { n: number }).n, 2)
+  } finally { world.cleanup() }
+})
+
+test('approved rule HTTP rejects invalid terms, unverified mapping, unauthorized actor and forged origin', async () => {
+  const world = await makeWorld()
+  try {
+    const { session, mappingId } = await ruleSetup185(world)
+    const grid = await gridSession(world.app)
+    const valid = ruleInput185(mappingId)
+    for (const body of [
+      { ...valid, approvalEvidenceRef: '' },
+      { ...valid, ratesBps: { seller: 7000, sanchuang: 1000, guangdian: 1999 } },
+      { ...valid, approvalOn: '2026-11-02' },
+      { ...valid, effectiveFrom: '2026-02-31' },
+      { ...valid, processorFeeBps: 100, processorFeeOwner: 'none' },
+      { ...valid, feeBase: 'registered_order' },
+    ]) {
+      const rejected = await api(world.app, 'POST', '/admin/settlement/rules', {
+        session, body,
+      })
+      assert.equal(rejected.status, 400, JSON.stringify(body))
+    }
+    const missingMapping = await api(world.app, 'POST', '/admin/settlement/rules', {
+      session, body: { ...valid, mappingId: randomUUID() },
+    })
+    assert.equal(missingMapping.status, 404)
+    const crossAgreement = await api(world.app, 'POST', '/admin/settlement/rules', {
+      session, body: { ...valid, agreementRef: 'WRONG-CONTRACT' },
+    })
+    assert.equal(crossAgreement.status, 409)
+
+    assert.equal((await api(world.app, 'GET', '/admin/settlement/rules', {
+      session: grid,
+    })).status, 403)
+    assert.equal((await api(world.app, 'POST', '/admin/settlement/rules', {
+      session: grid, body: valid,
+    })).status, 403)
+    assert.equal((await api(world.app, 'POST', '/admin/settlement/quotes', {
+      session: grid, body: { orderId: world.localOrderId },
+    })).status, 403)
+    assert.equal((await api(world.app, 'GET', '/admin/settlement/rules')).status, 401)
+    const noCsrf = await world.app.request('/admin/settlement/rules', {
+      method: 'POST', headers: {
+        cookie: session.cookies, origin: ADMIN_ORIGIN, 'content-type': 'application/json',
+      }, body: JSON.stringify(valid),
+    })
+    assert.equal(noCsrf.status, 403)
+    const hostile = await world.app.request('/admin/settlement/rules', {
+      method: 'POST', headers: {
+        cookie: session.cookies, 'x-csrf-token': session.csrfToken,
+        origin: 'https://evil.example', 'content-type': 'application/json',
+      }, body: JSON.stringify(valid),
+    })
+    assert.equal(hostile.status, 403)
+    const { createSettlementRule, listSettlementRules, quoteSettlementOrder } =
+      await import('../src/ledger/settlement-rules.js')
+    assert.throws(() => createSettlementRule(world.db, adminActor(world), valid),
+      /仅管理员/)
+    assert.deepEqual(listSettlementRules(world.db, adminActor(world), world.communityId).items, [])
+    assert.throws(() => listSettlementRules(world.db, adminActor(world),
+      world.otherCommunityId), /无权访问/)
+    assert.throws(() => quoteSettlementOrder(world.db, adminActor(world),
+      world.otherOrderId), /无权访问/)
+    assert.equal((world.sqlite.prepare('SELECT count(*) AS n FROM settlement_rule_versions')
+      .get() as { n: number }).n, 0)
+  } finally { world.cleanup() }
+})
+
+test('new 0019 settlement rule migration upgrades real populated 0018 DB without rewriting ledger facts', async () => {
+  const { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } =
+    await import('node:fs')
+  const root = mkdtempSync(join(tmpdir(), 'll-rule-upgrade-'))
+  try {
+    const oldDir = join(root, 'old')
+    mkdirSync(join(oldDir, 'meta'), { recursive: true })
+    for (const name of readdirSync(migrationsFolder)) {
+      if (/^[0-9]{4}_.*\.sql$/u.test(name) && !name.startsWith('0019_')) {
+        copyFileSync(join(migrationsFolder, name), join(oldDir, name))
+      }
+    }
+    const current = JSON.parse(readFileSync(join(migrationsFolder, 'meta/_journal.json'), 'utf8')) as {
+      entries: Array<{ idx: number; tag: string }>
+    }
+    assert.equal(current.entries.at(-1)?.tag, '0019_settlement_rules')
+    current.entries = current.entries.filter((entry) => entry.idx < 19)
+    writeFileSync(join(oldDir, 'meta/_journal.json'), JSON.stringify(current))
+    const dbFile = join(root, 'legacy.sqlite')
+    const old = createDatabase(dbFile, oldDir)
+    const communityId = randomUUID()
+    old.db.insert(communities).values({
+      id: communityId, name: '升级前 0018 社区',
+      createdAt: new Date('2026-11-01T00:00:00.000Z'),
+    }).run()
+    old.sqlite.close()
+    const upgraded = createDatabase(dbFile, migrationsFolder)
+    try {
+      const prior = upgraded.sqlite.prepare(
+        'SELECT name FROM communities WHERE id=?',
+      ).get(communityId) as { name: string }
+      assert.equal(prior.name, '升级前 0018 社区')
+      const ruleTable = upgraded.sqlite.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='settlement_rule_versions'",
+      ).get() as { name: string }
+      assert.equal(ruleTable.name, 'settlement_rule_versions')
+      assert.equal((upgraded.sqlite.prepare('SELECT count(*) AS n FROM settlement_rule_versions')
+        .get() as { n: number }).n, 0, 'production migration seeds no fake contract')
+    } finally { upgraded.sqlite.close() }
+  } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+
+test('trial quote blocks mismatched receipts and processing fees larger than a party share', async () => {
+  const mismatchWorld = await makeWorld()
+  try {
+    const { session, mappingId } = await ruleSetup185(mismatchWorld, 800)
+    const rule = await api(mismatchWorld.app, 'POST', '/admin/settlement/rules', {
+      session, body: ruleInput185(mappingId),
+    })
+    assert.equal(rule.status, 201)
+    const q = await api(mismatchWorld.app, 'POST', '/admin/settlement/quotes', {
+      session, body: { orderId: mismatchWorld.localOrderId },
+    })
+    assert.equal(q.status, 200)
+    const bad = await q.json() as {
+      status: string; allocation: unknown; blockingReasons: string[];
+      payableAmountCents: null;
+    }
+    assert.equal(bad.status, 'blocked')
+    assert.equal(bad.allocation, null)
+    assert.equal(bad.payableAmountCents, null)
+    assert.ok(bad.blockingReasons.includes('amount_mismatch'))
+  } finally { mismatchWorld.cleanup() }
+
+  const feeWorld = await makeWorld()
+  try {
+    const { session, mappingId } = await ruleSetup185(feeWorld)
+    const feeRule = await api(feeWorld.app, 'POST', '/admin/settlement/rules', {
+      session, body: {
+        ...ruleInput185(mappingId),
+        processorFeeBps: 5000,
+        processorFeeOwner: 'sanchuang',
+      },
+    })
+    assert.equal(feeRule.status, 201)
+    const q = await api(feeWorld.app, 'POST', '/admin/settlement/quotes', {
+      session, body: { orderId: feeWorld.localOrderId },
+    })
+    assert.equal(q.status, 200)
+    const blocked = await q.json() as {
+      status: string; allocation: unknown; blockingReasons: string[];
+    }
+    assert.equal(blocked.status, 'blocked')
+    assert.equal(blocked.allocation, null)
+    assert.deepEqual(blocked.blockingReasons, ['fee_exceeds_owner_share'])
+  } finally { feeWorld.cleanup() }
+})

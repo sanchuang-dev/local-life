@@ -91,7 +91,7 @@ function rejectsWith(fn: () => unknown, code: string): void {
 /* -------------------------------------------------------------------------- */
 
 test('the migration file itself carries the partial unique index and the status check', () => {
-  const sql = readFileSync(join(migrations, '0018_smiling_stardust.sql'), 'utf8')
+  const sql = readFileSync(join(migrations, '0020_ll_identity_001_binding.sql'), 'utf8')
   // The invariant must be visible in the deployed SQL, not only in the ORM.
   assert.match(
     sql,
