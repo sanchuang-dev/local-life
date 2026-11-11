@@ -11,6 +11,7 @@ import {
   Result,
   Space,
   Table,
+  Tabs,
   Tag,
   Typography,
 } from 'antd'
@@ -44,6 +45,7 @@ import {
   listReconciliationBatches,
   lockReconciliationBatch,
 } from '../services/ledger'
+import { SettlementCandidatePanel } from './SettlementCandidatePanel'
 import './ledger.css'
 
 /**
@@ -51,9 +53,9 @@ import './ledger.css'
  *
  * What this page deliberately does *not* do:
  *
- * - No 结算单 / 应付金额. There is no settlement rule in this MVP, so
- *   `settlementAmountStatus` is always `pending_rule` and every amount on screen
- *   is labelled 账面登记毛额. A batch freezes facts; it never computes a payout.
+ * - This page adds only a read-only settlement candidate view, never a payable
+ *   computation. The candidate DTO reports `pending_rule` / null, irrespective
+ *   of contract records elsewhere. A reconciliation batch never pays out.
  * - No client-side arithmetic across the two diff blocks. 未纳入（待办） and
  *   锁后补录（既成事实） are disjoint by construction, and adding them would
  *   produce a number nobody can act on.
@@ -126,6 +128,25 @@ export function SettlementsPage() {
 
 function SettlementConsole({ session }: { session: AuthenticatedSession }) {
   const { message, modal } = AntdApp.useApp()
+
+  /* ------------------------------- page tabs ------------------------------- */
+
+  /**
+   * Two views of the same page. The state is intentionally local: #188 adds no
+   * route, no query parameter and no level-one navigation, so browser back still
+   * leaves the page instead of replaying a tab. The candidate panel is mounted
+   * lazily on its first activation, which also keeps the reconciliation view's
+   * existing requests (and its regression tests) untouched until a human asks
+   * for 分成结算单.
+   */
+  const [tab, setTab] = useState<'reconciliation' | 'candidates'>('reconciliation')
+  const [candidatesMounted, setCandidatesMounted] = useState(false)
+
+  const switchTab = (key: string) => {
+    const next = key === 'candidates' ? 'candidates' : 'reconciliation'
+    if (next === 'candidates') setCandidatesMounted(true)
+    setTab(next)
+  }
 
   /* ------------------------------- batch list ------------------------------ */
 
@@ -235,7 +256,7 @@ function SettlementConsole({ session }: { session: AuthenticatedSession }) {
           </p>
           <p>
             锁定后该期间成为冻结账目：合计与归属不再变化，之后补录的流水只能以「锁后补录」出现在差异页。
-            锁定不可回退，也不产生任何应付金额——本 MVP 没有结算规则。
+            锁定不可回退，也不产生任何应付金额——经营对账不负责计算合同分成。
           </p>
         </div>
       ),
@@ -597,107 +618,137 @@ function SettlementConsole({ session }: { session: AuthenticatedSession }) {
     <div className="page">
       <PageHeader
         title="对账结算"
-        description="按业务日期间创建对账批次、核对差异并导出账面明细。锁定只冻结合计与归属，不产生应付金额：本 MVP 没有结算规则，所有金额都是账面登记毛额。"
+        description="经营对账按业务日期间创建、锁定并导出账面明细；分成结算单是只读候选看板。两者都不在本页计算应付金额；候选接口的「待核定」不代表系统没有已核准合同或线下付款记录。"
         status={<Tag color="green">真实数据</Tag>}
+        subnav={
+          <Tabs
+            activeKey={tab}
+            onChange={switchTab}
+            items={[
+              { key: 'reconciliation', label: '经营对账' },
+              { key: 'candidates', label: '分成结算单' },
+            ]}
+          />
+        }
         extra={
-          <Space wrap>
-            <Button onClick={confirmWholeExport} loading={exporting}>
-              导出全部 CSV
-            </Button>
-            <Button type="primary" onClick={openCreate}>
-              新建对账批次
-            </Button>
-          </Space>
+          tab === 'reconciliation' ? (
+            <Space wrap>
+              <Button onClick={confirmWholeExport} loading={exporting}>
+                导出全部 CSV
+              </Button>
+              <Button type="primary" onClick={openCreate}>
+                新建对账批次
+              </Button>
+            </Space>
+          ) : null
         }
       />
 
       <div className="page-stack">
-        <Alert
-          type="info"
-          showIcon
-          title="口径与边界"
-          description="批次成员按「对账期间 + 社区范围」从不可变流水派生，系统不会回写流水；锁定只让合计与归属冻结。锁定之后补录的流水会以「锁后补录」出现在差异页，绝不会静默并入已冻结账目。"
-        />
-
-        {batchesError ? (
+        <div
+          className="ledger-tabpanel"
+          role="tabpanel"
+          aria-label="经营对账"
+          hidden={tab !== 'reconciliation'}
+        >
           <Alert
-            type="error"
+            type="info"
             showIcon
-            title={batchErrorTitle(batchesError, '对账批次加载失败')}
-            description={batchesError.message}
-            action={
-              <Button size="small" onClick={refreshBatches}>
-                重试
-              </Button>
-            }
+            title="口径与边界"
+            description="批次成员按「对账期间 + 社区范围」从不可变流水派生，系统不会回写流水；锁定只让合计与归属冻结。锁定之后补录的流水会以「锁后补录」出现在差异页，绝不会静默并入已冻结账目。"
           />
-        ) : (
-          <Card
-            size="small"
-            title="对账批次"
-            extra={
-              <Space wrap size={8}>
-                {batchesAsOf ? (
-                  <Typography.Text type="secondary">
-                    数据截至 {formatDateTime(batchesAsOf)}（Asia/Shanghai）
-                  </Typography.Text>
-                ) : null}
-                <Button size="small" onClick={refreshBatches} loading={batchesLoading}>
-                  刷新
-                </Button>
-              </Space>
-            }
-          >
-            <Table<ReconciliationBatch>
-              rowKey={(row) => row.batchId}
-              columns={batchColumns}
-              dataSource={batches}
-              loading={batchesLoading}
-              size="small"
-              pagination={false}
-              scroll={{ x: 'max-content' }}
-              locale={{
-                emptyText: batchesLoading ? null : (
-                  <Empty
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description="还没有对账批次"
-                  >
-                    <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
-                      先按一个业务日期间新建批次，核对完差异后再锁定。没有批次时，期间内的流水
-                      处于「未纳入」状态。
-                    </Typography.Paragraph>
-                    <Button size="small" type="primary" onClick={openCreate}>
-                      新建对账批次
-                    </Button>
-                  </Empty>
-                ),
-              }}
-            />
-          </Card>
-        )}
 
-        <div className="ledger-note" role="note" aria-label="对账口径说明">
-          <Typography.Text strong>对账口径说明</Typography.Text>
-          <ul>
-            <li>
-              期间是<b>业务日期</b>（<code>YYYY-MM-DD</code>），按 Asia/Shanghai 解释，含首尾
-              两天；跨月的期间同样闭合。
-            </li>
-            <li>
-              <b>未纳入</b>是待办：期间内、但没有任何已锁定批次覆盖的流水；<b>锁后补录</b>是
-              既成事实：期间被锁定、但流水在锁定之后才录入。两者按构造互斥，本页并列展示，
-              <b>绝不相加</b>，也不据此推导应付或分账。
-            </li>
-            <li>
-              差异结论清单每一项都是「必须有人处理」的判断；异常只是复核提示，复核不会修改
-              流水本身。
-            </li>
-            <li>
-              CSV 走独立下载通道（不是 JSON 接口）：文件为 UTF-8 BOM + CRLF，可直接用中文
-              Excel 打开；每次导出都会留一条审计记录。
-            </li>
-          </ul>
+          {batchesError ? (
+            <Alert
+              type="error"
+              showIcon
+              title={batchErrorTitle(batchesError, '对账批次加载失败')}
+              description={batchesError.message}
+              action={
+                <Button size="small" onClick={refreshBatches}>
+                  重试
+                </Button>
+              }
+            />
+          ) : (
+            <Card
+              size="small"
+              title="对账批次"
+              extra={
+                <Space wrap size={8}>
+                  {batchesAsOf ? (
+                    <Typography.Text type="secondary">
+                      数据截至 {formatDateTime(batchesAsOf)}（Asia/Shanghai）
+                    </Typography.Text>
+                  ) : null}
+                  <Button size="small" onClick={refreshBatches} loading={batchesLoading}>
+                    刷新
+                  </Button>
+                </Space>
+              }
+            >
+              <Table<ReconciliationBatch>
+                rowKey={(row) => row.batchId}
+                columns={batchColumns}
+                dataSource={batches}
+                loading={batchesLoading}
+                size="small"
+                pagination={false}
+                scroll={{ x: 'max-content' }}
+                locale={{
+                  emptyText: batchesLoading ? null : (
+                    <Empty
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                      description="还没有对账批次"
+                    >
+                      <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
+                        先按一个业务日期间新建批次，核对完差异后再锁定。没有批次时，期间内的流水
+                        处于「未纳入」状态。
+                      </Typography.Paragraph>
+                      <Button size="small" type="primary" onClick={openCreate}>
+                        新建对账批次
+                      </Button>
+                    </Empty>
+                  ),
+                }}
+              />
+            </Card>
+          )}
+
+          <div className="ledger-note" role="note" aria-label="对账口径说明">
+            <Typography.Text strong>对账口径说明</Typography.Text>
+            <ul>
+              <li>
+                期间是<b>业务日期</b>（<code>YYYY-MM-DD</code>），按 Asia/Shanghai 解释，含首尾
+                两天；跨月的期间同样闭合。
+              </li>
+              <li>
+                <b>未纳入</b>是待办：期间内、但没有任何已锁定批次覆盖的流水；<b>锁后补录</b>是
+                既成事实：期间被锁定、但流水在锁定之后才录入。两者按构造互斥，本页并列展示，
+                <b>绝不相加</b>，也不据此推导应付或分账。
+              </li>
+              <li>
+                差异结论清单每一项都是「必须有人处理」的判断；异常只是复核提示，复核不会修改
+                流水本身。
+              </li>
+              <li>
+                CSV 走独立下载通道（不是 JSON 接口）：文件为 UTF-8 BOM + CRLF，可直接用中文
+                Excel 打开；每次导出都会留一条审计记录。
+              </li>
+            </ul>
+          </div>
         </div>
+
+        {candidatesMounted ? (
+          <div
+            className="ledger-tabpanel"
+            role="tabpanel"
+            aria-label="分成结算单"
+            hidden={tab !== 'candidates'}
+          >
+            <SettlementCandidatePanel />
+          </div>
+        ) : null}
       </div>
 
       {/* --------------------------- create batch modal -------------------------- */}

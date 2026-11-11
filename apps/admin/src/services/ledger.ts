@@ -16,6 +16,7 @@ import {
   reconciliationBatchListResponseSchema,
   reconciliationBatchSchema,
   reconciliationDiffSchema,
+  settlementCandidateListResponseSchema,
   type CreateBatchRequest,
   type LedgerAnomaly,
   type LedgerAnomalyKind,
@@ -42,6 +43,8 @@ import {
   type ReconciliationBatchListResponse,
   type ReconciliationDiff,
   type SettlementAmountStatus,
+  type SettlementCandidateListResponse,
+  type SettlementCandidateQuery,
 } from '@sanchuang-dev/local-life-contracts'
 import {
   LocalApiError,
@@ -324,6 +327,45 @@ export async function lockReconciliationBatch(
     { method: 'POST', csrfToken, body },
   )
   return parsePayload(reconciliationBatchSchema, payload, '对账批次锁定结果')
+}
+
+/* -------------------------------------------------------------------------- */
+/* Settlement candidates (#184) — read-only evidence, never a payable         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * GET /admin/settlement/candidates — paged, per-community candidate rows.
+ *
+ * The response contract is deliberately narrow and the page must not widen it:
+ *
+ * - `summaryScope` is always `'page'`, so `summary` describes the rows in this
+ *   response only — never the whole date range. The page says 「仅当前页」.
+ * - `settlementAmountStatus` is always `'pending_rule'` and
+ *   `payableAmountCents` is always `null`. This candidate DTO does not report
+ *   actual approved rule or payment status; neither value may be estimated.
+ * - `receipt` is the only source of 实收; `registeredAmountCents` is the order's
+ *   registered amount and is never presented as money received.
+ *
+ * The query is a `strictObject` on the server: `page`, `pageSize` (≤100),
+ * `communityId`, `from`, `to` and `keyword` are the only parameters this helper
+ * may send, and `from`/`to` are business dates interpreted in Asia/Shanghai.
+ */
+export async function listSettlementCandidates(
+  query: SettlementCandidateQuery,
+  signal?: AbortSignal,
+): Promise<SettlementCandidateListResponse> {
+  const payload = await requestLocalJson(
+    withQuery(`/api${LEDGER_ROUTES.adminSettlementCandidates}`, {
+      page: query.page,
+      pageSize: query.pageSize,
+      communityId: query.communityId,
+      from: query.from,
+      to: query.to,
+      keyword: query.keyword?.trim() ? query.keyword.trim() : undefined,
+    }),
+    { signal },
+  )
+  return parsePayload(settlementCandidateListResponseSchema, payload, '分成结算候选')
 }
 
 /* -------------------------------------------------------------------------- */

@@ -598,6 +598,30 @@ describe('SettlementsPage locking', () => {
     expect(await screen.findByText(/该批次或期间已锁定/)).toBeTruthy()
     expect(screen.queryByText(/数据已被更新，已刷新批次列表/)).toBeNull()
   })
+
+  it('freezes the period without implying a payment, transfer or write-off', async () => {
+    const calls = stubApi(stubBaseline())
+
+    renderPage(ADMIN_SESSION)
+    await screen.findByText(BATCH_NO)
+
+    fireEvent.click(screen.getByRole('button', { name: '锁定' }))
+    const dialog = await screen.findByRole('dialog')
+    const copy = dialog.textContent ?? ''
+
+    // 锁定 is a book-freeze, and the copy says exactly that…
+    expect(copy).toMatch(/锁定不可回退，也不产生任何应付金额/)
+    expect(copy).toMatch(/账面登记毛额/)
+    expect(copy).toMatch(/冻结账目/)
+    // …and never claims money moved, was paid out, or was written off.
+    expect(copy).not.toMatch(/转账|已付款|已支付|付款成功|打款|已结清|已核销|结算完成|已结算/)
+    // No currency other than the batch's own registered gross is invented here.
+    expect(copy).not.toContain('¥0.00')
+    expect(callsTo(calls, '/api/admin/reconciliation/batches/')).toHaveLength(0)
+    // Cancel is a real, separate act; the irreversible POST has not happened.
+    expect(screen.getByRole('button', { name: /取\s*消/ })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '确认锁定' })).toBeTruthy()
+  })
 })
 
 describe('SettlementsPage diff', () => {
