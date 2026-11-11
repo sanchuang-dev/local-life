@@ -16,6 +16,7 @@ import type { AppDatabase } from '../db/client.js'
 import type { AppBindings, AppContext, AuthSession, HttpErrorStatus } from '../http.js'
 import type { LocalActor } from '../local/shared.js'
 import { LocalError } from '../local/shared.js'
+import { ResidentCommunityError } from '../resident-community/service.js'
 import { enterDailyDraw, getMyDrawHistory, getMyDrawState, verifyDrawCredential, redeemDrawCredential, revokeDrawCredential } from './engine.js'
 import {
   createDrawPrize,
@@ -57,6 +58,13 @@ export function registerDrawRoutes(app: Hono<AppBindings>, deps: DrawRouteDeps):
 
   const failWithDrawError = (c: AppContext, error: unknown): Response => {
     if (error instanceof LocalError) {
+      return fail(c, error.status, error.code, error.message)
+    }
+    // #171 LL-IDENTITY-001: entering a draw is a community-scoped write, so the
+    // shared confirmed-community guard can refuse it. Without this mapping the
+    // refusal escapes as a 500 `internal_error`, which would look like a server
+    // fault instead of "confirm your community first".
+    if (error instanceof ResidentCommunityError) {
       return fail(c, error.status, error.code, error.message)
     }
     throw error
