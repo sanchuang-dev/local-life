@@ -610,6 +610,8 @@ export const settlementCandidateSchema = z.strictObject({
   productName: z.string().min(1),
   orderStatus: z.string().min(1),
   registeredAmountCents: cents,
+  periodAt: isoTimestamp,
+  periodSource: z.enum(['linked_receipt', 'order_registration']),
   sellerStatus: settlementOrderPartyResponseSchema.shape.sellerStatus,
   orderParty: settlementOrderPartySnapshotSchema.nullable(),
   receipt: ledgerOrderEvidenceSchema.shape.payment,
@@ -630,6 +632,7 @@ export const settlementCandidateListResponseSchema = z.strictObject({
   asOf: isoTimestamp,
   /** Totals below apply ONLY to the returned page, not the whole date range. */
   summaryScope: z.literal('page'),
+  periodPolicy: z.literal('linked_receipt_else_order_registration'),
   summary: z.strictObject({
     recordedReceiptGrossCents: cents,
     reversedReceiptCents: cents,
