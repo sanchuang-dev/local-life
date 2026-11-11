@@ -1426,7 +1426,12 @@ test('previous unlinked receipt cannot be counted again under a new order/source
     const base = linkedReceiptRequest(world)
     const legacy = await api(world.app, 'POST', '/admin/ledger/payments', {
       session,
-      body: { ...base, orderId: undefined, sourceId: 'old-unlinked-receipt' },
+      body: {
+        ...base,
+        orderId: undefined,
+        sourceId: 'old-unlinked-receipt',
+        evidenceRef: 'ＢＡＮＫ－ＬＯＣＡＬ－ＬＬ１６６－００１',
+      },
     })
     assert.equal(legacy.status, 201)
     const duplicateProof = await api(world.app, 'POST', '/admin/ledger/payments', {
@@ -2885,7 +2890,7 @@ test('payment proof rejects duplicate proof, wrong beneficiary, overpay, unsafe 
       beneficiaryPartyId:locked.line.sellerPartyId,
       amountCents:100,
       paidAt:CLOCK.toISOString(),
-      proofRefMasked:'TEST-BANK-RECEIPT-SET007-B-尾号5678',
+      proofRefMasked:'PROOF-SET007-5678',
       idempotencyKey:randomUUID(),
     }
     const first=await api(world.app,'POST',paymentsUrl187(locked.statementId),{
@@ -2899,6 +2904,7 @@ test('payment proof rejects duplicate proof, wrong beneficiary, overpay, unsafe 
       session:locked.session,body:{
         ...sellerRequest,
         beneficiaryPartyId:locked.line.sanchuangPartyId,
+        proofRefMasked:'ＰＲＯＯＦ－ＳＥＴ００７－５６７８',
         idempotencyKey:randomUUID(),
       },
     })).status,409,'same external proof cannot move to another beneficiary')
