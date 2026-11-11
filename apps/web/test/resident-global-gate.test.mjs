@@ -7,7 +7,7 @@ import { buildResidentLoginHref, normalizeActivityId, resolveResidentLoginTarget
 const emptyContext = { activityId: null, inviteCode: null, inviteInvalid: false }
 
 test('all resident routes, including activity invitations, are gated when unauthenticated', () => {
-  for (const path of ['/', '/community', '/community/activity/silver-neighborhood', '/life', '/health', '/points', '/gd', '/me', '/me/orders']) {
+  for (const path of ['/', '/community', '/community/activity/silver-neighborhood', '/life', '/health', '/points', '/gd', '/me', '/me/orders', '/me/community', '/me/community/confirm']) {
     assert.equal(isResidentGateExempt(path), false, path)
     assert.equal(decideResidentGate('unauthenticated', false), 'login')
   }
