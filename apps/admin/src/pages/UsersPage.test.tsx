@@ -92,16 +92,58 @@ function entry(overrides: Partial<UserDirectoryEntry> = {}): UserDirectoryEntry 
     wechatProfileAuthorizedAt: '2026-10-06T00:00:00.000Z',
     identityMethods: ['wechat'],
     staffRole: null,
-    residentCommunities: [
-      {
-        id: COMMUNITY_A.id,
-        name: COMMUNITY_A.name,
-        joinedAt: '2026-10-05T00:00:00.000Z',
-      },
-    ],
+    // #171: the default fixture is a resident who confirmed COMMUNITY_A themself.
+    confirmedCommunity: {
+      id: COMMUNITY_A.id,
+      name: COMMUNITY_A.name,
+      confirmedAt: '2026-10-08T00:00:00.000Z',
+      source: 'resident_h5_confirmed',
+    },
+    communityRelationSource: 'confirmed_binding',
+    residentCommunityState: 'confirmed',
+    residentCommunities: [],
     createdAt: '2026-10-01T00:00:00.000Z',
     ...overrides,
   }
+}
+
+/**
+ * #171: an account that only carries historical relations — the rows the retired
+ * #123 login wrote automatically. It is NOT a confirmed permanent community and
+ * the page must never present it as one.
+ */
+function historicalEntry(overrides: Partial<UserDirectoryEntry> = {}): UserDirectoryEntry {
+  return entry({
+    id: LEGACY_USER,
+    displayName: '历史归属账号',
+    localDisplayName: '历史归属账号',
+    confirmedCommunity: null,
+    communityRelationSource: 'historical_assignment',
+    residentCommunityState: 'unbound',
+    residentCommunities: [
+      { id: COMMUNITY_A.id, name: COMMUNITY_A.name, joinedAt: '2026-10-05T00:00:00.000Z' },
+    ],
+    ...overrides,
+  })
+}
+
+/** #171: an account with no binding and no historical relation at all. */
+function unboundEntry(overrides: Partial<UserDirectoryEntry> = {}): UserDirectoryEntry {
+  return entry({
+    id: USER_B,
+    displayName: '未命名用户',
+    localDisplayName: null,
+    wechatNickname: null,
+    wechatAvatarUrl: 'https://example.test/avatar-b.jpg',
+    wechatProfileAuthorizedAt: '2026-10-06T00:00:00.000Z',
+    identityMethods: ['phone'],
+    staffRole: null,
+    confirmedCommunity: null,
+    communityRelationSource: 'none',
+    residentCommunityState: 'unbound',
+    residentCommunities: [],
+    ...overrides,
+  })
 }
 
 function detail(overrides: Partial<UserDirectoryDetail> = {}): UserDirectoryDetail {
@@ -113,6 +155,11 @@ function detail(overrides: Partial<UserDirectoryDetail> = {}): UserDirectoryDeta
       wechatNickname: '微信王小网',
       identityMethods: ['wechat', 'phone', 'staff'],
       staffRole: 'grid_worker',
+      // #171: two historical relations, no confirmation — the exact shape the
+      // back office must show as 历史归属 rather than 常驻社区.
+      confirmedCommunity: null,
+      communityRelationSource: 'historical_assignment',
+      residentCommunityState: 'pending_review',
       residentCommunities: [
         { id: COMMUNITY_A.id, name: COMMUNITY_A.name, joinedAt: '2026-10-05T00:00:00.000Z' },
         { id: COMMUNITY_B.id, name: COMMUNITY_B.name, joinedAt: '2026-10-07T00:00:00.000Z' },
@@ -144,6 +191,9 @@ function legacyEntry(overrides: Partial<UserDirectoryEntry> = {}): UserDirectory
     wechatProfileAuthorizedAt: null,
     identityMethods: [],
     staffRole: null,
+    confirmedCommunity: null,
+    communityRelationSource: 'none',
+    residentCommunityState: 'unbound',
     residentCommunities: [],
     createdAt: '2026-09-01T00:00:00.000Z',
     ...overrides,
@@ -229,20 +279,7 @@ describe('UsersPage real directory read', () => {
         const page = Number(params.get('page'))
         const pageSize = Number(params.get('pageSize'))
         return json({
-          items: [
-            entry(),
-            entry({
-              id: USER_B,
-              displayName: '未命名用户',
-              localDisplayName: null,
-              wechatNickname: null,
-              wechatAvatarUrl: 'https://example.test/avatar-b.jpg',
-              wechatProfileAuthorizedAt: '2026-10-06T00:00:00.000Z',
-              identityMethods: ['phone'],
-              staffRole: null,
-              residentCommunities: [],
-            }),
-          ],
+          items: [entry(), unboundEntry()],
           total: 43,
           page,
           pageSize,
@@ -451,28 +488,81 @@ describe('UsersPage read-only detail drawer', () => {
     expect(within(body).getByText('grid.b')).toBeTruthy()
     expect(within(body).getByText('正常')).toBeTruthy()
     expect(within(body).getByText('1 个（仅计数）')).toBeTruthy()
-    // Both resident communities are listed, each with its own join time.
-    expect(within(body).getByText(/幸福社区 · .*加入/)).toBeTruthy()
-    expect(within(body).getByText(/阳光社区 · .*加入/)).toBeTruthy()
+    // #171: two historical relations and no confirmation — the drawer must say so
+    // and must never promote either historical row to a permanent community.
+    expect(within(body).getByText(/幸福社区 · .*记录/)).toBeTruthy()
+    expect(within(body).getByText(/阳光社区 · .*记录/)).toBeTruthy()
+    expect(within(body).getByText('历史归属（未确认）')).toBeTruthy()
+    expect(within(body).getByText('历史待核查')).toBeTruthy()
+    expect(
+      within(body).getByText(
+        '尚未确认常驻社区；现有记录只是历史归属，不能当作常驻社区。',
+      ),
+    ).toBeTruthy()
     // Staff authorization is rendered under 后台账户, not as resident belonging.
     expect(within(body).getAllByText('后台账户').length).toBeGreaterThan(0)
-    expect(within(body).getByText('居民社区归属')).toBeTruthy()
-    // Read-only: the drawer has no editable form control.
+    expect(within(body).getByText('居民常驻社区（#171 只读）')).toBeTruthy()
+    // Read-only: the drawer has no editable form control and no rebind entry.
     expect(within(body).queryAllByRole('textbox')).toEqual([])
     expect(within(body).queryAllByRole('combobox')).toEqual([])
     expect(
-      within(body).getByText('本页只读，不提供编辑身份、社区归属或后台账户的操作。'),
+      within(body).getByText(/本页只读，不提供编辑身份、社区归属或后台账户的操作/),
     ).toBeTruthy()
   })
 
-  it('keeps multiple community memberships on one user row', async () => {
+  it('never renders a historical assignment as a confirmed permanent community', async () => {
+    stubApi((url) => {
+      if (url === '/api/admin/communities') return communityResponse()
+      if (url.startsWith('/api/admin/users?')) {
+        const params = new URL(url, 'http://test.local').searchParams
+        return json({
+          items: [historicalEntry()],
+          total: 1,
+          page: Number(params.get('page')),
+          pageSize: Number(params.get('pageSize')),
+        })
+      }
+      if (url === `/api/admin/users/${LEGACY_USER}`) return json(detail())
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+    renderPage(ADMIN_SESSION)
+    await screen.findByText('历史归属账号')
+
+    // The list cell keeps the two facts visually and textually apart.
+    const row = tableRows()[0]!
+    expect(within(row).getByText('历史归属（未确认）')).toBeTruthy()
+    expect(within(row).getByText('历史归属：幸福社区')).toBeTruthy()
+    expect(within(row).queryByText(/常驻：/)).toBeNull()
+    expect(within(row).queryByText(/已确认常驻/)).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '详情' }))
+    expect(await screen.findByText('用户详情 · 王小网')).toBeTruthy()
+    const body = drawerBody()
+    // Drawer: the confirmation row stays honest — no green 「常驻：<name>」 tag, no
+    // confirmation badge, and the absence text names the history explicitly.
+    expect(within(body).queryByText(/常驻：/)).toBeNull()
+    expect(within(body).queryByText('已确认常驻')).toBeNull()
+    expect(within(body).getAllByText('历史归属（未确认）').length).toBeGreaterThan(0)
+    expect(within(body).getByText('历史待核查')).toBeTruthy()
+    // No interactive control anywhere in the drawer carries a rebind word.
+    const rebindWords = ['改绑', '解绑', '重新绑定', '重绑', '切换常驻社区', '转移常驻']
+    const controls = Array.from(
+      body.querySelectorAll<HTMLElement>('button, a, [role="button"], .ant-tag-close-icon'),
+    )
+    for (const word of rebindWords) {
+      expect(controls.some((control) => control.textContent?.includes(word))).toBe(false)
+    }
+    expect(body.querySelectorAll('button[type="submit"], form').length).toBe(0)
+  })
+
+  it('keeps multiple historical assignments on one user row, all labelled as history', async () => {
     stubApi((url) => {
       if (url === '/api/admin/communities') return communityResponse()
       if (!url.startsWith('/api/admin/users?')) throw new Error(`unexpected fetch: ${url}`)
       const params = new URL(url, 'http://test.local').searchParams
       return json({
         items: [
-          entry({
+          historicalEntry({
             residentCommunities: [
               {
                 id: COMMUNITY_A.id,
@@ -494,11 +584,12 @@ describe('UsersPage read-only detail drawer', () => {
     })
 
     renderPage(ADMIN_SESSION)
-    await screen.findByText('微信花花')
+    await screen.findByText('历史归属账号')
     expect(tableRows()).toHaveLength(1)
     const row = tableRows()[0]!
-    expect(within(row).getByText('幸福社区')).toBeTruthy()
-    expect(within(row).getByText('阳光社区')).toBeTruthy()
+    expect(within(row).getByText('历史归属：幸福社区')).toBeTruthy()
+    expect(within(row).getByText('历史归属：阳光社区')).toBeTruthy()
+    expect(within(row).queryByText(/常驻：/)).toBeNull()
   })
 
   it('discards one account before another detail request can show it', async () => {
