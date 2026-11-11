@@ -2474,6 +2474,7 @@ test('statement with no approved contract stays a reproducible pending CSV and c
     const perf = await grid.text()
     assert.ok(perf.includes(world.gridStaffId))
     assert.ok(perf.includes('确认业绩笔数'))
+    assert.ok(!perf.includes(world.crmOrderId), 'single-day export cannot include earlier CRM facts')
     assert.ok(!perf.includes('商户净额分'))
     assert.ok(!perf.includes('"900"'), 'performance export cannot emit a cash amount')
 
@@ -2602,7 +2603,27 @@ test('approved settlement locks exact cents once, snapshots contract version and
       session,body:statementBody186(world,'2026-11-01','2026-11-10'),
     })
     assert.equal(secondPeriod.status,201)
-    const secondDraft=await secondPeriod.json() as {statement:{id:string}}
+    const secondDraft=await secondPeriod.json() as {
+      statement:{id:string;summary:{eligibleGrossCents:number}};
+      performance:Array<{sourceId:string;staffId:string;sourceDisplayNo:string}>;
+    }
+    assert.equal(secondDraft.statement.summary.eligibleGrossCents,900,
+      'confirmed CRM business with no amount cannot inflate received revenue')
+    assert.equal(secondDraft.performance.length,1,
+      'confirmed CRM without a price must be snapshotted as WORKER performance')
+    assert.equal(secondDraft.performance[0]?.sourceId,world.crmOrderId)
+    assert.equal(secondDraft.performance[0]?.staffId,world.operatorStaffId)
+    const organizationGridCsv=await api(world.app,'GET',
+      gridUrl186(secondDraft.statement.id),{session})
+    assert.equal(organizationGridCsv.status,200)
+    assert.ok((await organizationGridCsv.text()).includes('GD-20261103-001'),
+      'admin export must include confirmed CRM business in non-monetary performance')
+    const workerGridCsv=await api(world.app,'GET',
+      gridUrl186(secondDraft.statement.id),{session:await gridSession(world.app)})
+    assert.equal(workerGridCsv.status,200)
+    const workerText=await workerGridCsv.text()
+    assert.ok(!workerText.includes(world.crmOrderId),
+      'grid worker must not see another staff member\'s service performance')
     const secondReview=await api(world.app,'POST',reviewUrl186(secondDraft.statement.id),{
       session:second,body:{expectedRevision:1,evidenceRef:'TEST-DUP-REVIEW'},
     })
