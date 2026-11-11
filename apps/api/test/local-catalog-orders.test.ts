@@ -36,7 +36,6 @@ import {
   localOrderEvents,
   localOrders,
   localProducts,
-  residentCommunityAssignments,
   staffAccounts,
   users,
 } from '../src/db/schema.js'

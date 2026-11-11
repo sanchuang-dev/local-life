@@ -32,9 +32,16 @@ export interface SessionLike {
   csrfToken: string
 }
 
-/** The subset of `app` these helpers need; keeps the helper free of app wiring. */
+/**
+ * The subset of `app` these helpers need; keeps the helper free of app wiring.
+ *
+ * `request` is typed as `Response | Promise<Response>` on purpose: Hono's own
+ * `request()` signature returns that union, so narrowing it to `Promise<Response>`
+ * would make a real `App` structurally incompatible with this interface and force
+ * every caller to cast.
+ */
 export interface Requestable {
-  request: (input: string, init?: RequestInit) => Promise<Response>
+  request: (input: string, init?: RequestInit) => Response | Promise<Response>
 }
 
 /** Default trusted browser origin used by the API test suites. */
@@ -129,11 +136,13 @@ export function confirmCommunityOverHttp(
     ...(csrfToken === undefined ? {} : { 'x-csrf-token': csrfToken }),
     ...(requestOrigin === null ? {} : { origin: requestOrigin }),
   }
-  return app.request(RESIDENT_COMMUNITY_ROUTES.confirm, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ communityId }),
-  })
+  return Promise.resolve(
+    app.request(RESIDENT_COMMUNITY_ROUTES.confirm, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ communityId }),
+    }),
+  )
 }
 
 /**
