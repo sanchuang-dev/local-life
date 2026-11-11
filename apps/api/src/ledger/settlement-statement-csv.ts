@@ -1,5 +1,6 @@
 import type {
   SettlementStatement, SettlementStatementDetail, SettlementStatementLine,
+  SettlementStatementPerformance,
 } from '@sanchuang-dev/local-life-contracts'
 import { maskPhoneNumbers } from './reconciliation-service.js'
 
@@ -58,6 +59,7 @@ export function entitySettlementCsv(detail: SettlementStatementDetail): string {
 export function gridPerformanceCsv(
   statement: SettlementStatement,
   lines: SettlementStatementLine[],
+  performance: SettlementStatementPerformance[],
 ): string {
   const rows: Array<Array<string | number | null>> = [[
     '结算单号','版本','快照截至UTC','结算状态','付款状态',
@@ -72,6 +74,17 @@ export function gridPerformanceCsv(
       l.communityId,l.gridStaffId,l.orderId,l.orderDisplayNo,
       1,l.gridReviewerUserId,resultLabel(l),
       l.blockingReasons.join('；'),statement.snapshotDigest,
+    ])
+  }
+  // Existing CRM-confirmed Guangdian cases have no monetary basis at all.
+  // An append-only fact counts as performance; it MUST NOT become a payment.
+  for(const p of performance) {
+    rows.push([
+      statement.statementNo,statement.generation,statement.asOf,
+      stateLabel(statement.status),'广电受理业绩不等于个人应付',
+      p.communityId,p.staffId,p.sourceId,p.sourceDisplayNo,
+      1,p.confirmedByUserId,'已确认业务-无金额',
+      '仅计业绩笔数；没有收款金额不得计算分成',statement.snapshotDigest,
     ])
   }
   return csv(rows)
