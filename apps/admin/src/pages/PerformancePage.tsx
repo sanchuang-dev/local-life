@@ -23,10 +23,12 @@ import {
   type LedgerEntry,
   type LedgerFactKind,
   type LedgerOverview,
+  type LedgerOrderEvidence,
   type LedgerSourceSystem,
 } from '@sanchuang-dev/local-life-contracts'
 import { useAdminAuth } from '../app/auth-context'
 import { PageHeader } from '../components/PageHeader'
+import { PaymentEvidencePanel } from '../components/PaymentEvidencePanel'
 import { DataPanel, type PanelFilter, type PanelQuery } from '../shared/components/DataPanel'
 import type { DateRangeValue } from '../shared/components/DataPanel'
 import { getAdminCrmFilterOptions } from '../services/crm'
@@ -46,6 +48,8 @@ import {
   formatCents,
   formatDateTime,
   getLedgerOverview,
+  getLedgerOrderEvidence,
+  getLedgerEntryOrderEvidence,
   listLedgerAnomalies,
   listLedgerEntries,
   syncLedgerSourceFacts,
@@ -343,6 +347,31 @@ function PerformanceConsole({ session }: { session: AuthenticatedSession }) {
 
   const [entryOpen, setEntryOpen] = useState(false)
   const [entry, setEntry] = useState<LedgerEntry | null>(null)
+  const [entryOrder, setEntryOrder] = useState<LedgerOrderEvidence | null>(null)
+  const [entryOrderError, setEntryOrderError] = useState<string | null>(null)
+
+  // Orders and receipts are linked only by a persisted backend relation.
+  // Never infer a match from equal amounts or the account that entered them.
+  useEffect(() => {
+    if (!entryOpen || !entry) return
+    let active = true
+    const controller = new AbortController()
+    setEntryOrder(null)
+    setEntryOrderError(null)
+    const lookup = entry.sourceSystem === 'local_order'
+      ? getLedgerOrderEvidence(entry.sourceId, controller.signal)
+      : entry.factKind === 'payment_received' || entry.factKind === 'payment_reversed'
+        ? getLedgerEntryOrderEvidence(entry.counterEntryId ?? entry.entryId, controller.signal)
+        : Promise.resolve(null)
+    lookup.then((result) => {
+      if (active) setEntryOrder(result)
+    }).catch((cause: unknown) => {
+      if (active && !controller.signal.aborted) {
+        setEntryOrderError(describeLocalError(cause, '未能读取订单关联信息'))
+      }
+    })
+    return () => { active = false; controller.abort() }
+  }, [entryOpen, entry, listToken])
 
   /* ------------------------------- lookups --------------------------------- */
 
@@ -632,6 +661,16 @@ function PerformanceConsole({ session }: { session: AuthenticatedSession }) {
           </ul>
         </div>
 
+        <PaymentEvidencePanel
+          csrfToken={session.csrfToken}
+          communityId={query.filters.communityId}
+          defaultStaffId={session.staff.id}
+          staffOptions={staffOptions}
+          gridStaffOptions={staffOptions.filter((option) =>
+            staff.some((person) => person.id === option.value && person.role === 'grid_worker'))}
+          onUpdated={refresh}
+        />
+
         <DataPanel<LedgerEntry, LedgerFilters, LedgerSortKey>
           id="ledger-entries"
           label="经营流水明细"
@@ -714,6 +753,24 @@ function PerformanceConsole({ session }: { session: AuthenticatedSession }) {
                       依据：{LEDGER_ATTRIBUTION_BASIS_LABELS[entry.attribution.basis]}
                     </Typography.Text>
                   </Space>
+                </Descriptions.Item>
+                <Descriptions.Item label="关联本地订单">
+                  {entryOrder ? (
+                    <Space orientation="vertical" size={2}>
+                      <Typography.Text strong>
+                        {entryOrder.orderDisplayNo} · {entryOrder.productName}
+                      </Typography.Text>
+                      <Typography.Text type="secondary">
+                        登记 {formatCents(entryOrder.registeredAmountCents)}（非实收）；
+                        {entryOrder.payment
+                          ? `凭据实收 ${formatCents(entryOrder.payment.amountCents)}`
+                          : '尚无实收证明'}
+                      </Typography.Text>
+                      <Typography.Text type="secondary">
+                        {entryOrder.blockingReasons.join('；') || '收款证据已有记录，非结算凭证'}
+                      </Typography.Text>
+                    </Space>
+                  ) : (entryOrderError ? entryOrderError : '未关联本地订单（历史流水不自动匹配）')}
                 </Descriptions.Item>
                 <Descriptions.Item label="凭据">
                   <Space orientation="vertical" size={2}>

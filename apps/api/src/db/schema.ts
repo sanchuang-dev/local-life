@@ -1816,6 +1816,31 @@ export const ledgerEntries = sqliteTable(
 )
 
 /**
+ * A receipt can be linked to exactly one locally verified order. Neither the
+ * historical order nor the append-only ledger fact is updated to attach it.
+ * Unlinked legacy receipts remain unlinked (never guessed from amount/time).
+ * Database indexes protect both sides of the 1:1 relationship and a normalized
+ * evidence reference, even under simultaneous admin requests.
+ */
+export const ledgerPaymentOrderLinks = sqliteTable(
+  'ledger_payment_order_links',
+  {
+    orderId: text('order_id')
+      .primaryKey()
+      .references(() => localOrders.id, { onDelete: 'restrict' }),
+    entryId: text('entry_id')
+      .notNull()
+      .references(() => ledgerEntries.id, { onDelete: 'restrict' }),
+    evidenceKey: text('evidence_key').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('ledger_payment_order_links_entry_uq').on(table.entryId),
+    uniqueIndex('ledger_payment_order_links_evidence_uq').on(table.evidenceKey),
+  ],
+)
+
+/**
  * Dedupe key of the ledger: one source fact may enter the ledger at most once
  * per fact kind. `(source_system, source_id, fact_kind)` is UNIQUE, so a
  * duplicate notification, a replayed import or a concurrent consumer can only
@@ -2196,6 +2221,7 @@ export const schema = {
   localOrderEvents,
   reconciliationBatches,
   ledgerEntries,
+  ledgerPaymentOrderLinks,
   ledgerEntrySources,
   ledgerAnomalies,
   externalOffers,
