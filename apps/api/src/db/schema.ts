@@ -1857,6 +1857,73 @@ export const settlementReceiptClaims = sqliteTable('settlement_receipt_claims', 
   index('settlement_receipt_claim_statement_idx').on(table.statementId),
 ])
 
+
+
+/* #187 Offline payment proof. Append-only evidence, never a transfer command. */
+export const settlementPaymentRecords = sqliteTable('settlement_payment_records', {
+  id: text('id').primaryKey(),
+  statementId: text('statement_id').notNull()
+    .references(() => settlementStatements.id, { onDelete: 'restrict' }),
+  communityId: text('community_id').notNull()
+    .references(() => communities.id, { onDelete: 'restrict' }),
+  beneficiaryPartyId: text('beneficiary_party_id').notNull()
+    .references(() => settlementParties.id, { onDelete: 'restrict' }),
+  beneficiaryRole: text('beneficiary_role')
+    .$type<'seller' | 'sanchuang' | 'guangdian'>().notNull(),
+  beneficiaryLegalName: text('beneficiary_legal_name').notNull(),
+  beneficiaryRegistryRef: text('beneficiary_registry_ref').notNull(),
+  beneficiaryVerificationRef: text('beneficiary_verification_ref'),
+  payableCentsSnapshot: integer('payable_cents_snapshot').notNull(),
+  amountCents: integer('amount_cents').notNull(),
+  paidAt: integer('paid_at', { mode: 'timestamp_ms' }).notNull(),
+  proofRefMasked: text('proof_ref_masked').notNull(),
+  proofFingerprint: text('proof_fingerprint').notNull(),
+  recorderUserId: text('recorder_user_id').notNull()
+    .references(() => users.id, { onDelete: 'restrict' }),
+  idempotencyKey: text('idempotency_key').notNull(),
+  recordedAt: integer('recorded_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  uniqueIndex('settlement_payment_proof_fingerprint_uq').on(table.proofFingerprint),
+  uniqueIndex('settlement_payment_record_idempotency_uq').on(table.idempotencyKey),
+  index('settlement_payment_statement_idx').on(table.statementId, table.recordedAt),
+  index('settlement_payment_beneficiary_idx')
+    .on(table.statementId, table.beneficiaryPartyId, table.recordedAt),
+  check('settlement_payment_record_role_check',
+    sql`${table.beneficiaryRole} IN ('seller','sanchuang','guangdian')`),
+  check('settlement_payment_record_money_check',
+    sql`${table.payableCentsSnapshot} > 0 AND ${table.amountCents} > 0
+      AND ${table.amountCents} <= ${table.payableCentsSnapshot}`),
+])
+
+export const settlementPaymentEvents = sqliteTable('settlement_payment_events', {
+  id: text('id').primaryKey(),
+  paymentRecordId: text('payment_record_id').notNull()
+    .references(() => settlementPaymentRecords.id, { onDelete: 'restrict' }),
+  statementId: text('statement_id').notNull()
+    .references(() => settlementStatements.id, { onDelete: 'restrict' }),
+  kind: text('kind').$type<'recorded' | 'verified' | 'disputed'>().notNull(),
+  sequence: integer('sequence').notNull(),
+  actorUserId: text('actor_user_id').notNull()
+    .references(() => users.id, { onDelete: 'restrict' }),
+  evidenceRef: text('evidence_ref'),
+  state: text('state').$type<'pending_review' | 'verified' | 'disputed'>().notNull(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  uniqueIndex('settlement_payment_event_sequence_uq').on(table.paymentRecordId, table.sequence),
+  uniqueIndex('settlement_payment_event_idempotency_uq').on(table.idempotencyKey),
+  uniqueIndex('settlement_payment_event_terminal_uq').on(table.paymentRecordId)
+    .where(sql`${table.kind} IN ('verified','disputed')`),
+  index('settlement_payment_event_statement_idx').on(table.statementId, table.createdAt),
+  check('settlement_payment_event_kind_state_check', sql`
+    (${table.kind} = 'recorded' AND ${table.sequence} = 1
+      AND ${table.state} = 'pending_review' AND ${table.evidenceRef} IS NULL)
+    OR (${table.kind} = 'verified' AND ${table.sequence} = 2
+      AND ${table.state} = 'verified' AND ${table.evidenceRef} IS NOT NULL)
+    OR (${table.kind} = 'disputed' AND ${table.sequence} = 2
+      AND ${table.state} = 'disputed' AND ${table.evidenceRef} IS NOT NULL)`),
+])
+
 /**
  * Append-only local-order timeline. `source_type` + `source_id` are the stable
  * consumption contract for downstream work (#64): a consumer must be able to

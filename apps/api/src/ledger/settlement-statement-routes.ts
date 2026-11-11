@@ -7,6 +7,9 @@ import {
   settlementStatementDetailSchema,
   settlementStatementListQuerySchema,
   settlementStatementListResponseSchema,
+  recordSettlementPaymentRequestSchema,
+  settlementPaymentActionRequestSchema,
+  settlementPaymentOverviewSchema,
   type ApiErrorCode,
 } from '@sanchuang-dev/local-life-contracts'
 import type { ApiConfig } from '../config.js'
@@ -18,6 +21,12 @@ import {
   listSettlementStatements, lockSettlementStatement,
   performanceLinesForActor, reviewSettlementStatement,
 } from './settlement-statements.js'
+import {
+  disputeSettlementPayment,
+  getSettlementPaymentOverview,
+  recordSettlementPayment,
+  verifySettlementPayment,
+} from './settlement-payments.js'
 import { entitySettlementCsv, gridPerformanceCsv } from './settlement-statement-csv.js'
 
 export interface SettlementStatementRouteDeps {
@@ -58,6 +67,10 @@ export function registerSettlementStatementRoutes(
   }
   const idOf = (c: AppContext): string | null => {
     const result = idSchema.safeParse(c.req.param('statementId'))
+    return result.success ? result.data : null
+  }
+  const paymentIdOf = (c: AppContext): string | null => {
+    const result = idSchema.safeParse(c.req.param('paymentId'))
     return result.success ? result.data : null
   }
   const asCsv = (text: string, id: string, suffix: string): Response => new Response(text, {
@@ -120,6 +133,55 @@ export function registerSettlementStatementRoutes(
       db,auth.actor,id,input.data.expectedRevision,input.data.evidenceRef,clock()))) }
     catch(e) { return error(c,e) }
   })
+
+  app.get(LEDGER_ROUTES.adminSettlementPayments, (c) => {
+    const auth=guard(c,'read')
+    if(auth instanceof Response) return auth
+    const id=idOf(c)
+    if(!id) return fail(c,404,API_ERROR_CODES.notFound,'结算单不存在')
+    try { return c.json(settlementPaymentOverviewSchema.parse(
+      getSettlementPaymentOverview(db,auth.actor,id))) }
+    catch(e) { return error(c,e) }
+  })
+  app.post(LEDGER_ROUTES.adminSettlementPayments, async (c) => {
+    const auth=guard(c,'admin')
+    if(auth instanceof Response) return auth
+    const id=idOf(c)
+    if(!id) return fail(c,404,API_ERROR_CODES.notFound,'结算单不存在')
+    const input=recordSettlementPaymentRequestSchema.safeParse(await c.req.json().catch(()=>null))
+    if(!input.success) return fail(c,400,API_ERROR_CODES.invalidRequest,
+      '请核对收款主体、整数分金额、实际付款时间、脱敏凭据引用和幂等键')
+    try { return c.json(settlementPaymentOverviewSchema.parse(
+      recordSettlementPayment(db,auth.actor,id,input.data,clock())),201) }
+    catch(e) { return error(c,e) }
+  })
+  app.post(LEDGER_ROUTES.adminSettlementPaymentVerify, async (c) => {
+    const auth=guard(c,'admin')
+    if(auth instanceof Response) return auth
+    const id=idOf(c)
+    const paymentId=paymentIdOf(c)
+    if(!id || !paymentId) return fail(c,404,API_ERROR_CODES.notFound,'付款凭据不存在')
+    const input=settlementPaymentActionRequestSchema.safeParse(await c.req.json().catch(()=>null))
+    if(!input.success) return fail(c,400,API_ERROR_CODES.invalidRequest,'缺少复核证据或事件幂等键')
+    try { return c.json(settlementPaymentOverviewSchema.parse(
+      verifySettlementPayment(db,auth.actor,id,paymentId,
+        input.data.eventIdempotencyKey,input.data.evidenceRef,clock()))) }
+    catch(e) { return error(c,e) }
+  })
+  app.post(LEDGER_ROUTES.adminSettlementPaymentDispute, async (c) => {
+    const auth=guard(c,'admin')
+    if(auth instanceof Response) return auth
+    const id=idOf(c)
+    const paymentId=paymentIdOf(c)
+    if(!id || !paymentId) return fail(c,404,API_ERROR_CODES.notFound,'付款凭据不存在')
+    const input=settlementPaymentActionRequestSchema.safeParse(await c.req.json().catch(()=>null))
+    if(!input.success) return fail(c,400,API_ERROR_CODES.invalidRequest,'缺少争议证据或事件幂等键')
+    try { return c.json(settlementPaymentOverviewSchema.parse(
+      disputeSettlementPayment(db,auth.actor,id,paymentId,
+        input.data.eventIdempotencyKey,input.data.evidenceRef,clock()))) }
+    catch(e) { return error(c,e) }
+  })
+
   app.get(LEDGER_ROUTES.adminSettlementEntityCsv, (c) => {
     const auth=guard(c,'read')
     if(auth instanceof Response) return auth
