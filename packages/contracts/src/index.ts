@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { activityRewardPlanSchema } from './rewards.js'
+import { publicPurchaseRewardSchema, purchaseRewardPlanSchema } from './purchase-reward.js'
 import { activityStatusSchema, authCommunitySchema, staffRoleSchema } from './identity.js'
 
 /** Route identifiers shared by the API and every client that calls it. */
@@ -51,6 +52,13 @@ export const API_ERROR_CODES = {
    * budget accounting.
    */
   rewardPlanLocked: 'reward_plan_locked',
+  /**
+   * A published/paused activity may not have its consumption reward plan
+   * changed (LL-PUR-001). Its coupon liability and team quota are part of the
+   * frozen rule snapshot, so editing them after publication would silently
+   * reset the activity's promised budget.
+   */
+  purchaseRewardPlanLocked: 'purchase_reward_plan_locked',
   /**
    * Phone (SMS one-time code) identity, Issue #93. This card ships the server
    * state machine only: no SMS provider is bundled, so a production deployment
@@ -589,6 +597,17 @@ export const activityKeyRulesSchema = z
      * and must never fall back to the mutable `activities` columns.
      */
     rewardPlan: activityRewardPlanSchema.nullable().optional(),
+    /**
+     * Consumption team reward plan (LL-PUR-001). Same three-way optionality as
+     * `rewardPlan`: an absent key means a snapshot frozen before this rule or an
+     * edit that must inherit the stored plan, `null` means "deliberately not
+     * configured", and an object is the single tier of this activity.
+     *
+     * The plan only fixes the rule. Spend aggregation, coupon issuance and
+     * redemption belong to later LL-PUR cards and must never be inferred from
+     * this field alone.
+     */
+    purchaseRewardPlan: purchaseRewardPlanSchema.nullable().optional(),
   })
   .superRefine((value, ctx) => {
     if (Date.parse(value.endsAt) <= Date.parse(value.startsAt)) {
@@ -767,6 +786,11 @@ export type PublicActivitySummary = z.infer<typeof publicActivitySummarySchema>
 export const publicActivityDetailSchema = publicActivitySummarySchema.extend({
   description: z.string().nullable(),
   publicRules: activityPublicRulesSchema,
+  /**
+   * Residents may see the spend threshold and the per-member coupon face value.
+   * The internal `maxRewardedTeams` budget control is deliberately not exposed.
+   */
+  purchaseReward: publicPurchaseRewardSchema.nullable(),
   publishedAt: isoTimestamp.nullable(),
 })
 
@@ -810,6 +834,11 @@ export const adminActivityDetailSchema = adminActivitySummarySchema.extend({
    * every edit would silently drop it.
    */
   rewardPlan: activityRewardPlanSchema.nullable(),
+  /**
+   * Consumption reward tier stored on the activity (LL-PUR-001), exposed so an
+   * admin form can read a draft back and round-trip it on the next save.
+   */
+  purchaseRewardPlan: purchaseRewardPlanSchema.nullable(),
 })
 
 export type AdminActivityDetail = z.infer<typeof adminActivityDetailSchema>
@@ -2036,6 +2065,7 @@ export type ActivityParticipationConfirmResponse = z.infer<
 export * from './identity.js'
 export * from './crmeb.js'
 export * from './rewards.js'
+export * from './purchase-reward.js'
 export * from './ledger.js'
 export * from './user-directory.js'
 export * from './resident-community.js'
