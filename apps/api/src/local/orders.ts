@@ -30,10 +30,10 @@ import {
   communities,
   localOrderEvents,
   localOrders,
-  residentCommunityAssignments,
   staffAccounts,
   users,
 } from '../db/schema.js'
+import { assertResidentOfConfirmedCommunity } from '../resident-community/service.js'
 import {
   LocalError,
   assertCommunityAccess,
@@ -347,24 +347,24 @@ function matchesIntent(row: OrderRow, input: RegistrationInput): boolean {
   )
 }
 
+/**
+ * Community-scoped write guard for local orders (#171 LL-IDENTITY-001).
+ *
+ * The authority is the resident's own confirmed binding, not the historical
+ * `resident_community_assignments` row: that table records "a relation was
+ * observed" (and the retired #123 login wrote it automatically), so treating it as
+ * permission would let a login from an activity page order in a community the
+ * resident never confirmed. `assertResidentOfConfirmedCommunity` throws the shared
+ * `ResidentCommunityError` (403 not-bound / 403 conflict / 404 unknown community)
+ * whose message names the confirmed community, and the route maps it to the
+ * standard envelope.
+ */
 function assertResidentOfCommunity(
   db: AppDatabase,
   residentUserId: string,
   communityId: string,
 ): void {
-  const membership = db
-    .select()
-    .from(residentCommunityAssignments)
-    .where(
-      and(
-        eq(residentCommunityAssignments.userId, residentUserId),
-        eq(residentCommunityAssignments.communityId, communityId),
-      ),
-    )
-    .get()
-  if (!membership) {
-    throw new LocalError(403, API_ERROR_CODES.forbidden, '居民不属于该社区，无法登记该商品')
-  }
+  assertResidentOfConfirmedCommunity(db, residentUserId, communityId)
 }
 
 /**
@@ -644,6 +644,7 @@ export function listStaffOrders(
     const pattern = escapedLike(query.keyword)
     conditions.push(
       or(
+        sql`${localOrders.id} LIKE ${pattern} ESCAPE '\\'`,
         sql`${localOrders.productName} LIKE ${pattern} ESCAPE '\\'`,
         sql`${localOrders.note} LIKE ${pattern} ESCAPE '\\'`,
       )!,

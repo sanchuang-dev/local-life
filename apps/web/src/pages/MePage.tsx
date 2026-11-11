@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { ChevronRight, ClipboardList, Gift, LogOut, ShieldCheck, ShoppingBasket, Smartphone, UserRound } from 'lucide-react'
+import { ChevronRight, ClipboardList, Gift, Home, LogOut, ShieldCheck, ShoppingBasket, Smartphone, UserRound } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
 import { PhoneVerificationForm } from '../components/auth/PhoneVerificationForm'
+import { ResidentCommunityCard } from '../components/community/ResidentCommunityCard'
+import { useResidentCommunity } from '../hooks/useResidentCommunity'
 import { isWeChatBrowser } from '../components/auth/wechatEnvironment'
 import { buildResidentLoginHref } from '../components/auth/residentLogin'
 import { parseInviteParam } from '../components/activity/share'
@@ -67,6 +69,10 @@ export function MePage() {
     authLoading: auth.loading,
   })
   const wallet = useRewardWallet({
+    sessionKey: auth.session?.user.id ?? null,
+    authLoading: auth.loading,
+  })
+  const residentCommunity = useResidentCommunity({
     sessionKey: auth.session?.user.id ?? null,
     authLoading: auth.loading,
   })
@@ -345,6 +351,42 @@ export function MePage() {
           </>
         ) : null}
       </article>
+
+      {auth.session && !auth.session.staff ? (
+        <>
+          <div className="mt-4">
+            {/*
+              Read-only here on purpose: 我的 never turns a server-side candidate or a
+              browser `localStorage` choice into a confirmation target. The explicit
+              first confirmation lives on the community page the resident is browsing.
+            */}
+            <ResidentCommunityCard
+              state={residentCommunity.state}
+              onReload={residentCommunity.reload}
+              chooseCommunityHref="/"
+            />
+          </div>
+          <Link
+            to="/me/community"
+            state={{ from: '/me' }}
+            className="mt-3 flex items-center gap-3 rounded-[18px] border border-slate-100 bg-white px-4 py-3.5 shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+          >
+            <span
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[#e8f6f0] text-[#388b77]"
+              aria-hidden="true"
+            >
+              <Home size={20} strokeWidth={1.8} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[14px] font-semibold text-slate-800">我的常驻社区</span>
+              <span className="mt-0.5 block text-[11px] leading-4 text-slate-400">
+                只读查看确认日期与历史归属
+              </span>
+            </span>
+            <ChevronRight size={17} className="shrink-0 text-slate-300" aria-hidden="true" />
+          </Link>
+        </>
+      ) : null}
 
       <Link
         to="/me/rewards"

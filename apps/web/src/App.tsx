@@ -20,6 +20,8 @@ import { HealthPage } from './pages/HealthPage'
 import { LifePage } from './pages/LifePage'
 import { LocalProductPage } from './pages/LocalProductPage'
 import { MePage } from './pages/MePage'
+import { ResidentCommunityConfirmPage } from './pages/ResidentCommunityConfirmPage'
+import { ResidentCommunityPage } from './pages/ResidentCommunityPage'
 import { ResidentLoginPage } from './pages/ResidentLoginPage'
 import { MyOrderDetailPage } from './pages/MyOrderDetailPage'
 import { MyOrdersPage } from './pages/MyOrdersPage'
@@ -69,6 +71,8 @@ export default function App() {
         <Route path="/points" element={<PointsPage />} />
         <Route element={<RequireResidentAuth />}>
           <Route path="/me" element={<MePage />} />
+          <Route path="/me/community" element={<ResidentCommunityPage />} />
+          <Route path="/me/community/confirm" element={<ResidentCommunityConfirmPage />} />
           <Route path="/me/devices" element={<HealthDevicesPage />} />
           <Route path="/me/orders" element={<MyOrdersPage />} />
           <Route path="/me/orders/:localOrderId" element={<MyOrderDetailPage />} />

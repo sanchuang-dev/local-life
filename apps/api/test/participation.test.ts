@@ -26,6 +26,7 @@ import {
   getParticipationState,
   ParticipationError,
 } from '../src/participation/service.js'
+import { seedConfirmedCommunity } from './resident-community-fixtures.js'
 
 const migrationsFolder = fileURLToPath(new URL('../db/migrations', import.meta.url))
 const apiRoot = fileURLToPath(new URL('..', import.meta.url))
@@ -59,6 +60,20 @@ function createFixture(): Fixture {
 function addUser(db: AppDatabase, displayName: string | null): string {
   const id = randomUUID()
   db.insert(users).values({ id, displayName, createdAt: NOW, updatedAt: NOW }).run()
+  return id
+}
+
+/**
+ * A resident who confirmed `communityId` as their permanent community (#171).
+ *
+ * Joining an activity is a community-scoped write and is refused for a resident
+ * without a confirmed binding, so every participant in this suite needs one. The
+ * binding is created by the production confirmation service — the same path a
+ * resident takes — never by writing a historical assignment row.
+ */
+function addResident(db: AppDatabase, displayName: string | null, communityId: string): string {
+  const id = addUser(db, displayName)
+  seedConfirmedCommunity(db, id, communityId, NOW)
   return id
 }
 
@@ -148,10 +163,10 @@ function withTempDir(prefix: string) {
 test('A/B/C fill the three seats, lock the team in the same transaction and reject the fourth resident', () => {
   const { db, sqlite, communityId } = createFixture()
   try {
-    const userA = addUser(db, '张三')
-    const userB = addUser(db, '李四')
-    const userC = addUser(db, '王五')
-    const userD = addUser(db, '赵六')
+    const userA = addResident(db, '张三', communityId)
+    const userB = addResident(db, '李四', communityId)
+    const userC = addResident(db, '王五', communityId)
+    const userD = addResident(db, '赵六', communityId)
     const activityId = addActivity(db, communityId, userA)
 
     const first = confirmParticipation(db, { activityId, userId: userA, now: NOW })
@@ -296,9 +311,9 @@ test('A/B/C fill the three seats, lock the team in the same transaction and reje
 test('repeated confirm is idempotent and another team invitation never rewrites the frozen attribution', () => {
   const { db, sqlite, communityId } = createFixture()
   try {
-    const userA = addUser(db, '团长甲')
-    const userB = addUser(db, '成员乙')
-    const userC = addUser(db, '团长丙')
+    const userA = addResident(db, '团长甲', communityId)
+    const userB = addResident(db, '成员乙', communityId)
+    const userC = addResident(db, '团长丙', communityId)
     const activityId = addActivity(db, communityId, userA)
 
     const teamA = confirmParticipation(db, { activityId, userId: userA, now: NOW })
@@ -368,7 +383,7 @@ test('repeated confirm is idempotent and another team invitation never rewrites 
 test('one resident may join a different activity, but never twice in the same one', () => {
   const { db, sqlite, communityId } = createFixture()
   try {
-    const userA = addUser(db, '跨场居民')
+    const userA = addResident(db, '跨场居民', communityId)
     const activityOne = addActivity(db, communityId, userA, { title: '第一场' })
     const activityTwo = addActivity(db, communityId, userA, { title: '第二场' })
 
@@ -411,9 +426,9 @@ test('one resident may join a different activity, but never twice in the same on
 test('invalid, malformed and cross-activity invite codes are rejected without writing anything', () => {
   const { db, sqlite, communityId } = createFixture()
   try {
-    const userA = addUser(db, '团长')
-    const userX = addUser(db, '外场团长')
-    const userE = addUser(db, '受邀居民')
+    const userA = addResident(db, '团长', communityId)
+    const userX = addResident(db, '外场团长', communityId)
+    const userE = addResident(db, '受邀居民', communityId)
     const activityOne = addActivity(db, communityId, userA, { title: '本场活动' })
     const activityTwo = addActivity(db, communityId, userX, { title: '另一场活动' })
 
@@ -511,7 +526,7 @@ test('unpublished, ended and time-expired activities reject participation while 
         endsAt: scenario.endsAt,
         title: `${scenario.status}-${scenario.expectedReason}`,
       })
-      const resident = addUser(db, '居民')
+      const resident = addResident(db, '居民', communityId)
 
       const state = getParticipationState(db, { activityId, userId: resident, now: NOW })
       assert.equal(state.activityStatus, scenario.expectedStatus)
@@ -539,7 +554,7 @@ test('unpublished, ended and time-expired activities reject participation while 
       endsAt: new Date('2026-12-20T10:00:00.000Z'),
       title: '可预报名活动',
     })
-    const earlyResident = addUser(db, '预报名居民')
+    const earlyResident = addResident(db, '预报名居民', communityId)
     const upcomingState = getParticipationState(db, {
       activityId: upcoming,
       userId: earlyResident,
@@ -557,7 +572,7 @@ test('unpublished, ended and time-expired activities reject participation while 
     // An existing team is still readable after the activity is paused, but no new
     // participation can be confirmed.
     const pausedExisting = addActivity(db, communityId, owner, { title: '暂停但已有团' })
-    const leader = addUser(db, '暂停场团长')
+    const leader = addResident(db, '暂停场团长', communityId)
     const seeded = confirmParticipation(db, {
       activityId: pausedExisting,
       userId: leader,
@@ -576,7 +591,7 @@ test('unpublished, ended and time-expired activities reject participation while 
     assert.equal(pausedState.team?.id, seeded.state.team?.id)
     assert.equal(pausedState.joinable, false)
     assert.equal(pausedState.unavailableReason, 'activity_not_published')
-    const lateJoiner = addUser(db, '迟到居民')
+    const lateJoiner = addResident(db, '迟到居民', communityId)
     assert.equal(
       participationError(() =>
         confirmParticipation(db, {
@@ -597,7 +612,7 @@ test('the service distinguishes a missing activity from a draft, both hidden beh
   const { db, sqlite, communityId } = createFixture()
   try {
     const owner = addUser(db, '负责人')
-    const resident = addUser(db, '居民')
+    const resident = addResident(db, '居民', communityId)
     const draftId = addActivity(db, communityId, owner, { status: 'draft', title: '草稿活动' })
 
     const draftState = participationError(() =>
@@ -720,7 +735,7 @@ test('migration 0002 applies to an empty database with its indexes, foreign keys
     // The migrated database is usable end to end, not merely navigable.
     const communityId = randomUUID()
     db.insert(communities).values({ id: communityId, name: '迁移验证社区', createdAt: NOW }).run()
-    const leader = addUser(db, '迁移团长')
+    const leader = addResident(db, '迁移团长', communityId)
     const activityId = addActivity(db, communityId, leader)
     const confirmed = confirmParticipation(db, { activityId, userId: leader, now: NOW })
     assert.equal(confirmed.created, true)
@@ -734,10 +749,10 @@ test('migration 0002 applies to an empty database with its indexes, foreign keys
 test('triggers reject attribution updates, deletes and any attempt to unlock a full team', () => {
   const { db, sqlite, communityId } = createFixture()
   try {
-    const userA = addUser(db, '团长甲')
-    const userB = addUser(db, '成员乙')
-    const userC = addUser(db, '成员丙')
-    const outsider = addUser(db, '外场团长')
+    const userA = addResident(db, '团长甲', communityId)
+    const userB = addResident(db, '成员乙', communityId)
+    const userC = addResident(db, '成员丙', communityId)
+    const outsider = addResident(db, '外场团长', communityId)
     const activityId = addActivity(db, communityId, userA)
     const otherActivityId = addActivity(db, communityId, outsider, { title: '另一场活动' })
 
@@ -885,7 +900,7 @@ test('triggers reject attribution updates, deletes and any attempt to unlock a f
     )
     // Two participations for the same resident in one activity are impossible,
     // even in another team of the same activity.
-    const extraLeader = addUser(db, '额外团长')
+    const extraLeader = addResident(db, '额外团长', communityId)
     const extraTeam = confirmParticipation(db, { activityId, userId: extraLeader, now: NOW })
     const extraInvitation = db
       .select()
@@ -913,7 +928,7 @@ test('triggers reject attribution updates, deletes and any attempt to unlock a f
     )
     // Invite codes are unique and must keep the 32 lowercase hex shape. An
     // invitation-less team isolates the code constraint from UNIQUE(team_id).
-    const codeOnlyLeader = addUser(db, '待发码团长')
+    const codeOnlyLeader = addResident(db, '待发码团长', communityId)
     const codeOnlyTeamId = randomUUID()
     sqlite
       .prepare(
@@ -1099,10 +1114,10 @@ test('two independent SQLite connections race for the last seat: exactly one win
       .insert(communities)
       .values({ id: communityId, name: '并发验证社区', createdAt: NOW })
       .run()
-    const leader = addUser(first.db, '团长')
-    const member = addUser(first.db, '第二位成员')
-    const contenderOne = addUser(first.db, '抢席一')
-    const contenderTwo = addUser(first.db, '抢席二')
+    const leader = addResident(first.db, '团长', communityId)
+    const member = addResident(first.db, '第二位成员', communityId)
+    const contenderOne = addResident(first.db, '抢席一', communityId)
+    const contenderTwo = addResident(first.db, '抢席二', communityId)
     const activityId = addActivity(first.db, communityId, leader, {
       startsAt: new Date(),
       endsAt: activityEnd,
@@ -1219,8 +1234,8 @@ test('the service returns the same durable state to a fresh connection', () => {
   try {
     const communityId = randomUUID()
     first.db.insert(communities).values({ id: communityId, name: '持久化社区', createdAt: NOW }).run()
-    const leader = addUser(first.db, '团长')
-    const member = addUser(first.db, '成员')
+    const leader = addResident(first.db, '团长', communityId)
+    const member = addResident(first.db, '成员', communityId)
     const activityId = addActivity(first.db, communityId, leader)
     const leaderState = confirmParticipation(first.db, { activityId, userId: leader, now: NOW })
     const joined = confirmParticipation(first.db, {

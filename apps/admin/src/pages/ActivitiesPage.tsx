@@ -63,6 +63,7 @@ import {
   type ActivityTransition,
 } from '../services/activities'
 import type { AuthenticatedSession } from '../services/auth'
+import { DrawPoolDrawer } from './DrawPoolDrawer'
 import './activities.css'
 
 // utcOffset keeps the pickers on Asia/Shanghai wall time whatever zone the
@@ -765,6 +766,8 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
   const [auditError, setAuditError] = useState<string | null>(null)
   const auditRequestRef = useRef(0)
 
+  const [drawPoolActivity, setDrawPoolActivity] = useState<AdminActivitySummary | null>(null)
+
   useEffect(() => {
     let active = true
     const controller = new AbortController()
@@ -1210,6 +1213,7 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
         onClick: () => confirmTransition(row, 'end'),
       },
       { key: 'versions', label: '规则版本', onClick: () => openVersions(row) },
+      { key: 'draw', label: '今日抽奖', onClick: () => setDrawPoolActivity(row) },
       { key: 'audit', label: '审计', onClick: () => openAudit(row) },
     ]
   }
@@ -1831,6 +1835,13 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
           />
         )}
       </Drawer>
+
+      <DrawPoolDrawer
+        open={drawPoolActivity !== null}
+        activity={drawPoolActivity}
+        session={session}
+        onClose={() => setDrawPoolActivity(null)}
+      />
     </div>
   )
 }

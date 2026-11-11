@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 import { activityRewardPlanSchema } from './rewards.js'
-import { authCommunitySchema, staffRoleSchema } from './identity.js'
+import { activityStatusSchema, authCommunitySchema, staffRoleSchema } from './identity.js'
 
 /** Route identifiers shared by the API and every client that calls it. */
 export const API_ROUTES = {
@@ -67,6 +67,16 @@ export const API_ERROR_CODES = {
   phoneInUse: 'phone_in_use',
   smsDeliveryFailed: 'sms_delivery_failed',
   /**
+   * Real "today's draw" prize pool (LL-LOT-001). `draw_pool_not_ready` blocks
+   * enabling a pool without a real, in-stock, weighted prize; `draw_pool_not_configured`
+   * means a prize cannot be added before the base rule was saved.
+   */
+  drawPoolNotReady: 'draw_pool_not_ready',
+  drawPoolNotConfigured: 'draw_pool_not_configured',
+  drawDailyLimit: 'draw_daily_limit_reached',
+  drawCredentialInvalid: 'draw_credential_invalid',
+  drawAlreadyRedeemed: 'draw_already_redeemed',
+  /**
    * Local catalogue (#109): an off-shelf product refuses *new* registrations.
    * Existing orders keep their frozen snapshot and are unaffected.
    */
@@ -104,6 +114,17 @@ export const API_ERROR_CODES = {
   wechatConfigDecryptFailed: 'wechat_config_decrypt_failed',
   wechatProfileIdentityMismatch: 'wechat_profile_identity_mismatch',
   wechatJsSdkUnavailable: 'wechat_js_sdk_unavailable',
+  /**
+   * Permanent resident community (#171 LL-IDENTITY-001). Every code is a
+   * refusal, never a silent repair: a second confirmation must not overwrite the
+   * first one, and a historical multi-community account must wait for a human.
+   */
+  residentCommunityNotFound: 'resident_community_not_found',
+  residentCommunityAlreadyConfirmed: 'resident_community_already_confirmed',
+  residentCommunityConflict: 'resident_community_conflict',
+  residentCommunityPendingReview: 'resident_community_pending_review',
+  /** A community-scoped resident write requires a confirmed permanent community. */
+  residentCommunityNotBound: 'resident_community_not_bound',
 } as const
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES]
@@ -528,10 +549,11 @@ export const ACTIVITY_ROUTES = {
   adminAudit: '/admin/activities/:activityId/audit',
 } as const
 
-/** Lifecycle state of an activity. Only staff can change it, through explicit transitions. */
-export const activityStatusSchema = z.enum(['draft', 'published', 'paused', 'ended'])
-export type ActivityStatus = z.infer<typeof activityStatusSchema>
-
+/**
+ * Lifecycle state of an activity. Only staff can change it, through explicit
+ * transitions. The schema itself lives in `identity.ts` so domain modules can
+ * import it without a circular dependency; it is re-exported from here.
+ */
 /** Status values that may be exposed to residents; drafts are never public. */
 export const activityPublicStatusSchema = z.enum(['published', 'paused', 'ended'])
 export type ActivityPublicStatus = z.infer<typeof activityPublicStatusSchema>
@@ -857,6 +879,17 @@ export const residentDirectoryQuerySchema = z.strictObject({
   keyword: z.string().trim().min(1).max(80).optional(),
 })
 
+/**
+ * How the resident is related to the queried community (#171 LL-IDENTITY-001):
+ * `confirmed_binding` — the resident confirmed this community themself, the only
+ * permanent fact; `historical_assignment` — a legacy relation was observed (also
+ * what the retired #123 login wrote automatically) and it is NOT a confirmation.
+ */
+export const residentDirectoryRelationSourceSchema = z.enum([
+  'confirmed_binding',
+  'historical_assignment',
+])
+
 export const residentDirectoryEntrySchema = z.strictObject({
   id: z.string().uuid(),
   /** Display-only precedence: consented WeChat > local name > 微信用户. */
@@ -866,7 +899,10 @@ export const residentDirectoryEntrySchema = z.strictObject({
   wechatAvatarUrl: z.string().nullable(),
   profileAuthorizedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
+  /** When this particular relation to the queried community began. */
   joinedAt: z.string().datetime(),
+  /** Never render a `historical_assignment` as a confirmed permanent community. */
+  communityRelationSource: residentDirectoryRelationSourceSchema,
 })
 export const residentDirectoryResponseSchema = z.strictObject({
   items: z.array(residentDirectoryEntrySchema),
@@ -2002,6 +2038,8 @@ export * from './crmeb.js'
 export * from './rewards.js'
 export * from './ledger.js'
 export * from './user-directory.js'
+export * from './resident-community.js'
+export * from './draw.js'
 
 /* -------------------------------------------------------------------------- */
 /* Phone (SMS one-time code) resident identity (#93 LL-H5-002)                 */

@@ -24,6 +24,7 @@ import {
   revokeGrant,
 } from '../src/rewards/service.js'
 import { communities, staffAccounts, users } from '../src/db/schema.js'
+import { seedConfirmedCommunity } from './resident-community-fixtures.js'
 
 /**
  * Regression suite for the "rule edit mints a new version" class of bug.
@@ -132,6 +133,9 @@ function createWorld(plan: ActivityRewardPlan = PLAN): World {
   const newUser = (displayName: string): string => {
     const id = randomUUID()
     db.insert(users).values({ id, displayName, createdAt: OPEN, updatedAt: OPEN }).run()
+    // #171: every resident below joins an activity of `communityId`, so each one
+    // must hold a real confirmed binding (not a legacy assignment).
+    seedConfirmedCommunity(db, id, communityId, OPEN)
     return id
   }
 

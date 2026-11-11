@@ -43,6 +43,7 @@ import {
   staffCommunityAssignments,
   users,
 } from '../src/db/schema.js'
+import { seedConfirmedCommunity } from './resident-community-fixtures.js'
 
 const migrationsFolder = fileURLToPath(new URL('../db/migrations', import.meta.url))
 
@@ -118,6 +119,20 @@ function createWorld(options: { plan?: ActivityRewardPlan | null } = {}): World 
     return id
   }
 
+  /**
+   * A resident of `communityId` (#171 LL-IDENTITY-001).
+   *
+   * Joining a team is a community-scoped write, so the resident must actually
+   * hold a confirmed binding — not a historical assignment. `seedConfirmedCommunity`
+   * runs the production confirmation service, so the fixture is exactly the row a
+   * resident who confirmed 常驻社区 would have.
+   */
+  const addResident = (name: string, community = communityId): string => {
+    const id = addUser(name)
+    seedConfirmedCommunity(db, id, community, OPEN)
+    return id
+  }
+
   const adminUser = addUser('管理员')
   const operatorUser = addUser('运营员')
   const operator = makeStaff(db, adminUser, 'reward-admin', 'admin', OPEN)
@@ -153,9 +168,10 @@ function createWorld(options: { plan?: ActivityRewardPlan | null } = {}): World 
     otherCreated.updatedAt,
   )
 
-  const leader = addUser('团长甲')
-  const member2 = addUser('成员乙')
-  const member3 = addUser('成员丙')
+  // A/B/C confirmed THIS activity's community; the outsider confirmed nothing.
+  const leader = addResident('团长甲')
+  const member2 = addResident('成员乙')
+  const member3 = addResident('成员丙')
   const outsider = addUser('路人丁')
 
   const started = confirmParticipation(db, { activityId: published.id, userId: leader, now: OPEN })
@@ -210,12 +226,15 @@ function qualifyTeam(world: World, now = IN_WINDOW): void {
  * other team's view of it. Returns the team's identifiers.
  */
 function makeSecondTeam(world: World, label: string): { leader: string; teamId: string } {
-  const addUser = (name: string): string => {
+  const addResident = (name: string): string => {
     const id = randomUUID()
     world.db.insert(users).values({ id, displayName: name, createdAt: OPEN, updatedAt: OPEN }).run()
+    // #171: this team plays in `world.activityId`, so every member must hold a
+    // confirmed binding for that activity's community.
+    seedConfirmedCommunity(world.db, id, world.communityId, OPEN)
     return id
   }
-  const leader = addUser(`${label}团长`)
+  const leader = addResident(`${label}团长`)
   const started = confirmParticipation(world.db, {
     activityId: world.activityId,
     userId: leader,
@@ -223,7 +242,7 @@ function makeSecondTeam(world: World, label: string): { leader: string; teamId: 
   })
   const inviteCode = started.state.team?.inviteCode
   assert.ok(inviteCode, 'the second team leader must receive an invite code')
-  const members = [addUser(`${label}成员甲`), addUser(`${label}成员乙`)]
+  const members = [addResident(`${label}成员甲`), addResident(`${label}成员乙`)]
   for (const member of members) {
     confirmParticipation(world.db, {
       activityId: world.activityId,
@@ -781,38 +800,9 @@ test('stock exhaustion rejects the claim without creating a grant row', () => {
     qualifyTeam(world)
     claimTeamReward(world.db, { activityId: world.activityId, userId: world.leader, now: IN_WINDOW })
 
-    // A second team in the same activity.
-    const leader2 = randomUUID()
-    world.db
-      .insert(users)
-      .values({ id: leader2, displayName: '团长乙', createdAt: OPEN, updatedAt: OPEN })
-      .run()
-    const started = confirmParticipation(world.db, {
-      activityId: world.activityId,
-      userId: leader2,
-      now: OPEN,
-    })
-    const inviteCode = started.state.team!.inviteCode!
-    for (const name of ['成员戊', '成员己']) {
-      const id = randomUUID()
-      world.db
-        .insert(users)
-        .values({ id, displayName: name, createdAt: OPEN, updatedAt: OPEN })
-        .run()
-      confirmParticipation(world.db, { activityId: world.activityId, userId: id, inviteCode, now: OPEN })
-      recordCheckin(world.db, {
-        activityId: world.activityId,
-        userId: id,
-        operator: world.operator,
-        now: IN_WINDOW,
-      })
-    }
-    recordCheckin(world.db, {
-      activityId: world.activityId,
-      userId: leader2,
-      operator: world.operator,
-      now: IN_WINDOW,
-    })
+    // A second team in the same activity. Its members must hold a confirmed
+    // community binding (#171) before they may occupy a seat.
+    const { leader: leader2 } = makeSecondTeam(world, '乙队')
 
     const exhausted = expectRewardError(
       () =>
@@ -851,37 +841,7 @@ test('budget exhaustion is reported separately from stock exhaustion', () => {
     qualifyTeam(world)
     claimTeamReward(world.db, { activityId: world.activityId, userId: world.leader, now: IN_WINDOW })
 
-    const leader2 = randomUUID()
-    world.db
-      .insert(users)
-      .values({ id: leader2, displayName: '团长丙', createdAt: OPEN, updatedAt: OPEN })
-      .run()
-    const started = confirmParticipation(world.db, {
-      activityId: world.activityId,
-      userId: leader2,
-      now: OPEN,
-    })
-    const inviteCode = started.state.team!.inviteCode!
-    for (const name of ['成员庚', '成员辛']) {
-      const id = randomUUID()
-      world.db
-        .insert(users)
-        .values({ id, displayName: name, createdAt: OPEN, updatedAt: OPEN })
-        .run()
-      confirmParticipation(world.db, { activityId: world.activityId, userId: id, inviteCode, now: OPEN })
-      recordCheckin(world.db, {
-        activityId: world.activityId,
-        userId: id,
-        operator: world.operator,
-        now: IN_WINDOW,
-      })
-    }
-    recordCheckin(world.db, {
-      activityId: world.activityId,
-      userId: leader2,
-      operator: world.operator,
-      now: IN_WINDOW,
-    })
+    const { leader: leader2 } = makeSecondTeam(world, '丙队')
 
     const overBudget = expectRewardError(
       () =>
@@ -1430,15 +1390,27 @@ test('revoking a check-in of a team that stays qualified leaves the grant alone'
     assert.equal(claim.created, true)
 
     // A check-in in the *other* activity must never disturb this team's grant.
+    //
+    // #171: the leader confirmed community A, so they may not join an activity of
+    // community B any more (that is asserted separately in
+    // `resident-community-guard.test.ts`). The cross-activity check-in is therefore
+    // produced by a resident of community B — the same scenario, one honest
+    // resident per community.
+    const neighbour = randomUUID()
+    world.db
+      .insert(users)
+      .values({ id: neighbour, displayName: '乙社区居民', createdAt: OPEN, updatedAt: OPEN })
+      .run()
+    seedConfirmedCommunity(world.db, neighbour, world.otherCommunityId, OPEN)
     const otherStarted = confirmParticipation(world.db, {
       activityId: world.otherActivityId,
-      userId: world.leader,
+      userId: neighbour,
       now: OPEN,
     })
     assert.equal(otherStarted.created, true)
     recordCheckin(world.db, {
       activityId: world.otherActivityId,
-      userId: world.leader,
+      userId: neighbour,
       operator: world.operator,
       now: IN_WINDOW,
     })

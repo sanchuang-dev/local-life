@@ -6,8 +6,12 @@ import {
   publicActivityListResponseSchema,
   type PublicActivitySummary,
   type TeamRewardState,
+  type ResidentDrawAttempt,
 } from '@sanchuang-dev/local-life-contracts'
 import { getTeamRewardState, isRewardApiError } from '../services/rewards'
+import { getResidentDrawHistory } from '../services/draw'
+import { distinctDrawWins } from '../lib/drawUi'
+import { isLocalApiError } from '../services/localApi'
 import { rewardBucketOf, type RewardBucket } from '../components/activity/rewardLabels'
 
 /**
@@ -23,11 +27,18 @@ export type RewardWalletEntry = {
   bucket: RewardBucket
 }
 
+export type DrawWalletEntry = {
+  activityId: string
+  activityTitle: string
+  communityName: string
+  attempt: ResidentDrawAttempt
+}
+
 export type RewardWalletState =
   | { status: 'loading' }
   | { status: 'unauthenticated' }
   | { status: 'error'; message: string }
-  | { status: 'ready'; entries: RewardWalletEntry[] }
+  | { status: 'ready'; entries: RewardWalletEntry[]; drawEntries: DrawWalletEntry[] }
 
 /** Public activities read per wallet load; the MVP runs a handful of activities. */
 const MAX_ACTIVITIES = 12
@@ -91,36 +102,47 @@ export function useRewardWallet({
 
         const settled = await Promise.all(
           activities.map(async (activity) => {
-            try {
-              const reward = await getTeamRewardState(activity.id, controller.signal)
-              return { activity, reward }
-            } catch (cause) {
-              // No team yet / no plan / not published: the resident simply has no
-              // wallet entry here. Real authorization and server failures still throw.
-              if (isRewardApiError(cause) && cause.status === 409) return null
-              throw cause
-            }
+            // Team reward and draw awards are separate ledgers. A resident who
+            // never joined a team can still have won an actual draw prize.
+            const [reward, drawHistory] = await Promise.all([
+              getTeamRewardState(activity.id, controller.signal).catch((cause: unknown) => {
+                if (isRewardApiError(cause) && cause.status === 409) return null
+                throw cause
+              }),
+              getResidentDrawHistory(activity.id, controller.signal),
+            ])
+            return { activity, reward, drawHistory }
           }),
         )
 
         if (!active) return
-        const entries: RewardWalletEntry[] = settled
-          .filter((item): item is { activity: PublicActivitySummary; reward: TeamRewardState } =>
-            item !== null,
-          )
-          .map(({ activity, reward }) => ({
-            activityId: activity.id,
-            activityTitle: activity.title,
-            activityStatus: activity.status,
-            communityName: activity.community.name,
-            reward,
-            bucket: rewardBucketOf(reward),
-          }))
-
-        setState({ status: 'ready', entries })
+        const entries: RewardWalletEntry[] = []
+        const drawEntries: DrawWalletEntry[] = []
+        for (const { activity, reward, drawHistory } of settled) {
+          if (reward) {
+            entries.push({
+              activityId: activity.id,
+              activityTitle: activity.title,
+              activityStatus: activity.status,
+              communityName: activity.community.name,
+              reward,
+              bucket: rewardBucketOf(reward),
+            })
+          }
+          for (const attempt of distinctDrawWins(drawHistory.attempts, drawHistory.activeAwards)) {
+            drawEntries.push({
+              activityId: activity.id,
+              activityTitle: activity.title,
+              communityName: activity.community.name,
+              attempt,
+            })
+          }
+        }
+        drawEntries.sort((a, b) => b.attempt.createdAt.localeCompare(a.attempt.createdAt))
+        setState({ status: 'ready', entries, drawEntries })
       } catch (cause) {
         if (!active || controller.signal.aborted) return
-        if (isRewardApiError(cause) && cause.status === 401) {
+        if ((isRewardApiError(cause) || isLocalApiError(cause)) && cause.status === 401) {
           reportResidentSessionExpired()
           setState({ status: 'unauthenticated' })
           return
