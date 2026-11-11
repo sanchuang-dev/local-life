@@ -261,6 +261,23 @@ export function DailyDrawCard({
               </p>
             </div>
           ) : null}
+          {data.history && data.history.attempts.length > 0 ? (
+            <details className="mt-3 rounded-[12px] border border-slate-100 bg-white p-3">
+              <summary className="min-h-[32px] cursor-pointer text-[12px] font-semibold text-teal-700">
+                查看抽奖记录（最近 {data.history.attempts.length} 次）
+              </summary>
+              <ul className="mt-2 grid gap-2" aria-label="我的抽奖记录">
+                {data.history.attempts.slice(0, 12).map((attempt) => (
+                  <li key={attempt.id} className="flex flex-wrap items-center justify-between gap-1 border-t border-slate-100 pt-2 text-[11px] text-slate-600">
+                    <span>{new Date(attempt.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</span>
+                    <span className={attempt.outcome === 'won' ? 'font-semibold text-teal-700' : 'text-slate-500'}>
+                      {attempt.outcome === 'won' ? '中奖：' + (attempt.prize?.name ?? '奖品') : '未中奖'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
           <Link to="/me/rewards" state={{ from: loginTarget }}
             className="mt-3 flex min-h-[44px] items-center justify-center text-[13px] font-semibold text-teal-700">
             我的奖励与中奖记录
