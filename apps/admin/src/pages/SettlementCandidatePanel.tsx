@@ -40,10 +40,9 @@ import './ledger.css'
  *
  * What this panel deliberately does **not** do:
  *
- * - It does not compute a payable / share / fee / difference. There is no
- *   approved settlement rule in this MVP, so `settlementAmountStatus` is always
- *   `pending_rule` and `payableAmountCents` is always `null`; the panel renders
- *   待核定 instead of inventing a number.
+ * - It does not compute a payable / share / fee / difference. The candidate
+ *   contract reports `pending_rule` / `payableAmountCents: null` regardless of
+ *   rule records managed by other APIs; this view renders 待核定, never a guess.
  * - It does not add `registeredAmountCents` to `receipt.amountCents` or present
  *   one as the other. 登记金额 and 凭据实收 are separated in the list and the
  *   drawer, exactly as the server returns them.
@@ -135,8 +134,8 @@ const REASON_META: Record<SettlementCandidateReason, { label: string; nextStep: 
     nextStep: '补齐三创与广电法律主体及协议依据。',
   },
   missing_approved_rule: {
-    label: '缺少已核准分成规则',
-    nextStep: '登记并核准分成合同规则；在规则核准前，系统不推算应分金额。',
+    label: '候选尚未采用分成规则',
+    nextStep: '核对已核准合同规则，并在正式结算单流程采用；本候选接口不计算应分金额。',
   },
 }
 
@@ -337,7 +336,7 @@ export function SettlementCandidatePanel() {
       render: () => (
         <Space orientation="vertical" size={2}>
           <Tag color="orange">待核定</Tag>
-          <Typography.Text type="secondary">尚无已核准分成规则</Typography.Text>
+          <Typography.Text type="secondary">候选接口未计算应分金额</Typography.Text>
         </Space>
       ),
     },
@@ -399,7 +398,7 @@ export function SettlementCandidatePanel() {
         type="info"
         showIcon
         title="只读候选 · 不产生应付金额"
-        description="本看板只展示服务端返回的订单、凭据与阻塞原因。有凭据实收毛额、冲正与不可结算单数都只统计当前返回页，不代表整个期间。应分金额固定为「待核定」：尚无已核准合同规则，系统不推算分成比例、手续费或应付款。列表与页内汇总始终受服务端授权社区范围约束；前端筛选不能扩大权限。"
+        description="本看板只展示服务端返回的订单、凭据与阻塞原因。有凭据实收毛额、冲正与不可结算单数都只统计当前返回页，不代表整个期间。应分金额固定为「待核定」：本接口不计算分成比例、手续费或应付款，也不能据此判断合同是否已经核准。列表与页内汇总始终受服务端授权社区范围约束；前端筛选不能扩大权限。"
       />
 
       {unauthorized ? (
@@ -613,8 +612,8 @@ function CandidateKpis({ response }: { response: SettlementCandidateListResponse
             {/* No rule is approved, so the server marks every candidate on this
                 page as blocked. The number is not a "some settle / some do not"
                 ratio and is never rewritten by comparing it to visibleItems. */}
-            当前没有已核准规则，服务端会把本页每个候选都标为不可结算；该数字通常等于本页候选数，
-            不代表部分可结、部分不可结。
+            候选接口尚未采用合同规则，服务端将本页候选标为不可结算；该数字通常等于本页候选数，
+            不代表合同不存在，也不代表部分可结、部分不可结。
           </span>
         </Card>
       </Col>
@@ -625,7 +624,7 @@ function CandidateKpis({ response }: { response: SettlementCandidateListResponse
             <Tag color="orange">待核定</Tag>
           </div>
           <span className="ledger-kpi-note">
-            尚无已核准的合同规则，系统不推算分成金额；没有规则时不会显示任何应付数字。
+            本候选接口不计算应分金额；是否已有已核准合同须查询合同规则记录。
           </span>
         </Card>
       </Col>
@@ -633,11 +632,11 @@ function CandidateKpis({ response }: { response: SettlementCandidateListResponse
         <Card size="small" className="ledger-kpi" data-testid="candidate-kpi-payment">
           <Typography.Text type="secondary">已登记付款</Typography.Text>
           <div className="ledger-candidate-kpi-value" data-tone="muted">
-            尚无登记或确认记录
+            本看板未查询付款记录
           </div>
           <span className="ledger-kpi-note">
-            本看板未接入付款登记；未来即使有登记，也只有服务端核验通过的付款确认才算核销；
-            当前不能认为款项已经付出。
+            本看板未查询付款记录或核销状态，不能由此推断实际支付；
+            只有服务端核验通过的付款确认才算核销，当前不能认为款项已经付出。
           </span>
         </Card>
       </Col>
@@ -923,7 +922,7 @@ function CandidateDetail({ row }: { row: SettlementCandidate }) {
             type="info"
             showIcon
             title="服务端未返回阻塞原因"
-            description="即使没有阻塞原因，仍需已核准的合同规则才能计算应分金额；当前规则状态固定为待核定。"
+            description="即使没有阻塞原因，本候选接口也不计算应分金额；请在正式结算单核对已核准合同规则。"
           />
         ) : (
           <ol className="ledger-candidate-blocking">
@@ -931,7 +930,9 @@ function CandidateDetail({ row }: { row: SettlementCandidate }) {
               <li key={`${reason}-${index}`}>
                 <Tag color="orange">{REASON_META[reason].label}</Tag>
                 <div className="ledger-candidate-blocking-message">
-                  {row.blockingMessages[index] ?? '服务端未返回该原因的说明。'}
+                  {reason === 'missing_approved_rule'
+                    ? '候选接口尚未采用合同规则；请以合同规则记录和正式结算单为准。'
+                    : (row.blockingMessages[index] ?? '服务端未返回该原因的说明。')}
                 </div>
                 <div className="ledger-candidate-blocking-next">
                   下一步应补：{REASON_META[reason].nextStep}
@@ -949,11 +950,11 @@ function CandidateDetail({ row }: { row: SettlementCandidate }) {
             <Tag color="orange">待核定</Tag>
           </Descriptions.Item>
           <Descriptions.Item label="应分金额">
-            待核定：尚无已核准的合同规则，系统不推算分成金额。
+            待核定：本候选接口不提供分成计算结果，请在正式结算单核对。
           </Descriptions.Item>
           <Descriptions.Item label="已登记付款">
-            尚无登记或确认记录；本看板未接入付款登记；
-            未来即使有登记，也只有服务端核验通过的付款确认才算核销；当前不能认为款项已经付出。
+            本看板未查询付款记录或核销状态；
+            无法据此判断是否登记、复核或完成线下支付，请在正式结算单核对。
           </Descriptions.Item>
         </Descriptions>
         <p className="ledger-diff-hint">

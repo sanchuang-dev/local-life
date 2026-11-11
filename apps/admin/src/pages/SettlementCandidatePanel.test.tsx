@@ -362,7 +362,7 @@ describe('SettlementsPage 双 Tab 宿主', () => {
 
     expect(await screen.findByText('有凭据实收毛额（仅当前页）')).toBeTruthy()
     expect(screen.getAllByText('待核定').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('尚无登记或确认记录').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('本看板未查询付款记录').length).toBeGreaterThan(0)
     expect(document.body.textContent).not.toContain('¥0.00')
     expect(document.body.textContent).not.toMatch(/已付款|已结清|已核销/)
 
@@ -436,7 +436,7 @@ describe('SettlementCandidatePanel list and KPI', () => {
     expect(screen.getByText('不可结算单数（仅当前页）')).toBeTruthy()
     expect(within(screen.getByTestId('candidate-kpi-blocked')).getByText('2 单')).toBeTruthy()
     expect(screen.getByTestId('candidate-kpi-blocked').textContent).toContain(
-      '当前没有已核准规则，服务端会把本页每个候选都标为不可结算',
+      '候选接口尚未采用合同规则，服务端将本页候选标为不可结算',
     )
     expect(screen.getByTestId('candidate-kpi-blocked').textContent).toContain(
       '不代表部分可结、部分不可结',
@@ -444,9 +444,9 @@ describe('SettlementCandidatePanel list and KPI', () => {
     expect(screen.getByText('应分金额')).toBeTruthy()
     expect(screen.getAllByText('待核定').length).toBeGreaterThan(0)
     expect(screen.getByText('已登记付款')).toBeTruthy()
-    expect(screen.getAllByText('尚无登记或确认记录').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('本看板未查询付款记录').length).toBeGreaterThan(0)
     expect(screen.getByTestId('candidate-kpi-payment').textContent).toContain(
-      '本看板未接入付款登记',
+      '本看板未查询付款记录或核销状态',
     )
     expect(screen.getByTestId('candidate-kpi-payment').textContent).toContain(
       '只有服务端核验通过的付款确认才算核销',
@@ -568,7 +568,7 @@ describe('SettlementCandidatePanel drawer', () => {
     // Blocking reasons: server message + readable label + next step.
     const blocking = within(drawer).getByLabelText('为什么不能结算')
     expect(within(blocking).getByText('登记金额与实收不符')).toBeTruthy()
-    expect(within(blocking).getByText('缺少已核准分成规则')).toBeTruthy()
+    expect(within(blocking).getByText('候选尚未采用分成规则')).toBeTruthy()
     expect(
       within(blocking).getByText('登记价与凭据实收不符；部分退款/合并收款未支持自动拆分'),
     ).toBeTruthy()
@@ -576,7 +576,7 @@ describe('SettlementCandidatePanel drawer', () => {
       within(blocking).getByText(/下一步应补：人工核对收据与订单登记金额/),
     ).toBeTruthy()
     expect(
-      within(blocking).getByText(/下一步应补：登记并核准分成合同规则/),
+      within(blocking).getByText(/下一步应补：核对已核准合同规则/),
     ).toBeTruthy()
 
     // UUIDs are visible/copyable here, and only here.
@@ -587,9 +587,10 @@ describe('SettlementCandidatePanel drawer', () => {
     expect(within(drawer).getByText(GUANGDIAN_PARTY_ID)).toBeTruthy()
     expect(drawer.querySelectorAll('.ant-typography-copy').length).toBeGreaterThan(0)
 
-    // The drawer also states the pending rule and the absence of payment records.
-    expect(within(drawer).getByText(/尚无已核准的合同规则/)).toBeTruthy()
-    expect(within(drawer).getByText(/尚无登记或确认记录；本看板未接入付款登记/)).toBeTruthy()
+    // The drawer distinguishes unknown rule/payment status from absent records.
+    expect(within(drawer).getByText(/本候选接口不提供分成计算结果/)).toBeTruthy()
+    expect(within(drawer).getByText(/本看板未查询付款记录或核销状态/)).toBeTruthy()
+    expect(within(blocking).getByText(/候选接口尚未采用合同规则/)).toBeTruthy()
   })
 
   it('keeps a receipt-less candidate honest in the drawer', async () => {
@@ -940,8 +941,10 @@ describe('SettlementCandidatePanel anti-misleading wording', () => {
     expect(payable.textContent).not.toMatch(/本期|已结清|已核销|已付款/)
 
     const payment = screen.getByTestId('candidate-kpi-payment')
-    expect(payment.textContent).toContain('尚无登记或确认记录')
+    expect(payment.textContent).toContain('本看板未查询付款记录')
     expect(payment.textContent).toMatch(/不能认为款项已经付出/)
+    expect(payment.textContent).not.toMatch(/尚无登记或确认记录/)
+    expect(document.body.textContent).not.toMatch(/尚无已核准的?合同规则|本 MVP 没有已核准的结算规则/)
     expect(payment.textContent).not.toMatch(/¥/)
     expect(payment.textContent).not.toMatch(/已付款|已支付|已转账|已结清|已核销|付款成功/)
 

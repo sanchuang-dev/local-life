@@ -341,8 +341,8 @@ export async function lockReconciliationBatch(
  * - `summaryScope` is always `'page'`, so `summary` describes the rows in this
  *   response only — never the whole date range. The page says 「仅当前页」.
  * - `settlementAmountStatus` is always `'pending_rule'` and
- *   `payableAmountCents` is always `null`. There is no approved settlement rule
- *   in this MVP, so neither value may be replaced by a client-side estimate.
+ *   `payableAmountCents` is always `null`. This candidate DTO does not report
+ *   actual approved rule or payment status; neither value may be estimated.
  * - `receipt` is the only source of 实收; `registeredAmountCents` is the order's
  *   registered amount and is never presented as money received.
  *

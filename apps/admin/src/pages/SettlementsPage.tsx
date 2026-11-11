@@ -53,9 +53,9 @@ import './ledger.css'
  *
  * What this page deliberately does *not* do:
  *
- * - No 结算单 / 应付金额. There is no settlement rule in this MVP, so
- *   `settlementAmountStatus` is always `pending_rule` and every amount on screen
- *   is labelled 账面登记毛额. A batch freezes facts; it never computes a payout.
+ * - This page adds only a read-only settlement candidate view, never a payable
+ *   computation. The candidate DTO reports `pending_rule` / null, irrespective
+ *   of contract records elsewhere. A reconciliation batch never pays out.
  * - No client-side arithmetic across the two diff blocks. 未纳入（待办） and
  *   锁后补录（既成事实） are disjoint by construction, and adding them would
  *   produce a number nobody can act on.
@@ -256,7 +256,7 @@ function SettlementConsole({ session }: { session: AuthenticatedSession }) {
           </p>
           <p>
             锁定后该期间成为冻结账目：合计与归属不再变化，之后补录的流水只能以「锁后补录」出现在差异页。
-            锁定不可回退，也不产生任何应付金额——本 MVP 没有结算规则。
+            锁定不可回退，也不产生任何应付金额——经营对账不负责计算合同分成。
           </p>
         </div>
       ),
@@ -618,7 +618,7 @@ function SettlementConsole({ session }: { session: AuthenticatedSession }) {
     <div className="page">
       <PageHeader
         title="对账结算"
-        description="经营对账按业务日期间创建、锁定并导出账面明细；分成结算单是只读候选看板。两者都不产生应付金额：本 MVP 没有已核准的结算规则，所有金额都是账面登记毛额或凭据实收。"
+        description="经营对账按业务日期间创建、锁定并导出账面明细；分成结算单是只读候选看板。两者都不在本页计算应付金额；候选接口的「待核定」不代表系统没有已核准合同或线下付款记录。"
         status={<Tag color="green">真实数据</Tag>}
         subnav={
           <Tabs
