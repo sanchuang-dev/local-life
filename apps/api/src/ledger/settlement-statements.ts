@@ -375,7 +375,7 @@ export function listSettlementStatements(
   const items = db.select().from(settlementStatements).where(where)
     .orderBy(desc(settlementStatements.createdAt), desc(settlementStatements.id))
     .limit(query.pageSize).offset((query.page - 1)*query.pageSize)
-    .all().map(statementDto)
+    .all().map(row => statementDto(db, row))
   return { items, total, page: query.page, pageSize: query.pageSize }
 }
 function detailOf(db: AppDatabase, actor: LocalActor, id: string): SettlementStatementDetail {
