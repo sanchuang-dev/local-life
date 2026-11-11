@@ -7669,6 +7669,25 @@
             "registry_ref"
           ],
           "isUnique": false
+        },
+        "settlement_parties_verified_version_uq": {
+          "name": "settlement_parties_verified_version_uq",
+          "columns": [
+            "role",
+            "registry_ref",
+            "verification_ref"
+          ],
+          "isUnique": true,
+          "where": "verification_ref IS NOT NULL"
+        },
+        "settlement_parties_pending_version_uq": {
+          "name": "settlement_parties_pending_version_uq",
+          "columns": [
+            "role",
+            "registry_ref"
+          ],
+          "isUnique": true,
+          "where": "verification_ref IS NULL"
         }
       },
       "foreignKeys": {
