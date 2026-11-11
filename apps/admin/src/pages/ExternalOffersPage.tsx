@@ -1,17 +1,36 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   Alert, App as AntdApp, Button, Form, Input, InputNumber, Modal,
-  Result, Space, Switch, Table, Tag, Typography, type TableProps,
+  Result, Space, Switch, Table, Tag, Typography,
 } from 'antd'
 import {
   createExternalOfferRequestSchema, type ExternalOffer, type CreateExternalOfferRequest,
 } from '@sanchuang-dev/local-life-contracts'
 import { useAdminAuth } from '../app/auth-context'
 import { PageHeader } from '../components/PageHeader'
+import { DataPanel, type PanelColumn, type PanelFilter, type PanelQuery } from '../shared/components/DataPanel'
 import { createAdminOffer, importAdminOffers, listAdminOffers, updateAdminOffer } from '../services/externalOffers'
 import { describeLocalError } from '../services/localApi'
 import { downloadExternalOffersTemplate, previewExternalOffersExcel, type PreviewOfferRow } from '../utils/externalOffersExcel'
 import './local-console.css'
+
+interface OfferFilters {
+  keyword: string
+  status?: 'enabled' | 'disabled' | 'expired'
+}
+
+// The existing API returns a complete list. Query and paging are page-owned,
+// not invented inside DataPanel or presented as server-side search.
+type OfferSortKey = never
+const initialFilters: OfferFilters = { keyword: '', status: undefined }
+const offerFilters: readonly PanelFilter<OfferFilters>[] = [
+  { key: 'keyword', label: '活动检索', kind: 'text', placeholder: '活动名、平台或分类' },
+  { key: 'status', label: '状态', kind: 'status', options: [
+    { label: '已启用', value: 'enabled' },
+    { label: '已下架', value: 'disabled' },
+    { label: '已过期', value: 'expired' },
+  ] },
+]
 
 interface OfferForm {
   title: string
@@ -44,6 +63,9 @@ export function ExternalOffersPage() {
   const { message, modal } = AntdApp.useApp()
   const [form] = Form.useForm<OfferForm>()
   const [rows, setRows] = useState<ExternalOffer[]>([])
+  const [query, setQuery] = useState<PanelQuery<OfferFilters, OfferSortKey>>({
+    filters: initialFilters, page: 1, pageSize: 10,
+  })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
@@ -180,9 +202,9 @@ export function ExternalOffersPage() {
     })
   }
 
-  const columns: TableProps<ExternalOffer>['columns'] = [
+  const columns: readonly PanelColumn<ExternalOffer, OfferSortKey>[] = [
     {
-      title: '活动 / 实际平台', key: 'title',
+      title: '活动 / 实际平台', key: 'title', hideable: false,
       render: (_, row) => (
         <Space direction="vertical" size={2}>
           <Typography.Text strong>{row.title}</Typography.Text>
@@ -205,36 +227,60 @@ export function ExternalOffersPage() {
         </Tag>
       },
     },
-    {
-      title: '操作', key: 'actions', width: 140,
-      render: (_, row) => (
-        <Space>
-          <Button size="small" onClick={() => openEdit(row)}>编辑</Button>
-          <Switch size="small" checked={row.enabled} aria-label={row.enabled ? '下架优惠' : '启用优惠'}
-            onChange={(enabled) => changeVisibility(row, enabled)} />
-        </Space>
-      ),
-    },
   ]
+
+  // The panel owns presentation preferences only. The API has no pagination
+  // endpoint, so the page filters and slices the complete admin list itself.
+  const keyword = query.filters.keyword.trim().toLocaleLowerCase()
+  const filteredRows = rows.filter((row) => {
+    const expired = Boolean(row.expiresAt && new Date(row.expiresAt).getTime() <= Date.now())
+    const status = query.filters.status
+    if (status === 'expired' && !expired) return false
+    if (status === 'enabled' && (!row.enabled || expired)) return false
+    if (status === 'disabled' && (row.enabled || expired)) return false
+    return !keyword || [row.title, row.platform, row.category, row.description ?? '']
+      .some((value) => value.toLocaleLowerCase().includes(keyword))
+  })
+  const pageRows = filteredRows.slice((query.page - 1) * query.pageSize, query.page * query.pageSize)
 
   return (
     <div className="page">
-      <PageHeader title="精选优惠" description="编辑第三方活动链接；本站不发券、不代下单，也不保证第三方优惠可领取。" />
+      <PageHeader title="精选优惠" description="编辑第三方活动链接；本站不发券、不代下单，也不保证第三方优惠可领取。"
+        extra={<Button type="primary" onClick={openCreate}>新增优惠活动</Button>} />
       <div className="page-stack">
         <Alert type="info" showIcon message="新增活动默认下架"
           description="请在目标手机与微信内核验链接、活动名称和有效期，再明确启用。普通 H5 链接不能保证自动打开小程序或 App。" />
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-          <Button onClick={() => void refresh()} loading={loading}>刷新列表</Button>
-          <Space wrap>
-            <Button onClick={downloadExternalOffersTemplate}>下载Excel模板</Button>
-            <Button onClick={() => { setPreview(null); setImportOpen(true) }}>Excel批量导入</Button>
-            <Button type="primary" onClick={openCreate}>新增优惠活动</Button>
-          </Space>
-        </div>
-        {error && <Alert type="error" showIcon message={error} />}
-        <Table<ExternalOffer> rowKey="id" size="middle" dataSource={rows} columns={columns}
-          loading={loading} pagination={{ pageSize: 10 }} scroll={{ x: 660 }}
-          locale={{ emptyText: '暂无第三方优惠。请先新增并核实真实链接。' }} />
+        <DataPanel<ExternalOffer, OfferFilters, OfferSortKey>
+          id="external-offers"
+          label="精选优惠列表"
+          rowKey={(row) => row.id}
+          query={query}
+          onQueryChange={setQuery}
+          initialFilters={initialFilters}
+          data={{
+            rows: pageRows, total: filteredRows.length, loading,
+            error: error ? new Error(error) : undefined,
+          }}
+          filters={offerFilters}
+          columns={columns}
+          onRefresh={() => void refresh()}
+          errorTitle="优惠活动读取失败"
+          emptyText={rows.length === 0 ? '暂无第三方优惠。请先新增并核实真实链接。' : undefined}
+          toolbarExtra={
+            <Space wrap>
+              <Button onClick={downloadExternalOffersTemplate}>下载Excel模板</Button>
+              <Button onClick={() => { setPreview(null); setImportOpen(true) }}>Excel批量导入</Button>
+            </Space>
+          }
+          rowActions={(row) => [
+            { key: 'edit', label: '编辑', disabled: saving || importing, onClick: () => openEdit(row) },
+            {
+              key: 'visibility', label: row.enabled ? '下架' : '启用',
+              danger: row.enabled, disabled: saving || importing,
+              onClick: () => changeVisibility(row, !row.enabled),
+            },
+          ]}
+        />
       </div>
       <Modal title="Excel 批量导入" open={importOpen}
         onCancel={() => { if (!parsing && !importing) setImportOpen(false) }}
