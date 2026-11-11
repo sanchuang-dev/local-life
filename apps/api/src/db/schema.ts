@@ -1912,6 +1912,8 @@ export const settlementPaymentEvents = sqliteTable('settlement_payment_events', 
 }, (table) => [
   uniqueIndex('settlement_payment_event_sequence_uq').on(table.paymentRecordId, table.sequence),
   uniqueIndex('settlement_payment_event_idempotency_uq').on(table.idempotencyKey),
+  uniqueIndex('settlement_payment_event_terminal_uq').on(table.paymentRecordId)
+    .where(sql`${table.kind} IN ('verified','disputed')`),
   index('settlement_payment_event_statement_idx').on(table.statementId, table.createdAt),
   check('settlement_payment_event_kind_state_check', sql`
     (${table.kind} = 'recorded' AND ${table.sequence} = 1

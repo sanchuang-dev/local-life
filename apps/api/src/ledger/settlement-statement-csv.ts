@@ -16,7 +16,15 @@ function csv(rows: Array<Array<string | number | null | undefined>>): string {
 }
 const stateLabel = (s: SettlementStatement['status']): string => ({
   draft: '草案-待复核', reviewed: '已复核-待锁定',
-  locked: '已锁定-尚未登记付款', superseded: '已被新版取代',
+  locked: '已锁定', superseded: '已被新版取代',
+})[s]
+const paymentStateLabel = (s: SettlementStatement['paymentState']): string => ({
+  not_recorded: '未登记付款',
+  awaiting_payment: '待付款',
+  pending_review: '已登记待复核',
+  partial: '部分已核销',
+  verified: '已核销',
+  disputed: '付款争议',
 })[s]
 const resultLabel = (l: SettlementStatementLine): string =>
   l.state === 'calculated' ? '规则已核准-仅供锁定结算' : '待核定-不可计价'
@@ -39,7 +47,7 @@ export function entitySettlementCsv(detail: SettlementStatementDetail): string {
   for (const l of detail.lines) {
     rows.push([
       s.statementNo, s.generation, s.periodFrom, s.periodTo, s.asOf,
-      stateLabel(s.status), '尚未付款登记', l.communityId, l.orderId,
+      stateLabel(s.status), paymentStateLabel(s.paymentState), l.communityId, l.orderId,
       l.orderDisplayNo, l.productName, l.registeredAmountCents,
       l.receiptEntryId, l.receiptEvidenceRef, l.receiptReceivedAt,
       l.receiptAmountCents === null ? '未收款' : l.receiptAmountCents,

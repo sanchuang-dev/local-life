@@ -2578,7 +2578,7 @@ test('approved settlement locks exact cents once, snapshots contract version and
     assert.equal(result.statement.status,'locked')
     assert.equal(result.statement.revision,3)
     assert.equal(result.statement.snapshotDigest,created.statement.snapshotDigest)
-    assert.equal(result.statement.paymentState,'not_recorded')
+    assert.equal(result.statement.paymentState,'awaiting_payment')
     assert.equal(result.lines[0]?.allocation.sellerNetCents,621)
     assert.deepEqual(result.events.map(x=>x.kind),['created','reviewed','locked'])
     assert.deepEqual(result.postLockDisputes,[])
@@ -2927,6 +2927,14 @@ test('payment proof rejects duplicate proof, wrong beneficiary, overpay, unsafe 
         idempotencyKey:randomUUID(),
       },
     })).status,400,'full-looking account/card references must be rejected')
+
+    assert.equal((await api(world.app,'POST',paymentsUrl187(locked.statementId),{
+      session:locked.session,body:{
+        ...sellerRequest,
+        proofRefMasked:'',
+        idempotencyKey:randomUUID(),
+      },
+    })).status,400,'missing payment proof cannot become a payment record')
 
     const grid=await gridSession(world.app)
     assert.equal((await api(world.app,'POST',paymentsUrl187(locked.statementId),{
