@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { and, eq, gte, inArray, lt, lte, sql, type SQL } from 'drizzle-orm'
 import { z } from 'zod'
 import {
@@ -95,6 +95,14 @@ const isoTimestamp = z
 export const recordPaymentRequestSchema = ledgerRecordPaymentRequestSchema
 
 export type RecordPaymentRequest = z.infer<typeof recordPaymentRequestSchema>
+
+const canonicalPaymentEvidenceKey = (value: string): string =>
+  value.normalize('NFKC').trim().replace(/\\s+/gu, ' ').toLowerCase()
+
+const paymentProofSourceId = (value: string): string =>
+  'evidence-proof:' + createHash('sha256')
+    .update(canonicalPaymentEvidenceKey(value))
+    .digest('hex')
 
 /** A reversal of one receipt: always the full amount, always a new row. */
 export const reversePaymentRequestSchema = z.strictObject({
@@ -742,6 +750,8 @@ export function recordPayment(
   // One receipt number for the whole call: the duplicate probe and the insert must
   // agree, otherwise the idempotency key would be a fresh random every time.
   const sourceId = body.sourceId ?? `receipt:${randomUUID()}`
+  const evidenceKey = canonicalPaymentEvidenceKey(body.evidenceRef)
+  const proofSourceId = paymentProofSourceId(body.evidenceRef)
 
   const entryId = db.transaction(
     (tx): string => {
@@ -750,14 +760,21 @@ export function recordPayment(
       if (duplicate !== null) {
         throw new LocalError(409, API_ERROR_CODES.ledgerSourceDuplicate, '该收款凭据已登记，不能重复入账')
       }
-      // A human-provided sourceId is not sufficient to prevent double counting:
-      // two manual receipts could use different keys for the SAME proof.
-      // Protect new and legacy/unlinked money alike (no inferred order links).
-      const existingProof = tx.select({ id: ledgerEntries.id }).from(ledgerEntries)
-        .where(and(
-          eq(ledgerEntries.factKind, 'payment_received'),
-          sql`lower(trim(${ledgerEntries.evidenceRef})) = lower(trim(${body.evidenceRef}))`,
-        )).get()
+      // A human-provided sourceId is not sufficient to prevent double counting.
+      // Reserve a canonical proof alias in the existing UNIQUE source ledger so
+      // Unicode-width/case/whitespace variants cannot race into two receipts.
+      if (existingEntryIdOfSource(tx, 'manual', proofSourceId, 'payment_received') !== null) {
+        throw new LocalError(409, API_ERROR_CODES.ledgerSourceDuplicate,
+          '该凭据编号已有收款登记，不能重复记钱')
+      }
+      // Historical receipts predate the canonical alias. Keep them immutable,
+      // but normalize their raw references when deciding whether a new receipt
+      // would duplicate one of those facts.
+      const existingProof = tx.select({ evidenceRef: ledgerEntries.evidenceRef })
+        .from(ledgerEntries)
+        .where(eq(ledgerEntries.factKind, 'payment_received')).all()
+        .some((row) => row.evidenceRef !== null &&
+          canonicalPaymentEvidenceKey(row.evidenceRef) === evidenceKey)
       if (existingProof) {
         throw new LocalError(409, API_ERROR_CODES.ledgerSourceDuplicate,
           '该凭据编号已有收款登记，不能重复记钱')
@@ -785,7 +802,6 @@ export function recordPayment(
           .where(eq(ledgerPaymentOrderLinks.orderId, body.orderId)).get()) {
           throw new LocalError(409, API_ERROR_CODES.conflict, '该订单已有收款凭据，请在流水详情核查')
         }
-        const evidenceKey = body.evidenceRef.normalize('NFKC').toLowerCase()
         if (tx.select({ orderId: ledgerPaymentOrderLinks.orderId })
           .from(ledgerPaymentOrderLinks)
           .where(eq(ledgerPaymentOrderLinks.evidenceKey, evidenceKey)).get()) {
@@ -820,11 +836,21 @@ export function recordPayment(
         evidenceRef: body.evidenceRef,
         createdAt: now,
       })
+      if (sourceId !== proofSourceId) {
+        tx.insert(ledgerEntrySources).values({
+          id: randomUUID(),
+          sourceSystem: 'manual',
+          sourceId: proofSourceId,
+          factKind: 'payment_received',
+          entryId: appended.entryId,
+          createdAt: now,
+        }).run()
+      }
       if (body.orderId) {
         tx.insert(ledgerPaymentOrderLinks).values({
           orderId: body.orderId,
           entryId: appended.entryId,
-          evidenceKey: body.evidenceRef.normalize('NFKC').toLowerCase(),
+          evidenceKey,
           createdAt: now,
         }).run()
         insertAudit(tx, actor.userId, 'ledger.order_payment.linked', body.orderId, now, {
