@@ -134,6 +134,13 @@
       "when": 1794368000000,
       "tag": "0018_settlement_parties",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1794369000000,
+      "tag": "0019_settlement_rules",
+      "breakpoints": true
     }
   ]
 }
