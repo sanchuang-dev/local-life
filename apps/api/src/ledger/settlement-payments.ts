@@ -70,7 +70,7 @@ function constrain(error: unknown): never {
 const sha256 = (value: string): string =>
   createHash('sha256').update(value).digest('hex')
 const proofFingerprint = (value: string): string =>
-  sha256(value.trim().replace(/\s+/gu, ' ').toLowerCase())
+  sha256(value.normalize('NFKC').trim().replace(/\s+/gu, ' ').toLowerCase())
 
 function statementFor(db: AppDatabase, actor: LocalActor, statementId: string): StatementRow {
   requireOffice(actor)
