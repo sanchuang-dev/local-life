@@ -32,6 +32,7 @@ import {
   staffAccounts,
   users,
 } from '../src/db/schema.js'
+import { seedConfirmedCommunity } from './resident-community-fixtures.js'
 
 const migrationsFolder = fileURLToPath(new URL('../db/migrations', import.meta.url))
 
@@ -147,12 +148,14 @@ test('an ordinary edit to a published activity keeps the frozen reward plan', ()
     )
 
     // A resident joins so the check-in surface is genuinely reachable, not just
-    // "not configured".
+    // "not configured". #171: joining is a community-scoped write, so the
+    // resident must hold a real confirmed binding for this community.
     const leader = randomUUID()
     world.db
       .insert(users)
       .values({ id: leader, displayName: '团长甲', createdAt: OPEN, updatedAt: OPEN })
       .run()
+    seedConfirmedCommunity(world.db, leader, world.communityId, OPEN)
     confirmParticipation(world.db, { activityId: published.id, userId: leader, now: OPEN })
 
     const before = getCheckinState(world.db, {
@@ -273,6 +276,7 @@ test('an ordinary edit to a draft activity keeps the reward plan and exposes it'
       .insert(users)
       .values({ id: leader, displayName: '团长乙', createdAt: OPEN, updatedAt: OPEN })
       .run()
+    seedConfirmedCommunity(world.db, leader, world.communityId, OPEN)
     confirmParticipation(world.db, { activityId: published.id, userId: leader, now: OPEN })
     const state = getCheckinState(world.db, {
       activityId: published.id,

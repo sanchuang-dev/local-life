@@ -31,7 +31,6 @@ import {
   activityDrawAttempts,
   activityDrawCredentials,
   activityDrawFulfilmentEvents,
-  residentCommunityAssignments,
   communities,
   localProducts,
   staffAccounts,
@@ -40,6 +39,7 @@ import {
 } from '../src/db/schema.js'
 import { hashPassword } from '../src/auth/security.js'
 import { drawBeijingDay, enterDailyDraw } from '../src/draw/engine.js'
+import { seedConfirmedCommunity } from './resident-community-fixtures.js'
 
 const migrationsFolder = fileURLToPath(new URL('../db/migrations', import.meta.url))
 const ADMIN_ORIGIN = 'http://localhost:5174'
@@ -1060,12 +1060,24 @@ test('migration 0015 upgrades an older database in place and keeps its data', as
 
 
 
-async function bindStaffUser(fixture: Fixture, username: string, communityId = fixture.communityId): Promise<string> {
+/**
+ * Makes the staff account's user a resident of `communityId` by *confirming* it,
+ * which is what #171 requires before a community-scoped write such as a draw.
+ *
+ * HISTORICAL NOTE: this helper used to insert a `resident_community_assignments`
+ * row — exactly the auto-attribution #123 performed at login. That row no longer
+ * authorizes anything (see `resident-community-guard.test.ts`), so the fixture now
+ * performs the resident's real first confirmation through the production service
+ * rather than the guard being relaxed for tests.
+ */
+async function confirmStaffResident(
+  fixture: Fixture,
+  username: string,
+  communityId = fixture.communityId,
+): Promise<string> {
   const staff = fixture.db.select().from(staffAccounts).where(eq(staffAccounts.username, username)).get()
   assert.ok(staff)
-  fixture.db.insert(residentCommunityAssignments).values({
-    userId: staff.userId, communityId, createdAt: new Date(),
-  }).onConflictDoNothing().run()
+  seedConfirmedCommunity(fixture.db, staff.userId, communityId, new Date())
   return staff.userId
 }
 
@@ -1075,7 +1087,7 @@ test('LL-LOT-002: authenticated HTTP draw is persisted, idempotent, quota-bound 
     const activityId = await createActivity(fixture)
     const productId = await createProduct(fixture, { priceCents: 12_345 })
     const prize = await seedReadyPool(fixture, activityId, productId)
-    const userId = await bindStaffUser(fixture, 'admin')
+    const userId = await confirmStaffResident(fixture, 'admin')
     // Force an actual award: no-prize weight is zero, never a mocked win.
     const enabled = await getPool(fixture, activityId)
     const configResponse = await savePool(fixture, activityId, {
@@ -1166,7 +1178,7 @@ test('LL-LOT-002: disabled pool, missing community and cross-community staff are
       session: fixture.admin, body: { idempotencyKey: randomUUID() },
     })
     assert.equal(missingMembership.status, 403)
-    await bindStaffUser(fixture, 'admin')
+    await confirmStaffResident(fixture, 'admin')
     const pool = await getPool(fixture, activityId)
     const closed = await savePool(fixture, activityId, {
       expectedUpdatedAt: pool.updatedAt, enabled: false,
@@ -1195,7 +1207,7 @@ test('LL-LOT-002: cryptographic weighted miss, Shanghai day boundary, atomic las
     const activityId = await createActivity(fixture)
     const productId = await createProduct(fixture)
     const prize = await seedReadyPool(fixture, activityId, productId)
-    const userId = await bindStaffUser(fixture, 'admin')
+    const userId = await confirmStaffResident(fixture, 'admin')
     // Choose the next Beijing midnight relative to test execution time.
     // Fixed 2026 dates would make this regression test fail in future years.
     const currentDay = drawBeijingDay(NOW)
@@ -1235,8 +1247,8 @@ test('LL-LOT-002: two residents compete for the last real prize and exactly one 
     const activityId = await createActivity(fixture)
     const productId = await createProduct(fixture)
     const prize = await seedReadyPool(fixture, activityId, productId)
-    await bindStaffUser(fixture, 'admin')
-    await bindStaffUser(fixture, 'operator.a')
+    await confirmStaffResident(fixture, 'admin')
+    await confirmStaffResident(fixture, 'operator.a')
     const reduced = await updatePrize(fixture, activityId, prize.id, {
       expectedUpdatedAt: prize.updatedAt,
       totalQuantity: 1,
@@ -1269,7 +1281,7 @@ test('LL-LOT-002: missing credential secret refuses awards without consuming sto
     const activityId = await createActivity(fixture)
     const productId = await createProduct(fixture)
     const prize = await seedReadyPool(fixture, activityId, productId)
-    const adminUserId = await bindStaffUser(fixture, 'admin')
+    const adminUserId = await confirmStaffResident(fixture, 'admin')
     const config = loadConfig({ NODE_ENV: 'test', AUTH_DEV_ENABLED: 'true' })
     const withoutSecret = createApp({ db: fixture.db, config, logRequests: false })
     const blocked = await api(withoutSecret, 'POST', path(ACTIVITY_DRAW_ROUTES.enter, activityId), {
@@ -1290,7 +1302,7 @@ test('LL-LOT-002: outstanding winner stays accessible beyond 200 recent attempts
     const activityId = await createActivity(fixture)
     const productId = await createProduct(fixture)
     await seedReadyPool(fixture, activityId, productId)
-    const userId = await bindStaffUser(fixture, 'admin')
+    const userId = await confirmStaffResident(fixture, 'admin')
     const prize = enterDailyDraw(fixture.db, {
       activityId, userId, secret: DRAW_SECRET, idempotencyKey: randomUUID(),
       pick: () => 0,

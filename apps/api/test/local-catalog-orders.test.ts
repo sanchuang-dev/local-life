@@ -41,6 +41,7 @@ import {
   users,
 } from '../src/db/schema.js'
 import { hashPassword } from '../src/auth/security.js'
+import { confirmCommunityOrFail, seedConfirmedCommunity } from './resident-community-fixtures.js'
 
 const migrationsFolder = fileURLToPath(new URL('../db/migrations', import.meta.url))
 const ADMIN_PASSWORD = 'Admin-Password-123!'
@@ -176,6 +177,13 @@ async function staffSession(app: App, username: string, password: string): Promi
  * A real resident account + session through the documented dev login. It is the
  * same legal path every other suite uses: gated on NODE_ENV/AUTH_DEV_ENABLED and
  * it can only ever create a `staff: null` resident session.
+ *
+ * #171 LL-IDENTITY-001 SEMANTICS CHANGED: the third argument is no longer posted
+ * to `/auth/dev/login` (which now accepts `displayName` only and would answer
+ * 400). It is confirmed through `POST /resident-community/confirm` with the
+ * session's real CSRF token and trusted Origin — the ordinary resident flow. The
+ * signature is unchanged so call sites keep reading as "a resident of this
+ * community".
  */
 async function residentSession(
   app: App,
@@ -191,18 +199,20 @@ async function residentSession(
       'x-csrf-token': csrfState.token,
       origin: RESIDENT_ORIGIN,
     },
-    body: JSON.stringify({ displayName, communityId }),
+    body: JSON.stringify({ displayName }),
   })
   assert.equal(response.status, 200, 'resident dev login must succeed')
   const body = (await response.json()) as {
     user: { id: string }
     csrfToken: string
   }
-  return {
+  const session: ResidentSession = {
     cookies: cookieHeader(cookiePair(response, 'll_session'), cookiePair(response, 'll_csrf')),
     csrfToken: body.csrfToken,
     userId: body.user.id,
   }
+  await confirmCommunityOrFail(app, session, communityId, RESIDENT_ORIGIN)
+  return session
 }
 
 async function createCommunity(app: App, admin: Session, name: string): Promise<string> {
@@ -630,9 +640,9 @@ test('two processes racing on one idempotency key produce exactly one order', as
     db.insert(users)
       .values({ id: residentUserId, displayName: '并发居民', createdAt: now, updatedAt: now })
       .run()
-    db.insert(residentCommunityAssignments)
-      .values({ userId: residentUserId, communityId, createdAt: now })
-      .run()
+    // #171: registering an order is a community-scoped write, so the resident
+    // holds a real confirmed binding (not a historical assignment row).
+    seedConfirmedCommunity(db, residentUserId, communityId, now)
     db.insert(localProducts)
       .values({
         id: productId,

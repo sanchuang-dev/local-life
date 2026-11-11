@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import type {
-  AdminActivityDetail,
-  CreateActivityRequest,
-  PublicActivityDetail,
+import {
+  RESIDENT_COMMUNITY_ROUTES,
+  type AdminActivityDetail,
+  type CreateActivityRequest,
+  type PublicActivityDetail,
 } from '@sanchuang-dev/local-life-contracts'
 import { createApp } from '../src/app.js'
 import { loadConfig, type ApiConfig } from '../src/config.js'
@@ -107,17 +108,50 @@ export async function staffSession(
   return result.session
 }
 
+/**
+ * Creates a resident account + session, optionally with a *confirmed* community.
+ *
+ * SEMANTICS CHANGED FOR #171 (LL-IDENTITY-001) — read this before using it.
+ *
+ * `POST /auth/dev/login` now accepts `{ displayName }` only: logging in
+ * authenticates the person and writes nothing else. It used to accept a
+ * `communityId` and insert a `resident_community_assignments` row, i.e. it
+ * manufactured exactly the "log in and get attributed" behaviour #171 retires.
+ *
+ * Therefore the third parameter no longer means "create a historical residence".
+ * It now means "and then actually confirm this community", performed through the
+ * real `POST /resident-community/confirm` route with the real CSRF token and
+ * trusted Origin. That writes a `resident_community_bindings` row (plus its audit
+ * evidence) and zero assignment rows — the state a real resident reaches by
+ * tapping 确认常驻社区.
+ *
+ * If a test needs a *historical* relation instead (the retired #123 rows, or a
+ * `pending_review` account), do NOT use this helper: call
+ * `seedLegacyAssignment(db, userId, communityId)` from
+ * `resident-community-fixtures.ts`, whose name states it is history and never a
+ * confirmation.
+ */
 export async function residentSession(
   app: App,
   displayName = '测试居民',
   communityId?: string,
 ): Promise<AgentSession> {
-  const result = await sessionFromLogin(app, '/auth/dev/login', {
-    displayName,
-    ...(communityId ? { communityId } : {}),
-  })
+  const result = await sessionFromLogin(app, '/auth/dev/login', { displayName })
   assert.equal(result.response.status, 200, 'development resident login should succeed')
   assert.ok(result.session)
+  if (!communityId) return result.session
+  // The caller asked for a confirmed community, so perform the resident's own
+  // explicit confirmation instead of fabricating a residence row.
+  const confirmed = await app.request(RESIDENT_COMMUNITY_ROUTES.confirm, {
+    method: 'POST',
+    headers: writeHeaders(result.session.cookies, result.session.csrfToken),
+    body: JSON.stringify({ communityId }),
+  })
+  assert.equal(
+    confirmed.status,
+    200,
+    `resident ${displayName} must be able to confirm a community: ${confirmed.status} ${await confirmed.clone().text()}`,
+  )
   return result.session
 }
 
