@@ -37,6 +37,9 @@ import type {
   RewardEventKind,
   RewardGrantStatus,
   RewardRecipientRole,
+  ResidentCommunityBindingSource,
+  ResidentCommunityBindingStatus,
+  ResidentCommunityStoredCandidateSource,
   SettlementAmountStatus,
   LocalOrderEventType,
   LocalOrderRecordSource,
@@ -137,6 +140,107 @@ export const residentCommunityAssignments = sqliteTable(
   (table) => [
     primaryKey({ columns: [table.userId, table.communityId] }),
     index('resident_community_community_idx').on(table.communityId),
+  ],
+)
+
+/**
+ * The resident's permanent community binding (#171 LL-IDENTITY-001).
+ *
+ * A binding exists only after the resident themself explicitly confirmed one
+ * community. It is deliberately a *separate* table from
+ * `resident_community_assignments`, because that table records "a relation was
+ * observed" (and the retired #123 OAuth flow wrote rows into it automatically at
+ * login), while this table records "this resident confirmed this community and
+ * cannot change it". Keeping them apart is what lets the migration preserve every
+ * historical row instead of silently promoting it to a permanent binding.
+ *
+ * "At most one confirmed community per resident" is enforced by the database, not
+ * by application code, in two layers that cannot be bypassed by any SQL:
+ *   1. `resident_community_bindings_user_confirmed_uq` is a PARTIAL UNIQUE index
+ *      on `user_id` `WHERE status = 'confirmed'`;
+ *   2. `status` carries a CHECK that currently admits exactly one value
+ *      (`'confirmed'`), so the partial index covers every row and a second row for
+ *      the same resident is physically impossible. Any future status (e.g. a
+ *      compliance-superseded history row) would require a separately approved
+ *      migration that widens the CHECK *and* keeps the partial index intact, so
+ *      the invariant cannot be lost by accident.
+ * `evidence_ref` points at the append-only `audit_logs` row written by the same
+ * transaction; it is a redacted reference and never a credential.
+ *
+ * Concurrency: two devices confirming A and B at the same time cannot both win —
+ * SQLite serialises the writers and the UNIQUE index makes the loser fail.
+ */
+export const residentCommunityBindings = sqliteTable(
+  'resident_community_bindings',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    communityId: text('community_id')
+      .notNull()
+      .references(() => communities.id, { onDelete: 'restrict' }),
+    /** Only `'confirmed'` is legal today; see the table comment. */
+    status: text('status').$type<ResidentCommunityBindingStatus>().notNull().default('confirmed'),
+    confirmedAt: integer('confirmed_at', { mode: 'timestamp_ms' }).notNull(),
+    source: text('source').$type<ResidentCommunityBindingSource>().notNull(),
+    /** Actor of the confirmation: the resident themself (or a compliance operator). */
+    confirmedByUserId: text('confirmed_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    /** Redacted audit reference (the `audit_logs.id` written in this transaction). */
+    evidenceRef: text('evidence_ref').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('resident_community_bindings_user_confirmed_uq')
+      .on(table.userId)
+      .where(sql`${table.status} = 'confirmed'`),
+    index('resident_community_bindings_community_idx').on(table.communityId),
+    check('resident_community_bindings_status_check', sql`${table.status} = 'confirmed'`),
+    check(
+      'resident_community_bindings_source_check',
+      sql`${table.source} IN ('resident_h5_confirmed', 'admin_compliance_correction')`,
+    ),
+    check('resident_community_bindings_evidence_check', sql`length(${table.evidenceRef}) > 0`),
+  ],
+)
+
+/**
+ * Server-derived binding candidate, at most one per resident.
+ *
+ * A candidate is a *suggestion* produced from trusted server data only — today
+ * that means the community derived from an `activityId` the resident opened,
+ * resolved from the activity row inside the OAuth start flow. A client-supplied
+ * `communityId` is never accepted as a candidate source, which is what stops the
+ * retired "log in and get attributed" behaviour from coming back through the
+ * front door. Confirming a community deletes the candidate; an expired candidate
+ * is ignored by every read, so a stale suggestion cannot linger.
+ */
+export const residentCommunityBindingCandidates = sqliteTable(
+  'resident_community_binding_candidates',
+  {
+    userId: text('user_id')
+      .primaryKey()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    communityId: text('community_id')
+      .notNull()
+      .references(() => communities.id, { onDelete: 'cascade' }),
+    source: text('source').$type<ResidentCommunityStoredCandidateSource>().notNull(),
+    suggestedAt: integer('suggested_at', { mode: 'timestamp_ms' }).notNull(),
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    index('resident_community_candidates_community_idx').on(table.communityId),
+    check(
+      'resident_community_candidates_source_check',
+      sql`${table.source} IN ('activity_oauth_candidate')`,
+    ),
+    check(
+      'resident_community_candidates_expiry_check',
+      sql`${table.expiresAt} > ${table.suggestedAt}`,
+    ),
   ],
 )
 
@@ -1913,10 +2017,15 @@ export const ledgerAnomalies = sqliteTable(
   ],
 )
 
-export const userRelations = relations(users, ({ many }) => ({
+export const userRelations = relations(users, ({ many, one }) => ({
   wechatIdentities: many(wechatIdentities),
   phoneIdentities: many(residentPhoneIdentities),
   residentCommunities: many(residentCommunityAssignments),
+  /** Zero or one permanent binding: the DB enforces "at most one". */
+  residentCommunityBinding: one(residentCommunityBindings, {
+    fields: [users.id],
+    references: [residentCommunityBindings.userId],
+  }),
   sessions: many(sessions),
 }))
 
@@ -2180,6 +2289,8 @@ export const schema = {
   staffAccounts,
   staffCommunityAssignments,
   residentCommunityAssignments,
+  residentCommunityBindings,
+  residentCommunityBindingCandidates,
   sessions,
   wechatOauthConfigs,
   oauthStates,

@@ -76,6 +76,8 @@ import { registerParticipationRoutes } from './participation/routes.js'
 import { registerRewardRoutes } from './rewards/routes.js'
 import { registerDrawRoutes } from './draw/routes.js'
 import { registerUserDirectoryRoutes } from './users/routes.js'
+// #171 LL-IDENTITY-001: resident permanent-community read + explicit confirmation.
+import { registerResidentCommunityRoutes } from './resident-community/routes.js'
 import { registerCrmebRoutes } from './crmeb/routes.js'
 import { registerWechatAdminRoutes } from './wechat/routes.js'
 import { registerWechatJsSdkRoutes } from './wechat/js-sdk.js'
@@ -1584,6 +1586,17 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
   })
 
   registerParticipationRoutes(app, {
+    db,
+    config,
+    fail,
+    validCsrf,
+    bodySchemaError,
+  })
+
+  // Resident permanent community (#171 LL-IDENTITY-001): the one read behind
+  // 未绑定/已确认/待核查/冲突 plus the resident's explicit first confirmation.
+  // No rebind/unbind route exists; see `resident-community` contract docs.
+  registerResidentCommunityRoutes(app, {
     db,
     config,
     fail,

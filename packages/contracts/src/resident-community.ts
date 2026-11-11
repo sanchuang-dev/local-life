@@ -84,18 +84,53 @@ export type ResidentCommunityBindingSource = z.infer<
 >
 
 /**
- * Where a *candidate* came from. Candidates are derived server-side only — an
- * activity the resident demonstrably opened (its community was resolved from the
- * activity row, never from a client-supplied communityId). A client-supplied
- * communityId is never accepted as a candidate source.
+ * Row status of `resident_community_bindings`. Only `'confirmed'` exists: the
+ * table stores confirmed facts only, and historical relations stay in
+ * `resident_community_assignments`. The column exists so the DB-level invariant
+ * can be written as a partial unique index `(user_id) WHERE status='confirmed'`
+ * plus a CHECK that admits just this value — a future status would need an
+ * explicitly approved migration, not a silent widening.
  */
-export const RESIDENT_COMMUNITY_CANDIDATE_SOURCES = ['activity_oauth_candidate'] as const
+export const RESIDENT_COMMUNITY_BINDING_STATUSES = ['confirmed'] as const
+export const residentCommunityBindingStatusSchema = z.enum(RESIDENT_COMMUNITY_BINDING_STATUSES)
+export type ResidentCommunityBindingStatus = z.infer<
+  typeof residentCommunityBindingStatusSchema
+>
+
+/**
+ * Where a *candidate* came from. Candidates are derived server-side only, never
+ * from browser state:
+ *
+ * - `activity_oauth_candidate`: an activity the resident demonstrably opened; its
+ *   community was resolved from the activity row (never from a client-supplied
+ *   communityId) and is stored for the resident to confirm.
+ * - `legacy_single_assignment_candidate`: derived on read from a historical
+ *   `resident_community_assignments` row. That row is a relation, not a
+ *   confirmation, so it is offered as a suggestion only. Exactly one such row makes
+ *   the account confirmable; two or more without a binding are `pending_review`
+ *   instead and never become a candidate.
+ */
+export const RESIDENT_COMMUNITY_CANDIDATE_SOURCES = [
+  'activity_oauth_candidate',
+  'legacy_single_assignment_candidate',
+] as const
 export const residentCommunityCandidateSourceSchema = z.enum(
   RESIDENT_COMMUNITY_CANDIDATE_SOURCES,
 )
 export type ResidentCommunityCandidateSource = z.infer<
   typeof residentCommunityCandidateSourceSchema
 >
+
+/**
+ * The subset of candidate sources that is *persisted* in
+ * `resident_community_binding_candidates`. Only server-derived activity
+ * suggestions are stored; a `legacy_single_assignment_candidate` is derived on
+ * read from `resident_community_assignments` and therefore never written, which
+ * keeps the legacy table the single home of historical relations.
+ */
+export const RESIDENT_COMMUNITY_STORED_CANDIDATE_SOURCES = ['activity_oauth_candidate'] as const
+export type ResidentCommunityStoredCandidateSource =
+  (typeof RESIDENT_COMMUNITY_STORED_CANDIDATE_SOURCES)[number]
 
 /** Why the resident cannot confirm right now. `null` when confirmation is open. */
 export const residentCommunityConfirmBlockedReasonSchema = z.enum([
@@ -132,15 +167,20 @@ export const residentCommunityBindingSchema = z.strictObject({
 export type ResidentCommunityBinding = z.infer<typeof residentCommunityBindingSchema>
 
 /**
- * A server-derived, expiring candidate. It is a suggestion for the resident to
- * review, never a binding: confirming is still an explicit action, and the
- * candidate disappears once a binding exists.
+ * A server-derived candidate. It is a suggestion for the resident to review,
+ * never a binding: confirming is still an explicit action, and the candidate
+ * disappears once a binding exists.
+ *
+ * `expiresAt` is `null` only for a candidate derived from a historical relation,
+ * which is a fact rather than a session-scoped suggestion and therefore stays
+ * available until the resident confirms or an operator resolves it. An
+ * activity-derived candidate always carries an expiry.
  */
 export const residentCommunityCandidateSchema = z.strictObject({
   community: residentCommunityRefSchema,
   source: residentCommunityCandidateSourceSchema,
   suggestedAt: isoTimestamp,
-  expiresAt: isoTimestamp,
+  expiresAt: isoTimestamp.nullable(),
 })
 export type ResidentCommunityCandidate = z.infer<typeof residentCommunityCandidateSchema>
 

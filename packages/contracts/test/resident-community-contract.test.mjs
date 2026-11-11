@@ -26,7 +26,10 @@ import { describe, it } from 'node:test'
 import {
   API_ERROR_CODES,
   RESIDENT_COMMUNITY_BINDING_SOURCES,
+  RESIDENT_COMMUNITY_BINDING_STATUSES,
+  RESIDENT_COMMUNITY_CANDIDATE_SOURCES,
   RESIDENT_COMMUNITY_ROUTES,
+  RESIDENT_COMMUNITY_STORED_CANDIDATE_SOURCES,
   confirmResidentCommunityRequestSchema,
   confirmResidentCommunityResponseSchema,
   residentCommunityStatusResponseSchema,
@@ -95,9 +98,11 @@ const legacySingle = {
   binding: null,
   candidate: {
     community: refA,
-    source: 'activity_oauth_candidate',
+    // A historical relation is a standing fact, not a session suggestion, so this
+    // candidate carries no expiry and is the only nullable-`expiresAt` case.
+    source: 'legacy_single_assignment_candidate',
     suggestedAt: at,
-    expiresAt: '2026-11-18T04:00:00.000Z',
+    expiresAt: null,
   },
   legacyHistory: {
     assignmentCount: 1,
@@ -161,6 +166,22 @@ describe('resident community routes and error codes', () => {
         binding: { ...confirmed.binding, source: 'client_said_so' },
       }).success,
       false,
+    )
+  })
+
+  it('pins the DB status to confirmed and separates stored from derived candidates', () => {
+    // The partial unique index is written `WHERE status = 'confirmed'`, so the
+    // column must admit exactly that one value.
+    assert.deepEqual([...RESIDENT_COMMUNITY_BINDING_STATUSES], ['confirmed'])
+    // A legacy single relation is derived on read and never persisted, so only the
+    // activity-derived suggestion may appear in the candidate table.
+    assert.deepEqual([...RESIDENT_COMMUNITY_STORED_CANDIDATE_SOURCES], ['activity_oauth_candidate'])
+    for (const source of RESIDENT_COMMUNITY_CANDIDATE_SOURCES) {
+      assert.equal(typeof source, 'string')
+    }
+    assert.equal(
+      RESIDENT_COMMUNITY_CANDIDATE_SOURCES.includes('legacy_single_assignment_candidate'),
+      true,
     )
   })
 })
