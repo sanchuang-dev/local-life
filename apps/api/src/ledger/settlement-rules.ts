@@ -5,7 +5,6 @@ import {
   type CreateSettlementRuleRequest,
   type SettlementQuoteResponse,
   type SettlementRuleVersion,
-  type SettlementTrialAllocation,
 } from '@sanchuang-dev/local-life-contracts'
 import type { AppDatabase } from '../db/client.js'
 import { settlementProductMappings, settlementRuleVersions } from '../db/schema.js'
@@ -20,14 +19,15 @@ import { allocateSettlementCents } from './settlement-calculator.js'
 type RuleRow = typeof settlementRuleVersions.$inferSelect
 
 function toRule(row: RuleRow): SettlementRuleVersion {
+  // Strict shared DTO: flat SQL columns must not escape as extra properties.
+  const { sellerRateBps, sanchuangRateBps, guangdianRateBps, ...rest } = row
   return {
-    ...row,
+    ...rest,
     ratesBps: {
-      seller: row.sellerRateBps,
-      sanchuang: row.sanchuangRateBps,
-      guangdian: row.guangdianRateBps,
+      seller: sellerRateBps,
+      sanchuang: sanchuangRateBps,
+      guangdian: guangdianRateBps,
     },
-    approvalStatus: 'admin_attested',
     approvedAt: iso(row.approvedAt),
   }
 }
