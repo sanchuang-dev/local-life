@@ -127,6 +127,13 @@
       "when": 1794358952088,
       "tag": "0017_ledger_payment_evidence",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1794368000000,
+      "tag": "0018_settlement_parties",
+      "breakpoints": true
     }
   ]
 }
