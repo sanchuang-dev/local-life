@@ -22,7 +22,7 @@
 | `resident_community_binding_candidates` | **新增**服务端派生的一次性「绑定候选」，`user_id` 为主键 | 登录时可写、确认时删除、7 天后读不到 |
 | `audit_logs` | 确认与候选的审计证据 | 只追加 |
 
-关键约束（数据库层，不依赖应用判断，见 `apps/api/db/migrations/0020_ll_identity_001_binding.sql`）：
+关键约束（数据库层，不依赖应用判断，见 `apps/api/db/migrations/0022_ll_identity_001_binding.sql`）：
 
 - `resident_community_bindings_user_confirmed_uq`：对 `(user_id)` 的**部分唯一索引**，条件 `WHERE status = 'confirmed'`；
 - `resident_community_bindings_status_check`：`status` 目前只允许 `'confirmed'`，因此上面那条部分索引实际覆盖全表，任何第二条 confirmed 都不可能存在；
@@ -44,7 +44,7 @@
 
 迁移只做两件事：
 
-1. 建两张新表与索引（`0020_ll_identity_001_binding.sql`）；
+1. 建两张新表与索引（`0022_ll_identity_001_binding.sql`）；
 2. **不做任何**从 `resident_community_assignments` 到 `resident_community_bindings` 的批量转换、不复制、不删除、不改列。
 
 因此迁移后：
@@ -73,8 +73,8 @@ DROP INDEX IF EXISTS `resident_community_bindings_user_confirmed_uq`;
 DROP INDEX IF EXISTS `resident_community_candidates_community_idx`;
 DROP TABLE IF EXISTS `resident_community_bindings`;
 DROP TABLE IF EXISTS `resident_community_binding_candidates`;
--- 然后把 drizzle 的 __drizzle_migrations 里最后一条 0020 记录删掉，否则迁移器不会重跑。
-DELETE FROM `__drizzle_migrations` WHERE `hash` = '<0020 的 hash>';
+-- 然后把 drizzle 的 __drizzle_migrations 里最后一条 0022 记录删掉，否则迁移器不会重跑。
+DELETE FROM `__drizzle_migrations` WHERE `hash` = '<0022 的 hash>';
 ```
 
 `resident_community_assignments` 与其余所有既有表**完全不在回滚范围内**——它们从来没有被本迁移修改过。
@@ -119,7 +119,7 @@ pnpm db:resident-binding:preflight .data/local-life-dev.sqlite --json
 
 | 文件 | 作用 |
 | --- | --- |
-| `scripts/resident-binding-evidence-fixture.mjs`（`pnpm db:resident-binding:fixture <路径>`） | 用**真实迁移链**（`apps/api/db/migrations/*.sql` 全部 19 个）建一个真实 SQLite，再插入 0 / 1 / 2+ 三种历史归属账号，以及挂在多归属账号上的一条 `local_orders` 和一条 `ledger_entries` |
+| `scripts/resident-binding-evidence-fixture.mjs`（`pnpm db:resident-binding:fixture <路径>`） | 用**真实迁移链**（`apps/api/db/migrations/*.sql` 全部 23 个）建一个真实 SQLite，再插入 0 / 1 / 2+ 三种历史归属账号，以及挂在多归属账号上的一条 `local_orders` 和一条 `ledger_entries` |
 | `scripts/resident-binding-readonly-proof.mjs` | 用**与预检完全相同**的 `{ readOnly: true }` 句柄，依次尝试 INSERT / UPDATE / DELETE / 插入绑定，四个写操作必须全部被 SQLite 拒绝 |
 | `scripts/resident-binding-readonly-proof.test.mjs` | 5 个 `node:test`：① 四个写全部被拒（`attempt to write a readonly database`）；② 跑一次预检后文件**逐字节不变**且所有表行数不变；③ 路径不存在时失败退出而不是报「0 条」；④ fixture 确实包含 0/1/2+ 三个桶与 #171 新表；⑤ **可写句柄**（模拟误操作脚本）直插第二条 confirmed 会被部分唯一索引拒绝，`status` 非 `confirmed` 会被 CHECK 拒绝，且迁移文件中不存在 `ALTER TABLE resident_community_assignments` |
 

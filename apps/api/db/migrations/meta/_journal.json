@@ -155,6 +155,13 @@
       "when": 1794371400000,
       "tag": "0021_settlement_payment_evidence",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1794390840000,
+      "tag": "0022_ll_identity_001_binding",
+      "breakpoints": true
     }
   ]
 }
