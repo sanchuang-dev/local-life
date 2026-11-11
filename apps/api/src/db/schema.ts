@@ -1561,6 +1561,66 @@ export const localOrders = sqliteTable(
   ],
 )
 
+
+/* -------------------------------------------------------------------------- */
+/* Independently identified settlement parties and immutable sales provenance */
+/* (#183). Never derive a seller from product community or the order creator. */
+/* -------------------------------------------------------------------------- */
+
+export const settlementParties = sqliteTable('settlement_parties', {
+  id: text('id').primaryKey(),
+  role: text('role').$type<'seller' | 'sanchuang' | 'guangdian'>().notNull(),
+  legalName: text('legal_name').notNull(),
+  registryRef: text('registry_ref').notNull(),
+  verificationRef: text('verification_ref'),
+  verifiedAt: integer('verified_at', { mode: 'timestamp_ms' }),
+  createdByUserId: text('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  index('settlement_parties_role_registry_idx').on(table.role, table.registryRef),
+  check('settlement_parties_role_check',
+    sql.raw("role IN ('seller','sanchuang','guangdian')")),
+  check('settlement_parties_verification_check',
+    sql.raw("(verified_at IS NULL AND verification_ref IS NULL) OR (verified_at IS NOT NULL AND verification_ref IS NOT NULL)")),
+])
+
+/** Effective-dated, disjoint mapping versions; no retroactive UPDATE/DELETE. */
+export const settlementProductMappings = sqliteTable('settlement_product_mappings', {
+  id: text('id').primaryKey(),
+  communityId: text('community_id').notNull().references(() => communities.id, { onDelete: 'restrict' }),
+  productId: text('product_id').notNull().references(() => localProducts.id, { onDelete: 'restrict' }),
+  sellerPartyId: text('seller_party_id').notNull().references(() => settlementParties.id, { onDelete: 'restrict' }),
+  sanchuangPartyId: text('sanchuang_party_id').references(() => settlementParties.id, { onDelete: 'restrict' }),
+  guangdianPartyId: text('guangdian_party_id').references(() => settlementParties.id, { onDelete: 'restrict' }),
+  agreementRef: text('agreement_ref').notNull(),
+  effectiveFrom: text('effective_from').notNull(),
+  effectiveTo: text('effective_to').notNull(),
+  createdByUserId: text('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  index('settlement_mapping_community_product_idx').on(table.communityId, table.productId),
+  index('settlement_mapping_seller_idx').on(table.sellerPartyId),
+  check('settlement_mapping_period_check', sql.raw('effective_from <= effective_to')),
+])
+
+/**
+ * Human-confirmed order-to-merchant snapshot. Missing row means missing seller;
+ * adding a backdated product mapping never silently changes an existing order.
+ */
+export const settlementOrderPartySnapshots = sqliteTable('settlement_order_party_snapshots', {
+  orderId: text('order_id').primaryKey().references(() => localOrders.id, { onDelete: 'restrict' }),
+  mappingId: text('mapping_id').notNull().references(() => settlementProductMappings.id, { onDelete: 'restrict' }),
+  sellerPartyId: text('seller_party_id').notNull().references(() => settlementParties.id, { onDelete: 'restrict' }),
+  sanchuangPartyId: text('sanchuang_party_id').references(() => settlementParties.id, { onDelete: 'restrict' }),
+  guangdianPartyId: text('guangdian_party_id').references(() => settlementParties.id, { onDelete: 'restrict' }),
+  agreementRef: text('agreement_ref').notNull(),
+  confirmationRef: text('confirmation_ref').notNull(),
+  confirmedByUserId: text('confirmed_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  confirmedAt: integer('confirmed_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  index('settlement_order_party_mapping_idx').on(table.mappingId),
+])
+
 /**
  * Append-only local-order timeline. `source_type` + `source_id` are the stable
  * consumption contract for downstream work (#64): a consumer must be able to
@@ -2218,6 +2278,9 @@ export const schema = {
   activityDrawFulfilmentEvents,
   localProducts,
   localOrders,
+  settlementParties,
+  settlementProductMappings,
+  settlementOrderPartySnapshots,
   localOrderEvents,
   reconciliationBatches,
   ledgerEntries,
