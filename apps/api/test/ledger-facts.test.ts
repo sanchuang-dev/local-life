@@ -2299,14 +2299,14 @@ test('new 0019 settlement rule migration upgrades real populated 0018 DB without
     const oldDir = join(root, 'old')
     mkdirSync(join(oldDir, 'meta'), { recursive: true })
     for (const name of readdirSync(migrationsFolder)) {
-      if (/^[0-9]{4}_.*\.sql$/u.test(name) && !name.startsWith('0019_')) {
+      if (/^[0-9]{4}_.*\.sql$/u.test(name) && Number(name.slice(0,4)) < 19) {
         copyFileSync(join(migrationsFolder, name), join(oldDir, name))
       }
     }
     const current = JSON.parse(readFileSync(join(migrationsFolder, 'meta/_journal.json'), 'utf8')) as {
       entries: Array<{ idx: number; tag: string }>
     }
-    assert.equal(current.entries.at(-1)?.tag, '0019_settlement_rules')
+    assert.equal(current.entries.find(entry => entry.idx === 19)?.tag, '0019_settlement_rules')
     current.entries = current.entries.filter((entry) => entry.idx < 19)
     writeFileSync(join(oldDir, 'meta/_journal.json'), JSON.stringify(current))
     const dbFile = join(root, 'legacy.sqlite')
@@ -2378,4 +2378,415 @@ test('trial quote blocks mismatched receipts and processing fees larger than a p
     assert.equal(blocked.allocation, null)
     assert.deepEqual(blocked.blockingReasons, ['fee_exceeds_owner_share'])
   } finally { feeWorld.cleanup() }
+})
+
+
+/* -------------------------------------------------------------------------- */
+/* #186 · reproducible statement draft, independent review, lock and CSV       */
+/* -------------------------------------------------------------------------- */
+
+async function secondAdminSession186(world: World): Promise<Session> {
+  const userId = randomUUID()
+  const staffId = randomUUID()
+  const when = new Date('2026-11-01T00:00:00.000Z')
+  world.db.insert(users).values({
+    id: userId, displayName: '独立管理员复核人', createdAt: when, updatedAt: when,
+  }).run()
+  world.db.insert(staffAccounts).values({
+    id: staffId, userId, username: 'admin-reviewer-186',
+    passwordHash: await hashPassword(ADMIN_PASSWORD),
+    role: 'admin', status: 'active', createdAt: when, updatedAt: when,
+  }).run()
+  world.db.insert(staffCommunityAssignments).values({
+    staffAccountId: staffId, communityId: world.communityId, createdAt: when,
+  }).run()
+  const state = await csrf(world.app)
+  const response = await world.app.request('/auth/login', {
+    method: 'POST', headers: {
+      'content-type': 'application/json',
+      cookie: state.cookie, 'x-csrf-token': state.token, origin: ADMIN_ORIGIN,
+    },
+    body: JSON.stringify({
+      username: 'admin-reviewer-186', password: ADMIN_PASSWORD,
+    }),
+  })
+  assert.equal(response.status, 200)
+  const result = await response.json() as { csrfToken: string }
+  return {
+    cookies: `${cookiePair(response,'ll_session')}; ${cookiePair(response,'ll_csrf')}`,
+    csrfToken: result.csrfToken,
+  }
+}
+const statementBody186 = (world: World, from = '2026-11-09', to = '2026-11-09') => ({
+  communityId: world.communityId, periodFrom: from, periodTo: to,
+})
+const statementUrl186 = '/admin/settlement/statements'
+const reviewUrl186 = (id: string) => statementUrl186 + '/' + id + '/review'
+const lockUrl186 = (id: string) => statementUrl186 + '/' + id + '/lock'
+const entityUrl186 = (id: string) => statementUrl186 + '/' + id + '/entity.csv'
+const gridUrl186 = (id: string) => statementUrl186 + '/' + id + '/performance.csv'
+
+test('statement with no approved contract stays a reproducible pending CSV and cannot lock as payable', async () => {
+  const world = await makeWorld()
+  try {
+    const { session, paymentEntryId } = await ruleSetup185(world)
+    const draft = await api(world.app, 'POST', statementUrl186, {
+      session, body: statementBody186(world),
+    })
+    assert.equal(draft.status, 201)
+    const detail = await draft.json() as {
+      statement: {
+        id: string; generation: number; revision: number; status: string;
+        summary: { lineCount:number; calculatedCount:number; blockedCount:number;
+          eligibleDistributionCents: number|null }; paymentState:string;
+      };
+      lines: Array<{receiptEntryId:string;allocation:null;state:string;blockingReasons:string[]}>;
+      events: Array<{kind:string;revision:number}>;
+    }
+    assert.equal(detail.statement.status, 'draft')
+    assert.equal(detail.statement.generation, 1)
+    assert.equal(detail.statement.summary.lineCount, 1)
+    assert.equal(detail.statement.summary.calculatedCount, 0)
+    assert.equal(detail.statement.summary.blockedCount, 1)
+    assert.equal(detail.statement.summary.eligibleDistributionCents, null)
+    assert.equal(detail.statement.paymentState, 'not_recorded')
+    assert.equal(detail.lines[0]?.receiptEntryId, paymentEntryId)
+    assert.equal(detail.lines[0]?.state, 'blocked')
+    assert.equal(detail.lines[0]?.allocation, null)
+    assert.ok(detail.lines[0]?.blockingReasons.includes('missing_approved_rule'))
+    assert.deepEqual(detail.events.map(x=>x.kind), ['created'])
+
+    const conflict = await api(world.app, 'POST', statementUrl186, {
+      session, body: statementBody186(world),
+    })
+    assert.equal(conflict.status, 409, 'duplicate period must not create a second active draft')
+    const entityCsv = await api(world.app, 'GET', entityUrl186(detail.statement.id),{session})
+    assert.equal(entityCsv.status, 200)
+    const text = await entityCsv.text()
+    assert.ok(text.includes('草案-待复核'))
+    assert.ok(text.includes('待核定'))
+    assert.ok(text.includes(paymentEntryId))
+    assert.ok(!text.includes('已结清'))
+    const grid = await api(world.app, 'GET', gridUrl186(detail.statement.id), {
+      session: await gridSession(world.app),
+    })
+    assert.equal(grid.status, 200)
+    const perf = await grid.text()
+    assert.ok(perf.includes(world.gridStaffId))
+    assert.ok(perf.includes('确认业绩笔数'))
+    assert.ok(!perf.includes(world.crmOrderId), 'single-day export cannot include earlier CRM facts')
+    assert.ok(!perf.includes('商户净额分'))
+    assert.ok(!perf.includes('"900"'), 'performance export cannot emit a cash amount')
+
+    const ownReview = await api(world.app, 'POST', reviewUrl186(detail.statement.id), {
+      session, body: { expectedRevision: 1, evidenceRef: 'TEST-SELF-REVIEW' },
+    })
+    assert.equal(ownReview.status, 403, 'original author cannot self-review')
+    const reviewer = await secondAdminSession186(world)
+    const verified = await api(world.app, 'POST', reviewUrl186(detail.statement.id), {
+      session: reviewer,
+      body: { expectedRevision: 1, evidenceRef: 'TEST-SECOND-ADMIN-REVIEW-001' },
+    })
+    assert.equal(verified.status, 200)
+    const reviewed = await verified.json() as {
+      statement: {revision:number;status:string};events:Array<{kind:string}>
+    }
+    assert.equal(reviewed.statement.status, 'reviewed')
+    assert.equal(reviewed.statement.revision, 2)
+    assert.deepEqual(reviewed.events.map(x=>x.kind),['created','reviewed'])
+    const noPayable = await api(world.app, 'POST', lockUrl186(detail.statement.id), {
+      session, body: { expectedRevision: 2, evidenceRef: 'TEST-LOCK-ATTEMPT' },
+    })
+    assert.equal(noPayable.status, 409, 'no approved rule means no locked amount')
+    assert.equal((world.sqlite.prepare('SELECT count(*) AS n FROM settlement_receipt_claims')
+      .get() as {n:number}).n,0)
+
+    const replace = await api(world.app, 'POST', statementUrl186, {
+      session, body: {
+        ...statementBody186(world),replaceStatementId:detail.statement.id,
+        expectedRevision:2,
+      },
+    })
+    assert.equal(replace.status,201)
+    const replacement = await replace.json() as {statement:{id:string;generation:number;status:string}}
+    assert.equal(replacement.statement.generation,2)
+    assert.equal(replacement.statement.status,'draft')
+    const original = await api(world.app,'GET',statementUrl186+'/'+detail.statement.id,{session})
+    assert.equal(original.status,200)
+    assert.equal((await original.json() as {statement:{status:string}}).statement.status,'superseded')
+    assert.equal((world.sqlite.prepare('SELECT count(*) AS n FROM settlement_statement_lines')
+      .get() as {n:number}).n,2,'new generation retains old immutable lines')
+  } finally { world.cleanup() }
+})
+
+test('approved settlement locks exact cents once, snapshots contract version and reports post-lock reversal', async () => {
+  const world = await makeWorld()
+  try {
+    const { session, mappingId, paymentEntryId } = await ruleSetup185(world)
+    const approved = await api(world.app,'POST','/admin/settlement/rules',{
+      session,body:ruleInput185(mappingId),
+    })
+    assert.equal(approved.status,201)
+    const rule = await approved.json() as {id:string;version:number}
+    const draft = await api(world.app,'POST',statementUrl186,{
+      session,body:statementBody186(world),
+    })
+    assert.equal(draft.status,201)
+    const created=await draft.json() as {
+      statement:{id:string;revision:number;snapshotDigest:string;status:string;
+        summary:{eligibleGrossCents:number;calculatedCount:number;feeCents:number;
+          sellerNetCents:number;sanchuangNetCents:number;guangdianNetCents:number;
+          eligibleDistributionCents:number|null}};
+      lines:Array<{id:string;state:string;ruleId:string;ruleVersion:number;
+        receiptEntryId:string;operatingBatchId:string;allocation:{grossReceivedCents:number}}>;
+    }
+    assert.equal(created.statement.summary.eligibleGrossCents,900)
+    assert.equal(created.statement.summary.calculatedCount,1)
+    assert.equal(created.statement.summary.feeCents,9)
+    assert.equal(created.statement.summary.sellerNetCents,621)
+    assert.equal(created.statement.summary.sanchuangNetCents,90)
+    assert.equal(created.statement.summary.guangdianNetCents,180)
+    assert.equal(created.statement.summary.eligibleDistributionCents,891)
+    assert.equal(created.lines[0]?.ruleId,rule.id)
+    assert.equal(created.lines[0]?.ruleVersion,1)
+    assert.equal(created.lines[0]?.receiptEntryId,paymentEntryId)
+    assert.ok(created.lines[0]?.operatingBatchId)
+
+    const second=await secondAdminSession186(world)
+    const reviewed=await api(world.app,'POST',reviewUrl186(created.statement.id),{
+      session:second,body:{expectedRevision:1,evidenceRef:'TEST-SECOND-ADMIN-REVIEW-186'},
+    })
+    assert.equal(reviewed.status,200)
+    assert.equal((await reviewed.json() as {statement:{revision:number}}).statement.revision,2)
+    const stale=await api(world.app,'POST',reviewUrl186(created.statement.id),{
+      session:second,body:{expectedRevision:1,evidenceRef:'TEST-REPLAY'},
+    })
+    assert.equal(stale.status,409)
+
+    const locked=await api(world.app,'POST',lockUrl186(created.statement.id),{
+      session,body:{expectedRevision:2,evidenceRef:'TEST-FINANCE-LOCK-ACK-186'},
+    })
+    assert.equal(locked.status,200)
+    const result=await locked.json() as {
+      statement:{status:string;revision:number;paymentState:string;snapshotDigest:string;
+        summary:{sellerNetCents:number}};
+      lines:Array<{allocation:{sellerNetCents:number};sourceDigest:string}>;
+      events:Array<{kind:string;revision:number}>;
+      postLockDisputes:Array<{orderId:string}>;
+    }
+    assert.equal(result.statement.status,'locked')
+    assert.equal(result.statement.revision,3)
+    assert.equal(result.statement.snapshotDigest,created.statement.snapshotDigest)
+    assert.equal(result.statement.paymentState,'not_recorded')
+    assert.equal(result.lines[0]?.allocation.sellerNetCents,621)
+    assert.deepEqual(result.events.map(x=>x.kind),['created','reviewed','locked'])
+    assert.deepEqual(result.postLockDisputes,[])
+    assert.equal((world.sqlite.prepare('SELECT count(*) AS n FROM settlement_receipt_claims')
+      .get() as {n:number}).n,1)
+    assert.equal((world.sqlite.prepare('SELECT count(*) AS n FROM settlement_statement_events')
+      .get() as {n:number}).n,3)
+    const replay=await api(world.app,'POST',lockUrl186(created.statement.id),{
+      session,body:{expectedRevision:2,evidenceRef:'TEST-DUP-LOCK'},
+    })
+    assert.equal(replay.status,409)
+    assert.throws(()=>world.sqlite.prepare(
+      'UPDATE settlement_statement_lines SET registered_amount_cents=1 WHERE statement_id=?',
+    ).run(created.statement.id),/immutable/)
+    assert.throws(()=>world.sqlite.prepare(
+      'UPDATE settlement_statements SET seller_net_cents=1 WHERE id=?',
+    ).run(created.statement.id),/immutable/)
+    assert.throws(()=>world.sqlite.prepare(
+      'DELETE FROM settlement_statement_events WHERE statement_id=?',
+    ).run(created.statement.id),/immutable/)
+
+    const secondPeriod=await api(world.app,'POST',statementUrl186,{
+      session,body:statementBody186(world,'2026-11-01','2026-11-10'),
+    })
+    assert.equal(secondPeriod.status,201)
+    const secondDraft=await secondPeriod.json() as {
+      statement:{id:string;summary:{eligibleGrossCents:number}};
+      performance:Array<{sourceId:string;staffId:string;sourceDisplayNo:string}>;
+    }
+    assert.equal(secondDraft.statement.summary.eligibleGrossCents,900,
+      'confirmed CRM business with no amount cannot inflate received revenue')
+    assert.equal(secondDraft.performance.length,1,
+      'confirmed CRM without a price must be snapshotted as WORKER performance')
+    assert.equal(secondDraft.performance[0]?.sourceId,world.crmOrderId)
+    assert.equal(secondDraft.performance[0]?.staffId,world.operatorStaffId)
+    const organizationGridCsv=await api(world.app,'GET',
+      gridUrl186(secondDraft.statement.id),{session})
+    assert.equal(organizationGridCsv.status,200)
+    assert.ok((await organizationGridCsv.text()).includes('GD-20261103-001'),
+      'admin export must include confirmed CRM business in non-monetary performance')
+    const workerGridCsv=await api(world.app,'GET',
+      gridUrl186(secondDraft.statement.id),{session:await gridSession(world.app)})
+    assert.equal(workerGridCsv.status,200)
+    const workerText=await workerGridCsv.text()
+    assert.ok(!workerText.includes(world.crmOrderId),
+      'grid worker must not see another staff member\'s service performance')
+    const secondReview=await api(world.app,'POST',reviewUrl186(secondDraft.statement.id),{
+      session:second,body:{expectedRevision:1,evidenceRef:'TEST-DUP-REVIEW'},
+    })
+    assert.equal(secondReview.status,200)
+    const duplicateClaim=await api(world.app,'POST',lockUrl186(secondDraft.statement.id),{
+      session,body:{expectedRevision:2,evidenceRef:'TEST-DUP-CLAIM'},
+    })
+    assert.equal(duplicateClaim.status,409,'one receipt must never be priced twice')
+    assert.equal((world.sqlite.prepare('SELECT count(*) AS n FROM settlement_receipt_claims')
+      .get() as {n:number}).n,1)
+
+    const entity=await api(world.app,'GET',entityUrl186(created.statement.id),{session})
+    assert.equal(entity.status,200)
+    const entityText=await entity.text()
+    assert.ok(entityText.includes('已锁定-尚未登记付款'))
+    assert.ok(entityText.includes(rule.id))
+    assert.ok(entityText.includes(paymentEntryId))
+    assert.ok(!entityText.includes('已结清'))
+    assert.equal((await api(world.app,'GET',entityUrl186(created.statement.id),{
+      session:await gridSession(world.app),
+    })).status,403)
+
+    const reversed=await api(world.app,'POST',
+      '/admin/ledger/payments/'+paymentEntryId+'/reverse',{
+        session,body:{staffId:world.operatorStaffId,reason:'TEST-POST-LOCK-REVERSAL'},
+      })
+    assert.equal(reversed.status,201)
+    const frozen=await api(world.app,'GET',statementUrl186+'/'+created.statement.id,{session})
+    assert.equal(frozen.status,200)
+    const after=await frozen.json() as {
+      statement:{status:string;summary:{sellerNetCents:number}};
+      lines:Array<{allocation:{sellerNetCents:number}}>;
+      postLockDisputes:Array<{orderId:string;reasons:string[]}>;
+    }
+    assert.equal(after.statement.status,'locked')
+    assert.equal(after.statement.summary.sellerNetCents,621)
+    assert.equal(after.lines[0]?.allocation.sellerNetCents,621)
+    assert.equal(after.postLockDisputes[0]?.orderId,world.localOrderId)
+    assert.ok(after.postLockDisputes[0]?.reasons.includes('receipt_reversed'))
+    const newCsv=await api(world.app,'GET',entityUrl186(created.statement.id),{session})
+    assert.ok((await newCsv.text()).includes('receipt_reversed'))
+  } finally { world.cleanup() }
+})
+
+test('statement rejects unauthorized roles, bad dates, CSRF/origin and stale or changed evidence', async () => {
+  const world=await makeWorld()
+  try {
+    const {session,mappingId,paymentEntryId}=await ruleSetup185(world)
+    const reviewer=await secondAdminSession186(world)
+    const grid=await gridSession(world.app)
+    assert.equal((await api(world.app,'GET',statementUrl186)).status,401)
+    assert.equal((await api(world.app,'GET',statementUrl186,{session:grid})).status,403)
+    assert.equal((await api(world.app,'POST',statementUrl186,{
+      session:grid,body:statementBody186(world),
+    })).status,403)
+    for (const invalid of [
+      {...statementBody186(world),periodFrom:'2026-02-31'},
+      {...statementBody186(world),periodFrom:'2026-11-30',periodTo:'2026-11-09'},
+      {...statementBody186(world),replaceStatementId:randomUUID()},
+    ]) {
+      assert.equal((await api(world.app,'POST',statementUrl186,{
+        session,body:invalid,
+      })).status,400)
+    }
+    const noCsrf=await world.app.request(statementUrl186,{
+      method:'POST',headers:{
+        cookie:session.cookies,origin:ADMIN_ORIGIN,'content-type':'application/json',
+      },body:JSON.stringify(statementBody186(world)),
+    })
+    assert.equal(noCsrf.status,403)
+    const badOrigin=await world.app.request(statementUrl186,{
+      method:'POST',headers:{
+        cookie:session.cookies,origin:'https://evil.example',
+        'x-csrf-token':session.csrfToken,'content-type':'application/json',
+      },body:JSON.stringify(statementBody186(world)),
+    })
+    assert.equal(badOrigin.status,403)
+    const outside=await api(world.app,'POST',statementUrl186,{
+      session,body:{...statementBody186(world),communityId:world.otherCommunityId},
+    })
+    assert.equal(outside.status,201,'admin may work across communities')
+    assert.equal((await api(world.app,'GET',
+      statementUrl186+'?pageSize=1000',{session})).status,400)
+    const {listSettlementStatements,createSettlementStatement}=
+      await import('../src/ledger/settlement-statements.js')
+    assert.throws(()=>createSettlementStatement(world.db,adminActor(world),{
+      ...statementBody186(world),communityId:world.otherCommunityId,
+    }),/无权访问/)
+    assert.deepEqual(listSettlementStatements(world.db,adminActor(world),{
+      communityId:world.communityId,page:1,pageSize:20,
+    }).items,[])
+
+    const rule=await api(world.app,'POST','/admin/settlement/rules',{
+      session,body:ruleInput185(mappingId),
+    })
+    assert.equal(rule.status,201)
+    const draft=await api(world.app,'POST',statementUrl186,{
+      session,body:statementBody186(world),
+    })
+    assert.equal(draft.status,201)
+    const row=await draft.json() as {statement:{id:string}}
+    const changed=await api(world.app,'POST',
+      '/admin/ledger/payments/'+paymentEntryId+'/reverse',{
+        session,body:{staffId:world.operatorStaffId,reason:'TEST-BEFORE-LOCK-REVERSAL'},
+      })
+    assert.equal(changed.status,201)
+    const notReviewable=await api(world.app,'POST',reviewUrl186(row.statement.id),{
+      session:reviewer,body:{expectedRevision:1,evidenceRef:'TEST-CHECK-STALENESS'},
+    })
+    assert.equal(notReviewable.status,409,
+      'review must detect reverse after draft and require regeneration')
+    assert.equal((world.sqlite.prepare(
+      "SELECT status FROM settlement_statements WHERE id=?",
+    ).get(row.statement.id) as {status:string}).status,'draft')
+  } finally { world.cleanup() }
+})
+
+test('statement CSV neutralizes formulas and masks resident phones',async()=>{
+  const {settlementCsvCell}=await import('../src/ledger/settlement-statement-csv.js')
+  assert.equal(settlementCsvCell('=CMD()'),'"\'=CMD()"')
+  assert.equal(settlementCsvCell('  +calc'),'"\'  +calc"')
+  assert.equal(settlementCsvCell('@SUM(A1)'),'"\'@SUM(A1)"')
+  assert.equal(settlementCsvCell('13800138000'),'"138****8000"')
+  assert.equal(settlementCsvCell('a"b\r\nc'),'"a""b\r\nc"')
+})
+
+test('SQLite 0019→0020 migration preserves prior contract and identity facts',async()=>{
+  const {copyFileSync,mkdirSync,readFileSync,readdirSync,writeFileSync}=
+    await import('node:fs')
+  const dir=mkdtempSync(join(tmpdir(),'ll-settlement-0020-'))
+  try {
+    const oldDir=join(dir,'legacy')
+    mkdirSync(join(oldDir,'meta'),{recursive:true})
+    for (const n of readdirSync(migrationsFolder)) {
+      if (/^[0-9]{4}_.*\.sql$/u.test(n) && Number(n.slice(0,4))<20) {
+        copyFileSync(join(migrationsFolder,n),join(oldDir,n))
+      }
+    }
+    const journal=JSON.parse(readFileSync(join(migrationsFolder,'meta/_journal.json'),'utf8')) as {
+      entries:Array<{idx:number;tag:string}>
+    }
+    assert.equal(journal.entries.find(x=>x.idx===20)?.tag,'0020_settlement_statements')
+    journal.entries=journal.entries.filter(x=>x.idx<20)
+    writeFileSync(join(oldDir,'meta/_journal.json'),JSON.stringify(journal))
+    const file=join(dir,'prior.sqlite')
+    const previous=createDatabase(file,oldDir)
+    const id=randomUUID()
+    previous.db.insert(communities).values({
+      id,name:'0020迁移前社区',createdAt:new Date('2026-11-01T00:00:00.000Z'),
+    }).run()
+    previous.sqlite.close()
+    const current=createDatabase(file,migrationsFolder)
+    try {
+      assert.equal((current.sqlite.prepare('SELECT name FROM communities WHERE id=?')
+        .get(id) as {name:string}).name,'0020迁移前社区')
+      assert.ok(current.sqlite.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='settlement_statements'",
+      ).get())
+      assert.ok(current.sqlite.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='settlement_rule_versions'",
+      ).get())
+      assert.equal((current.sqlite.prepare('SELECT count(*) AS n FROM settlement_statements')
+        .get() as {n:number}).n,0,'no fake payout rows after upgrade')
+    } finally {current.sqlite.close()}
+  } finally {rmSync(dir,{recursive:true,force:true})}
 })

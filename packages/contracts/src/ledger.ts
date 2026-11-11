@@ -108,6 +108,12 @@ export const LEDGER_ROUTES = {
   adminSettlementCandidates: '/admin/settlement/candidates',
   adminSettlementRules: '/admin/settlement/rules',
   adminSettlementQuote: '/admin/settlement/quotes',
+  adminSettlementStatements: '/admin/settlement/statements',
+  adminSettlementStatement: '/admin/settlement/statements/:statementId',
+  adminSettlementReview: '/admin/settlement/statements/:statementId/review',
+  adminSettlementLock: '/admin/settlement/statements/:statementId/lock',
+  adminSettlementEntityCsv: '/admin/settlement/statements/:statementId/entity.csv',
+  adminSettlementPerformanceCsv: '/admin/settlement/statements/:statementId/performance.csv',
 } as const
 
 /**
@@ -769,6 +775,165 @@ export const settlementQuoteResponseSchema = z.strictObject({
   guangdianPartyId: uuid.nullable(),
 })
 export type SettlementQuoteResponse = z.infer<typeof settlementQuoteResponseSchema>
+
+
+/* -------------------------------------------------------------------------- */
+/* #186 · Offline settlement: draft snapshots, independent review, locked CSV  */
+/* -------------------------------------------------------------------------- */
+
+/** No real contract, merchant or payable amount is ever seeded here. */
+export const settlementStatementStatusSchema =
+  z.enum(['draft', 'reviewed', 'locked', 'superseded'])
+export const settlementStatementLineStatusSchema = z.enum(['calculated', 'blocked'])
+
+export const createSettlementStatementRequestSchema = z.strictObject({
+  communityId: uuid,
+  periodFrom: settlementBusinessDateSchema,
+  periodTo: settlementBusinessDateSchema,
+  replaceStatementId: uuid.optional(),
+  expectedRevision: z.number().int().min(1).optional(),
+}).superRefine((v, ctx) => {
+  if (v.periodFrom > v.periodTo) ctx.addIssue({
+    code: 'custom', path: ['periodTo'], message: '结束日期早于起始日期',
+  })
+  if ((v.replaceStatementId === undefined) !== (v.expectedRevision === undefined)) {
+    ctx.addIssue({
+      code: 'custom', path: ['expectedRevision'],
+      message: '替换草案必须同时提交旧草案 ID 与预期版本',
+    })
+  }
+})
+export type CreateSettlementStatementRequest =
+  z.infer<typeof createSettlementStatementRequestSchema>
+export const settlementStatementActionRequestSchema = z.strictObject({
+  expectedRevision: z.number().int().min(1),
+  evidenceRef: z.string().trim().min(2).max(200),
+})
+
+export const settlementStatementSummarySchema = z.strictObject({
+  lineCount: count,
+  calculatedCount: count,
+  blockedCount: count,
+  /** Received gross only for eligible lines; never counted twice as order value. */
+  eligibleGrossCents: cents,
+  feeCents: cents,
+  sellerNetCents: cents,
+  sanchuangNetCents: cents,
+  guangdianNetCents: cents,
+  /** Null when nothing qualifies, NOT a fabricated numeric zero payable. */
+  eligibleDistributionCents: cents.nullable(),
+})
+export type SettlementStatementSummary =
+  z.infer<typeof settlementStatementSummarySchema>
+
+export const settlementStatementSchema = z.strictObject({
+  id: uuid,
+  communityId: uuid,
+  statementNo: z.string().min(1),
+  periodFrom: settlementBusinessDateSchema,
+  periodTo: settlementBusinessDateSchema,
+  generation: z.number().int().min(1),
+  revision: z.number().int().min(1),
+  status: settlementStatementStatusSchema,
+  snapshotDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  asOf: isoTimestamp,
+  createdByUserId: uuid,
+  createdAt: isoTimestamp,
+  updatedAt: isoTimestamp,
+  reviewedByUserId: uuid.nullable(),
+  reviewEvidenceRef: z.string().nullable(),
+  reviewedAt: isoTimestamp.nullable(),
+  lockedByUserId: uuid.nullable(),
+  lockEvidenceRef: z.string().nullable(),
+  lockedAt: isoTimestamp.nullable(),
+  summary: settlementStatementSummarySchema,
+  /** No external payout evidence until #187, even for a locked statement. */
+  paymentState: z.literal('not_recorded'),
+})
+export type SettlementStatement = z.infer<typeof settlementStatementSchema>
+
+export const settlementStatementLineSchema = z.strictObject({
+  id: uuid,
+  statementId: uuid,
+  orderId: uuid,
+  orderDisplayNo: z.string().min(1),
+  communityId: uuid,
+  productId: uuid,
+  productName: z.string().min(1),
+  periodAt: isoTimestamp,
+  registeredAmountCents: cents,
+  receiptEntryId: uuid.nullable(),
+  receiptEvidenceRef: z.string().nullable(),
+  receiptReceivedAt: isoTimestamp.nullable(),
+  receiptAmountCents: cents.nullable(),
+  operatingBatchId: uuid.nullable(),
+  gridStaffId: uuid.nullable(),
+  gridReviewerUserId: uuid.nullable(),
+  mappingId: uuid.nullable(),
+  sellerPartyId: uuid.nullable(),
+  sanchuangPartyId: uuid.nullable(),
+  guangdianPartyId: uuid.nullable(),
+  agreementRef: z.string().nullable(),
+  ruleId: uuid.nullable(),
+  ruleVersion: z.number().int().min(1).nullable(),
+  state: settlementStatementLineStatusSchema,
+  blockingReasons: z.array(z.string().min(1)),
+  allocation: settlementTrialAllocationSchema.nullable(),
+  sourceDigest: z.string().regex(/^[a-f0-9]{64}$/),
+})
+export type SettlementStatementLine = z.infer<typeof settlementStatementLineSchema>
+
+/** Confirmed CRM service performance contains NO money; it is not a payable line. */
+export const settlementStatementPerformanceSchema = z.strictObject({
+  id: uuid,
+  statementId: uuid,
+  entryId: uuid,
+  sourceId: uuid,
+  sourceDisplayNo: z.string().min(1),
+  communityId: uuid,
+  staffId: uuid,
+  confirmedByUserId: uuid.nullable(),
+  confirmedAt: isoTimestamp,
+  evidenceRef: z.string().nullable(),
+  sourceDigest: z.string().regex(/^[a-f0-9]{64}$/),
+})
+export type SettlementStatementPerformance =
+  z.infer<typeof settlementStatementPerformanceSchema>
+
+export const settlementStatementEventSchema = z.strictObject({
+  id: uuid,
+  statementId: uuid,
+  kind: z.enum(['created', 'reviewed', 'locked', 'superseded']),
+  revision: z.number().int().min(1),
+  actorUserId: uuid,
+  evidenceRef: z.string().nullable(),
+  snapshotDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  createdAt: isoTimestamp,
+})
+export const settlementStatementDetailSchema = z.strictObject({
+  statement: settlementStatementSchema,
+  lines: z.array(settlementStatementLineSchema),
+  performance: z.array(settlementStatementPerformanceSchema),
+  events: z.array(settlementStatementEventSchema),
+  /** Post-lock reversal/anomaly is an explicit dispute, never a rewritten line. */
+  postLockDisputes: z.array(z.strictObject({
+    orderId: uuid,
+    reasons: z.array(z.string().min(1)),
+  })),
+})
+export type SettlementStatementDetail = z.infer<typeof settlementStatementDetailSchema>
+export const settlementStatementListQuerySchema = z.strictObject({
+  communityId: uuid.optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+})
+export const settlementStatementListResponseSchema = z.strictObject({
+  items: z.array(settlementStatementSchema),
+  total: count,
+  page: z.number().int().min(1),
+  pageSize: z.number().int().min(1).max(100),
+})
+export type SettlementStatementListResponse = z.infer<typeof settlementStatementListResponseSchema>
 
 /* -------------------------------------------------------------------------- */
 /* Overview                                                                   */

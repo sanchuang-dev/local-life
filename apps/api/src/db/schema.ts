@@ -1680,6 +1680,183 @@ export const settlementRuleVersions = sqliteTable('settlement_rule_versions', {
   check('settlement_rule_terms_check', sql`${table.feeBase} = 'actual_received' AND ${table.roundingRecipient} IN ('seller','sanchuang','guangdian') AND ${table.roundingPolicy} = 'floor_then_named_remainder' AND ${table.processorFeeRounding} = 'floor' AND ${table.reversalPolicy} = 'full_reversal_blocks' AND ${table.partialRefundPolicy} = 'unsupported_blocks' AND ${table.approvalStatus} = 'admin_attested'`),
 ])
 
+
+/* #186 Offline SETTLEMENT only. Distinct from #64 operating recon; no payouts. */
+export const settlementStatements = sqliteTable('settlement_statements', {
+  id: text('id').primaryKey(),
+  statementNo: text('statement_no').notNull(),
+  communityId: text('community_id').notNull()
+    .references(() => communities.id, { onDelete: 'restrict' }),
+  periodFrom: text('period_from').notNull(),
+  periodTo: text('period_to').notNull(),
+  generation: integer('generation').notNull(),
+  revision: integer('revision').notNull(),
+  status: text('status').$type<'draft' | 'reviewed' | 'locked' | 'superseded'>().notNull(),
+  snapshotDigest: text('snapshot_digest').notNull(),
+  asOf: integer('as_of', { mode: 'timestamp_ms' }).notNull(),
+  lineCount: integer('line_count').notNull(),
+  calculatedCount: integer('calculated_count').notNull(),
+  blockedCount: integer('blocked_count').notNull(),
+  eligibleGrossCents: integer('eligible_gross_cents').notNull(),
+  feeCents: integer('fee_cents').notNull(),
+  sellerNetCents: integer('seller_net_cents').notNull(),
+  sanchuangNetCents: integer('sanchuang_net_cents').notNull(),
+  guangdianNetCents: integer('guangdian_net_cents').notNull(),
+  createdByUserId: text('created_by_user_id').notNull()
+    .references(() => users.id, { onDelete: 'restrict' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  reviewedByUserId: text('reviewed_by_user_id')
+    .references(() => users.id, { onDelete: 'restrict' }),
+  reviewEvidenceRef: text('review_evidence_ref'),
+  reviewedAt: integer('reviewed_at', { mode: 'timestamp_ms' }),
+  lockedByUserId: text('locked_by_user_id')
+    .references(() => users.id, { onDelete: 'restrict' }),
+  lockEvidenceRef: text('lock_evidence_ref'),
+  lockedAt: integer('locked_at', { mode: 'timestamp_ms' }),
+}, (table) => [
+  uniqueIndex('settlement_statements_no_uq').on(table.statementNo),
+  uniqueIndex('settlement_statements_period_generation_uq')
+    .on(table.communityId, table.periodFrom, table.periodTo, table.generation),
+  uniqueIndex('settlement_statements_active_period_uq')
+    .on(table.communityId, table.periodFrom, table.periodTo)
+    .where(sql`${table.status} <> 'superseded'`),
+  index('settlement_statements_scope_idx').on(table.communityId, table.createdAt),
+  check('settlement_statements_status_check',
+    sql`${table.status} IN ('draft','reviewed','locked','superseded')`),
+  check('settlement_statements_money_check', sql`
+    ${table.lineCount} >= 0 AND ${table.calculatedCount} >= 0
+    AND ${table.blockedCount} >= 0
+    AND ${table.lineCount} = ${table.calculatedCount} + ${table.blockedCount}
+    AND ${table.eligibleGrossCents} >= 0 AND ${table.feeCents} >= 0
+    AND ${table.sellerNetCents} >= 0 AND ${table.sanchuangNetCents} >= 0
+    AND ${table.guangdianNetCents} >= 0
+    AND ${table.eligibleGrossCents} = ${table.feeCents}
+      + ${table.sellerNetCents} + ${table.sanchuangNetCents}
+      + ${table.guangdianNetCents}`),
+  check('settlement_statements_review_check', sql`
+    (${table.status} = 'draft'
+      AND ${table.reviewedByUserId} IS NULL AND ${table.reviewedAt} IS NULL
+      AND ${table.lockedAt} IS NULL)
+    OR (${table.status} IN ('reviewed','locked')
+      AND ${table.reviewedByUserId} IS NOT NULL AND ${table.reviewedAt} IS NOT NULL
+      AND ${table.reviewEvidenceRef} IS NOT NULL
+      AND ${table.reviewedByUserId} <> ${table.createdByUserId}
+      AND ((${table.status} = 'reviewed' AND ${table.lockedAt} IS NULL)
+        OR (${table.status} = 'locked' AND ${table.lockedAt} IS NOT NULL
+          AND ${table.lockedByUserId} IS NOT NULL AND ${table.lockEvidenceRef} IS NOT NULL)))
+    OR (${table.status} = 'superseded' AND ${table.lockedAt} IS NULL)`),
+])
+
+/** One immutable fact row per order in a statement generation. */
+export const settlementStatementLines = sqliteTable('settlement_statement_lines', {
+  id: text('id').primaryKey(),
+  statementId: text('statement_id').notNull()
+    .references(() => settlementStatements.id, { onDelete: 'restrict' }),
+  orderId: text('order_id').notNull()
+    .references(() => localOrders.id, { onDelete: 'restrict' }),
+  orderDisplayNo: text('order_display_no').notNull(),
+  communityId: text('community_id').notNull()
+    .references(() => communities.id, { onDelete: 'restrict' }),
+  productId: text('product_id').notNull()
+    .references(() => localProducts.id, { onDelete: 'restrict' }),
+  productName: text('product_name').notNull(),
+  periodAt: integer('period_at', { mode: 'timestamp_ms' }).notNull(),
+  registeredAmountCents: integer('registered_amount_cents').notNull(),
+  receiptEntryId: text('receipt_entry_id')
+    .references(() => ledgerEntries.id, { onDelete: 'restrict' }),
+  receiptEvidenceRef: text('receipt_evidence_ref'),
+  receiptReceivedAt: integer('receipt_received_at', { mode: 'timestamp_ms' }),
+  receiptAmountCents: integer('receipt_amount_cents'),
+  operatingBatchId: text('operating_batch_id')
+    .references(() => reconciliationBatches.id, { onDelete: 'restrict' }),
+  gridStaffId: text('grid_staff_id')
+    .references(() => staffAccounts.id, { onDelete: 'restrict' }),
+  gridReviewerUserId: text('grid_reviewer_user_id')
+    .references(() => users.id, { onDelete: 'restrict' }),
+  mappingId: text('mapping_id')
+    .references(() => settlementProductMappings.id, { onDelete: 'restrict' }),
+  sellerPartyId: text('seller_party_id')
+    .references(() => settlementParties.id, { onDelete: 'restrict' }),
+  sanchuangPartyId: text('sanchuang_party_id')
+    .references(() => settlementParties.id, { onDelete: 'restrict' }),
+  guangdianPartyId: text('guangdian_party_id')
+    .references(() => settlementParties.id, { onDelete: 'restrict' }),
+  agreementRef: text('agreement_ref'),
+  ruleId: text('rule_id')
+    .references(() => settlementRuleVersions.id, { onDelete: 'restrict' }),
+  ruleVersion: integer('rule_version'),
+  state: text('state').$type<'calculated' | 'blocked'>().notNull(),
+  blockingReasonsJson: text('blocking_reasons_json').notNull(),
+  allocationJson: text('allocation_json'),
+  sourceDigest: text('source_digest').notNull(),
+}, (table) => [
+  uniqueIndex('settlement_statement_line_order_uq').on(table.statementId, table.orderId),
+  index('settlement_statement_line_receipt_idx').on(table.receiptEntryId),
+  index('settlement_statement_line_grid_idx').on(table.statementId, table.gridStaffId),
+  check('settlement_statement_line_state_check', sql`
+    (${table.state} = 'blocked' AND ${table.allocationJson} IS NULL)
+    OR (${table.state} = 'calculated' AND ${table.allocationJson} IS NOT NULL
+      AND ${table.ruleId} IS NOT NULL AND ${table.receiptEntryId} IS NOT NULL)`),
+])
+
+/** Non-monetary Guangdian CRM-confirmed performance; never becomes a payout line. */
+export const settlementStatementPerformance = sqliteTable('settlement_statement_performance', {
+  id: text('id').primaryKey(),
+  statementId: text('statement_id').notNull()
+    .references(() => settlementStatements.id, { onDelete: 'restrict' }),
+  entryId: text('entry_id').notNull()
+    .references(() => ledgerEntries.id, { onDelete: 'restrict' }),
+  sourceId: text('source_id').notNull()
+    .references(() => crmServiceOrders.id, { onDelete: 'restrict' }),
+  sourceDisplayNo: text('source_display_no').notNull(),
+  communityId: text('community_id').notNull()
+    .references(() => communities.id, { onDelete: 'restrict' }),
+  staffId: text('staff_id').notNull()
+    .references(() => staffAccounts.id, { onDelete: 'restrict' }),
+  confirmedByUserId: text('confirmed_by_user_id')
+    .references(() => users.id, { onDelete: 'restrict' }),
+  confirmedAt: integer('confirmed_at', { mode: 'timestamp_ms' }).notNull(),
+  evidenceRef: text('evidence_ref'),
+  sourceDigest: text('source_digest').notNull(),
+}, (table) => [
+  uniqueIndex('settlement_performance_statement_entry_uq').on(table.statementId, table.entryId),
+  index('settlement_performance_worker_idx').on(table.statementId, table.staffId),
+])
+
+/** Independent append-only audit of who created, reviewed, locked or replaced. */
+export const settlementStatementEvents = sqliteTable('settlement_statement_events', {
+  id: text('id').primaryKey(),
+  statementId: text('statement_id').notNull()
+    .references(() => settlementStatements.id, { onDelete: 'restrict' }),
+  kind: text('kind').$type<'created' | 'reviewed' | 'locked' | 'superseded'>().notNull(),
+  revision: integer('revision').notNull(),
+  actorUserId: text('actor_user_id').notNull()
+    .references(() => users.id, { onDelete: 'restrict' }),
+  evidenceRef: text('evidence_ref'),
+  snapshotDigest: text('snapshot_digest').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  uniqueIndex('settlement_statement_event_revision_uq').on(table.statementId, table.revision),
+])
+
+/** A locked receipt can be priced in exactly ONE settlement, even across periods. */
+export const settlementReceiptClaims = sqliteTable('settlement_receipt_claims', {
+  receiptEntryId: text('receipt_entry_id').primaryKey()
+    .references(() => ledgerEntries.id, { onDelete: 'restrict' }),
+  orderId: text('order_id').notNull()
+    .references(() => localOrders.id, { onDelete: 'restrict' }),
+  statementId: text('statement_id').notNull()
+    .references(() => settlementStatements.id, { onDelete: 'restrict' }),
+  lineId: text('line_id').notNull()
+    .references(() => settlementStatementLines.id, { onDelete: 'restrict' }),
+  claimedAt: integer('claimed_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  uniqueIndex('settlement_receipt_claim_order_uq').on(table.orderId),
+  uniqueIndex('settlement_receipt_claim_line_uq').on(table.lineId),
+  index('settlement_receipt_claim_statement_idx').on(table.statementId),
+])
+
 /**
  * Append-only local-order timeline. `source_type` + `source_id` are the stable
  * consumption contract for downstream work (#64): a consumer must be able to
@@ -2341,6 +2518,11 @@ export const schema = {
   settlementProductMappings,
   settlementOrderPartySnapshots,
   settlementRuleVersions,
+  settlementStatements,
+  settlementStatementLines,
+  settlementStatementPerformance,
+  settlementStatementEvents,
+  settlementReceiptClaims,
   localOrderEvents,
   reconciliationBatches,
   ledgerEntries,
