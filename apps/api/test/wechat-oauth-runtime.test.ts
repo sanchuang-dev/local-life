@@ -12,6 +12,8 @@ import {
   communities,
   oauthStates,
   residentCommunityAssignments,
+  residentCommunityBindingCandidates,
+  residentCommunityBindings,
   users,
   wechatIdentities,
   wechatOauthConfigs,
@@ -653,7 +655,10 @@ test('an activity-scoped attempt still associates the resident after a switch', 
       .insert(communities)
       .values({ id: communityId, name: '切换测试社区', createdAt: new Date() })
       .run()
-    // #123: attribution rides on the activity, never on a client-sent community.
+    // The community still rides on the activity, never on a client-sent value.
+    // #171 LL-IDENTITY-001: after login it is a SUGGESTION the resident must
+    // confirm, not an auto-written residence. The derivation itself — including
+    // the surviving state across a config switch — is what this test guards.
     const activityId = seedActivity(harness.db, communityId)
     const start = await beginLogin(harness.app, `?activityId=${activityId}`)
     seedWechatConfig(harness.db, { appId: TEST_APP_ID_B, appSecret: TEST_APP_SECRET_B })
@@ -667,12 +672,33 @@ test('an activity-scoped attempt still associates the resident after a switch', 
       .innerJoin(wechatIdentities, eq(wechatIdentities.userId, users.id))
       .get()
     assert.ok(resident)
-    const assignment = harness.db
+    // No permanent community and no historical relation — only one suggestion.
+    assert.equal(
+      harness.db
+        .select()
+        .from(residentCommunityAssignments)
+        .where(eq(residentCommunityAssignments.userId, resident.id))
+        .all().length,
+      0,
+      'login must not write a historical attribution',
+    )
+    assert.equal(
+      harness.db
+        .select()
+        .from(residentCommunityBindings)
+        .where(eq(residentCommunityBindings.userId, resident.id))
+        .all().length,
+      0,
+      'login must not confirm a permanent community',
+    )
+    const candidates = harness.db
       .select()
-      .from(residentCommunityAssignments)
-      .where(eq(residentCommunityAssignments.userId, resident.id))
-      .get()
-    assert.equal(assignment?.communityId, communityId)
+      .from(residentCommunityBindingCandidates)
+      .where(eq(residentCommunityBindingCandidates.userId, resident.id))
+      .all()
+    assert.equal(candidates.length, 1, 'exactly one server-derived suggestion')
+    assert.equal(candidates[0]?.communityId, communityId)
+    assert.equal(candidates[0]?.source, 'activity_oauth_candidate')
     assert.equal(harness.db.select().from(activityParticipations).all().length, 0)
   } finally {
     harness.sqlite.close()

@@ -11,6 +11,8 @@ import {
   communities,
   tencentMapConfigs,
   residentCommunityAssignments,
+  residentCommunityBindingCandidates,
+  residentCommunityBindings,
   staffAccounts,
   users,
   wechatIdentities,
@@ -378,7 +380,10 @@ test('WeChat OAuth binds one stable resident identity, validates state/nonce and
     )
     assert.equal(secondCallback.status, 302)
     // Re-login reuses the identity: one WeChat identity, one resident, one
-    // residence — the seeded activity owner is a staff fixture, not a resident.
+    // session. #171 LL-IDENTITY-001: the activity-derived community is only ever a
+    // SUGGESTION after login — the retired #123 flow wrote a
+    // `resident_community_assignments` row here, which is exactly the
+    // auto-attribution this issue removes.
     assert.equal(context.db.select().from(wechatIdentities).all().length, 1)
     assert.equal(
       context.db
@@ -386,8 +391,18 @@ test('WeChat OAuth binds one stable resident identity, validates state/nonce and
         .from(residentCommunityAssignments)
         .where(eq(residentCommunityAssignments.communityId, communityId))
         .all().length,
-      1,
+      0,
+      'login must not write a historical attribution',
     )
+    assert.equal(
+      context.db.select().from(residentCommunityBindings).all().length,
+      0,
+      'login must not confirm a permanent community',
+    )
+    const candidates = context.db.select().from(residentCommunityBindingCandidates).all()
+    assert.equal(candidates.length, 1, 'exactly one server-derived suggestion may exist')
+    assert.equal(candidates[0]?.communityId, communityId)
+    assert.equal(candidates[0]?.source, 'activity_oauth_candidate')
   } finally {
     context.sqlite.close()
   }

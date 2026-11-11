@@ -242,14 +242,22 @@ test('purchase link requires a resident session, a published same-community acti
     })
     assert.equal(draft.status, 404)
 
+    // #171 LL-IDENTITY-001: the purchase link is a community-scoped write, and its
+    // authority is the resident's own CONFIRMED binding. Resident A confirmed
+    // community A, so an activity of community B is refused by the shared guard —
+    // explicitly as `resident_community_conflict`, which the H5 can tell apart from
+    // a generic `forbidden`, and the message names the bound community.
     const otherCommunity = await api(app, 'POST', '/integrations/crmeb/purchase-link', {
       session: residentA,
       body: { activityId: publishedB, crmebProductId: 101 },
     })
     assert.equal(otherCommunity.status, 403)
-    assert.equal(
-      (await errorEnvelope(otherCommunity)).error.code,
-      API_ERROR_CODES.forbidden,
+    const otherCommunityError = (await errorEnvelope(otherCommunity)).error
+    assert.equal(otherCommunityError.code, API_ERROR_CODES.residentCommunityConflict)
+    assert.match(
+      otherCommunityError.message,
+      /A 社区/,
+      'the refusal must name the community the resident actually confirmed',
     )
 
     const unknownActivity = await api(app, 'POST', '/integrations/crmeb/purchase-link', {
