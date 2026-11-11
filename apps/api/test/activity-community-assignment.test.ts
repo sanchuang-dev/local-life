@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { and, desc, eq } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 import test from 'node:test'
 import type { ActivityStatus } from '@sanchuang-dev/local-life-contracts'
 import { createApp } from '../src/app.js'
@@ -21,6 +21,8 @@ import {
   localOrders,
   oauthStates,
   residentCommunityAssignments,
+  residentCommunityBindingCandidates,
+  residentCommunityBindings,
   staffAccounts,
   users,
   wechatIdentities,
@@ -28,21 +30,32 @@ import {
 import { masterKeyEnv, seedWechatConfig, TEST_APP_ID } from './wechat-fixtures.js'
 
 /**
- * Independent acceptance for #123 — activity-driven community attribution.
+ * #171 LL-IDENTITY-001 acceptance for the case that used to be #123 —
+ * activity-driven community *attribution*.
  *
  * Every step below is the real Hono app over real HTTP (`app.request`), the real
  * migrated SQLite schema, real cookies and the real OAuth state machine. Only the
  * remote WeChat token endpoint is faked, and only at the `fetch` boundary; real
  * WeChat authorization is NOT exercised here (no credentials available).
  *
- * What this file is allowed to claim, and therefore asserts explicitly:
- *  - the community is derived from the stored activity row, never from the query;
+ * SEMANTICS CHANGED BY #171, and what is asserted instead of the old #123 claim:
+ *  - the community is still derived from the stored activity row, never from the
+ *    query;
  *  - the public-visibility rule is the same one the public activity read applies;
  *  - a client-supplied `communityId` is refused even when that community exists;
- *  - logging in writes an assignment and nothing else — no participation, team,
- *    invitation, order, check-in or reward row;
- *  - duplicate logins are idempotent thanks to the `(user_id, community_id)` PK;
- *  - the admin `GET /crm/residents` list reads the new resident back.
+ *  - **logging in no longer creates a permanent community at all.** The retired
+ *    #123 flow inserted a `resident_community_assignments` row on every activity
+ *    login, which is exactly the auto-attribution #171 forbids. After a login the
+ *    asserted shape is therefore: 0 assignments, 0 bindings, and at most ONE
+ *    `resident_community_binding_candidates` row whose source is
+ *    `activity_oauth_candidate` — a suggestion the resident must confirm;
+ *  - a resident still may not end up with two permanent communities: confirming is
+ *    409 against an existing binding, and the binding table's partial unique index
+ *    is the disk-level backstop;
+ *  - logging in writes no participation, team, invitation, order, check-in or
+ *    reward row either;
+ *  - the admin `GET /crm/residents` list reads the resident back, and labels the
+ *    relation's source honestly.
  */
 
 const migrationsFolder = fileURLToPath(new URL('../db/migrations', import.meta.url))
@@ -78,6 +91,12 @@ function cookiePair(response: Response, name: string): string {
   const pair = cookiePairs(response).find((value) => value.startsWith(`${name}=`))
   assert.ok(pair, `expected a ${name} cookie in ${response.headers.get('set-cookie') ?? '<none>'}`)
   return pair
+}
+
+/** The bare value of a Set-Cookie pair, i.e. what the double-submit header needs. */
+function cookieValue(response: Response, name: string): string {
+  const pair = cookiePair(response, name)
+  return pair.slice(pair.indexOf('=') + 1)
 }
 
 function countingProvider(openid = 'wechat-openid-123') {
@@ -213,6 +232,61 @@ function assignmentsOf(db: AppDatabase, userId: string) {
     .all()
 }
 
+/** #171: the permanent community is the binding table, nothing else. */
+function bindingsOf(db: AppDatabase, userId: string) {
+  return db
+    .select()
+    .from(residentCommunityBindings)
+    .where(eq(residentCommunityBindings.userId, userId))
+    .all()
+}
+
+/** #171: the login-derived suggestion, at most one row per resident. */
+function candidatesOf(db: AppDatabase, userId: string) {
+  return db
+    .select()
+    .from(residentCommunityBindingCandidates)
+    .where(eq(residentCommunityBindingCandidates.userId, userId))
+    .all()
+}
+
+/**
+ * Asserts the post-login identity shape #171 requires: the login authenticated a
+ * person and left at most ONE unconfirmed suggestion. It must never have written a
+ * permanent community, and never a historical relation either — that row is what
+ * the retired #123 flow created automatically and what #171 forbids.
+ */
+function assertNoPermanentCommunity(db: AppDatabase, userId: string, candidateCommunityId: string | null) {
+  assert.deepEqual(assignmentsOf(db, userId), [], 'login must not write a historical relation')
+  assert.deepEqual(bindingsOf(db, userId), [], 'login must not confirm a permanent community')
+  const candidates = candidatesOf(db, userId)
+  if (candidateCommunityId === null) {
+    assert.deepEqual(candidates, [], 'no activity context, no suggestion')
+    return
+  }
+  assert.equal(candidates.length, 1, 'at most one suggestion may exist per resident')
+  assert.equal(candidates[0]?.communityId, candidateCommunityId)
+  assert.equal(candidates[0]?.source, 'activity_oauth_candidate')
+}
+
+/** The resident's real confirmation over HTTP, with the session's own CSRF token. */
+async function confirmCommunity(
+  app: App,
+  session: { cookies: string; csrfToken: string },
+  communityId: string,
+) {
+  return app.request('/resident-community/confirm', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      cookie: session.cookies,
+      'x-csrf-token': session.csrfToken,
+      origin: new URL(WEB_ORIGIN).origin,
+    },
+    body: JSON.stringify({ communityId }),
+  })
+}
+
 /**
  * The resident created by the OAuth callback, identified through its WeChat
  * identity. `users` is shared with staff accounts, so counting that table would
@@ -236,7 +310,7 @@ function countResidents(db: AppDatabase): number {
   return residentUserIds(db).length
 }
 
-test('a published activity derives its community server-side and the resident list reads it back', async () => {
+test('a published activity derives its community server-side and only suggests it to the resident', async () => {
   const { app, db, sqlite } = harness()
   try {
     const ownerId = addStaffUser(db)
@@ -263,18 +337,37 @@ test('a published activity derives its community server-side and the resident li
     assert.equal(countResidents(db), 1)
     assert.equal(db.select().from(wechatIdentities).all().length, 1)
     const residentId = onlyResident(db)
-    const assignments = assignmentsOf(db, residentId)
-    assert.equal(assignments.length, 1)
-    assert.equal(assignments[0]?.communityId, communityA)
+
+    // #171: the derived community is a SUGGESTION after login, never a residence.
+    // The retired #123 flow wrote one `resident_community_assignments` row here,
+    // which is precisely the auto-attribution this issue removes.
+    assertNoPermanentCommunity(db, residentId, communityA)
     assert.equal(
-      assignments.some((row) => row.communityId === communityB),
+      candidatesOf(db, residentId).some((row) => row.communityId === communityB),
       false,
-      'the sibling community is never granted',
+      'the sibling community is never suggested',
     )
+
+    // The resident confirms it themself, over real HTTP with the session's CSRF token.
+    // The CSRF token is the double-submit value the callback already put in the
+    // `ll_csrf` cookie, so no extra endpoint call is needed here.
+    const sessionCookies = `${cookiePair(callback, 'll_session')}; ${cookiePair(callback, 'll_csrf')}`
+    const confirmed = await confirmCommunity(
+      app,
+      { cookies: sessionCookies, csrfToken: cookieValue(callback, 'll_csrf') },
+      communityA,
+    )
+    assert.equal(confirmed.status, 200, await confirmed.clone().text())
+    const bindings = bindingsOf(db, residentId)
+    assert.equal(bindings.length, 1, 'exactly one permanent community after confirmation')
+    assert.equal(bindings[0]?.communityId, communityA)
+    assert.equal(bindings[0]?.source, 'resident_h5_confirmed')
+    assert.deepEqual(assignmentsOf(db, residentId), [], 'confirmation writes no historical relation')
+    assert.deepEqual(candidatesOf(db, residentId), [], 'the suggestion is consumed by the confirmation')
     assertNoActivityWrites(db)
 
     // The admin-facing list is the acceptance surface: community A sees the
-    // resident, community B must not.
+    // resident as a CONFIRMED relation, community B must not see them at all.
     const admin = await addAdmin(db)
     const csrfResponse = await app.request('/auth/csrf')
     const csrfCookie = cookiePair(csrfResponse, 'll_csrf')
@@ -296,11 +389,18 @@ test('a published activity derives its community server-side and the resident li
       headers: { cookie: staffCookies },
     })
     assert.equal(listA.status, 200)
-    const bodyA = (await listA.json()) as { items: Array<{ id: string; displayName: string }> }
+    const bodyA = (await listA.json()) as {
+      items: Array<{ id: string; displayName: string; communityRelationSource: string }>
+    }
     assert.deepEqual(
       bodyA.items.map((item) => item.id),
       [residentId],
       'community A resident list contains exactly the logged-in resident',
+    )
+    assert.equal(
+      bodyA.items[0]?.communityRelationSource,
+      'confirmed_binding',
+      'a confirmed community must be labelled as a confirmed binding, not as history',
     )
 
     const listB = await app.request(`/crm/residents?communityId=${communityB}`, {
@@ -346,6 +446,10 @@ test('the public-visibility boundary decides attribution: paused and ended still
     )
     assert.equal(db.select().from(oauthStates).all().length, 0, 'a refused start mints no state')
     assert.equal(db.select().from(residentCommunityAssignments).all().length, 0)
+    assert.equal(db.select().from(residentCommunityBindings).all().length, 0)
+    // A refused start also never leaves a suggestion behind: the candidate is
+    // written by the callback, not by `start`.
+    assert.equal(db.select().from(residentCommunityBindingCandidates).all().length, 0)
   } finally {
     sqlite.close()
   }
@@ -384,10 +488,8 @@ test('activity UUID lookup is case-insensitive and still derives the stored comm
     const callback = await finish(app, started)
     assert.equal(callback.status, 302)
     const residentId = onlyResident(db)
-    assert.deepEqual(
-      assignmentsOf(db, residentId).map((row) => row.communityId),
-      [communityId],
-    )
+    // #171: the derived community reaches the resident as the one suggestion.
+    assertNoPermanentCommunity(db, residentId, communityId)
     assertNoActivityWrites(db)
   } finally {
     sqlite.close()
@@ -415,6 +517,7 @@ test('a client-supplied communityId is refused even when that community really e
     assert.equal(mixed.status, 400)
     assert.equal(db.select().from(oauthStates).all().length, 0)
     assert.equal(db.select().from(residentCommunityAssignments).all().length, 0)
+    assert.equal(db.select().from(residentCommunityBindings).all().length, 0)
   } finally {
     sqlite.close()
   }
@@ -437,13 +540,15 @@ test('a login without activity context creates no community residence at all', a
       0,
       'no activity context, no residence',
     )
+    // #171: with no activity context there is not even a suggestion to confirm.
+    assertNoPermanentCommunity(db, onlyResident(db), null)
     assertNoActivityWrites(db)
   } finally {
     sqlite.close()
   }
 })
 
-test('duplicate logins keep exactly one residence and re-login from another activity adds only that one', async () => {
+test('duplicate logins never accumulate residences and a second community is refused, not merged', async () => {
   const { app, db, sqlite } = harness()
   try {
     const ownerId = addStaffUser(db)
@@ -455,29 +560,55 @@ test('duplicate logins keep exactly one residence and re-login from another acti
     const first = await finish(app, await start(app, `?activityId=${activityA}`))
     assert.equal(first.status, 302)
     const residentId = onlyResident(db)
-    assert.equal(assignmentsOf(db, residentId).length, 1)
+    // #171: the first login leaves ONE suggestion for community A and no residence.
+    assertNoPermanentCommunity(db, residentId, communityA)
 
-    // Same activity again, and a plain retry: still exactly one row for A.
+    // Same activity again, and a plain retry: the resident is unchanged and the
+    // resident's permanent-community story is still "nothing confirmed".
     for (const query of [`?activityId=${activityA}`, `?activityId=${activityA}`]) {
       const again = await finish(app, await start(app, query))
       assert.equal(again.status, 302)
     }
     assert.equal(countResidents(db), 1, 'no duplicate resident')
     assert.equal(db.select().from(wechatIdentities).all().length, 1)
-    const afterRetries = assignmentsOf(db, residentId)
-    assert.equal(afterRetries.length, 1, 'duplicate logins are idempotent')
-    assert.equal(afterRetries[0]?.communityId, communityA)
+    assertNoPermanentCommunity(db, residentId, communityA)
 
-    // A second activity in a different community is a second legitimate
-    // residence, still one row per (user, community).
+    // A login from a SECOND activity of another community may replace the
+    // suggestion (newest trusted hint wins), but it still grants nothing: the
+    // resident has not confirmed anything yet.
     const other = await finish(app, await start(app, `?activityId=${activityB}`))
     assert.equal(other.status, 302)
-    const both = assignmentsOf(db, residentId)
-    assert.equal(both.length, 2)
-    assert.deepEqual(
-      both.map((row) => row.communityId).sort(),
-      [communityA, communityB].sort(),
+    assertNoPermanentCommunity(db, residentId, communityB)
+
+    // The resident confirms community A, then tries to confirm community B. The
+    // old #123 model would have accumulated a second relation; #171 must refuse.
+    const confirmedCookies = `${cookiePair(other, 'll_session')}; ${cookiePair(other, 'll_csrf')}`
+    const confirmA = await confirmCommunity(
+      app,
+      { cookies: confirmedCookies, csrfToken: cookieValue(other, 'll_csrf') },
+      communityA,
     )
+    assert.equal(confirmA.status, 200, await confirmA.clone().text())
+    assert.deepEqual(
+      bindingsOf(db, residentId).map((row) => row.communityId),
+      [communityA],
+    )
+    const confirmB = await confirmCommunity(
+      app,
+      { cookies: confirmedCookies, csrfToken: cookieValue(other, 'll_csrf') },
+      communityB,
+    )
+    assert.equal(confirmB.status, 409, 'a second permanent community is refused')
+    assert.equal(
+      ((await confirmB.json()) as { error: { code: string } }).error.code,
+      'resident_community_conflict',
+    )
+    assert.deepEqual(
+      bindingsOf(db, residentId).map((row) => row.communityId),
+      [communityA],
+      'the first confirmation stays untouched',
+    )
+    assert.deepEqual(assignmentsOf(db, residentId), [], 'no historical relation was ever written')
     assertNoActivityWrites(db)
   } finally {
     sqlite.close()
@@ -501,17 +632,9 @@ test('the callback consumes the stored community even if the activity stops bein
     const callback = await finish(app, started)
     assert.equal(callback.status, 302)
     const residentId = onlyResident(db)
-    const rows = db
-      .select()
-      .from(residentCommunityAssignments)
-      .where(
-        and(
-          eq(residentCommunityAssignments.userId, residentId),
-          eq(residentCommunityAssignments.communityId, communityId),
-        ),
-      )
-      .all()
-    assert.equal(rows.length, 1)
+    // #171: the in-flight attempt still delivers the suggestion it started with,
+    // and still creates no permanent community by itself.
+    assertNoPermanentCommunity(db, residentId, communityId)
     assertNoActivityWrites(db)
   } finally {
     sqlite.close()

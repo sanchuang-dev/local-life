@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link } from 'react-router'
+import { Link, useLocation } from 'react-router'
 import {
   ACTIVITY_ROUTES,
   PUBLIC_COMMUNITY_ROUTE,
@@ -18,6 +18,15 @@ import { CommunityLocationError, createCommunityLocationRequester } from '../lib
 import { communityLocationSheetCopy, type CommunityLocationStatus } from '../lib/communityLocationCopy'
 import type { Gcj02Point } from '../lib/communityCoordinates'
 import { activityDetailHref, SELECTED_COMMUNITY_KEY } from '../lib/communityHomeRoute'
+import {
+  BROWSE_ONLY_NOTICE,
+  LOCATION_NOT_PROOF_NOTICE,
+  residentCommunityConfirmHrefWithContext,
+} from '../lib/residentCommunity'
+import { ResidentCommunityCard } from '../components/community/ResidentCommunityCard'
+import { useResidentAuth } from '../hooks/useResidentAuth'
+import { useResidentCommunity } from '../hooks/useResidentCommunity'
+import { buildResidentLoginHref } from '../components/auth/residentLogin'
 
 type AsyncList<T> = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; items: T[] }
 
@@ -75,6 +84,20 @@ export function CommunityDiscoveryPage() {
   const mountedRef = useRef(true)
   const lastTrigger = useRef<HTMLElement | null>(null)
   const modalRef = useRef<HTMLElement | null>(null)
+
+  // Permanent community is a separate, account-level fact (#171 LL-IDENTITY-001).
+  // `selectedId` above stays a *browsing* choice in localStorage and is never sent
+  // as an identity claim; this read only decides which read-only banner/link the
+  // current community shows.
+  const auth = useResidentAuth()
+  const residentCommunity = useResidentCommunity({
+    sessionKey: auth.session?.user.id ?? null,
+    authLoading: auth.loading,
+  })
+  const residentStatus = residentCommunity.state.status === 'ready' ? residentCommunity.state.data : null
+  // Only an explicit logged-out visitor gets the login-first path; a session
+  // failure must never be presented as "please log in".
+  const needsLogin = !auth.loading && auth.sessionStatus === 'unauthenticated'
 
   useEffect(() => {
     const controller = new AbortController()
@@ -255,6 +278,24 @@ export function CommunityDiscoveryPage() {
   const displayed = showAllManual ? directory : shown
   const locationCopy = communityLocationSheetCopy(locationStatus, locationError)
 
+  // The explicit first-confirmation target for the community currently being
+  // browsed. The query carries the browsing community id only; the API re-reads
+  // that row. `activityId`/`invite` are forwarded so a login round trip keeps the
+  // original invitation context and returns to this confirmation. The search
+  // comes from the router (not `window.location`) so the Pages HashRouter build
+  // resolves the same query as the clean-path build.
+  const routeSearch = useLocation().search
+  const confirmReturnTo = community
+    ? residentCommunityConfirmHrefWithContext(community.id, routeSearch)
+    : null
+  const loginHref = confirmReturnTo
+    ? buildResidentLoginHref(confirmReturnTo, {
+        activityId: new URLSearchParams(routeSearch).get('activityId'),
+        inviteCode: new URLSearchParams(routeSearch).get('invite'),
+        inviteInvalid: new URLSearchParams(routeSearch).get('inviteInvalid') === '1',
+      })
+    : null
+
   return (
     <div className="mx-auto min-h-[70vh] w-full max-w-[480px] bg-[#f5f7f7] text-[#172d28]">
       <header className="flex items-start justify-between gap-3 px-5 pb-2 pt-5 max-[359px]:px-4">
@@ -279,7 +320,7 @@ export function CommunityDiscoveryPage() {
                 <p className="text-[14px] font-semibold text-[#116d63]">当前浏览社区</p>
                 <button type="button" data-switch-community
                   className="min-h-11 text-[14px] font-semibold text-[#116d63]"
-                  onClick={(e) => openSheet(null, e.currentTarget)}>切换社区 <ChevronDown size={15} className="inline" /></button>
+                  onClick={(e) => openSheet(null, e.currentTarget)}>切换浏览社区 <ChevronDown size={15} className="inline" /></button>
               </div>
               <div className="mt-2 flex items-center gap-3">
                 <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e8f6f0] text-[#116d63]">
@@ -289,6 +330,7 @@ export function CommunityDiscoveryPage() {
                   <p className="text-[14px] text-[#5b6c67]">{community.address || '社区服务点地址暂未录入'}</p>
                 </div>
               </div>
+              <p className="mt-2 text-[12px] leading-5 text-[#5b6c67]">{BROWSE_ONLY_NOTICE}</p>
             </>
           ) : (
             <>
@@ -297,12 +339,12 @@ export function CommunityDiscoveryPage() {
               </p>
               <h2 id="home-community-title" className="mt-2 text-[24px] font-bold leading-8">
                 {locationStatus === 'success' && nearby.length === 0 && directory.status === 'ready' ? '附近暂未找到社区' :
-                  locationStatus === 'success' && nearby.length ? '选择你所在的社区' :
+                  locationStatus === 'success' && nearby.length ? '选择要浏览的社区' :
                   locationStatus === 'locating' ? '正在获取你的位置' : locationStatus === 'error' ? '暂时无法获取位置' :
-                  '先选择你所在的社区'}
+                  '先选一个要浏览的社区'}
               </h2>
               <p className="mt-2 text-[15px] leading-7 text-[#5b6c67]">
-                {locationStatus === 'success' ? '我们按照社区服务点的位置推荐附近社区，你可以自行确认。' :
+                {locationStatus === 'success' ? '我们按照社区服务点的位置推荐附近社区，你可以自行选择要浏览的社区。' :
                   '定位后可以查看附近社区，也可以直接搜索社区名称。'}
               </p>
               {locationStatus === 'error' && locationError && (
@@ -340,9 +382,23 @@ export function CommunityDiscoveryPage() {
                   手动选择社区
                 </button>
               </div>
+              <p className="mt-2 text-[12px] leading-5 text-[#5b6c67]">{LOCATION_NOT_PROOF_NOTICE}</p>
             </>
           )}
         </section>
+
+        {community ? (
+          <div className="mt-5">
+            <ResidentCommunityCard
+              state={residentCommunity.state}
+              onReload={residentCommunity.reload}
+              browsingCommunity={{ id: community.id, name: community.name }}
+              confirmHref={residentStatus?.canConfirm ? confirmReturnTo : null}
+              loginHref={needsLogin ? loginHref : null}
+              chooseCommunityHref="/"
+            />
+          </div>
+        ) : null}
 
         <section className="mt-9" aria-labelledby="community-activities-title">
           <h2 id="community-activities-title" className="text-[21px] font-bold">社区活动</h2>
@@ -369,7 +425,7 @@ export function CommunityDiscoveryPage() {
               <CalendarX size={28} className="text-[#138b79]"/>
               <h3 className="mt-2 text-[16px] font-semibold">这个社区暂无已发布活动</h3>
               <p className="mt-1 text-[14px] text-[#5b6c67]">可以切换其他社区看看，或稍后再来。</p>
-              <button type="button" className={`${secondary} mt-4`} onClick={(e)=>openSheet(null,e.currentTarget)}>切换社区</button>
+              <button type="button" className={`${secondary} mt-4`} onClick={(e)=>openSheet(null,e.currentTarget)}>切换浏览社区</button>
             </div>
           ) : (
             <div className="mt-3 grid gap-3">
@@ -402,11 +458,14 @@ export function CommunityDiscoveryPage() {
             className="relative z-10 flex max-h-[90dvh] w-full max-w-[480px] flex-col overflow-hidden rounded-t-[24px] bg-[#f5f7f7] shadow-xl sm:max-h-[85dvh] sm:rounded-[24px]">
             <div className="flex justify-center pt-2 sm:hidden"><span className="h-1.5 w-10 rounded-full bg-[#d6e3de]"/></div>
             <div className="flex items-center justify-between px-5 pb-3 pt-3">
-              <h2 id="community-sheet-heading" className="text-[20px] font-bold">选择社区</h2>
+              <h2 id="community-sheet-heading" className="text-[20px] font-bold">选择要浏览的社区</h2>
               <button type="button" aria-label="关闭社区选择" onClick={closeSheet}
                 className="grid h-11 w-11 place-items-center rounded-full text-[#5b6c67]"><X size={21}/></button>
             </div>
             <div className="px-5">
+              <p className="mb-3 rounded-lg bg-[#f0f5f3] px-3 py-2 text-[12px] leading-5 text-[#5b6c67]">
+                {BROWSE_ONLY_NOTICE}
+              </p>
               <div className="flex items-center justify-between gap-3 rounded-xl bg-[#e8f6f0] p-3">
                 <div className="flex min-w-0 items-start gap-2">
                   <LocateFixed size={19} className="mt-0.5 shrink-0 text-[#138b79]"/>
@@ -467,8 +526,11 @@ export function CommunityDiscoveryPage() {
                   searchResults?.status === 'ready' && searchResults.items.some((item)=>item.id===draftId)
                 )}
                 onClick={confirmSelection}>
-                确认选择社区
+                确认浏览这个社区
               </button>
+              <p className="mt-2 text-center text-[11px] leading-4 text-[#5b6c67]">
+                这里只改变浏览的社区，不会确认或改变你的常驻社区。
+              </p>
             </div>
           </section>
         </div>, document.body)}

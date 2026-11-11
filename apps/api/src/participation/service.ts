@@ -20,6 +20,7 @@ import {
   auditLogs,
   users,
 } from '../db/schema.js'
+import { assertResidentOfConfirmedCommunity } from '../resident-community/service.js'
 
 /**
  * SQLite + Drizzle participation service (Issue #60 / LL-MVP-004).
@@ -92,6 +93,12 @@ export interface ParticipationActivitySnapshot {
   id: string
   status: ActivityStatus
   endsAt: Date
+  /**
+   * The community the activity belongs to (#171 LL-IDENTITY-001). Joining is a
+   * community-scoped write, so the authority is the resident's confirmed binding
+   * for this community — never a historical assignment row.
+   */
+  communityId: string
 }
 
 export interface ParticipationStateInput {
@@ -131,6 +138,7 @@ export function findParticipationActivity(
       id: activities.id,
       status: activities.status,
       endsAt: activities.endsAt,
+      communityId: activities.communityId,
     })
     .from(activities)
     .where(eq(activities.id, activityId))
@@ -146,6 +154,7 @@ function loadParticipationActivity(
       id: activities.id,
       status: activities.status,
       endsAt: activities.endsAt,
+      communityId: activities.communityId,
     })
     .from(activities)
     .where(eq(activities.id, activityId))
@@ -494,6 +503,14 @@ export function confirmParticipation(
         if (existing) {
           return { created: false, state: buildState(tx, activity, input.userId, now) }
         }
+
+        // #171 LL-IDENTITY-001: joining an activity is a community-scoped write.
+        // The retired #123 flow gave every logged-in resident a historical
+        // assignment row, which looked like permission; now only the resident's
+        // own confirmed binding authorizes a join. An existing participation is
+        // returned above unchanged, so history stays readable and re-reads are
+        // never blocked by a missing binding.
+        assertResidentOfConfirmedCommunity(tx, input.userId, activity.communityId)
 
         if (input.inviteCode !== undefined) {
           joinTeamByInvite(tx, activity, input.userId, input.inviteCode, now)

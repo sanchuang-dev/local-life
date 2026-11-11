@@ -13,6 +13,7 @@ const environmentSchema = z
     PORT: z.coerce.number().int().min(1).max(65_535).default(4080),
     DATABASE_PATH: z.string().min(1).default('../../.data/local-life.sqlite'),
     SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(168),
+    DRAW_CREDENTIAL_SECRET: z.string().min(32).optional(),
     COOKIE_DOMAIN: z.string().min(1).optional(),
     // WeChat admin config (#113 LL-SYS-001). The master key encrypts the
     // versioned credentials stored in SQLite; it is never stored in the
@@ -134,6 +135,8 @@ export interface ApiConfig {
   host: string
   port: number
   databasePath: string
+  /** Required to issue live draw credentials; absence disables drawing, not the API. */
+  drawCredentialSecret?: string
   sessionTtlSeconds: number
   cookieDomain?: string
   cookieSecure: boolean
@@ -307,6 +310,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): ApiConfig {
     port: value.PORT,
     databasePath: value.DATABASE_PATH,
     sessionTtlSeconds: value.SESSION_TTL_HOURS * 60 * 60,
+    ...(value.DRAW_CREDENTIAL_SECRET ? { drawCredentialSecret: value.DRAW_CREDENTIAL_SECRET } : {}),
     ...(value.COOKIE_DOMAIN ? { cookieDomain: value.COOKIE_DOMAIN } : {}),
     cookieSecure: value.NODE_ENV === 'production',
     ...(wechatConfigMasterKey ? { wechatConfigMasterKey } : {}),

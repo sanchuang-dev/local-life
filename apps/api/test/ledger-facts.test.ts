@@ -2338,14 +2338,20 @@ test('new 0019 settlement rule migration upgrades real populated 0018 DB without
     const oldDir = join(root, 'old')
     mkdirSync(join(oldDir, 'meta'), { recursive: true })
     for (const name of readdirSync(migrationsFolder)) {
-      if (/^[0-9]{4}_.*\.sql$/u.test(name) && Number(name.slice(0,4)) < 19) {
+      if (/^[0-9]{4}_.*\.sql$/u.test(name) && Number(name.slice(0, 4)) < 19) {
         copyFileSync(join(migrationsFolder, name), join(oldDir, name))
       }
     }
     const current = JSON.parse(readFileSync(join(migrationsFolder, 'meta/_journal.json'), 'utf8')) as {
       entries: Array<{ idx: number; tag: string }>
     }
-    assert.equal(current.entries.find(entry => entry.idx === 19)?.tag, '0019_settlement_rules')
+    // Guard the simulated legacy state: index 19 must still be the settlement-rules
+    // migration, and every later migration (this branch appends one) must be
+    // excluded below. Asserting that 0019 is the *last* entry would make this test
+    // fail as soon as any unrelated migration lands after it, which is not what it
+    // is trying to prove.
+    const rules = current.entries.find((entry) => entry.idx === 19)
+    assert.equal(rules?.tag, '0019_settlement_rules')
     current.entries = current.entries.filter((entry) => entry.idx < 19)
     writeFileSync(join(oldDir, 'meta/_journal.json'), JSON.stringify(current))
     const dbFile = join(root, 'legacy.sqlite')

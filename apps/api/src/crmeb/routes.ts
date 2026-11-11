@@ -22,6 +22,7 @@ import { logEvent } from '../log.js'
 import { CrmebOutapiClient } from './client.js'
 import { CrmebDomainError, toCrmebHttpFailure } from './errors.js'
 import { createCrmebPurchaseLink } from './attribution.js'
+import { ResidentCommunityError } from '../resident-community/service.js'
 import {
   bindCrmebIdentity,
   getResidentCrmebIdentity,
@@ -93,6 +94,12 @@ export function registerCrmebRoutes(
     const failure = toCrmebHttpFailure(error)
     if (failure) return fail(c, failure.status, failure.code, failure.message)
     if (error instanceof CrmebDomainError) {
+      return fail(c, error.status, error.code, error.message)
+    }
+    // #171 LL-IDENTITY-001: an activity-scoped purchase link is now authorized by
+    // the resident's own confirmed binding, so the shared guard's 403/404 keeps
+    // the standard envelope instead of surfacing as a 500.
+    if (error instanceof ResidentCommunityError) {
       return fail(c, error.status, error.code, error.message)
     }
     throw error

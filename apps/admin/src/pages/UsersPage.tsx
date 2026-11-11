@@ -16,6 +16,15 @@ import {
 } from '../shared/components/DataPanel'
 import type { AuthenticatedSession } from '../services/auth'
 import {
+  communityCellEntries,
+  confirmedCommunityAbsenceText,
+  describeBindingSource,
+  describeCommunityRelation,
+  formatBackOfficeDate,
+  residentStateBadge,
+  residentStateUnavailableReason,
+} from '../shared/lib/resident-community-view'
+import {
   getUserDirectoryEntry,
   isUserDirectoryApiError,
   listUserDirectory,
@@ -115,20 +124,66 @@ function identityTags(methods: readonly (keyof typeof IDENTITY_METHOD_LABELS)[])
   return methods.map((method) => <Tag key={method}>{IDENTITY_METHOD_LABELS[method]}</Tag>)
 }
 
-function residentCommunityTags(
-  communities: ReadonlyArray<{ id: string; name: string }>,
-): ReactNode {
-  if (communities.length === 0) return <Tag>未关联社区</Tag>
-  const visible = communities.slice(0, 2)
+/**
+ * The community cell for one directory row (#171 LL-IDENTITY-001).
+ *
+ * A confirmed permanent community and a historical relation are shown with
+ * different words on purpose: the back office may never present a legacy relation
+ * (including the rows the retired #123 login wrote automatically) as a confirmed
+ * permanent community, and it may never present an out-of-scope confirmation as
+ * 「未关联」. There is no rebind/unbind affordance — no admin route exists.
+ */
+function residentCommunityCell(row: UserDirectoryEntry): ReactNode {
+  const relation = describeCommunityRelation(row)
+  const entries = communityCellEntries(row)
+  // The state badge only adds information beyond the relation tag for the two
+  // cases that need a human: a legacy conflict awaiting review, and a real
+  // conflict. `unbound`/`confirmed` would merely repeat the relation tag, and a
+  // missing state (community-scoped operator) must not be guessed.
+  const badge = residentStateBadge(row.residentCommunityState)
+  const extraBadge =
+    badge && (badge.label === '历史待核查' || badge.label === '常驻社区冲突') ? badge : null
   return (
     <Space size={4} wrap>
-      {visible.map((community) => (
-        <Tag key={community.id}>{community.name}</Tag>
-      ))}
-      {communities.length > visible.length ? (
-        <Tag>+{communities.length - visible.length}</Tag>
+      <Tag color={relation.tone === 'neutral' ? undefined : relation.tone} title={relation.detail}>
+        {relation.label}
+      </Tag>
+      {entries.slice(0, 2).map((community) =>
+        community.kind === 'confirmed' ? (
+          <Tag key={community.id} color="green">
+            常驻：{community.name}
+          </Tag>
+        ) : (
+          <Tag key={community.id}>历史归属：{community.name}</Tag>
+        ),
+      )}
+      {entries.length > 2 ? <Tag>+{entries.length - 2}</Tag> : null}
+      {extraBadge ? (
+        <Tag color={extraBadge.tone === 'neutral' ? undefined : extraBadge.tone}>
+          {extraBadge.label}
+        </Tag>
       ) : null}
     </Space>
+  )
+}
+
+/** Read-only resident state for the detail drawer, never guessed when absent. */
+function residentStateNode(state: UserDirectoryEntry['residentCommunityState']): ReactNode {
+  const badge = residentStateBadge(state)
+  if (badge) {
+    return (
+      <Space direction="vertical" size={2}>
+        <Tag color={badge.tone === 'neutral' ? undefined : badge.tone}>{badge.label}</Tag>
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          {badge.hint}
+        </Typography.Text>
+      </Space>
+    )
+  }
+  return (
+    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+      {residentStateUnavailableReason(state)}
+    </Typography.Text>
   )
 }
 
@@ -348,9 +403,8 @@ export function UsersPage({ session }: UsersPageProps) {
       },
       {
         key: 'residentCommunities',
-        title: '社区归属',
-        render: (_value: unknown, row: UserDirectoryEntry) =>
-          residentCommunityTags(row.residentCommunities),
+        title: '常驻社区 / 历史归属',
+        render: (_value: unknown, row: UserDirectoryEntry) => residentCommunityCell(row),
       },
       {
         key: 'createdAt',
@@ -408,7 +462,7 @@ export function UsersPage({ session }: UsersPageProps) {
     <div className="page">
       <PageHeader
         title="用户管理"
-        description="平台全部用户目录（含未关联社区的账号）。社区归属只是用户属性；后台账户的社区授权与居民社区归属是两种不同关系。"
+        description="平台全部用户目录（含未关联社区的账号）。常驻社区由居民本人确认，管理台只读展示，不可代为变更；历史归属只是观察记录，不代表已确认。后台账户的社区授权与居民社区归属是两种不同关系。"
         status={
           <Tag color="blue">
             {session.staff.role === 'admin' ? '管理员：全部用户' : '仅权限范围内用户'}
@@ -573,26 +627,59 @@ export function UsersPage({ session }: UsersPageProps) {
               )}
             </Descriptions>
 
-            <Descriptions size="small" column={1} bordered title="居民社区归属">
-              <Descriptions.Item label="归属社区">
-                {detail.residentCommunities.length === 0 ? (
+            <Descriptions size="small" column={1} bordered title="居民常驻社区（#171 只读）">
+              <Descriptions.Item label="常驻社区">
+                {detail.confirmedCommunity ? (
+                  <Space size={4} wrap>
+                    <Tag color="green">{detail.confirmedCommunity.name}</Tag>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      本人确认时间 {formatBackOfficeDate(detail.confirmedCommunity.confirmedAt)} ·
+                      {' '}{describeBindingSource(detail.confirmedCommunity.source)}
+                    </Typography.Text>
+                  </Space>
+                ) : (
                   <Typography.Text type="secondary">
-                    未关联社区（账号真实存在，可正常登录）
+                    {confirmedCommunityAbsenceText(detail)}
                   </Typography.Text>
+                )}
+              </Descriptions.Item>
+              <Descriptions.Item label="归属判定">
+                <Space direction="vertical" size={2}>
+                  <Tag
+                    color={
+                      describeCommunityRelation(detail).tone === 'neutral'
+                        ? undefined
+                        : describeCommunityRelation(detail).tone
+                    }
+                  >
+                    {describeCommunityRelation(detail).label}
+                  </Tag>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    {describeCommunityRelation(detail).detail}
+                  </Typography.Text>
+                </Space>
+              </Descriptions.Item>
+              <Descriptions.Item label="历史社区归属（只读，不代表已确认）">
+                {detail.residentCommunities.length === 0 ? (
+                  <Typography.Text type="secondary">无历史社区关系记录</Typography.Text>
                 ) : (
                   <Space size={4} wrap>
                     {detail.residentCommunities.map((community) => (
                       <Tag key={community.id}>
-                        {community.name} · {formatDate(community.joinedAt)} 加入
+                        {community.name} · {formatDate(community.joinedAt)} 记录
                       </Tag>
                     ))}
                   </Space>
                 )}
               </Descriptions.Item>
+              <Descriptions.Item label="居民端状态">
+                {residentStateNode(detail.residentCommunityState)}
+              </Descriptions.Item>
             </Descriptions>
 
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              本页只读，不提供编辑身份、社区归属或后台账户的操作。
+              本页只读，不提供编辑身份、社区归属或后台账户的操作；成员的常驻社区只能由本人在居民端首次确认，
+              后台没有改绑、解绑或代确认入口。如需纠正录入错误或处理身份纠纷，请走已审计的合规纠正流程。
             </Typography.Text>
           </Space>
         ) : (

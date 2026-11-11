@@ -3,6 +3,10 @@ import {
   apiErrorSchema,
   createBatchRequestSchema,
   ledgerAnomalyListResponseSchema,
+  ledgerEntrySchema,
+  ledgerEntryOrderEvidenceSchema,
+  ledgerOrderEvidenceSchema,
+  ledgerRecordPaymentRequestSchema,
   ledgerListResponseSchema,
   ledgerOverviewSchema,
   ledgerSyncRequestSchema,
@@ -19,6 +23,9 @@ import {
   type LedgerAnomalySeverity,
   type LedgerAttributionBasis,
   type LedgerAttributionState,
+  type LedgerEntry,
+  type LedgerOrderEvidence,
+  type LedgerRecordPaymentRequest,
   type LedgerEvidenceKind,
   type LedgerFactKind,
   type LedgerListQuery,
@@ -149,6 +156,59 @@ export async function listLedgerAnomalies(signal?: AbortSignal): Promise<LedgerA
     '未解决异常',
   )
   return parsed.items
+}
+
+/** One verified local order and its human-recorded receipt evidence trail. */
+export async function getLedgerOrderEvidence(
+  orderId: string,
+  signal?: AbortSignal,
+): Promise<LedgerOrderEvidence> {
+  const payload = await requestLocalJson(
+    `/api${fillRoute(LEDGER_ROUTES.adminOrderEvidence, ':orderId', orderId)}`,
+    { signal },
+  )
+  return parsePayload(ledgerOrderEvidenceSchema, payload, '订单收款凭据')
+}
+
+/** Reverse lookup for the ledger detail drawer. Legacy receipts return null. */
+export async function getLedgerEntryOrderEvidence(
+  entryId: string,
+  signal?: AbortSignal,
+): Promise<LedgerOrderEvidence | null> {
+  const payload = await requestLocalJson(
+    `/api${fillRoute(LEDGER_ROUTES.adminEntryOrderEvidence, ':entryId', entryId)}`,
+    { signal },
+  )
+  return parsePayload(ledgerEntryOrderEvidenceSchema, payload, '流水关联订单').order
+}
+
+/**
+ * Append a *new* manual receipt and immutable order link in one transaction.
+ * Sending orderId never rewrites a historic manual receipt.
+ */
+export async function recordLedgerOrderReceipt(
+  csrfToken: string,
+  request: LedgerRecordPaymentRequest & { orderId: string },
+): Promise<LedgerEntry> {
+  const payload = await requestLocalJson('/api/admin/ledger/payments', {
+    method: 'POST',
+    csrfToken,
+    body: ledgerRecordPaymentRequestSchema.parse(request),
+  })
+  return parsePayload(ledgerEntrySchema, payload, '订单收款登记结果')
+}
+
+/** Confirmation is an append-only audit, never a reassignment of the order creator. */
+export async function confirmLedgerPaymentAttribution(
+  csrfToken: string,
+  request: { entryId: string; staffId: string; note: string },
+): Promise<LedgerEntry> {
+  const payload = await requestLocalJson('/api/admin/ledger/attributions', {
+    method: 'POST',
+    csrfToken,
+    body: request,
+  })
+  return parsePayload(ledgerEntrySchema, payload, '业绩归属确认结果')
 }
 
 /** Explicitly project real source facts; retries are idempotent by source key. */

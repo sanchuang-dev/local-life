@@ -23,6 +23,7 @@ import { useBackTarget } from '../hooks/useBackTarget'
 import { useResidentAuth } from '../hooks/useResidentAuth'
 import { buildResidentLoginHref } from '../components/auth/residentLogin'
 import { useRewardWallet, type RewardWalletEntry } from '../hooks/useRewardWallet'
+import { DrawWalletSection } from '../components/activity/DrawWalletSection'
 
 const BUCKET_ORDER: RewardBucket[] = ['claimable', 'pending', 'redeemed', 'disputed', 'void']
 
@@ -51,6 +52,7 @@ export function MyRewardsPage() {
   const [bucket, setBucket] = useState<RewardBucket | ''>('')
 
   const entries = wallet.state.status === 'ready' ? wallet.state.entries : []
+  const drawEntries = wallet.state.status === 'ready' ? wallet.state.drawEntries : []
   const visible = bucket === '' ? entries : entries.filter((item) => item.bucket === bucket)
   const counts = BUCKET_ORDER.reduce<Record<string, number>>((accumulator, key) => {
     accumulator[key] = entries.filter((item) => item.bucket === key).length
@@ -126,14 +128,14 @@ export function MyRewardsPage() {
         </section>
       ) : null}
 
-      {wallet.state.status === 'ready' && entries.length === 0 ? (
+      {wallet.state.status === 'ready' && entries.length === 0 && drawEntries.length === 0 ? (
         <section className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
           <p className="flex items-center gap-1.5 text-[14px] font-bold text-slate-800">
             <Gift size={16} className="shrink-0 text-teal-700" aria-hidden="true" />
             暂无活动奖励
           </p>
           <p className="mt-1 text-[12px] leading-5 text-slate-500">
-            你还没有加入任何已发布活动的三人团。参与活动并坐满 3 人、完成 3 次现场核验签到后，可在这里领取奖励凭据。
+            暂时没有团队奖励或抽奖中奖。参与社区活动后，可以在这里查看自己的真实奖励与核销凭据。
           </p>
           <Link
             to="/community/activity"
@@ -150,16 +152,21 @@ export function MyRewardsPage() {
         </p>
       ) : null}
 
+      <DrawWalletSection entries={drawEntries} />
+
       {visible.length > 0 ? (
-        <ul className="mt-3 grid gap-3">
+        <section className="mt-5" aria-labelledby="team-wallet-heading">
+          <h2 id="team-wallet-heading" className="mb-3 text-[17px] font-bold text-slate-900">团队签到奖励</h2>
+          <ul className="grid gap-3">
           {visible.map((entry) => (
             <RewardWalletCard key={entry.activityId} entry={entry} />
           ))}
-        </ul>
+          </ul>
+        </section>
       ) : null}
 
       <p className="mt-5 text-[11px] leading-[1.7] text-slate-400">
-        凭据码仅在领取时完整显示一次，请妥善保存。
+        团队签到奖励凭据请在领取时保存；抽奖中奖的有效核销码可在本页查看，请勿公开分享。
       </p>
     </div>
   )

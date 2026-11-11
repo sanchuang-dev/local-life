@@ -19,6 +19,7 @@ import {
   staffAccounts,
   users,
 } from '../src/db/schema.js'
+import { seedConfirmedCommunity } from './resident-community-fixtures.js'
 
 const migrationsFolder = fileURLToPath(new URL('../db/migrations', import.meta.url))
 const apiRoot = fileURLToPath(new URL('..', import.meta.url))
@@ -215,8 +216,15 @@ interface RaceWorld {
   sqlite: SqliteConnection
   databasePath: string
   activityId: string
+  communityId: string
   operator: { userId: string; staffId: string; role: 'admin' }
   tempDir: string
+  /**
+   * Adds a resident who really confirmed this activity's community (#171).
+   * Joining a team is community-scoped, so a bare `users` row is no longer
+   * allowed to occupy a seat.
+   */
+  addResident: (displayName: string) => string
   cleanup: () => void
 }
 
@@ -258,12 +266,25 @@ function createRaceWorld(plan: ActivityRewardPlan): RaceWorld {
   })
   const published = transitionActivity(db, operator, created.id, 'publish', created.updatedAt)
 
+  const addResident = (displayName: string): string => {
+    const id = randomUUID()
+    db.insert(users)
+      .values({ id, displayName, createdAt: OPEN, updatedAt: OPEN })
+      .run()
+    // Real confirmation through the production service: the resident's own
+    // permanent community for this activity's community (#171).
+    seedConfirmedCommunity(db, id, communityId, OPEN)
+    return id
+  }
+
   return {
     db,
     sqlite,
     databasePath,
     activityId: published.id,
+    communityId,
     operator,
+    addResident,
     tempDir,
     cleanup: () => rmSync(tempDir, { recursive: true, force: true }),
   }
@@ -277,10 +298,7 @@ test('two connections racing for the last prize produce exactly one grant', asyn
     // Two fully qualified teams (3 seats + 3 verified check-ins each).
     const teams: Array<{ leader: string; teamId: string }> = []
     for (const label of ['甲', '乙']) {
-      const leader = randomUUID()
-      world.db.insert(users)
-        .values({ id: leader, displayName: `团长${label}`, createdAt: OPEN, updatedAt: OPEN })
-        .run()
+      const leader = world.addResident(`团长${label}`)
       const started = confirmParticipation(world.db, {
         activityId: world.activityId,
         userId: leader,
@@ -289,10 +307,7 @@ test('two connections racing for the last prize produce exactly one grant', asyn
       const inviteCode = started.state.team!.inviteCode!
       const teamId = started.state.team!.id
       for (const memberLabel of ['二', '三']) {
-        const member = randomUUID()
-        world.db.insert(users)
-          .values({ id: member, displayName: `成员${label}${memberLabel}`, createdAt: OPEN, updatedAt: OPEN })
-          .run()
+        const member = world.addResident(`成员${label}${memberLabel}`)
         confirmParticipation(world.db, {
           activityId: world.activityId,
           userId: member,
@@ -396,10 +411,7 @@ test('two connections racing for the last budget slot produce exactly one grant'
   try {
     const teams: Array<{ leader: string }> = []
     for (const label of ['甲', '乙']) {
-      const leader = randomUUID()
-      world.db.insert(users)
-        .values({ id: leader, displayName: `团长${label}`, createdAt: OPEN, updatedAt: OPEN })
-        .run()
+      const leader = world.addResident(`团长${label}`)
       const started = confirmParticipation(world.db, {
         activityId: world.activityId,
         userId: leader,
@@ -408,10 +420,7 @@ test('two connections racing for the last budget slot produce exactly one grant'
       const inviteCode = started.state.team!.inviteCode!
       const teamId = started.state.team!.id
       for (const memberLabel of ['二', '三']) {
-        const member = randomUUID()
-        world.db.insert(users)
-          .values({ id: member, displayName: `成员${label}${memberLabel}`, createdAt: OPEN, updatedAt: OPEN })
-          .run()
+        const member = world.addResident(`成员${label}${memberLabel}`)
         confirmParticipation(world.db, {
           activityId: world.activityId,
           userId: member,
@@ -496,10 +505,7 @@ test('two connections racing to redeem the same code redeem it exactly once', as
   const world = createRaceWorld(PLAN)
   const children: RaceChild[] = []
   try {
-    const leader = randomUUID()
-    world.db.insert(users)
-      .values({ id: leader, displayName: '团长甲', createdAt: OPEN, updatedAt: OPEN })
-      .run()
+    const leader = world.addResident('团长甲')
     const started = confirmParticipation(world.db, {
       activityId: world.activityId,
       userId: leader,
@@ -508,10 +514,7 @@ test('two connections racing to redeem the same code redeem it exactly once', as
     const inviteCode = started.state.team!.inviteCode!
     const teamId = started.state.team!.id
     for (const memberLabel of ['二', '三']) {
-      const member = randomUUID()
-      world.db.insert(users)
-        .values({ id: member, displayName: `成员${memberLabel}`, createdAt: OPEN, updatedAt: OPEN })
-        .run()
+      const member = world.addResident(`成员${memberLabel}`)
       confirmParticipation(world.db, {
         activityId: world.activityId,
         userId: member,
@@ -591,10 +594,7 @@ test('two connections racing for the same team prize after a rule edit produce e
   const world = createRaceWorld(PLAN)
   const children: RaceChild[] = []
   try {
-    const leader = randomUUID()
-    world.db.insert(users)
-      .values({ id: leader, displayName: '团长甲', createdAt: OPEN, updatedAt: OPEN })
-      .run()
+    const leader = world.addResident('团长甲')
     const started = confirmParticipation(world.db, {
       activityId: world.activityId,
       userId: leader,
@@ -603,10 +603,7 @@ test('two connections racing for the same team prize after a rule edit produce e
     const inviteCode = started.state.team!.inviteCode!
     const teamId = started.state.team!.id
     for (const memberLabel of ['乙', '丙']) {
-      const member = randomUUID()
-      world.db.insert(users)
-        .values({ id: member, displayName: `成员${memberLabel}`, createdAt: OPEN, updatedAt: OPEN })
-        .run()
+      const member = world.addResident(`成员${memberLabel}`)
       confirmParticipation(world.db, {
         activityId: world.activityId,
         userId: member,

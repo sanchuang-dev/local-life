@@ -26,6 +26,7 @@ import {
 import { confirmParticipation } from '../src/participation/service.js'
 import { claimTeamReward, recordCheckin } from '../src/rewards/service.js'
 import { activities, activityRuleVersions, communities, staffAccounts, users } from '../src/db/schema.js'
+import { seedConfirmedCommunity } from './resident-community-fixtures.js'
 
 const migrationsFolder = fileURLToPath(new URL('../db/migrations', import.meta.url))
 
@@ -135,6 +136,9 @@ function seedCheckedInTeam(world: World, activityId: string, tag: string): strin
     .insert(users)
     .values({ id: leader, displayName: `${tag}-leader`, createdAt: OPEN, updatedAt: OPEN })
     .run()
+  // #171: a check-in is a community-scoped write, so every seeded participant
+  // needs a real confirmed binding for this activity's community.
+  seedConfirmedCommunity(world.db, leader, world.communityId, OPEN)
   const joined = confirmParticipation(world.db, { activityId, userId: leader, now: OPEN })
   const inviteCode = joined.state.team?.inviteCode
   assert.ok(inviteCode, 'the leader must receive an invite code')
@@ -146,6 +150,7 @@ function seedCheckedInTeam(world: World, activityId: string, tag: string): strin
       .insert(users)
       .values({ id: member, displayName: `${tag}-${suffix}`, createdAt: OPEN, updatedAt: OPEN })
       .run()
+    seedConfirmedCommunity(world.db, member, world.communityId, OPEN)
     confirmParticipation(world.db, { activityId, userId: member, inviteCode, now: OPEN })
     recordCheckin(world.db, {
       activityId,

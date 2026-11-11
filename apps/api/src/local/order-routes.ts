@@ -25,6 +25,7 @@ import {
   verifyOrder,
 } from './orders.js'
 import { LocalError, type LocalActor } from './shared.js'
+import { ResidentCommunityError } from '../resident-community/service.js'
 
 export interface LocalOrderRouteDeps {
   db: AppDatabase
@@ -66,6 +67,13 @@ export function registerLocalOrderRoutes(
 
   const failWithLocalError = (c: AppContext, error: unknown): Response => {
     if (error instanceof LocalError) {
+      return fail(c, error.status, error.code, error.message)
+    }
+    // #171 LL-IDENTITY-001: registering an order (self-service or staff-recorded)
+    // is a community-scoped write and is refused by the shared confirmed-community
+    // guard when the resident has no binding or belongs to another community. Map
+    // that refusal to the standard envelope instead of a 500 internal_error.
+    if (error instanceof ResidentCommunityError) {
       return fail(c, error.status, error.code, error.message)
     }
     throw error
