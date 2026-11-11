@@ -1578,6 +1578,12 @@ export const settlementParties = sqliteTable('settlement_parties', {
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (table) => [
   index('settlement_parties_role_registry_idx').on(table.role, table.registryRef),
+  uniqueIndex('settlement_parties_verified_version_uq')
+    .on(table.role, table.registryRef, table.verificationRef)
+    .where(sql.raw('verification_ref IS NOT NULL')),
+  uniqueIndex('settlement_parties_pending_version_uq')
+    .on(table.role, table.registryRef)
+    .where(sql.raw('verification_ref IS NULL')),
   check('settlement_parties_role_check',
     sql.raw("role IN ('seller','sanchuang','guangdian')")),
   check('settlement_parties_verification_check',
