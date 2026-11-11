@@ -114,6 +114,17 @@ export const API_ERROR_CODES = {
   wechatConfigDecryptFailed: 'wechat_config_decrypt_failed',
   wechatProfileIdentityMismatch: 'wechat_profile_identity_mismatch',
   wechatJsSdkUnavailable: 'wechat_js_sdk_unavailable',
+  /**
+   * Permanent resident community (#171 LL-IDENTITY-001). Every code is a
+   * refusal, never a silent repair: a second confirmation must not overwrite the
+   * first one, and a historical multi-community account must wait for a human.
+   */
+  residentCommunityNotFound: 'resident_community_not_found',
+  residentCommunityAlreadyConfirmed: 'resident_community_already_confirmed',
+  residentCommunityConflict: 'resident_community_conflict',
+  residentCommunityPendingReview: 'resident_community_pending_review',
+  /** A community-scoped resident write requires a confirmed permanent community. */
+  residentCommunityNotBound: 'resident_community_not_bound',
 } as const
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[keyof typeof API_ERROR_CODES]
@@ -2013,6 +2024,7 @@ export * from './crmeb.js'
 export * from './rewards.js'
 export * from './ledger.js'
 export * from './user-directory.js'
+export * from './resident-community.js'
 export * from './draw.js'
 
 /* -------------------------------------------------------------------------- */
