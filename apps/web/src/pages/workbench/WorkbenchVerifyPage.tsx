@@ -10,6 +10,7 @@ import {
   type RewardRedeemResponse,
 } from '@sanchuang-dev/local-life-contracts'
 import { useStaffSession } from '../../hooks/useStaffSession'
+import { DrawRedeemPanel } from '../../components/activity/DrawRedeemPanel'
 import { useAsyncResource } from '../../hooks/useAsyncResource'
 import { StaffGate, StaffIdentityCard } from '../../components/crm/StaffGate'
 import {
@@ -43,7 +44,7 @@ import {
 } from '../../services/rewards'
 
 /** Priorities for the field flow: redeem a code, then verify on-site check-ins. */
-type VerifyTab = 'redeem' | 'checkins'
+type VerifyTab = 'redeem' | 'checkins' | 'draw'
 
 const MAX_CODE_LENGTH = 10
 
@@ -133,7 +134,7 @@ function VerifyView() {
         </p>
       ) : null}
 
-      <div className="mt-4 grid grid-cols-2 rounded-[14px] bg-slate-100 p-1">
+      <div className="mt-4 grid grid-cols-3 rounded-[14px] bg-slate-100 p-1">
         <button
           type="button"
           aria-pressed={tab === 'redeem'}
@@ -154,6 +155,16 @@ function VerifyView() {
         >
           参与者签到
         </button>
+        <button
+          type="button"
+          aria-pressed={tab === 'draw'}
+          onClick={() => setTab('draw')}
+          className={`min-h-11 rounded-[11px] px-2 text-[12px] font-bold transition ${
+            tab === 'draw' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500'
+          }`}
+        >
+          抽奖核销
+        </button>
       </div>
 
       {tab === 'redeem' ? (
@@ -161,6 +172,12 @@ function VerifyView() {
           onRedeemed={(result) => {
             selectActivity(result.grant.activityId)
           }}
+        />
+      ) : tab === 'draw' ? (
+        <DrawRedeemPanel
+          activities={activityList}
+          activityId={activeActivity?.id ?? null}
+          onSelectActivity={selectActivity}
         />
       ) : (
         <CheckinPanel
