@@ -135,7 +135,7 @@ export function registerSettlementStatementRoutes(
     if(!id) return fail(c,404,API_ERROR_CODES.notFound,'结算单不存在')
     try {
       const result=performanceLinesForActor(db,auth.actor,id)
-      return asCsv(gridPerformanceCsv(result.statement,result.lines),id,'grid-performance')
+      return asCsv(gridPerformanceCsv(result.statement,result.lines,result.performance),id,'grid-performance')
     } catch(e) { return error(c,e) }
   })
 }
