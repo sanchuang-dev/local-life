@@ -897,6 +897,11 @@ export const settlementStatementDetailSchema = z.strictObject({
   statement: settlementStatementSchema,
   lines: z.array(settlementStatementLineSchema),
   events: z.array(settlementStatementEventSchema),
+  /** Post-lock reversal/anomaly is an explicit dispute, never a rewritten line. */
+  postLockDisputes: z.array(z.strictObject({
+    orderId: uuid,
+    reasons: z.array(z.string().min(1)),
+  })),
 })
 export type SettlementStatementDetail = z.infer<typeof settlementStatementDetailSchema>
 export const settlementStatementListQuerySchema = z.strictObject({
