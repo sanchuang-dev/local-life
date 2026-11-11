@@ -73,6 +73,9 @@ export const API_ERROR_CODES = {
    */
   drawPoolNotReady: 'draw_pool_not_ready',
   drawPoolNotConfigured: 'draw_pool_not_configured',
+  drawDailyLimit: 'draw_daily_limit_reached',
+  drawCredentialInvalid: 'draw_credential_invalid',
+  drawAlreadyRedeemed: 'draw_already_redeemed',
   /**
    * Local catalogue (#109): an off-shelf product refuses *new* registrations.
    * Existing orders keep their frozen snapshot and are unaffected.
