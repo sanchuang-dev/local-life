@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, inArray, isNull, like, lt, lte, or, type SQL } from 'drizzle-orm'
+import { and, count, desc, eq, gte, inArray, isNull, like, lt, lte, or, sql, type SQL } from 'drizzle-orm'
 import {
   API_ERROR_CODES,
   type SettlementCandidate,
@@ -57,8 +57,15 @@ export function listSettlementCandidates(
     assertCommunityAccess(db, actor, query.communityId)
     conditions.push(eq(localOrders.communityId, query.communityId))
   }
-  if (query.from) conditions.push(gte(localOrders.createdAt, new Date(shanghaiDayStartMs(query.from))))
-  if (query.to) conditions.push(lt(localOrders.createdAt, new Date(shanghaiDayEndExclusiveMs(query.to))))
+  // A cross-period receipt belongs to its actual received period, not the
+  // date its order was registered. Unpaid orders use the registration period.
+  const periodMoment = sql<number>`coalesce((
+    select e.occurred_at from ledger_payment_order_links l
+    join ledger_entries e on e.id = l.entry_id
+    where l.order_id = ${localOrders.id}
+  ), ${localOrders.createdAt})`
+  if (query.from) conditions.push(gte(periodMoment, shanghaiDayStartMs(query.from)))
+  if (query.to) conditions.push(lt(periodMoment, shanghaiDayEndExclusiveMs(query.to)))
   if (query.keyword) {
     const term = '%' + query.keyword.replace(/[%_]/g, '') + '%'
     conditions.push(or(like(localOrders.id, term), like(localOrders.productName, term))!)
@@ -156,6 +163,8 @@ export function listSettlementCandidates(
       communityId: order.communityId, productId: order.productId,
       productName: order.productName, orderStatus: order.status,
       registeredAmountCents: order.totalCents,
+      periodAt: evidence.payment?.receivedAt ?? iso(order.createdAt),
+      periodSource: evidence.payment ? 'linked_receipt' : 'order_registration',
       sellerStatus: parties.sellerStatus,
       orderParty: parties.snapshot,
       receipt: evidence.payment,
@@ -169,6 +178,7 @@ export function listSettlementCandidates(
   return {
     items, total, page: query.page, pageSize: query.pageSize,
     asOf: iso(now), summaryScope: 'page',
+    periodPolicy: 'linked_receipt_else_order_registration',
     summary: {
       recordedReceiptGrossCents: items.reduce((sum, x) => sum + (x.receipt?.amountCents ?? 0), 0),
       reversedReceiptCents: items.reduce((sum, x) =>
@@ -184,6 +194,7 @@ function emptyPage(query: SettlementCandidateQuery, now: Date): SettlementCandid
   return {
     items: [], total: 0, page: query.page, pageSize: query.pageSize,
     asOf: iso(now), summaryScope: 'page',
+    periodPolicy: 'linked_receipt_else_order_registration',
     summary: { recordedReceiptGrossCents: 0, reversedReceiptCents: 0,
       blockedItems: 0, visibleItems: 0 },
     payableAmountCents: null, settlementAmountStatus: 'pending_rule',
