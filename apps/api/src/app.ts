@@ -73,6 +73,7 @@ import { registerLedgerRoutes } from './ledger/routes.js'
 import { registerSettlementPartyRoutes } from './ledger/settlement-party-routes.js'
 import { registerSettlementCandidateRoutes } from './ledger/settlement-candidate-routes.js'
 import { registerSettlementRuleRoutes } from './ledger/settlement-rule-routes.js'
+import { registerSettlementStatementRoutes } from './ledger/settlement-statement-routes.js'
 import { registerReconciliationRoutes } from './ledger/reconciliation-routes.js'
 import { registerParticipationRoutes } from './participation/routes.js'
 import { registerRewardRoutes } from './rewards/routes.js'
@@ -1700,6 +1701,7 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
   registerSettlementPartyRoutes(app, { db, config, fail, validCsrf, now: options.now })
   registerSettlementCandidateRoutes(app, { db, fail, now: options.now })
   registerSettlementRuleRoutes(app, { db, config, fail, validCsrf, now: options.now })
+  registerSettlementStatementRoutes(app, { db, config, fail, validCsrf, now: options.now })
 
   registerRewardRoutes(app, {
     db,

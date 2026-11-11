@@ -108,6 +108,16 @@ export const LEDGER_ROUTES = {
   adminSettlementCandidates: '/admin/settlement/candidates',
   adminSettlementRules: '/admin/settlement/rules',
   adminSettlementQuote: '/admin/settlement/quotes',
+  adminSettlementStatements: '/admin/settlement/statements',
+  adminSettlementStatement: '/admin/settlement/statements/:statementId',
+  adminSettlementReview: '/admin/settlement/statements/:statementId/review',
+  adminSettlementLock: '/admin/settlement/statements/:statementId/lock',
+  adminSettlementEntityCsv: '/admin/settlement/statements/:statementId/entity.csv',
+  adminSettlementPerformanceCsv: '/admin/settlement/statements/:statementId/performance.csv',
+  /** #187: offline payment proof only; never initiates a transfer. */
+  adminSettlementPayments: '/admin/settlement/statements/:statementId/payments',
+  adminSettlementPaymentVerify: '/admin/settlement/statements/:statementId/payments/:paymentId/verify',
+  adminSettlementPaymentDispute: '/admin/settlement/statements/:statementId/payments/:paymentId/dispute',
 } as const
 
 /**
@@ -769,6 +779,270 @@ export const settlementQuoteResponseSchema = z.strictObject({
   guangdianPartyId: uuid.nullable(),
 })
 export type SettlementQuoteResponse = z.infer<typeof settlementQuoteResponseSchema>
+
+
+/* -------------------------------------------------------------------------- */
+/* #186 · Offline settlement: draft snapshots, independent review, locked CSV  */
+/* -------------------------------------------------------------------------- */
+
+/** No real contract, merchant or payable amount is ever seeded here. */
+export const settlementStatementStatusSchema =
+  z.enum(['draft', 'reviewed', 'locked', 'superseded'])
+export const settlementStatementLineStatusSchema = z.enum(['calculated', 'blocked'])
+
+export const createSettlementStatementRequestSchema = z.strictObject({
+  communityId: uuid,
+  periodFrom: settlementBusinessDateSchema,
+  periodTo: settlementBusinessDateSchema,
+  replaceStatementId: uuid.optional(),
+  expectedRevision: z.number().int().min(1).optional(),
+}).superRefine((v, ctx) => {
+  if (v.periodFrom > v.periodTo) ctx.addIssue({
+    code: 'custom', path: ['periodTo'], message: '结束日期早于起始日期',
+  })
+  if ((v.replaceStatementId === undefined) !== (v.expectedRevision === undefined)) {
+    ctx.addIssue({
+      code: 'custom', path: ['expectedRevision'],
+      message: '替换草案必须同时提交旧草案 ID 与预期版本',
+    })
+  }
+})
+export type CreateSettlementStatementRequest =
+  z.infer<typeof createSettlementStatementRequestSchema>
+export const settlementStatementActionRequestSchema = z.strictObject({
+  expectedRevision: z.number().int().min(1),
+  evidenceRef: z.string().trim().min(2).max(200),
+})
+
+export const settlementStatementSummarySchema = z.strictObject({
+  lineCount: count,
+  calculatedCount: count,
+  blockedCount: count,
+  /** Received gross only for eligible lines; never counted twice as order value. */
+  eligibleGrossCents: cents,
+  feeCents: cents,
+  sellerNetCents: cents,
+  sanchuangNetCents: cents,
+  guangdianNetCents: cents,
+  /** Null when nothing qualifies, NOT a fabricated numeric zero payable. */
+  eligibleDistributionCents: cents.nullable(),
+})
+export type SettlementStatementSummary =
+  z.infer<typeof settlementStatementSummarySchema>
+
+export const settlementPaymentStateSchema = z.enum([
+  'not_recorded',
+  'awaiting_payment',
+  'pending_review',
+  'partial',
+  'verified',
+  'disputed',
+])
+export type SettlementPaymentState = z.infer<typeof settlementPaymentStateSchema>
+
+export const settlementStatementSchema = z.strictObject({
+  id: uuid,
+  communityId: uuid,
+  statementNo: z.string().min(1),
+  periodFrom: settlementBusinessDateSchema,
+  periodTo: settlementBusinessDateSchema,
+  generation: z.number().int().min(1),
+  revision: z.number().int().min(1),
+  status: settlementStatementStatusSchema,
+  snapshotDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  asOf: isoTimestamp,
+  createdByUserId: uuid,
+  createdAt: isoTimestamp,
+  updatedAt: isoTimestamp,
+  reviewedByUserId: uuid.nullable(),
+  reviewEvidenceRef: z.string().nullable(),
+  reviewedAt: isoTimestamp.nullable(),
+  lockedByUserId: uuid.nullable(),
+  lockEvidenceRef: z.string().nullable(),
+  lockedAt: isoTimestamp.nullable(),
+  summary: settlementStatementSummarySchema,
+  /** Derived from immutable #187 evidence. Locking by itself is only awaiting payment. */
+  paymentState: settlementPaymentStateSchema,
+})
+export type SettlementStatement = z.infer<typeof settlementStatementSchema>
+
+export const settlementStatementLineSchema = z.strictObject({
+  id: uuid,
+  statementId: uuid,
+  orderId: uuid,
+  orderDisplayNo: z.string().min(1),
+  communityId: uuid,
+  productId: uuid,
+  productName: z.string().min(1),
+  periodAt: isoTimestamp,
+  registeredAmountCents: cents,
+  receiptEntryId: uuid.nullable(),
+  receiptEvidenceRef: z.string().nullable(),
+  receiptReceivedAt: isoTimestamp.nullable(),
+  receiptAmountCents: cents.nullable(),
+  operatingBatchId: uuid.nullable(),
+  gridStaffId: uuid.nullable(),
+  gridReviewerUserId: uuid.nullable(),
+  mappingId: uuid.nullable(),
+  sellerPartyId: uuid.nullable(),
+  sanchuangPartyId: uuid.nullable(),
+  guangdianPartyId: uuid.nullable(),
+  agreementRef: z.string().nullable(),
+  ruleId: uuid.nullable(),
+  ruleVersion: z.number().int().min(1).nullable(),
+  state: settlementStatementLineStatusSchema,
+  blockingReasons: z.array(z.string().min(1)),
+  allocation: settlementTrialAllocationSchema.nullable(),
+  sourceDigest: z.string().regex(/^[a-f0-9]{64}$/),
+})
+export type SettlementStatementLine = z.infer<typeof settlementStatementLineSchema>
+
+/** Confirmed CRM service performance contains NO money; it is not a payable line. */
+export const settlementStatementPerformanceSchema = z.strictObject({
+  id: uuid,
+  statementId: uuid,
+  entryId: uuid,
+  sourceId: uuid,
+  sourceDisplayNo: z.string().min(1),
+  communityId: uuid,
+  staffId: uuid,
+  confirmedByUserId: uuid.nullable(),
+  confirmedAt: isoTimestamp,
+  evidenceRef: z.string().nullable(),
+  sourceDigest: z.string().regex(/^[a-f0-9]{64}$/),
+})
+export type SettlementStatementPerformance =
+  z.infer<typeof settlementStatementPerformanceSchema>
+
+export const settlementStatementEventSchema = z.strictObject({
+  id: uuid,
+  statementId: uuid,
+  kind: z.enum(['created', 'reviewed', 'locked', 'superseded']),
+  revision: z.number().int().min(1),
+  actorUserId: uuid,
+  evidenceRef: z.string().nullable(),
+  snapshotDigest: z.string().regex(/^[a-f0-9]{64}$/),
+  createdAt: isoTimestamp,
+})
+export const settlementStatementDetailSchema = z.strictObject({
+  statement: settlementStatementSchema,
+  lines: z.array(settlementStatementLineSchema),
+  performance: z.array(settlementStatementPerformanceSchema),
+  events: z.array(settlementStatementEventSchema),
+  /** Post-lock reversal/anomaly is an explicit dispute, never a rewritten line. */
+  postLockDisputes: z.array(z.strictObject({
+    orderId: uuid,
+    reasons: z.array(z.string().min(1)),
+  })),
+})
+export type SettlementStatementDetail = z.infer<typeof settlementStatementDetailSchema>
+
+
+/* -------------------------------------------------------------------------- */
+/* #187 · Offline payment proof: evidence registration + independent review    */
+/* -------------------------------------------------------------------------- */
+
+export const settlementPaymentRecordStateSchema =
+  z.enum(['pending_review', 'verified', 'disputed'])
+export const settlementPaymentBeneficiaryStateSchema =
+  z.enum(['awaiting_payment', 'pending_review', 'partial', 'verified', 'disputed'])
+
+/**
+ * This is a masked external proof REFERENCE, not a bank account or payment
+ * instruction. Long contiguous digit strings are refused to reduce accidental
+ * storage of full account/card numbers.
+ */
+export const maskedSettlementPaymentProofRefSchema = z.string().trim().min(4).max(160)
+  .refine((value) => !/\d{12,}/u.test(value), '不得填写完整银行卡号、账号或其他长数字凭据')
+
+export const recordSettlementPaymentRequestSchema = z.strictObject({
+  beneficiaryPartyId: uuid,
+  amountCents: z.number().int().min(1),
+  paidAt: isoTimestamp,
+  proofRefMasked: maskedSettlementPaymentProofRefSchema,
+  idempotencyKey: uuid,
+})
+export type RecordSettlementPaymentRequest =
+  z.infer<typeof recordSettlementPaymentRequestSchema>
+
+export const settlementPaymentActionRequestSchema = z.strictObject({
+  eventIdempotencyKey: uuid,
+  evidenceRef: z.string().trim().min(2).max(200),
+})
+export type SettlementPaymentActionRequest =
+  z.infer<typeof settlementPaymentActionRequestSchema>
+
+export const settlementPaymentRecordSchema = z.strictObject({
+  id: uuid,
+  statementId: uuid,
+  communityId: uuid,
+  beneficiaryPartyId: uuid,
+  beneficiaryRole: z.enum(['seller', 'sanchuang', 'guangdian']),
+  beneficiaryLegalName: z.string().min(1),
+  beneficiaryRegistryRef: z.string().min(1),
+  beneficiaryVerificationRef: z.string().nullable(),
+  payableCentsSnapshot: z.number().int().min(1),
+  amountCents: z.number().int().min(1),
+  paidAt: isoTimestamp,
+  proofRefMasked: maskedSettlementPaymentProofRefSchema,
+  recorderUserId: uuid,
+  recordedAt: isoTimestamp,
+  state: settlementPaymentRecordStateSchema,
+})
+export type SettlementPaymentRecord = z.infer<typeof settlementPaymentRecordSchema>
+
+export const settlementPaymentEventSchema = z.strictObject({
+  id: uuid,
+  paymentRecordId: uuid,
+  statementId: uuid,
+  kind: z.enum(['recorded', 'verified', 'disputed']),
+  sequence: z.number().int().min(1).max(2),
+  actorUserId: uuid,
+  evidenceRef: z.string().nullable(),
+  state: settlementPaymentRecordStateSchema,
+  createdAt: isoTimestamp,
+})
+export type SettlementPaymentEvent = z.infer<typeof settlementPaymentEventSchema>
+
+export const settlementPaymentBeneficiarySchema = z.strictObject({
+  partyId: uuid,
+  role: z.enum(['seller', 'sanchuang', 'guangdian']),
+  legalName: z.string().min(1),
+  registryRef: z.string().min(1),
+  verificationRef: z.string().nullable(),
+  payableCents: z.number().int().min(1),
+  recordedCents: cents,
+  verifiedCents: cents,
+  state: settlementPaymentBeneficiaryStateSchema,
+})
+export type SettlementPaymentBeneficiary =
+  z.infer<typeof settlementPaymentBeneficiarySchema>
+
+export const settlementPaymentOverviewSchema = z.strictObject({
+  statementId: uuid,
+  communityId: uuid,
+  state: settlementPaymentStateSchema,
+  payableCents: cents,
+  recordedCents: cents,
+  verifiedCents: cents,
+  beneficiaries: z.array(settlementPaymentBeneficiarySchema),
+  records: z.array(settlementPaymentRecordSchema),
+  events: z.array(settlementPaymentEventSchema),
+})
+export type SettlementPaymentOverview = z.infer<typeof settlementPaymentOverviewSchema>
+
+export const settlementStatementListQuerySchema = z.strictObject({
+  communityId: uuid.optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+})
+export const settlementStatementListResponseSchema = z.strictObject({
+  items: z.array(settlementStatementSchema),
+  total: count,
+  page: z.number().int().min(1),
+  pageSize: z.number().int().min(1).max(100),
+})
+export type SettlementStatementListResponse = z.infer<typeof settlementStatementListResponseSchema>
 
 /* -------------------------------------------------------------------------- */
 /* Overview                                                                   */
