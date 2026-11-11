@@ -644,6 +644,7 @@ export function listStaffOrders(
     const pattern = escapedLike(query.keyword)
     conditions.push(
       or(
+        sql`${localOrders.id} LIKE ${pattern} ESCAPE '\\'`,
         sql`${localOrders.productName} LIKE ${pattern} ESCAPE '\\'`,
         sql`${localOrders.note} LIKE ${pattern} ESCAPE '\\'`,
       )!,
