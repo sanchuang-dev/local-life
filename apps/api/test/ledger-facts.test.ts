@@ -1449,6 +1449,39 @@ test('previous unlinked receipt cannot be counted again under a new order/source
   }
 })
 
+test('receipt proof canonicalization collapses whitespace before global dedupe', async () => {
+  const world = await makeWorld()
+  try {
+    const session = await adminSession(world.app)
+    markOrderVerified(world, world.localOrderId)
+    const base = linkedReceiptRequest(world)
+    const first = await api(world.app, 'POST', '/admin/ledger/payments', {
+      session,
+      body: {
+        ...base,
+        orderId: undefined,
+        sourceId: 'space-proof-one',
+        evidenceRef: 'BANK   SPACE　PROOF  166',
+      },
+    })
+    assert.equal(first.status, 201)
+    const replay = await api(world.app, 'POST', '/admin/ledger/payments', {
+      session,
+      body: {
+        ...base,
+        sourceId: 'space-proof-two',
+        evidenceRef: 'BANK SPACE PROOF 166',
+      },
+    })
+    assert.equal(replay.status, 409)
+    assert.equal((world.sqlite.prepare(
+      "SELECT count(*) AS n FROM ledger_entries WHERE fact_kind='payment_received'",
+    ).get() as { n: number }).n, 1)
+  } finally {
+    world.cleanup()
+  }
+})
+
 test('linked receipt attribution refuses an operator instead of treating recorder as promoter', async () => {
   const world = await makeWorld()
   try {
