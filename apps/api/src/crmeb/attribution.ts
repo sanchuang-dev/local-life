@@ -12,11 +12,11 @@ import type { AppDatabase } from '../db/client.js'
 import {
   activities,
   crmebClickAttributions,
-  residentCommunityAssignments,
   staffAccounts,
   staffCommunityAssignments,
 } from '../db/schema.js'
 import { hashToken } from '../auth/security.js'
+import { assertResidentOfConfirmedCommunity } from '../resident-community/service.js'
 import { CrmebDomainError } from './errors.js'
 
 const CRMEB_PRODUCT_DETAIL_PATH = '/pages/goods_details/index'
@@ -63,23 +63,13 @@ export function createCrmebPurchaseLink(
       throw new CrmebDomainError(404, API_ERROR_CODES.notFound, '活动不存在或尚未发布')
     }
 
-    const membership = db
-      .select({ communityId: residentCommunityAssignments.communityId })
-      .from(residentCommunityAssignments)
-      .where(
-        and(
-          eq(residentCommunityAssignments.userId, userId),
-          eq(residentCommunityAssignments.communityId, activity.communityId),
-        ),
-      )
-      .get()
-    if (!membership) {
-      throw new CrmebDomainError(
-        403,
-        API_ERROR_CODES.forbidden,
-        '该活动不属于你所在的社区，无法参与',
-      )
-    }
+    // #171 LL-IDENTITY-001: an activity-scoped purchase link is a
+    // community-scoped claim, so the authority is the resident's own confirmed
+    // binding. The retired #123 login wrote a historical assignment row
+    // automatically, which made "opened an activity link once" look like
+    // membership and let a resident claim a referral in a community they never
+    // confirmed.
+    assertResidentOfConfirmedCommunity(db, userId, activity.communityId)
   }
 
   let claimedStaffId: string | null = null

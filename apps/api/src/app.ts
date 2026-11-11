@@ -78,6 +78,8 @@ import { registerDrawRoutes } from './draw/routes.js'
 import { registerUserDirectoryRoutes } from './users/routes.js'
 // #171 LL-IDENTITY-001: resident permanent-community read + explicit confirmation.
 import { registerResidentCommunityRoutes } from './resident-community/routes.js'
+// A login may leave one server-derived candidate; nothing is ever auto-confirmed.
+import { recordBindingCandidate } from './resident-community/service.js'
 import { registerCrmebRoutes } from './crmeb/routes.js'
 import { registerWechatAdminRoutes } from './wechat/routes.js'
 import { registerWechatJsSdkRoutes } from './wechat/js-sdk.js'
@@ -1156,6 +1158,21 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
         return resolvedUserId
       })
 
+      // A successful login may leave the resident ONE server-derived suggestion:
+      // the community the `activityId` they opened resolved to, stored in the
+      // consumed `oauth_states` row by `/auth/wechat/start`. It is written after
+      // the identity exists and is only ever a suggestion — the resident still has
+      // to confirm it, and a resident who already confirmed gets nothing written
+      // (the service refuses and returns false). The value never comes from the
+      // request: `start` derives it from the activity row.
+      if (stateRecord.communityId) {
+        recordBindingCandidate(db, {
+          userId,
+          communityId: stateRecord.communityId,
+          source: 'activity_oauth_candidate',
+          now,
+        })
+      }
       const created = createSession(db, config, userId, null)
       setSessionCookies(c, config, created.token, created.csrfToken)
       clearOauthCookies(c, config)
