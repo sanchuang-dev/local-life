@@ -2039,7 +2039,7 @@ test('pure settlement calculator conserves every cent and rejects unapproved mon
   }), RangeError)
 })
 
-async function ruleSetup185(world: World) {
+async function ruleSetup185(world: World, receiptCents = 900) {
   const session = await adminSession(world.app)
   const parties: Record<string, string> = {}
   for (const role of ['seller', 'sanchuang', 'guangdian']) {
@@ -2076,6 +2076,7 @@ async function ruleSetup185(world: World) {
     session, body: linkedReceiptRequest(world, {
       evidenceRef: 'TEST-185-RECEIPT-001',
       sourceId: 'TEST-185-RECEIPT-SOURCE-001',
+      amountCents: receiptCents,
     }),
   })
   assert.equal(receipt.status, 201)
@@ -2324,4 +2325,51 @@ test('new 0019 settlement rule migration upgrades real populated 0018 DB without
         .get() as { n: number }).n, 0, 'production migration seeds no fake contract')
     } finally { upgraded.sqlite.close() }
   } finally { rmSync(root, { recursive: true, force: true }) }
+})
+
+
+test('trial quote blocks mismatched receipts and processing fees larger than a party share', async () => {
+  const mismatchWorld = await makeWorld()
+  try {
+    const { session, mappingId } = await ruleSetup185(mismatchWorld, 800)
+    const rule = await api(mismatchWorld.app, 'POST', '/admin/settlement/rules', {
+      session, body: ruleInput185(mappingId),
+    })
+    assert.equal(rule.status, 201)
+    const q = await api(mismatchWorld.app, 'POST', '/admin/settlement/quotes', {
+      session, body: { orderId: mismatchWorld.localOrderId },
+    })
+    assert.equal(q.status, 200)
+    const bad = await q.json() as {
+      status: string; allocation: unknown; blockingReasons: string[];
+      payableAmountCents: null;
+    }
+    assert.equal(bad.status, 'blocked')
+    assert.equal(bad.allocation, null)
+    assert.equal(bad.payableAmountCents, null)
+    assert.ok(bad.blockingReasons.includes('amount_mismatch'))
+  } finally { mismatchWorld.cleanup() }
+
+  const feeWorld = await makeWorld()
+  try {
+    const { session, mappingId } = await ruleSetup185(feeWorld)
+    const feeRule = await api(feeWorld.app, 'POST', '/admin/settlement/rules', {
+      session, body: {
+        ...ruleInput185(mappingId),
+        processorFeeBps: 5000,
+        processorFeeOwner: 'sanchuang',
+      },
+    })
+    assert.equal(feeRule.status, 201)
+    const q = await api(feeWorld.app, 'POST', '/admin/settlement/quotes', {
+      session, body: { orderId: feeWorld.localOrderId },
+    })
+    assert.equal(q.status, 200)
+    const blocked = await q.json() as {
+      status: string; allocation: unknown; blockingReasons: string[];
+    }
+    assert.equal(blocked.status, 'blocked')
+    assert.equal(blocked.allocation, null)
+    assert.deepEqual(blocked.blockingReasons, ['fee_exceeds_owner_share'])
+  } finally { feeWorld.cleanup() }
 })
