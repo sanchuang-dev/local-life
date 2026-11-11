@@ -60,10 +60,24 @@
 | 风险 | 对策 |
 | --- | --- |
 | 旧表被误加唯一约束导致多归属数据丢失 | 本卡**不修改**旧表结构，只在新建表上强制唯一 |
-| 迁移失败需要回滚 | 迁移只创建新对象；回滚 = 删除新表/索引，旧数据行数不变（完整回滚语句写在迁移文件头注释） |
+| 迁移失败需要回滚 | 迁移只创建新对象；回滚 = 删除新表/索引，旧数据行数不变。完整回滚语句见本节末，**不在**迁移文件里（迁移文件由 drizzle-kit 生成，手写注释会在下一次 `generate` 时被覆盖） |
 | 历史订单/报名/奖励/对账依赖旧归属 | 不删除、不重写任何既有事实行；新守卫只约束**新写入** |
 | 多归属账号在上线时被随机归属 | 直接标 `pending_review`，前端显示「历史归属待核查」，写操作按未确认处理 |
 | 线上库被本卡误操作 | 本卡不连接线上库；预检工具强制 `readOnly`，并由测试证明 SQLite 拒绝写 |
+
+回滚语句（执行前先确认迁移确实只创建了这两个对象；**不要**在任何既有表上执行）：
+
+```sql
+DROP INDEX IF EXISTS `resident_community_bindings_community_idx`;
+DROP INDEX IF EXISTS `resident_community_bindings_user_confirmed_uq`;
+DROP INDEX IF EXISTS `resident_community_candidates_community_idx`;
+DROP TABLE IF EXISTS `resident_community_bindings`;
+DROP TABLE IF EXISTS `resident_community_binding_candidates`;
+-- 然后把 drizzle 的 __drizzle_migrations 里最后一条 0020 记录删掉，否则迁移器不会重跑。
+DELETE FROM `__drizzle_migrations` WHERE `hash` = '<0020 的 hash>';
+```
+
+`resident_community_assignments` 与其余所有既有表**完全不在回滚范围内**——它们从来没有被本迁移修改过。
 
 ## 4. 历史归属只读预检方法
 
