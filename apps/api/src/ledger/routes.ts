@@ -1,4 +1,4 @@
-import type { z } from 'zod'
+import { z } from 'zod'
 import type { Hono } from 'hono'
 import {
   API_ERROR_CODES,
@@ -6,6 +6,8 @@ import {
   ledgerAnomalyListResponseSchema,
   ledgerAnomalySchema,
   ledgerEntrySchema,
+  ledgerEntryOrderEvidenceSchema,
+  ledgerOrderEvidenceSchema,
   ledgerListQuerySchema,
   ledgerListResponseSchema,
   ledgerOverviewQuerySchema,
@@ -39,6 +41,7 @@ import {
   reversePaymentRequestSchema,
   syncLedgerFacts,
 } from './service.js'
+import { readEntryOrderPaymentEvidence, readOrderPaymentEvidence } from './payment-evidence.js'
 
 export interface LedgerRouteDeps {
   db: AppDatabase
@@ -293,6 +296,34 @@ export function registerLedgerRoutes(app: Hono<AppBindings>, deps: LedgerRouteDe
     if (!entryId) return fail(c, 404, API_ERROR_CODES.notFound, '流水条目不存在')
     try {
       return respond(c, ledgerEntrySchema, getLedgerEntry(db, actorOf(guard), entryId))
+    } catch (error) {
+      return failWithLedgerError(c, error)
+    }
+  })
+
+  /* -------------------- Local-order receipt evidence (#166) ----------------- */
+
+  app.get(LEDGER_ROUTES.adminOrderEvidence, (c) => {
+    const guard = requireAdminSide(c)
+    if (guard instanceof Response) return guard
+    const orderId = z.string().uuid().safeParse(c.req.param('orderId'))
+    if (!orderId.success) return fail(c, 404, API_ERROR_CODES.notFound, '本地订单不存在')
+    try {
+      return respond(c, ledgerOrderEvidenceSchema,
+        readOrderPaymentEvidence(db, actorOf(guard), orderId.data))
+    } catch (error) {
+      return failWithLedgerError(c, error)
+    }
+  })
+
+  app.get(LEDGER_ROUTES.adminEntryOrderEvidence, (c) => {
+    const guard = requireAdminSide(c)
+    if (guard instanceof Response) return guard
+    const entryId = z.string().uuid().safeParse(c.req.param('entryId'))
+    if (!entryId.success) return fail(c, 404, API_ERROR_CODES.notFound, '流水条目不存在')
+    try {
+      return respond(c, ledgerEntryOrderEvidenceSchema,
+        readEntryOrderPaymentEvidence(db, actorOf(guard), entryId.data))
     } catch (error) {
       return failWithLedgerError(c, error)
     }

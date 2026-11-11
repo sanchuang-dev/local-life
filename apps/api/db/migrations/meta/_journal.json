@@ -106,6 +106,55 @@
       "when": 1794281994709,
       "tag": "0014_superb_eternals",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1794341385715,
+      "tag": "0015_burly_nocturne",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1794358920800,
+      "tag": "0016_organic_bedlam",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1794358952088,
+      "tag": "0017_ledger_payment_evidence",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1794368000000,
+      "tag": "0018_settlement_parties",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1794369000000,
+      "tag": "0019_settlement_rules",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1794370500000,
+      "tag": "0020_settlement_statements",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1794371400000,
+      "tag": "0021_settlement_payment_evidence",
+      "breakpoints": true
     }
   ]
 }

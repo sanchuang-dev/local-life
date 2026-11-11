@@ -1561,6 +1561,369 @@ export const localOrders = sqliteTable(
   ],
 )
 
+
+/* -------------------------------------------------------------------------- */
+/* Independently identified settlement parties and immutable sales provenance */
+/* (#183). Never derive a seller from product community or the order creator. */
+/* -------------------------------------------------------------------------- */
+
+export const settlementParties = sqliteTable('settlement_parties', {
+  id: text('id').primaryKey(),
+  role: text('role').$type<'seller' | 'sanchuang' | 'guangdian'>().notNull(),
+  legalName: text('legal_name').notNull(),
+  registryRef: text('registry_ref').notNull(),
+  verificationRef: text('verification_ref'),
+  verifiedAt: integer('verified_at', { mode: 'timestamp_ms' }),
+  createdByUserId: text('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  index('settlement_parties_role_registry_idx').on(table.role, table.registryRef),
+  uniqueIndex('settlement_parties_verified_version_uq')
+    .on(table.role, table.registryRef, table.verificationRef)
+    .where(sql.raw('verification_ref IS NOT NULL')),
+  uniqueIndex('settlement_parties_pending_version_uq')
+    .on(table.role, table.registryRef)
+    .where(sql.raw('verification_ref IS NULL')),
+  check('settlement_parties_role_check',
+    sql.raw("role IN ('seller','sanchuang','guangdian')")),
+  check('settlement_parties_verification_check',
+    sql.raw("(verified_at IS NULL AND verification_ref IS NULL) OR (verified_at IS NOT NULL AND verification_ref IS NOT NULL)")),
+])
+
+/** Effective-dated, disjoint mapping versions; no retroactive UPDATE/DELETE. */
+export const settlementProductMappings = sqliteTable('settlement_product_mappings', {
+  id: text('id').primaryKey(),
+  communityId: text('community_id').notNull().references(() => communities.id, { onDelete: 'restrict' }),
+  productId: text('product_id').notNull().references(() => localProducts.id, { onDelete: 'restrict' }),
+  sellerPartyId: text('seller_party_id').notNull().references(() => settlementParties.id, { onDelete: 'restrict' }),
+  sanchuangPartyId: text('sanchuang_party_id').references(() => settlementParties.id, { onDelete: 'restrict' }),
+  guangdianPartyId: text('guangdian_party_id').references(() => settlementParties.id, { onDelete: 'restrict' }),
+  agreementRef: text('agreement_ref').notNull(),
+  effectiveFrom: text('effective_from').notNull(),
+  effectiveTo: text('effective_to').notNull(),
+  createdByUserId: text('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  index('settlement_mapping_community_product_idx').on(table.communityId, table.productId),
+  index('settlement_mapping_seller_idx').on(table.sellerPartyId),
+  check('settlement_mapping_period_check', sql.raw('effective_from <= effective_to')),
+])
+
+/**
+ * Human-confirmed order-to-merchant snapshot. Missing row means missing seller;
+ * adding a backdated product mapping never silently changes an existing order.
+ */
+export const settlementOrderPartySnapshots = sqliteTable('settlement_order_party_snapshots', {
+  orderId: text('order_id').primaryKey().references(() => localOrders.id, { onDelete: 'restrict' }),
+  mappingId: text('mapping_id').notNull().references(() => settlementProductMappings.id, { onDelete: 'restrict' }),
+  sellerPartyId: text('seller_party_id').notNull().references(() => settlementParties.id, { onDelete: 'restrict' }),
+  sanchuangPartyId: text('sanchuang_party_id').references(() => settlementParties.id, { onDelete: 'restrict' }),
+  guangdianPartyId: text('guangdian_party_id').references(() => settlementParties.id, { onDelete: 'restrict' }),
+  agreementRef: text('agreement_ref').notNull(),
+  confirmationRef: text('confirmation_ref').notNull(),
+  confirmedByUserId: text('confirmed_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  confirmedAt: integer('confirmed_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  index('settlement_order_party_mapping_idx').on(table.mappingId),
+])
+
+/**
+ * A contract RATE is a separate, immutable, admin-attested version, scoped
+ * to a fully verified #183 sales mapping. No rate is seeded at startup.
+ * Final payable statements belong to #186, not this table.
+ */
+export const settlementRuleVersions = sqliteTable('settlement_rule_versions', {
+  id: text('id').primaryKey(),
+  mappingId: text('mapping_id').notNull()
+    .references(() => settlementProductMappings.id, { onDelete: 'restrict' }),
+  version: integer('version').notNull(),
+  communityId: text('community_id').notNull()
+    .references(() => communities.id, { onDelete: 'restrict' }),
+  productId: text('product_id').notNull()
+    .references(() => localProducts.id, { onDelete: 'restrict' }),
+  sellerPartyId: text('seller_party_id').notNull()
+    .references(() => settlementParties.id, { onDelete: 'restrict' }),
+  sanchuangPartyId: text('sanchuang_party_id').notNull()
+    .references(() => settlementParties.id, { onDelete: 'restrict' }),
+  guangdianPartyId: text('guangdian_party_id').notNull()
+    .references(() => settlementParties.id, { onDelete: 'restrict' }),
+  agreementRef: text('agreement_ref').notNull(),
+  approvalEvidenceRef: text('approval_evidence_ref').notNull(),
+  approvalOn: text('approval_on').notNull(),
+  effectiveFrom: text('effective_from').notNull(),
+  effectiveTo: text('effective_to').notNull(),
+  feeBase: text('fee_base').$type<'actual_received'>().notNull(),
+  processorFeeBps: integer('processor_fee_bps').notNull(),
+  processorFeeOwner: text('processor_fee_owner')
+    .$type<'none' | 'seller' | 'sanchuang' | 'guangdian'>().notNull(),
+  sellerRateBps: integer('seller_rate_bps').notNull(),
+  sanchuangRateBps: integer('sanchuang_rate_bps').notNull(),
+  guangdianRateBps: integer('guangdian_rate_bps').notNull(),
+  roundingRecipient: text('rounding_recipient')
+    .$type<'seller' | 'sanchuang' | 'guangdian'>().notNull(),
+  roundingPolicy: text('rounding_policy').$type<'floor_then_named_remainder'>().notNull(),
+  processorFeeRounding: text('processor_fee_rounding').$type<'floor'>().notNull(),
+  reversalPolicy: text('reversal_policy').$type<'full_reversal_blocks'>().notNull(),
+  partialRefundPolicy: text('partial_refund_policy').$type<'unsupported_blocks'>().notNull(),
+  approvalStatus: text('approval_status').$type<'admin_attested'>().notNull(),
+  approvedByUserId: text('approved_by_user_id').notNull()
+    .references(() => users.id, { onDelete: 'restrict' }),
+  approvedAt: integer('approved_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  uniqueIndex('settlement_rule_mapping_version_uq').on(table.mappingId, table.version),
+  uniqueIndex('settlement_rule_mapping_approval_uq').on(table.mappingId, table.approvalEvidenceRef),
+  index('settlement_rule_period_idx').on(table.communityId, table.productId, table.effectiveFrom, table.effectiveTo),
+  check('settlement_rule_version_positive', sql`${table.version} >= 1`),
+  check('settlement_rule_dates_check', sql`${table.approvalOn} <= ${table.effectiveFrom} AND ${table.effectiveFrom} <= ${table.effectiveTo}`),
+  check('settlement_rule_rate_sum_check', sql`${table.sellerRateBps} >= 0 AND ${table.sanchuangRateBps} >= 0 AND ${table.guangdianRateBps} >= 0 AND ${table.sellerRateBps} + ${table.sanchuangRateBps} + ${table.guangdianRateBps} = 10000`),
+  check('settlement_rule_fee_check', sql`${table.processorFeeBps} BETWEEN 0 AND 10000 AND ((${table.processorFeeBps} = 0 AND ${table.processorFeeOwner} = 'none') OR (${table.processorFeeBps} > 0 AND ${table.processorFeeOwner} IN ('seller','sanchuang','guangdian')))`),
+  check('settlement_rule_terms_check', sql`${table.feeBase} = 'actual_received' AND ${table.roundingRecipient} IN ('seller','sanchuang','guangdian') AND ${table.roundingPolicy} = 'floor_then_named_remainder' AND ${table.processorFeeRounding} = 'floor' AND ${table.reversalPolicy} = 'full_reversal_blocks' AND ${table.partialRefundPolicy} = 'unsupported_blocks' AND ${table.approvalStatus} = 'admin_attested'`),
+])
+
+
+/* #186 Offline SETTLEMENT only. Distinct from #64 operating recon; no payouts. */
+export const settlementStatements = sqliteTable('settlement_statements', {
+  id: text('id').primaryKey(),
+  statementNo: text('statement_no').notNull(),
+  communityId: text('community_id').notNull()
+    .references(() => communities.id, { onDelete: 'restrict' }),
+  periodFrom: text('period_from').notNull(),
+  periodTo: text('period_to').notNull(),
+  generation: integer('generation').notNull(),
+  revision: integer('revision').notNull(),
+  status: text('status').$type<'draft' | 'reviewed' | 'locked' | 'superseded'>().notNull(),
+  snapshotDigest: text('snapshot_digest').notNull(),
+  asOf: integer('as_of', { mode: 'timestamp_ms' }).notNull(),
+  lineCount: integer('line_count').notNull(),
+  calculatedCount: integer('calculated_count').notNull(),
+  blockedCount: integer('blocked_count').notNull(),
+  eligibleGrossCents: integer('eligible_gross_cents').notNull(),
+  feeCents: integer('fee_cents').notNull(),
+  sellerNetCents: integer('seller_net_cents').notNull(),
+  sanchuangNetCents: integer('sanchuang_net_cents').notNull(),
+  guangdianNetCents: integer('guangdian_net_cents').notNull(),
+  createdByUserId: text('created_by_user_id').notNull()
+    .references(() => users.id, { onDelete: 'restrict' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  reviewedByUserId: text('reviewed_by_user_id')
+    .references(() => users.id, { onDelete: 'restrict' }),
+  reviewEvidenceRef: text('review_evidence_ref'),
+  reviewedAt: integer('reviewed_at', { mode: 'timestamp_ms' }),
+  lockedByUserId: text('locked_by_user_id')
+    .references(() => users.id, { onDelete: 'restrict' }),
+  lockEvidenceRef: text('lock_evidence_ref'),
+  lockedAt: integer('locked_at', { mode: 'timestamp_ms' }),
+}, (table) => [
+  uniqueIndex('settlement_statements_no_uq').on(table.statementNo),
+  uniqueIndex('settlement_statements_period_generation_uq')
+    .on(table.communityId, table.periodFrom, table.periodTo, table.generation),
+  uniqueIndex('settlement_statements_active_period_uq')
+    .on(table.communityId, table.periodFrom, table.periodTo)
+    .where(sql`${table.status} <> 'superseded'`),
+  index('settlement_statements_scope_idx').on(table.communityId, table.createdAt),
+  check('settlement_statements_status_check',
+    sql`${table.status} IN ('draft','reviewed','locked','superseded')`),
+  check('settlement_statements_money_check', sql`
+    ${table.lineCount} >= 0 AND ${table.calculatedCount} >= 0
+    AND ${table.blockedCount} >= 0
+    AND ${table.lineCount} = ${table.calculatedCount} + ${table.blockedCount}
+    AND ${table.eligibleGrossCents} >= 0 AND ${table.feeCents} >= 0
+    AND ${table.sellerNetCents} >= 0 AND ${table.sanchuangNetCents} >= 0
+    AND ${table.guangdianNetCents} >= 0
+    AND ${table.eligibleGrossCents} = ${table.feeCents}
+      + ${table.sellerNetCents} + ${table.sanchuangNetCents}
+      + ${table.guangdianNetCents}`),
+  check('settlement_statements_review_check', sql`
+    (${table.status} = 'draft'
+      AND ${table.reviewedByUserId} IS NULL AND ${table.reviewedAt} IS NULL
+      AND ${table.lockedAt} IS NULL)
+    OR (${table.status} IN ('reviewed','locked')
+      AND ${table.reviewedByUserId} IS NOT NULL AND ${table.reviewedAt} IS NOT NULL
+      AND ${table.reviewEvidenceRef} IS NOT NULL
+      AND ${table.reviewedByUserId} <> ${table.createdByUserId}
+      AND ((${table.status} = 'reviewed' AND ${table.lockedAt} IS NULL)
+        OR (${table.status} = 'locked' AND ${table.lockedAt} IS NOT NULL
+          AND ${table.lockedByUserId} IS NOT NULL AND ${table.lockEvidenceRef} IS NOT NULL)))
+    OR (${table.status} = 'superseded' AND ${table.lockedAt} IS NULL)`),
+])
+
+/** One immutable fact row per order in a statement generation. */
+export const settlementStatementLines = sqliteTable('settlement_statement_lines', {
+  id: text('id').primaryKey(),
+  statementId: text('statement_id').notNull()
+    .references(() => settlementStatements.id, { onDelete: 'restrict' }),
+  orderId: text('order_id').notNull()
+    .references(() => localOrders.id, { onDelete: 'restrict' }),
+  orderDisplayNo: text('order_display_no').notNull(),
+  communityId: text('community_id').notNull()
+    .references(() => communities.id, { onDelete: 'restrict' }),
+  productId: text('product_id').notNull()
+    .references(() => localProducts.id, { onDelete: 'restrict' }),
+  productName: text('product_name').notNull(),
+  periodAt: integer('period_at', { mode: 'timestamp_ms' }).notNull(),
+  registeredAmountCents: integer('registered_amount_cents').notNull(),
+  receiptEntryId: text('receipt_entry_id')
+    .references(() => ledgerEntries.id, { onDelete: 'restrict' }),
+  receiptEvidenceRef: text('receipt_evidence_ref'),
+  receiptReceivedAt: integer('receipt_received_at', { mode: 'timestamp_ms' }),
+  receiptAmountCents: integer('receipt_amount_cents'),
+  operatingBatchId: text('operating_batch_id')
+    .references(() => reconciliationBatches.id, { onDelete: 'restrict' }),
+  gridStaffId: text('grid_staff_id')
+    .references(() => staffAccounts.id, { onDelete: 'restrict' }),
+  gridReviewerUserId: text('grid_reviewer_user_id')
+    .references(() => users.id, { onDelete: 'restrict' }),
+  mappingId: text('mapping_id')
+    .references(() => settlementProductMappings.id, { onDelete: 'restrict' }),
+  sellerPartyId: text('seller_party_id')
+    .references(() => settlementParties.id, { onDelete: 'restrict' }),
+  sanchuangPartyId: text('sanchuang_party_id')
+    .references(() => settlementParties.id, { onDelete: 'restrict' }),
+  guangdianPartyId: text('guangdian_party_id')
+    .references(() => settlementParties.id, { onDelete: 'restrict' }),
+  agreementRef: text('agreement_ref'),
+  ruleId: text('rule_id')
+    .references(() => settlementRuleVersions.id, { onDelete: 'restrict' }),
+  ruleVersion: integer('rule_version'),
+  state: text('state').$type<'calculated' | 'blocked'>().notNull(),
+  blockingReasonsJson: text('blocking_reasons_json').notNull(),
+  allocationJson: text('allocation_json'),
+  sourceDigest: text('source_digest').notNull(),
+}, (table) => [
+  uniqueIndex('settlement_statement_line_order_uq').on(table.statementId, table.orderId),
+  index('settlement_statement_line_receipt_idx').on(table.receiptEntryId),
+  index('settlement_statement_line_grid_idx').on(table.statementId, table.gridStaffId),
+  check('settlement_statement_line_state_check', sql`
+    (${table.state} = 'blocked' AND ${table.allocationJson} IS NULL)
+    OR (${table.state} = 'calculated' AND ${table.allocationJson} IS NOT NULL
+      AND ${table.ruleId} IS NOT NULL AND ${table.receiptEntryId} IS NOT NULL)`),
+])
+
+/** Non-monetary Guangdian CRM-confirmed performance; never becomes a payout line. */
+export const settlementStatementPerformance = sqliteTable('settlement_statement_performance', {
+  id: text('id').primaryKey(),
+  statementId: text('statement_id').notNull()
+    .references(() => settlementStatements.id, { onDelete: 'restrict' }),
+  entryId: text('entry_id').notNull()
+    .references(() => ledgerEntries.id, { onDelete: 'restrict' }),
+  sourceId: text('source_id').notNull()
+    .references(() => crmServiceOrders.id, { onDelete: 'restrict' }),
+  sourceDisplayNo: text('source_display_no').notNull(),
+  communityId: text('community_id').notNull()
+    .references(() => communities.id, { onDelete: 'restrict' }),
+  staffId: text('staff_id').notNull()
+    .references(() => staffAccounts.id, { onDelete: 'restrict' }),
+  confirmedByUserId: text('confirmed_by_user_id')
+    .references(() => users.id, { onDelete: 'restrict' }),
+  confirmedAt: integer('confirmed_at', { mode: 'timestamp_ms' }).notNull(),
+  evidenceRef: text('evidence_ref'),
+  sourceDigest: text('source_digest').notNull(),
+}, (table) => [
+  uniqueIndex('settlement_performance_statement_entry_uq').on(table.statementId, table.entryId),
+  index('settlement_performance_worker_idx').on(table.statementId, table.staffId),
+])
+
+/** Independent append-only audit of who created, reviewed, locked or replaced. */
+export const settlementStatementEvents = sqliteTable('settlement_statement_events', {
+  id: text('id').primaryKey(),
+  statementId: text('statement_id').notNull()
+    .references(() => settlementStatements.id, { onDelete: 'restrict' }),
+  kind: text('kind').$type<'created' | 'reviewed' | 'locked' | 'superseded'>().notNull(),
+  revision: integer('revision').notNull(),
+  actorUserId: text('actor_user_id').notNull()
+    .references(() => users.id, { onDelete: 'restrict' }),
+  evidenceRef: text('evidence_ref'),
+  snapshotDigest: text('snapshot_digest').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  uniqueIndex('settlement_statement_event_revision_uq').on(table.statementId, table.revision),
+])
+
+/** A locked receipt can be priced in exactly ONE settlement, even across periods. */
+export const settlementReceiptClaims = sqliteTable('settlement_receipt_claims', {
+  receiptEntryId: text('receipt_entry_id').primaryKey()
+    .references(() => ledgerEntries.id, { onDelete: 'restrict' }),
+  orderId: text('order_id').notNull()
+    .references(() => localOrders.id, { onDelete: 'restrict' }),
+  statementId: text('statement_id').notNull()
+    .references(() => settlementStatements.id, { onDelete: 'restrict' }),
+  lineId: text('line_id').notNull()
+    .references(() => settlementStatementLines.id, { onDelete: 'restrict' }),
+  claimedAt: integer('claimed_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  uniqueIndex('settlement_receipt_claim_order_uq').on(table.orderId),
+  uniqueIndex('settlement_receipt_claim_line_uq').on(table.lineId),
+  index('settlement_receipt_claim_statement_idx').on(table.statementId),
+])
+
+
+
+/* #187 Offline payment proof. Append-only evidence, never a transfer command. */
+export const settlementPaymentRecords = sqliteTable('settlement_payment_records', {
+  id: text('id').primaryKey(),
+  statementId: text('statement_id').notNull()
+    .references(() => settlementStatements.id, { onDelete: 'restrict' }),
+  communityId: text('community_id').notNull()
+    .references(() => communities.id, { onDelete: 'restrict' }),
+  beneficiaryPartyId: text('beneficiary_party_id').notNull()
+    .references(() => settlementParties.id, { onDelete: 'restrict' }),
+  beneficiaryRole: text('beneficiary_role')
+    .$type<'seller' | 'sanchuang' | 'guangdian'>().notNull(),
+  beneficiaryLegalName: text('beneficiary_legal_name').notNull(),
+  beneficiaryRegistryRef: text('beneficiary_registry_ref').notNull(),
+  beneficiaryVerificationRef: text('beneficiary_verification_ref'),
+  payableCentsSnapshot: integer('payable_cents_snapshot').notNull(),
+  amountCents: integer('amount_cents').notNull(),
+  paidAt: integer('paid_at', { mode: 'timestamp_ms' }).notNull(),
+  proofRefMasked: text('proof_ref_masked').notNull(),
+  proofFingerprint: text('proof_fingerprint').notNull(),
+  recorderUserId: text('recorder_user_id').notNull()
+    .references(() => users.id, { onDelete: 'restrict' }),
+  idempotencyKey: text('idempotency_key').notNull(),
+  recordedAt: integer('recorded_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  uniqueIndex('settlement_payment_proof_fingerprint_uq').on(table.proofFingerprint),
+  uniqueIndex('settlement_payment_record_idempotency_uq').on(table.idempotencyKey),
+  index('settlement_payment_statement_idx').on(table.statementId, table.recordedAt),
+  index('settlement_payment_beneficiary_idx')
+    .on(table.statementId, table.beneficiaryPartyId, table.recordedAt),
+  check('settlement_payment_record_role_check',
+    sql`${table.beneficiaryRole} IN ('seller','sanchuang','guangdian')`),
+  check('settlement_payment_record_money_check',
+    sql`${table.payableCentsSnapshot} > 0 AND ${table.amountCents} > 0
+      AND ${table.amountCents} <= ${table.payableCentsSnapshot}`),
+])
+
+export const settlementPaymentEvents = sqliteTable('settlement_payment_events', {
+  id: text('id').primaryKey(),
+  paymentRecordId: text('payment_record_id').notNull()
+    .references(() => settlementPaymentRecords.id, { onDelete: 'restrict' }),
+  statementId: text('statement_id').notNull()
+    .references(() => settlementStatements.id, { onDelete: 'restrict' }),
+  kind: text('kind').$type<'recorded' | 'verified' | 'disputed'>().notNull(),
+  sequence: integer('sequence').notNull(),
+  actorUserId: text('actor_user_id').notNull()
+    .references(() => users.id, { onDelete: 'restrict' }),
+  evidenceRef: text('evidence_ref'),
+  state: text('state').$type<'pending_review' | 'verified' | 'disputed'>().notNull(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  uniqueIndex('settlement_payment_event_sequence_uq').on(table.paymentRecordId, table.sequence),
+  uniqueIndex('settlement_payment_event_idempotency_uq').on(table.idempotencyKey),
+  uniqueIndex('settlement_payment_event_terminal_uq').on(table.paymentRecordId)
+    .where(sql`${table.kind} IN ('verified','disputed')`),
+  index('settlement_payment_event_statement_idx').on(table.statementId, table.createdAt),
+  check('settlement_payment_event_kind_state_check', sql`
+    (${table.kind} = 'recorded' AND ${table.sequence} = 1
+      AND ${table.state} = 'pending_review' AND ${table.evidenceRef} IS NULL)
+    OR (${table.kind} = 'verified' AND ${table.sequence} = 2
+      AND ${table.state} = 'verified' AND ${table.evidenceRef} IS NOT NULL)
+    OR (${table.kind} = 'disputed' AND ${table.sequence} = 2
+      AND ${table.state} = 'disputed' AND ${table.evidenceRef} IS NOT NULL)`),
+])
+
 /**
  * Append-only local-order timeline. `source_type` + `source_id` are the stable
  * consumption contract for downstream work (#64): a consumer must be able to
@@ -1816,6 +2179,31 @@ export const ledgerEntries = sqliteTable(
 )
 
 /**
+ * A receipt can be linked to exactly one locally verified order. Neither the
+ * historical order nor the append-only ledger fact is updated to attach it.
+ * Unlinked legacy receipts remain unlinked (never guessed from amount/time).
+ * Database indexes protect both sides of the 1:1 relationship and a normalized
+ * evidence reference, even under simultaneous admin requests.
+ */
+export const ledgerPaymentOrderLinks = sqliteTable(
+  'ledger_payment_order_links',
+  {
+    orderId: text('order_id')
+      .primaryKey()
+      .references(() => localOrders.id, { onDelete: 'restrict' }),
+    entryId: text('entry_id')
+      .notNull()
+      .references(() => ledgerEntries.id, { onDelete: 'restrict' }),
+    evidenceKey: text('evidence_key').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('ledger_payment_order_links_entry_uq').on(table.entryId),
+    uniqueIndex('ledger_payment_order_links_evidence_uq').on(table.evidenceKey),
+  ],
+)
+
+/**
  * Dedupe key of the ledger: one source fact may enter the ledger at most once
  * per fact kind. `(source_system, source_id, fact_kind)` is UNIQUE, so a
  * duplicate notification, a replayed import or a concurrent consumer can only
@@ -1902,9 +2290,230 @@ export const staffRelations = relations(staffAccounts, ({ one, many }) => ({
 
 
 /**
+ * Real "today's draw" pool (LL-LOT-001, Issue #173).
+ *
+ * Deliberately separate from `activity_prize_stocks`: that ledger belongs to the
+ * team-reward fulfilment (#62) and must not be reused. One row per activity is
+ * the single source of truth for the daily rule (draw limit, no-prize weight,
+ * one-click enablement). It starts disabled; enabling requires a real in-stock
+ * prize and is validated by the service before this row is written.
+ */
+export const activityDrawPools = sqliteTable(
+  'activity_draw_pools',
+  {
+    id: text('id').primaryKey(),
+    activityId: text('activity_id')
+      .notNull()
+      .unique()
+      .references(() => activities.id, { onDelete: 'restrict' }),
+    // Denormalised for scoped reads and enforced against the activity by trigger.
+    communityId: text('community_id')
+      .notNull()
+      .references(() => communities.id, { onDelete: 'restrict' }),
+    enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
+    dailyDrawLimitPerResident: integer('daily_draw_limit_per_resident').notNull(),
+    noPrizeWeight: integer('no_prize_weight').notNull().default(0),
+    createdByUserId: text('created_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    updatedByUserId: text('updated_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    index('activity_draw_pools_community_idx').on(table.communityId),
+    check('activity_draw_pools_enabled_check', sql`${table.enabled} IN (0, 1)`),
+    check(
+      'activity_draw_pools_daily_limit_check',
+      sql`${table.dailyDrawLimitPerResident} >= 1 AND ${table.dailyDrawLimitPerResident} <= 100`,
+    ),
+    check(
+      'activity_draw_pools_no_prize_weight_check',
+      sql`${table.noPrizeWeight} >= 0 AND ${table.noPrizeWeight} <= 1000000`,
+    ),
+  ],
+)
+
+/**
+ * One real product in the activity's draw pool with its own independent stock.
+ *
+ * The name / image / cost columns are a snapshot taken when the prize is
+ * configured. `local_products` may change later; nothing here follows it, and
+ * once `drawn_quantity > 0` a trigger rejects changing the snapshot. Catalogue
+ * shelf state is intentionally NOT part of redeemability: an off-shelf product
+ * can still back an already-configured prize, while the prize's own `enabled`
+ * and remaining stock decide whether it may be drawn.
+ */
+export const activityDrawPrizes = sqliteTable(
+  'activity_draw_prizes',
+  {
+    id: text('id').primaryKey(),
+    poolId: text('pool_id')
+      .notNull()
+      .references(() => activityDrawPools.id, { onDelete: 'restrict' }),
+    activityId: text('activity_id')
+      .notNull()
+      .references(() => activities.id, { onDelete: 'restrict' }),
+    communityId: text('community_id')
+      .notNull()
+      .references(() => communities.id, { onDelete: 'restrict' }),
+    productId: text('product_id')
+      .notNull()
+      .references(() => localProducts.id, { onDelete: 'restrict' }),
+    // Frozen snapshot; never re-read from `local_products` after insert.
+    productName: text('product_name').notNull(),
+    productImageUrl: text('product_image_url'),
+    costCents: integer('cost_cents').notNull(),
+    totalQuantity: integer('total_quantity').notNull(),
+    drawnQuantity: integer('drawn_quantity').notNull().default(0),
+    remainingQuantity: integer('remaining_quantity').notNull(),
+    weight: integer('weight').notNull().default(0),
+    enabled: integer('enabled', { mode: 'boolean' }).notNull().default(false),
+    createdByUserId: text('created_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    updatedByUserId: text('updated_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('activity_draw_prizes_activity_product_uq').on(
+      table.activityId,
+      table.productId,
+    ),
+    index('activity_draw_prizes_pool_idx').on(table.poolId),
+    index('activity_draw_prizes_activity_idx').on(table.activityId),
+    check(
+      'activity_draw_prizes_quantity_check',
+      sql`${table.totalQuantity} > 0
+        AND ${table.totalQuantity} <= 100000
+        AND ${table.drawnQuantity} >= 0
+        AND ${table.remainingQuantity} >= 0
+        AND ${table.drawnQuantity} + ${table.remainingQuantity} = ${table.totalQuantity}`,
+    ),
+    check(
+      'activity_draw_prizes_weight_check',
+      sql`${table.weight} >= 0 AND ${table.weight} <= 1000000`,
+    ),
+    check('activity_draw_prizes_enabled_check', sql`${table.enabled} IN (0, 1)`),
+    check('activity_draw_prizes_cost_check', sql`${table.costCents} >= 0`),
+  ],
+)
+
+/**
+ * Append-only draw configuration audit. Triggers reject UPDATE/DELETE so the
+ * history of a published activity's prize/weight changes cannot be rewritten.
+ */
+export const activityDrawEvents = sqliteTable(
+  'activity_draw_events',
+  {
+    id: text('id').primaryKey(),
+    activityId: text('activity_id')
+      .notNull()
+      .references(() => activities.id, { onDelete: 'restrict' }),
+    prizeId: text('prize_id').references(() => activityDrawPrizes.id, {
+      onDelete: 'restrict',
+    }),
+    kind: text('kind').notNull(),
+    actorUserId: text('actor_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    metadataJson: text('metadata_json'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    index('activity_draw_events_activity_idx').on(table.activityId, table.createdAt),
+    check(
+      'activity_draw_events_kind_check',
+      sql`${table.kind} IN (
+        'draw_pool.created',
+        'draw_pool.updated',
+        'draw_pool.enabled',
+        'draw_pool.disabled',
+        'draw_prize.created',
+        'draw_prize.updated',
+        'draw_prize.enabled',
+        'draw_prize.disabled'
+      )`,
+    ),
+  ],
+)
+
+/**
  * Curated external platform promotions. Never a payable product or a reward.
  * An offer starts disabled; operators must verify the link before publication.
  */
+
+/* Real daily draw attempts, separate from the three-seat group reward. */
+export const activityDrawAttempts = sqliteTable('activity_draw_attempts', {
+  id: text('id').primaryKey(),
+  activityId: text('activity_id').notNull().references(() => activities.id, { onDelete: 'restrict' }),
+  poolId: text('pool_id').notNull().references(() => activityDrawPools.id, { onDelete: 'restrict' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  day: text('day').notNull(),
+  sequence: integer('sequence').notNull(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  outcome: text('outcome').$type<'won' | 'missed'>().notNull(),
+  prizeId: text('prize_id').references(() => activityDrawPrizes.id, { onDelete: 'restrict' }),
+  prizeName: text('prize_name'),
+  prizeImageUrl: text('prize_image_url'),
+  prizeCostCents: integer('prize_cost_cents'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  uniqueIndex('draw_attempts_idempotency_uq').on(table.activityId, table.userId, table.idempotencyKey),
+  uniqueIndex('draw_attempts_daily_slot_uq').on(table.activityId, table.userId, table.day, table.sequence),
+  index('draw_attempts_user_day_idx').on(table.userId, table.activityId, table.day),
+  check('draw_attempts_seq_check', sql`${table.sequence} >= 1`),
+  check('draw_attempts_outcome_check', sql`${table.outcome} IN ('won','missed')`),
+  check('draw_attempts_snapshot_check', sql`(
+    (${table.outcome}='missed' AND ${table.prizeId} IS NULL AND ${table.prizeName} IS NULL AND ${table.prizeCostCents} IS NULL)
+    OR (${table.outcome}='won' AND ${table.prizeId} IS NOT NULL AND ${table.prizeName} IS NOT NULL AND ${table.prizeCostCents} >= 0)
+  )`),
+])
+
+export const activityDrawCredentials = sqliteTable('activity_draw_credentials', {
+  id: text('id').primaryKey(),
+  attemptId: text('attempt_id').notNull().unique().references(() => activityDrawAttempts.id, { onDelete: 'restrict' }),
+  activityId: text('activity_id').notNull().references(() => activities.id, { onDelete: 'restrict' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  prizeId: text('prize_id').notNull().references(() => activityDrawPrizes.id, { onDelete: 'restrict' }),
+  codeHash: text('code_hash').notNull().unique(),
+  codeSuffix: text('code_suffix').notNull(),
+  status: text('status').$type<'active'|'redeemed'|'revoked'>().notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  redeemedAt: integer('redeemed_at', { mode: 'timestamp_ms' }),
+  redeemedByStaffId: text('redeemed_by_staff_id').references(() => staffAccounts.id, { onDelete: 'restrict' }),
+  revokedAt: integer('revoked_at', { mode: 'timestamp_ms' }),
+  revokedByStaffId: text('revoked_by_staff_id').references(() => staffAccounts.id, { onDelete: 'restrict' }),
+  revokeReason: text('revoke_reason'),
+}, (table) => [
+  index('draw_credentials_activity_status_idx').on(table.activityId, table.status),
+  check('draw_credentials_status_check', sql`${table.status} IN ('active','redeemed','revoked')`),
+  check('draw_credentials_stamps_check', sql`(
+    (${table.status}='active' AND ${table.redeemedAt} IS NULL AND ${table.revokedAt} IS NULL)
+    OR (${table.status}='redeemed' AND ${table.redeemedAt} IS NOT NULL AND ${table.redeemedByStaffId} IS NOT NULL AND ${table.revokedAt} IS NULL)
+    OR (${table.status}='revoked' AND ${table.revokedAt} IS NOT NULL AND ${table.revokedByStaffId} IS NOT NULL AND ${table.redeemedAt} IS NULL)
+  )`),
+])
+
+export const activityDrawFulfilmentEvents = sqliteTable('activity_draw_fulfilment_events', {
+  id: text('id').primaryKey(),
+  activityId: text('activity_id').notNull().references(() => activities.id, { onDelete: 'restrict' }),
+  credentialId: text('credential_id').notNull().references(() => activityDrawCredentials.id, { onDelete: 'restrict' }),
+  kind: text('kind').$type<'issued'|'redeemed'|'revoked'|'disputed'>().notNull(),
+  actorUserId: text('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
+  staffId: text('staff_id').references(() => staffAccounts.id, { onDelete: 'set null' }),
+  note: text('note'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  index('draw_fulfilment_events_credential_idx').on(table.credentialId, table.createdAt),
+  check('draw_fulfilment_events_kind_check', sql`${table.kind} IN ('issued','redeemed','revoked','disputed')`),
+])
+
 export const externalOffers = sqliteTable(
   'external_offers',
   {
@@ -1964,11 +2573,27 @@ export const schema = {
   activityPrizeStocks,
   activityRewardEvents,
   activityRewardDisputes,
+  activityDrawPools,
+  activityDrawPrizes,
+  activityDrawEvents,
+  activityDrawAttempts,
+  activityDrawCredentials,
+  activityDrawFulfilmentEvents,
   localProducts,
   localOrders,
+  settlementParties,
+  settlementProductMappings,
+  settlementOrderPartySnapshots,
+  settlementRuleVersions,
+  settlementStatements,
+  settlementStatementLines,
+  settlementStatementPerformance,
+  settlementStatementEvents,
+  settlementReceiptClaims,
   localOrderEvents,
   reconciliationBatches,
   ledgerEntries,
+  ledgerPaymentOrderLinks,
   ledgerEntrySources,
   ledgerAnomalies,
   externalOffers,
