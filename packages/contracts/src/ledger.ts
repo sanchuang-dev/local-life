@@ -100,6 +100,10 @@ export const LEDGER_ROUTES = {
   adminOrderEvidence: '/admin/ledger/orders/:orderId/evidence',
   /** Reverse lookup from a ledger receipt to its linked order. */
   adminEntryOrderEvidence: '/admin/ledger/entries/:entryId/order-evidence',
+  /** Verified real-world settlement parties and explicit merchant mapping. */
+  adminSettlementParties: '/admin/settlement/parties',
+  adminSettlementMappings: '/admin/settlement/mappings',
+  adminSettlementOrderParty: '/admin/settlement/orders/:orderId/party',
 } as const
 
 /**
@@ -479,6 +483,94 @@ export const ledgerRecordPaymentRequestSchema = z.strictObject({
   sourceDisplayNo: z.string().trim().min(1).max(80).optional(),
 })
 export type LedgerRecordPaymentRequest = z.infer<typeof ledgerRecordPaymentRequestSchema>
+
+
+/* -------------------------------------------------------------------------- */
+/* Settlement identity, not financial rules (#183). No inferred beneficiary.  */
+/* -------------------------------------------------------------------------- */
+
+export const settlementPartyRoleSchema = z.enum(['seller', 'sanchuang', 'guangdian'])
+export const createSettlementPartyRequestSchema = z.strictObject({
+  role: settlementPartyRoleSchema,
+  legalName: z.string().trim().min(2).max(160),
+  registryRef: z.string().trim().min(2).max(120),
+  verificationRef: z.string().trim().min(2).max(200).nullable(),
+})
+export type CreateSettlementPartyRequest = z.infer<typeof createSettlementPartyRequestSchema>
+
+export const settlementPartySchema = createSettlementPartyRequestSchema.extend({
+  id: uuid,
+  verifiedAt: isoTimestamp.nullable(),
+  createdByUserId: uuid,
+  createdAt: isoTimestamp,
+})
+export type SettlementParty = z.infer<typeof settlementPartySchema>
+export const settlementPartyListResponseSchema = z.strictObject({
+  items: z.array(settlementPartySchema),
+})
+
+export const settlementPartyListQuerySchema = z.strictObject({
+  communityId: uuid.optional(),
+})
+
+export const createSettlementMappingRequestSchema = z.strictObject({
+  communityId: uuid,
+  productId: uuid,
+  sellerPartyId: uuid,
+  sanchuangPartyId: uuid.nullable(),
+  guangdianPartyId: uuid.nullable(),
+  agreementRef: z.string().trim().min(2).max(200),
+  effectiveFrom: businessDate,
+  effectiveTo: businessDate,
+}).refine((v) => v.effectiveFrom <= v.effectiveTo, {
+  path: ['effectiveTo'],
+  message: '映射终止日不能早于起始日',
+})
+export type CreateSettlementMappingRequest = z.infer<typeof createSettlementMappingRequestSchema>
+export const settlementMappingSchema = z.strictObject({
+  id: uuid,
+  communityId: uuid,
+  productId: uuid,
+  sellerPartyId: uuid,
+  sanchuangPartyId: uuid.nullable(),
+  guangdianPartyId: uuid.nullable(),
+  agreementRef: z.string().min(2),
+  effectiveFrom: businessDate,
+  effectiveTo: businessDate,
+  createdByUserId: uuid,
+  createdAt: isoTimestamp,
+})
+export type SettlementMapping = z.infer<typeof settlementMappingSchema>
+export const settlementMappingListResponseSchema = z.strictObject({
+  items: z.array(settlementMappingSchema),
+})
+export const settlementMappingListQuerySchema = settlementPartyListQuerySchema
+
+/**
+ * Order seller identity is an explicit, append-only human acknowledgement.
+ * No snapshot => missing_seller. Future mapping updates cannot backfill history.
+ */
+export const settlementOrderPartySnapshotSchema = z.strictObject({
+  orderId: uuid,
+  mappingId: uuid,
+  sellerPartyId: uuid,
+  sanchuangPartyId: uuid.nullable(),
+  guangdianPartyId: uuid.nullable(),
+  agreementRef: z.string().min(2),
+  confirmedByUserId: uuid,
+  confirmedAt: isoTimestamp,
+})
+export type SettlementOrderPartySnapshot = z.infer<typeof settlementOrderPartySnapshotSchema>
+export const settlementOrderPartyResponseSchema = z.strictObject({
+  orderId: uuid,
+  sellerStatus: z.enum(['missing_seller', 'incomplete_parties', 'verified']),
+  snapshot: settlementOrderPartySnapshotSchema.nullable(),
+})
+export const confirmSettlementOrderPartyRequestSchema = z.strictObject({
+  mappingId: uuid,
+  /** Human must explicitly attest the source document before snapshot creation. */
+  confirmationRef: z.string().trim().min(2).max(200),
+})
 
 /* -------------------------------------------------------------------------- */
 /* Overview                                                                   */
