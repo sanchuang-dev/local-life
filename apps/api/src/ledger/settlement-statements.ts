@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { and, count, desc, eq, inArray } from 'drizzle-orm'
+import { and, count, desc, eq, gte, inArray, lt } from 'drizzle-orm'
 import {
   API_ERROR_CODES,
   type CreateSettlementStatementRequest,
@@ -8,25 +8,29 @@ import {
   type SettlementStatement,
   type SettlementStatementDetail,
   type SettlementStatementLine,
+  type SettlementStatementPerformance,
   type SettlementStatementListResponse,
   type SettlementStatementSummary,
 } from '@sanchuang-dev/local-life-contracts'
 import type { AppDatabase } from '../db/client.js'
 import {
-  ledgerEntries, settlementReceiptClaims, settlementStatementEvents,
-  settlementStatementLines, settlementStatements,
+  crmServiceOrders, ledgerEntries, settlementReceiptClaims, settlementStatementEvents,
+  settlementStatementLines, settlementStatementPerformance, settlementStatements,
 } from '../db/schema.js'
 import {
   LocalError, assertCommunityAccess, insertAudit, iso, mapConstraintError,
   nextUpdatedAt, scopeCommunityIds, type LocalActor, type LocalTransaction,
 } from '../local/shared.js'
-import { ledgerEntrySelection, toLedgerEntry } from './shared.js'
+import { ledgerEntrySelection, shanghaiDayEndExclusiveMs,
+  shanghaiDayStartMs, toLedgerEntry } from './shared.js'
 import { listSettlementCandidates, readSettlementCandidate } from './settlement-candidates.js'
 import { quoteSettlementOrder } from './settlement-rules.js'
 
 const MAX_SNAPSHOT_LINES = 1_000
 type StatementRow = typeof settlementStatements.$inferSelect
 type LineRow = typeof settlementStatementLines.$inferSelect
+type PerformanceRow = typeof settlementStatementPerformance.$inferSelect
+type PerformanceWrite = Omit<typeof settlementStatementPerformance.$inferInsert, 'id' | 'statementId'>
 type EventRow = typeof settlementStatementEvents.$inferSelect
 type LineWrite = Omit<typeof settlementStatementLines.$inferInsert, 'id' | 'statementId'>
 type SourceLine = { snapshot: LineWrite; orderId: string }
@@ -98,6 +102,11 @@ function lineDto(row: LineRow): SettlementStatementLine {
     sourceDigest: row.sourceDigest,
   }
 }
+function performanceDto(row: PerformanceRow): SettlementStatementPerformance {
+  return {
+    ...row, confirmedAt: iso(row.confirmedAt),
+  }
+}
 function eventDto(row: EventRow): SettlementStatementDetail['events'][number] {
   return {
     ...row, createdAt: iso(row.createdAt),
@@ -116,6 +125,11 @@ function linesFor(db: AppDatabase, id: string): LineRow[] {
     .where(eq(settlementStatementLines.statementId, id))
     .orderBy(settlementStatementLines.orderId).all()
 }
+function performanceFor(db: AppDatabase, id: string): PerformanceRow[] {
+  return db.select().from(settlementStatementPerformance)
+    .where(eq(settlementStatementPerformance.statementId,id))
+    .orderBy(settlementStatementPerformance.entryId).all()
+}
 function eventsFor(db: AppDatabase, id: string): EventRow[] {
   return db.select().from(settlementStatementEvents)
     .where(eq(settlementStatementEvents.statementId, id))
@@ -125,6 +139,46 @@ function checkedSum(values: number[]): number {
   const total = values.reduce((sum, n) => sum + BigInt(n), 0n)
   if (total > BigInt(Number.MAX_SAFE_INTEGER)) conflict('结算金额超出安全整数范围')
   return Number(total)
+}
+
+/**
+ * CRM confirmed service orders have no monetary amount at all (#64).
+ * Snapshot only evidence-backed, explicitly attributed facts as WORKER COUNTS;
+ * no receipt, percentage, transfer, or personal payout can originate here.
+ */
+function captureCrmPerformance(
+  db: AppDatabase, communityId: string, from: string, to: string,
+): PerformanceWrite[] {
+  const rows = db.select(ledgerEntrySelection).from(ledgerEntries).where(and(
+    eq(ledgerEntries.communityId,communityId),
+    eq(ledgerEntries.sourceSystem,'crm_service_order'),
+    eq(ledgerEntries.factKind,'order_verified'),
+    gte(ledgerEntries.occurredAt,new Date(shanghaiDayStartMs(from))),
+    lt(ledgerEntries.occurredAt,new Date(shanghaiDayEndExclusiveMs(to))),
+  )).all()
+  const performance: PerformanceWrite[] = []
+  for(const row of rows) {
+    const entry=toLedgerEntry(row)
+    if (entry.amountCents !== 0 || entry.attribution.state !== 'attributed' ||
+        !entry.attribution.staffId || !entry.verifiedAt) {
+      continue
+    }
+    const crm=db.select({confirmedByUserId:crmServiceOrders.confirmedByUserId})
+      .from(crmServiceOrders).where(eq(crmServiceOrders.id,entry.sourceId)).get()
+    if(!crm) throw new Error('Confirmed CRM ledger fact lost its source order')
+    const partial={
+      entryId:entry.entryId, sourceId:entry.sourceId,
+      sourceDisplayNo:entry.sourceDisplayNo, communityId,
+      staffId:entry.attribution.staffId, confirmedByUserId:crm.confirmedByUserId,
+      confirmedAt:new Date(entry.verifiedAt), evidenceRef:entry.evidence.ref,
+    }
+    performance.push({
+      ...partial, sourceDigest:sha256(JSON.stringify({
+        ...partial,confirmedAt:partial.confirmedAt.toISOString(),
+      })),
+    })
+  }
+  return performance.sort((a,b)=>a.entryId.localeCompare(b.entryId))
 }
 
 /** Same immutable evidence pipeline as #184/#185, never a new money source. */
@@ -168,7 +222,7 @@ function captureOne(db: AppDatabase, actor: LocalActor, candidate: SettlementCan
 function capturePeriod(
   db: AppDatabase, actor: LocalActor,
   communityId: string, periodFrom: string, periodTo: string,
-): { lines: SourceLine[]; totals: Omit<SettlementStatementSummary, 'eligibleDistributionCents'>; digest: string } {
+): { lines: SourceLine[]; performance: PerformanceWrite[]; totals: Omit<SettlementStatementSummary, 'eligibleDistributionCents'>; digest: string } {
   const result: SettlementCandidate[] = []
   let page = 1
   while (true) {
@@ -184,6 +238,7 @@ function capturePeriod(
   }
   const lines = result.map(candidate => captureOne(db, actor, candidate))
     .sort((a,b) => a.orderId.localeCompare(b.orderId))
+  const performance = captureCrmPerformance(db,communityId,periodFrom,periodTo)
   const calculated = lines.filter(l => l.snapshot.state === 'calculated')
   const allocations = calculated.map(l => {
     if (!l.snapshot.allocationJson) throw new Error('Calculated line lost allocation')
@@ -207,8 +262,11 @@ function capturePeriod(
     throw new Error('Settlement gross/net statement does not conserve cents')
   }
   return {
-    lines, totals,
-    digest: sha256(JSON.stringify(lines.map(l => [l.orderId, l.snapshot.sourceDigest]))),
+    lines, performance, totals,
+    digest: sha256(JSON.stringify({
+      lines:lines.map(l=>[l.orderId,l.snapshot.sourceDigest]),
+      performance:performance.map(x=>[x.entryId,x.sourceDigest]),
+    })),
   }
 }
 function appendEvent(
