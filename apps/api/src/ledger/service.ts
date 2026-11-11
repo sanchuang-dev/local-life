@@ -97,7 +97,7 @@ export const recordPaymentRequestSchema = ledgerRecordPaymentRequestSchema
 export type RecordPaymentRequest = z.infer<typeof recordPaymentRequestSchema>
 
 const canonicalPaymentEvidenceKey = (value: string): string =>
-  value.normalize('NFKC').trim().replace(/\\s+/gu, ' ').toLowerCase()
+  value.normalize('NFKC').trim().replace(/\s+/gu, ' ').toLowerCase()
 
 const paymentProofSourceId = (value: string): string =>
   'evidence-proof:' + createHash('sha256')
