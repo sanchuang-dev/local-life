@@ -934,7 +934,7 @@ describe('SettlementCandidatePanel anti-misleading wording', () => {
 
     const payable = screen.getByTestId('candidate-kpi-payable')
     expect(within(payable).getByText('待核定')).toBeTruthy()
-    expect(payable.textContent).toMatch(/不推算分成金额/)
+    expect(payable.textContent).toMatch(/不计算应分金额/)
     // A pending rule must not look like a computed ¥0.00 / 0% / 本期应分.
     expect(payable.textContent).not.toMatch(/¥/)
     expect(payable.textContent).not.toMatch(/\d+(\.\d+)?\s*%/)
@@ -1002,8 +1002,8 @@ describe('SettlementCandidatePanel anti-misleading wording', () => {
     expect(drawer.textContent).not.toContain('¥74.80')
     expect(drawer.textContent).not.toContain('¥0.00')
     expect(drawer.textContent).not.toMatch(/已付款|已结清|已核销|付款成功|已转账/)
-    // 核销 may only appear inside the future-tense disclaimer, never as a status.
-    expect(drawer.textContent).toContain('只有服务端核验通过的付款确认才算核销')
+    // Payment evidence is unknown in this candidate view, not absent or verified.
+    expect(drawer.textContent).toContain('无法据此判断是否登记、复核或完成线下支付')
     // The registered amount is explicitly not money received.
     expect(within(drawer).getByText(/不是收款凭据，也不代表业务已办理或款项已经收到/)).toBeTruthy()
   })
