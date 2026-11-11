@@ -213,7 +213,7 @@ export function ExternalOffersPage() {
         </Space>
       ),
     },
-    { title: '排序', dataIndex: 'sortOrder', width: 72 },
+    { key: 'sortOrder', title: '排序', dataIndex: 'sortOrder', width: 72 },
     {
       title: '截止', key: 'expiresAt', width: 160,
       render: (_, row) => row.expiresAt ? new Date(row.expiresAt).toLocaleString('zh-CN') : '未设置',
