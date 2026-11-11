@@ -596,7 +596,7 @@ export type SettlementCandidateQuery = z.infer<typeof settlementCandidateQuerySc
 export const settlementCandidateReasonSchema = z.enum([
   'order_not_verified', 'missing_receipt', 'receipt_reversed',
   'amount_mismatch', 'attribution_pending',
-  'receipt_unreconciled', 'receipt_late_recorded',
+  'receipt_unreconciled', 'receipt_late_recorded', 'order_fact_unreconciled',
   'unresolved_anomaly', 'missing_seller', 'counterparty_incomplete',
   'missing_approved_rule',
 ])
