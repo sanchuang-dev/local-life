@@ -80,6 +80,7 @@ function detail(overrides: Partial<AdminActivityDetail> = {}): AdminActivityDeta
     publicRules: PUBLIC_RULES,
     currentRuleVersionId: VERSION_ID,
     rewardPlan: null,
+    purchaseRewardPlan: null,
     ...overrides,
   }
 }

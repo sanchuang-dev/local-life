@@ -575,6 +575,13 @@ export const activities = sqliteTable(
      * every activity that has no plan.
      */
     rewardPlanJson: text('reward_plan_json'),
+    /**
+     * Mutable current copy of the consumption team reward rule (LL-PUR-001).
+     * As with `reward_plan_json`, only the frozen rule-version snapshot may be
+     * authoritative after publication; this column lets a draft be edited
+     * before any version exists and is NULL when no purchase plan is set.
+     */
+    purchaseRewardPlanJson: text('purchase_reward_plan_json'),
     currentRuleVersionId: text('current_rule_version_id').references(
       () => activityRuleVersions.id,
       { onDelete: 'set null' },
