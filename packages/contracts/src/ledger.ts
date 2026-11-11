@@ -557,6 +557,7 @@ export const settlementOrderPartySnapshotSchema = z.strictObject({
   sanchuangPartyId: uuid.nullable(),
   guangdianPartyId: uuid.nullable(),
   agreementRef: z.string().min(2),
+  confirmationRef: z.string().min(2),
   confirmedByUserId: uuid,
   confirmedAt: isoTimestamp,
 })
