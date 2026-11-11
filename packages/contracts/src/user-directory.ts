@@ -1,6 +1,10 @@
 import { z } from 'zod'
 
 import { authCommunitySchema, staffRoleSchema } from './identity.js'
+import {
+  residentCommunityBindingSourceSchema,
+  residentCommunityStatusSchema,
+} from './resident-community.js'
 
 /**
  * Administrator user directory (#153 LL-USER-001).
@@ -127,11 +131,66 @@ export type UserDirectoryQuery = z.infer<typeof userDirectoryQuerySchema>
  * Resident community membership. This is the account's own resident community
  * relation (`resident_community_assignments`) — never the staff authorization a
  * back-office account holds over a community.
+ *
+ * Since #171 this list is HISTORICAL by definition: a row means "a relation was
+ * observed", not "the resident confirmed it". The confirmed permanent community
+ * lives in {@link userConfirmedCommunitySchema} and must never be rendered from
+ * here.
  */
 export const userResidentCommunitySchema = authCommunitySchema.extend({
   joinedAt: isoTimestamp,
 })
 export type UserResidentCommunity = z.infer<typeof userResidentCommunitySchema>
+
+/**
+ * The resident's confirmed permanent community (#171 LL-IDENTITY-001), as the
+ * back office may display it. Read-only: no admin route can create, change or
+ * delete one.
+ *
+ * This is the ONLY place `confirmedAt` may appear. `residentCommunities` (the
+ * historical relations) must never be promoted into this shape, and this shape
+ * must never be derived from `resident_community_assignments`.
+ */
+export const userConfirmedCommunitySchema = authCommunitySchema.extend({
+  /** `resident_community_bindings.confirmed_at` — the resident's own confirmation. */
+  confirmedAt: isoTimestamp,
+  /** Who/which approved flow produced the binding; never client-supplied. */
+  source: residentCommunityBindingSourceSchema,
+})
+export type UserConfirmedCommunity = z.infer<typeof userConfirmedCommunitySchema>
+
+/**
+ * Which of the facts (if either) explains the account's community relation, as a
+ * single flag so a reader cannot mistake history for confirmation:
+ *
+ * - `confirmed_binding`   — the resident confirmed a permanent community AND the
+ *                           caller is authorized for that community;
+ * - `historical_assignment` — no visible confirmation; only historical relations
+ *                           exist (NOT confirmed);
+ * - `out_of_scope`        — a confirmation exists but its community is outside
+ *                           the caller's authorization, so it is withheld. This is
+ *                           the honest answer for a community-scoped operator and
+ *                           must never be rendered as 「未绑定」;
+ * - `none`                — neither; the account has no community relation at all.
+ *
+ * An account can carry both facts at once; the flag reports the stronger one
+ * (`confirmed_binding`) and `confirmedCommunity` stays authoritative for display.
+ */
+export const userCommunityRelationSourceSchema = z.enum([
+  'confirmed_binding',
+  'historical_assignment',
+  'out_of_scope',
+  'none',
+])
+export type UserCommunityRelationSource = z.infer<typeof userCommunityRelationSourceSchema>
+
+/**
+ * The #171 state of this account, mirroring the resident's own view so an
+ * operator sees exactly what the resident sees. `unbound` + a legacy candidate is
+ * the 「等待本人确认」 case; `pending_review` is the 「需人工核查」 case.
+ */
+export const userResidentCommunityStateSchema = residentCommunityStatusSchema
+export type UserResidentCommunityState = z.infer<typeof userResidentCommunityStateSchema>
 
 /**
  * Back-office staff account attached to a platform user. `username` is the login
@@ -178,10 +237,57 @@ const userDirectoryBaseSchema = z.strictObject({
   /** Back-office role, or `null` for a pure resident account. */
   staffRole: staffRoleSchema.nullable(),
   /**
-   * Resident community memberships, ordered by community id. An empty array is
-   * the explicit 「未关联社区」 state — it is not an error and not hidden.
+   * HISTORICAL resident community relations (`resident_community_assignments`),
+   * ordered by community id. An empty array is the explicit 「未关联社区」 state —
+   * it is not an error and not hidden.
+   *
+   * Since #171 these rows must NEVER be rendered as 「已确认常驻社区」: they prove a
+   * relation was observed, not that the resident confirmed it. The confirmed
+   * community has its own field, {@link confirmedCommunity}.
    */
   residentCommunities: z.array(userResidentCommunitySchema),
+  /**
+   * The resident's own confirmed permanent community (#171), or `null`.
+   *
+   * This is the ONLY field that may be displayed as 「已确认常驻社区」. It is read
+   * from `resident_community_bindings` and is never derived from
+   * `residentCommunities`; an account that only carries historical relations
+   * therefore reports `null` here.
+   *
+   * `null` when the resident has not confirmed OR when the confirmation points at
+   * a community outside the caller's authorization (then
+   * `communityRelationSource` is `out_of_scope`, never `none`).
+   *
+   * Declared optional so an older fixture/consumer still type-checks, but the API
+   * always emits the key — explicitly `null` when the resident has not confirmed.
+   */
+  confirmedCommunity: userConfirmedCommunitySchema.nullable().optional(),
+  /**
+   * Which fact (if any) explains this account's community relation. It exists so a
+   * reader cannot mistake history for confirmation:
+   *
+   * - `confirmed_binding`     — the resident confirmed a permanent community;
+   * - `historical_assignment` — only historical relations exist, NOT confirmed;
+   * - `out_of_scope`          — a confirmation exists but its community is outside
+   *                             the caller's authorization, so it is withheld;
+   * - `none`                  — neither fact; no community relation at all.
+   *
+   * Always emitted by the API. Never omit-and-guess: an absent flag is not
+   * "no relation".
+   */
+  communityRelationSource: userCommunityRelationSourceSchema.optional(),
+  /**
+   * The resident's own #171 state, mirroring `GET /resident-community/status` so an
+   * operator sees exactly what the resident sees (`unbound` / `confirmed` /
+   * `pending_review` / `conflict`).
+   *
+   * The API computes it only for an unrestricted caller (admin) and emits `null`
+   * for a community-scoped operator: the state is derived from every historical
+   * relation, so deriving it for a scoped caller could disclose relations outside
+   * that caller's authorization. `null` therefore means "not derivable here" and
+   * must never be rendered as `unbound`.
+   */
+  residentCommunityState: userResidentCommunityStateSchema.nullable().optional(),
   /** Platform account registration time. */
   createdAt: isoTimestamp,
 })
@@ -192,6 +298,9 @@ type EntryLike = {
   wechatProfileAuthorizedAt: string | null
   identityMethods: readonly string[]
   staffRole: string | null
+  confirmedCommunity?: { id: string } | null
+  communityRelationSource?: string
+  residentCommunities?: readonly { id: string }[]
 }
 
 function addEntryIssues(value: EntryLike, ctx: z.core.$RefinementCtx): void {
@@ -218,6 +327,44 @@ function addEntryIssues(value: EntryLike, ctx: z.core.$RefinementCtx): void {
       message: 'staff 身份方式与 staffRole 必须同时存在或同时为空',
       path: ['staffRole'],
     })
+  }
+  // #171: history must never be readable as a confirmation, and a confirmation
+  // must never be fabricated from history. These two rules are what make the
+  // 「已确认常驻社区」 vs 「历史未确认归属」 distinction structural rather than
+  // a documentation promise.
+  const confirmed = value.confirmedCommunity ?? null
+  switch (value.communityRelationSource) {
+    case 'confirmed_binding': {
+      if (confirmed === null) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'communityRelationSource=confirmed_binding 必须携带 confirmedCommunity',
+          path: ['confirmedCommunity'],
+        })
+      }
+      break
+    }
+    case 'historical_assignment':
+    case 'out_of_scope':
+    case 'none': {
+      if (confirmed !== null) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `communityRelationSource=${value.communityRelationSource} 不得携带 confirmedCommunity`,
+          path: ['confirmedCommunity'],
+        })
+      }
+      if (value.communityRelationSource === 'none' && (value.residentCommunities?.length ?? 0) > 0) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'communityRelationSource=none 不得同时存在历史归属',
+          path: ['residentCommunities'],
+        })
+      }
+      break
+    }
+    default:
+      break
   }
 }
 
