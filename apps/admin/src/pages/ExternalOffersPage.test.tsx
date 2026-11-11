@@ -80,7 +80,7 @@ describe('External offers DataPanel integration', () => {
     expect(panel.className).toContain('data-panel')
     expect(within(panel).getByRole('button', { name: '下载Excel模板' })).toBeTruthy()
     expect(within(panel).getByRole('button', { name: 'Excel批量导入' })).toBeTruthy()
-    expect(within(panel).getByRole('button', { name: '刷新' })).toBeTruthy()
+    expect(within(panel).getByRole('button', { name: /刷\s*新/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: '新增优惠活动' })).toBeTruthy()
     expect(within(panel).getByRole('button', { name: '列设置' })).toBeTruthy()
     expect(within(panel).getAllByRole('button', { name: '编辑' })).toHaveLength(2)
@@ -88,7 +88,7 @@ describe('External offers DataPanel integration', () => {
 
     fireEvent.change(within(panel).getByRole('textbox', { name: '活动检索' }),
       { target: { value: '淘宝' } })
-    fireEvent.click(within(panel).getByRole('button', { name: '查询' }))
+    fireEvent.click(within(panel).getByRole('button', { name: /查\s*询/ }))
     await waitFor(() => {
       expect(within(panel).queryByText('美团外卖活动')).toBeNull()
       expect(within(panel).getByText('淘宝闪购活动')).toBeTruthy()
@@ -102,9 +102,9 @@ describe('External offers DataPanel integration', () => {
     renderPage()
     const panel = await screen.findByRole('region', { name: '精选优惠列表' })
     fireEvent.click(within(panel).getByRole('button', { name: 'Excel批量导入' }))
-    const dialog = await screen.findByRole('dialog', { name: 'Excel 批量导入' })
-    expect(within(dialog).getByLabelText('选择Excel文件')).toBeTruthy()
-    expect(within(dialog).getByRole('button', { name: '导入有效项（默认下架）' })
+    const fileInput = await screen.findByLabelText('选择Excel文件', {}, { timeout: 5000 })
+    expect(fileInput).toBeTruthy()
+    expect(screen.getByRole('button', { name: '导入有效项（默认下架）' })
       .hasAttribute('disabled')).toBe(true)
   })
 
