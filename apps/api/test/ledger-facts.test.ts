@@ -1523,3 +1523,218 @@ test('long receipt evidence retains the full proof while keeping response displa
     world.cleanup()
   }
 })
+
+
+/* -------------------------------------------------------------------------- */
+/* #183 · real seller identity is never inferred from an order/community      */
+/* -------------------------------------------------------------------------- */
+
+test('settlement party API: no configured seller, explicit verified mapping and immutable order snapshot', async () => {
+  const world = await makeWorld()
+  try {
+    const session = await adminSession(world.app)
+    const prefix = '/admin/settlement'
+    const initial = await api(world.app, 'GET',
+      prefix + '/orders/' + world.localOrderId + '/party', { session })
+    assert.equal(initial.status, 200)
+    assert.equal((await initial.json() as { sellerStatus: string }).sellerStatus, 'missing_seller')
+    const empty = await api(world.app, 'GET', prefix + '/parties', { session })
+    assert.deepEqual((await empty.json() as { items: unknown[] }).items, [])
+
+    const createParty = async (role: string, label: string, proof: string | null) => {
+      const response = await api(world.app, 'POST', prefix + '/parties', {
+        session, body: { role, legalName: label, registryRef: 'TEST-REG-' + role, verificationRef: proof },
+      })
+      assert.equal(response.status, 201)
+      return await response.json() as { id: string; verifiedAt: string | null }
+    }
+    const seller = await createParty('seller', '测试商品销售主体', 'TEST-SELLER-REGISTRY-APPROVAL')
+    const platform = await createParty('sanchuang', '测试三创主体', 'TEST-PLATFORM-APPROVAL')
+    const carrier = await createParty('guangdian', '测试广电主体', 'TEST-CARRIER-APPROVAL')
+    const unverified = await createParty('seller', '尚未核验的商户', null)
+    assert.equal(unverified.verifiedAt, null)
+    const replayParty = await api(world.app, 'POST', prefix + '/parties', {
+      session, body: {
+        role: 'seller', legalName: '重复商户版本',
+        registryRef: 'TEST-REG-seller', verificationRef: 'TEST-SELLER-REGISTRY-APPROVAL',
+      },
+    })
+    assert.equal(replayParty.status, 409, 'same verified identity and evidence cannot produce two versions')
+
+    const productId = (world.sqlite.prepare('SELECT product_id AS id FROM local_orders WHERE id=?')
+      .get(world.localOrderId) as { id: string }).id
+    const body = {
+      communityId: world.communityId, productId,
+      sellerPartyId: seller.id, sanchuangPartyId: platform.id,
+      guangdianPartyId: carrier.id, agreementRef: 'TEST-CONTRACT-2026-001',
+      effectiveFrom: '2026-11-01', effectiveTo: '2026-11-30',
+    }
+    const pendingParty = await api(world.app, 'POST', prefix + '/mappings', {
+      session, body: { ...body, sellerPartyId: unverified.id },
+    })
+    assert.equal(pendingParty.status, 409)
+    const wrongScope = await api(world.app, 'POST', prefix + '/mappings', {
+      session, body: { ...body, communityId: world.otherCommunityId },
+    })
+    assert.equal(wrongScope.status, 403)
+    const mappingResponse = await api(world.app, 'POST', prefix + '/mappings', {
+      session, body,
+    })
+    assert.equal(mappingResponse.status, 201)
+    const mapping = await mappingResponse.json() as { id: string }
+
+    const samePeriod = await api(world.app, 'POST', prefix + '/mappings', {
+      session, body: { ...body, effectiveFrom: '2026-11-15', effectiveTo: '2026-12-15' },
+    })
+    assert.equal(samePeriod.status, 409)
+    const beforeVerified = await api(world.app, 'POST',
+      prefix + '/orders/' + world.localOrderId + '/party', {
+        session, body: { mappingId: mapping.id, confirmationRef: 'TEST-HUMAN-REVIEW-001' },
+      })
+    assert.equal(beforeVerified.status, 409)
+
+    markOrderVerified(world, world.localOrderId)
+    const confirm = await api(world.app, 'POST',
+      prefix + '/orders/' + world.localOrderId + '/party', {
+        session, body: { mappingId: mapping.id, confirmationRef: 'TEST-HUMAN-REVIEW-001' },
+      })
+    assert.equal(confirm.status, 201)
+    const data = await confirm.json() as { sellerPartyId: string; mappingId: string; confirmationRef: string }
+    assert.equal(data.sellerPartyId, seller.id)
+    assert.equal(data.mappingId, mapping.id)
+    assert.equal(data.confirmationRef, 'TEST-HUMAN-REVIEW-001')
+
+    const saved = await api(world.app, 'GET',
+      prefix + '/orders/' + world.localOrderId + '/party', { session })
+    assert.equal(saved.status, 200)
+    assert.equal((await saved.json() as { sellerStatus: string }).sellerStatus, 'verified')
+    const repeated = await api(world.app, 'POST',
+      prefix + '/orders/' + world.localOrderId + '/party', {
+        session, body: { mappingId: mapping.id, confirmationRef: 'TEST-REPLAY' },
+      })
+    assert.equal(repeated.status, 409)
+    assert.throws(() => world.sqlite.prepare(
+      'UPDATE settlement_order_party_snapshots SET agreement_ref=? WHERE order_id=?',
+    ).run('hijack', world.localOrderId), /immutable/)
+    assert.equal((world.sqlite.prepare(
+      "SELECT count(*) AS n FROM audit_logs WHERE event LIKE 'settlement.%'",
+    ).get() as { n: number }).n, 6)
+
+    const nextPeriod = await api(world.app, 'POST', prefix + '/mappings', {
+      session, body: { ...body, effectiveFrom: '2026-12-01', effectiveTo: '2026-12-31' },
+    })
+    assert.equal(nextPeriod.status, 201)
+    const historic = await api(world.app, 'GET',
+      prefix + '/orders/' + world.localOrderId + '/party', { session })
+    assert.equal((await historic.json() as { snapshot: { mappingId: string } }).snapshot.mappingId,
+      mapping.id, 'later product mapping must never change historic order identity')
+  } finally {
+    world.cleanup()
+  }
+})
+
+test('settlement party routes enforce admin writes, CSRF+Origin, grid rejection and scoped reads', async () => {
+  const world = await makeWorld()
+  try {
+    const session = await adminSession(world.app)
+    const grid = await gridSession(world.app)
+    assert.equal((await api(world.app, 'GET', '/admin/settlement/parties', {
+      session: grid,
+    })).status, 403)
+    assert.equal((await api(world.app, 'POST', '/admin/settlement/parties', {
+      session: grid, body: {
+        role: 'seller', legalName: '伪商户', registryRef: 'FAKE', verificationRef: 'FAKE',
+      },
+    })).status, 403)
+    const withoutCsrf = await world.app.request('/admin/settlement/parties', {
+      method: 'POST',
+      headers: {
+        cookie: session.cookies, origin: ADMIN_ORIGIN, 'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        role: 'seller', legalName: '没有防伪令牌', registryRef: 'FAKE',
+        verificationRef: 'FAKE',
+      }),
+    })
+    assert.equal(withoutCsrf.status, 403)
+    const hostileOrigin = await world.app.request('/admin/settlement/parties', {
+      method: 'POST',
+      headers: {
+        cookie: session.cookies,
+        origin: 'https://evil.example',
+        'x-csrf-token': session.csrfToken,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        role: 'seller', legalName: '跨域伪主体', registryRef: 'FAKE',
+        verificationRef: 'FAKE',
+      }),
+    })
+    assert.equal(hostileOrigin.status, 403)
+    const absentOrder = await api(world.app, 'GET',
+      '/admin/settlement/orders/' + randomUUID() + '/party', { session })
+    assert.equal(absentOrder.status, 404)
+    const stranger = { userId: world.operatorUserId,
+      staffId: world.operatorStaffId, role: 'operator' as const }
+    const { listSettlementMappings, listSettlementParties, readOrderPartySnapshot } =
+      await import('../src/ledger/settlement-parties.js')
+    assert.deepEqual(listSettlementMappings(world.db, stranger, world.communityId).items, [])
+    assert.deepEqual(listSettlementParties(world.db, stranger, world.communityId).items, [])
+    assert.throws(() => listSettlementParties(world.db, stranger), /请选择有权社区/)
+    assert.throws(() => readOrderPartySnapshot(world.db, stranger, world.otherOrderId), /无权访问/)
+  } finally {
+    world.cleanup()
+  }
+})
+
+
+test('settlement identity migration 0018 upgrades a populated 0017 DB without touching old facts', async () => {
+  const { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } =
+    await import('node:fs')
+  const root = mkdtempSync(join(tmpdir(), 'll-settlement-upgrade-'))
+  try {
+    const oldMigrations = join(root, 'old')
+    mkdirSync(join(oldMigrations, 'meta'), { recursive: true })
+    for (const name of readdirSync(migrationsFolder)) {
+      if (/^[0-9]{4}_.*\.sql$/u.test(name) && !name.startsWith('0018_')) {
+        copyFileSync(join(migrationsFolder, name), join(oldMigrations, name))
+      }
+    }
+    const current = JSON.parse(readFileSync(join(migrationsFolder, 'meta/_journal.json'), 'utf8')) as {
+      entries: Array<{ idx: number; tag: string }>
+    }
+    assert.equal(current.entries.at(-1)?.tag, '0018_settlement_parties')
+    current.entries = current.entries.filter((entry) => entry.idx < 18)
+    writeFileSync(join(oldMigrations, 'meta/_journal.json'), JSON.stringify(current))
+    const dbPath = join(root, 'legacy.sqlite')
+    const legacy = createDatabase(dbPath, oldMigrations)
+    const communityId = randomUUID()
+    legacy.db.insert(communities).values({
+      id: communityId, name: '升级前已有社区',
+      createdAt: new Date('2026-11-01T00:00:00Z'),
+    }).run()
+    legacy.sqlite.close()
+
+    const upgraded = createDatabase(dbPath, migrationsFolder)
+    try {
+      const name = upgraded.sqlite.prepare('SELECT name FROM communities WHERE id=?')
+        .get(communityId) as { name: string }
+      assert.equal(name.name, '升级前已有社区')
+      const tables = upgraded.sqlite.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'settlement_%'",
+      ).all() as Array<{ name: string }>
+      assert.deepEqual(tables.map((row) => row.name).sort(), [
+        'settlement_order_party_snapshots',
+        'settlement_parties',
+        'settlement_product_mappings',
+      ])
+      assert.equal((upgraded.sqlite.prepare(
+        'SELECT count(*) AS n FROM ledger_entries',
+      ).get() as { n: number }).n, 0)
+    } finally {
+      upgraded.sqlite.close()
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
