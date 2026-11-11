@@ -14,6 +14,7 @@ import type { PublicActivityDetail } from '@sanchuang-dev/local-life-contracts'
 import { CampaignSheet } from '../components/CampaignSheet'
 import { ParticipationTeamCard } from '../components/activity/ParticipationTeamCard'
 import { RewardProgressCard } from '../components/activity/RewardProgressCard'
+import { DailyDrawCard } from '../components/activity/DailyDrawCard'
 import { ActivityLoginMarkerCleanup } from '../components/activity/ActivityLoginResult'
 import { readActivityLoginResult, type ActivityLoginResult } from '../components/activity/loginReturn'
 import {
@@ -32,8 +33,6 @@ import { useResidentAuth } from '../hooks/useResidentAuth'
 import { useRewardProgress } from '../hooks/useRewardProgress'
 import { useWechatActivityShare } from '../hooks/useWechatActivityShare'
 
-// Demo draw assets stay in `mocks/silverLuckyPrizes.ts` for the future server-side
-// prize-pool work; this page must not render them before that business exists.
 type SheetKind = 'rules' | 'share' | 'checkin-reward' | 'my-rewards' | null
 
 type ShareStatus = 'idle' | 'shared' | 'copied' | 'cancelled' | 'error' | 'wechat-hint'
@@ -454,6 +453,18 @@ export function SilverNeighborhoodCampaignPage() {
         loginResult={loginResult}
         onShare={openShareSheet}
       />
+
+      {activity ? (
+        <DailyDrawCard
+          key={activity.id}
+          activityId={activity.id}
+          userId={auth.session?.user.id ?? null}
+          csrfToken={auth.session?.csrfToken ?? null}
+          authLoading={auth.loading}
+          inviteCode={inviteParam.code}
+          inviteInvalid={inviteParam.invalid}
+        />
+      ) : null}
 
       {activity ? (
         <section className="mx-4 mt-5" aria-labelledby="team-reward-heading">
