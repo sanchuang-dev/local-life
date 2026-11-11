@@ -344,6 +344,11 @@ export function createSettlementStatement(
           ...line.snapshot, id: randomUUID(), statementId: row.id,
         }).run()
       }
+      for (const evidence of source.performance) {
+        tx.insert(settlementStatementPerformance).values({
+          ...evidence, id:randomUUID(),statementId:row.id,
+        }).run()
+      }
       appendEvent(tx, row, 'created', actor, 1, now, null)
       return detailOf(db, actor, row.id)
     }, { behavior: 'immediate' })
@@ -391,6 +396,7 @@ function detailOf(db: AppDatabase, actor: LocalActor, id: string): SettlementSta
   }
   return {
     statement: statementDto(row), lines: lines.map(lineDto),
+    performance:performanceFor(db,id).map(performanceDto),
     events: eventsFor(db, id).map(eventDto), postLockDisputes,
   }
 }
@@ -492,7 +498,8 @@ export function lockSettlementStatement(
 /** Grid workers can receive ONLY their own performance appendix, never statement money. */
 export function performanceLinesForActor(
   db: AppDatabase, actor: LocalActor, id: string,
-): { statement: SettlementStatement; lines: SettlementStatementLine[] } {
+): { statement: SettlementStatement; lines: SettlementStatementLine[];
+  performance: SettlementStatementPerformance[] } {
   if (!actor.role || !actor.staffId) {
     throw new LocalError(403, API_ERROR_CODES.forbidden, '未授权读取网格员业绩附表')
   }
@@ -501,5 +508,8 @@ export function performanceLinesForActor(
   assertCommunityAccess(db, actor, row.communityId)
   const lines = linesFor(db, row.id).filter(l =>
     actor.role !== 'grid_worker' || l.gridStaffId === actor.staffId)
-  return { statement: statementDto(row), lines: lines.map(lineDto) }
+  const performance = performanceFor(db, row.id).filter(p =>
+    actor.role !== 'grid_worker' || p.staffId === actor.staffId)
+  return { statement: statementDto(row), lines: lines.map(lineDto),
+    performance:performance.map(performanceDto) }
 }
