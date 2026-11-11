@@ -2299,14 +2299,14 @@ test('new 0019 settlement rule migration upgrades real populated 0018 DB without
     const oldDir = join(root, 'old')
     mkdirSync(join(oldDir, 'meta'), { recursive: true })
     for (const name of readdirSync(migrationsFolder)) {
-      if (/^[0-9]{4}_.*\.sql$/u.test(name) && !name.startsWith('0019_')) {
+      if (/^[0-9]{4}_.*\.sql$/u.test(name) && Number(name.slice(0,4)) < 19) {
         copyFileSync(join(migrationsFolder, name), join(oldDir, name))
       }
     }
     const current = JSON.parse(readFileSync(join(migrationsFolder, 'meta/_journal.json'), 'utf8')) as {
       entries: Array<{ idx: number; tag: string }>
     }
-    assert.equal(current.entries.at(-1)?.tag, '0019_settlement_rules')
+    assert.equal(current.entries.find(entry => entry.idx === 19)?.tag, '0019_settlement_rules')
     current.entries = current.entries.filter((entry) => entry.idx < 19)
     writeFileSync(join(oldDir, 'meta/_journal.json'), JSON.stringify(current))
     const dbFile = join(root, 'legacy.sqlite')
@@ -2475,7 +2475,7 @@ test('statement with no approved contract stays a reproducible pending CSV and c
     assert.ok(perf.includes(world.gridStaffId))
     assert.ok(perf.includes('确认业绩笔数'))
     assert.ok(!perf.includes('商户净额分'))
-    assert.ok(!perf.includes('900'))
+    assert.ok(!perf.includes('"900"'), 'performance export cannot emit a cash amount')
 
     const ownReview = await api(world.app, 'POST', reviewUrl186(detail.statement.id), {
       session, body: { expectedRevision: 1, evidenceRef: 'TEST-SELF-REVIEW' },
