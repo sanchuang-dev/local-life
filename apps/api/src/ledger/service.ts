@@ -6,6 +6,7 @@ import {
   ledgerAnomalyKindSchema,
   ledgerAnomalySchema,
   ledgerAnomalySeveritySchema,
+  ledgerRecordPaymentRequestSchema,
   ledgerSyncRequestSchema,
   type LedgerSyncRequest,
   type LedgerSyncResponse,
@@ -27,6 +28,7 @@ import {
   ledgerAnomalies,
   ledgerEntries,
   ledgerEntrySources,
+  ledgerPaymentOrderLinks,
   localOrders,
   reconciliationBatches,
   staffAccounts,
@@ -89,18 +91,7 @@ const isoTimestamp = z
  * default is a fresh id, and a repeated receipt number is a `409`
  * `ledger_source_duplicate` instead of a second 实收.
  */
-export const recordPaymentRequestSchema = z.strictObject({
-  communityId: uuid,
-  amountCents: z.number().int().min(1),
-  evidenceRef: z.string().trim().min(1).max(200),
-  evidenceKind: z.enum(['manual_receipt', 'bank_transfer']),
-  /** When the money was actually received (business instant). */
-  receivedAt: isoTimestamp,
-  /** 经办 staff member; never inferred from the session. */
-  staffId: uuid,
-  sourceId: z.string().trim().min(1).max(200).optional(),
-  sourceDisplayNo: z.string().trim().min(1).max(80).optional(),
-})
+export const recordPaymentRequestSchema = ledgerRecordPaymentRequestSchema
 
 export type RecordPaymentRequest = z.infer<typeof recordPaymentRequestSchema>
 
@@ -758,6 +749,61 @@ export function recordPayment(
       if (duplicate !== null) {
         throw new LocalError(409, API_ERROR_CODES.ledgerSourceDuplicate, '该收款凭据已登记，不能重复入账')
       }
+      // A human-provided sourceId is not sufficient to prevent double counting:
+      // two manual receipts could use different keys for the SAME proof.
+      // Protect new and legacy/unlinked money alike (no inferred order links).
+      const existingProof = tx.select({ id: ledgerEntries.id }).from(ledgerEntries)
+        .where(and(
+          eq(ledgerEntries.factKind, 'payment_received'),
+          sql`lower(trim(${ledgerEntries.evidenceRef})) = lower(trim(${body.evidenceRef}))`,
+        )).get()
+      if (existingProof) {
+        throw new LocalError(409, API_ERROR_CODES.ledgerSourceDuplicate,
+          '该凭据编号已有收款登记，不能重复记钱')
+      }
+
+      // Only a NEW receipt can be associated with an order, in this SAME
+      // immediate SQLite transaction. Never back-match a legacy receipt.
+      if (body.orderId) {
+        const order = tx.select().from(localOrders)
+          .where(eq(localOrders.id, body.orderId)).get()
+        if (!order) {
+          throw new LocalError(404, API_ERROR_CODES.notFound, '本地订单不存在')
+        }
+        if (order.communityId !== body.communityId) {
+          throw new LocalError(403, API_ERROR_CODES.forbidden, '收款与订单不属于同一社区')
+        }
+        if (order.status !== 'verified') {
+          throw new LocalError(409, API_ERROR_CODES.conflict, '订单尚未人工核验，不能登记对应收款')
+        }
+        if (order.totalCents <= 0) {
+          throw new LocalError(409, API_ERROR_CODES.conflict, '零金额订单不能登记实收凭据')
+        }
+        if (tx.select({ orderId: ledgerPaymentOrderLinks.orderId })
+          .from(ledgerPaymentOrderLinks)
+          .where(eq(ledgerPaymentOrderLinks.orderId, body.orderId)).get()) {
+          throw new LocalError(409, API_ERROR_CODES.conflict, '该订单已有收款凭据，请在流水详情核查')
+        }
+        const evidenceKey = body.evidenceRef.normalize('NFKC').toLowerCase()
+        if (tx.select({ orderId: ledgerPaymentOrderLinks.orderId })
+          .from(ledgerPaymentOrderLinks)
+          .where(eq(ledgerPaymentOrderLinks.evidenceKey, evidenceKey)).get()) {
+          throw new LocalError(409, API_ERROR_CODES.conflict, '该收款凭据已被另一笔订单使用')
+        }
+        const orderBusinessDay = toShanghaiBusinessDate(order.verifiedAt ?? order.createdAt)
+        const locked = tx.select({ id: reconciliationBatches.id })
+          .from(reconciliationBatches)
+          .where(and(
+            eq(reconciliationBatches.status, 'locked'),
+            lte(reconciliationBatches.periodFrom, orderBusinessDay),
+            gte(reconciliationBatches.periodTo, orderBusinessDay),
+            gte(reconciliationBatches.lockedAt, order.createdAt),
+          )).get()
+        if (locked) {
+          throw new LocalError(409, API_ERROR_CODES.ledgerBatchLocked,
+            '订单已处于锁定对账期间，不能补记关联收款')
+        }
+      }
       const appended = appendFact(tx, {
         factKind: 'payment_received',
         sourceSystem: 'manual',
@@ -780,6 +826,21 @@ export function recordPayment(
         evidenceRef: body.evidenceRef,
         createdAt: now,
       })
+      if (body.orderId) {
+        tx.insert(ledgerPaymentOrderLinks).values({
+          orderId: body.orderId,
+          entryId: appended.entryId,
+          evidenceKey: body.evidenceRef.normalize('NFKC').toLowerCase(),
+          createdAt: now,
+        }).run()
+        insertAudit(tx, actor.userId, 'ledger.order_payment.linked', body.orderId, now, {
+          entryId: appended.entryId,
+          communityId: body.communityId,
+          evidenceKind: body.evidenceKind,
+          evidenceRef: body.evidenceRef,
+          amountCents: String(body.amountCents),
+        })
+      }
       insertAudit(tx, actor.userId, 'ledger.payment.recorded', appended.entryId, now, {
         communityId: body.communityId,
         amountCents: String(body.amountCents),
@@ -971,6 +1032,23 @@ export function resolveAttribution(
       if (!row) throw new LocalError(404, API_ERROR_CODES.notFound, '流水条目不存在')
       assertCommunityAccess(db, actor, row.communityId)
 
+      const orderLink = tx.select({ orderId: ledgerPaymentOrderLinks.orderId })
+        .from(ledgerPaymentOrderLinks)
+        .where(eq(ledgerPaymentOrderLinks.entryId, body.entryId)).get()
+      if (orderLink) {
+        if (!body.note || body.note.trim().length < 2) {
+          throw new LocalError(400, API_ERROR_CODES.invalidRequest,
+            '确认订单收款业绩归属必须填写核验依据')
+        }
+        const reversed = tx.select({ id: ledgerEntries.id }).from(ledgerEntries)
+          .where(and(eq(ledgerEntries.factKind, 'payment_reversed'),
+            eq(ledgerEntries.counterEntryId, body.entryId))).get()
+        if (reversed) {
+          throw new LocalError(409, API_ERROR_CODES.conflict,
+            '收款已经冲正，不能再确认业绩归属')
+        }
+      }
+
       if (row.attributionState === 'attributed') {
         throw new LocalError(
           409,
@@ -1001,6 +1079,14 @@ export function resolveAttribution(
       }
 
       requireActiveStaff(tx, body.staffId, row.communityId)
+      if (orderLink) {
+        const assigned = tx.select({ role: staffAccounts.role }).from(staffAccounts)
+          .where(eq(staffAccounts.id, body.staffId)).get()
+        if (assigned?.role !== 'grid_worker') {
+          throw new LocalError(400, API_ERROR_CODES.invalidRequest,
+            '本地订单推广业绩只能确认给具备社区授权的网格员')
+        }
+      }
 
       insertAudit(tx, actor.userId, LEDGER_ATTRIBUTION_CONFIRMED_EVENT, body.entryId, now, {
         staffId: body.staffId,

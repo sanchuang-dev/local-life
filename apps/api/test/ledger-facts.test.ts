@@ -1203,3 +1203,297 @@ test('CSV export neutralizes formula-leading free-text evidence and source numbe
     world.cleanup()
   }
 })
+
+/* -------------------------------------------------------------------------- */
+/* #166: immutable order ↔ receipt evidence chain (real Hono + SQLite)          */
+/* -------------------------------------------------------------------------- */
+
+function markOrderVerified(world: World, orderId: string): void {
+  world.sqlite.prepare(
+    `UPDATE local_orders
+     SET status='verified', verified_at=?, verified_by_user_id=?,
+         verification_note=?, updated_at=?
+     WHERE id=?`,
+  ).run(
+    new Date('2026-11-07T03:00:00.000Z').getTime(),
+    world.operatorUserId,
+    '工作人员已核实登记业务，不代表已收款',
+    new Date('2026-11-07T03:00:00.000Z').getTime(),
+    orderId,
+  )
+}
+
+function linkedReceiptRequest(world: World, overrides: Record<string, unknown> = {}) {
+  return {
+    orderId: world.localOrderId,
+    communityId: world.communityId,
+    amountCents: 900,
+    evidenceKind: 'bank_transfer',
+    evidenceRef: 'BANK-LOCAL-LL166-001',
+    receivedAt: '2026-11-09T01:00:00.000Z',
+    staffId: world.operatorStaffId,
+    sourceId: 'receipt-ll166-001',
+    ...overrides,
+  }
+}
+
+test('linked receipt: real HTTP, one immutable payment, staff attribution and full reversal', async () => {
+  const world = await makeWorld()
+  try {
+    const session = await adminSession(world.app)
+    const unverified = await api(world.app, 'POST', '/admin/ledger/payments', {
+      session, body: linkedReceiptRequest(world),
+    })
+    assert.equal(unverified.status, 409)
+    markOrderVerified(world, world.localOrderId)
+    const before = await api(world.app, 'GET',
+      `/admin/ledger/orders/${world.localOrderId}/evidence`, { session })
+    assert.equal(before.status, 200)
+    const initial = await before.json() as { status: string; payment: unknown; canRecord: boolean }
+    assert.equal(initial.status, 'no_evidence')
+    assert.equal(initial.payment, null)
+    assert.equal(initial.canRecord, true)
+
+    const saved = await api(world.app, 'POST', '/admin/ledger/payments', {
+      session, body: linkedReceiptRequest(world),
+    })
+    assert.equal(saved.status, 201)
+    const savedEntry = ledgerEntrySchema.parse(await saved.json())
+    assert.equal(savedEntry.factKind, 'payment_received')
+    assert.equal(savedEntry.attribution.state, 'pending')
+
+    const after = await api(world.app, 'GET',
+      `/admin/ledger/orders/${world.localOrderId}/evidence`, { session })
+    assert.equal(after.status, 200)
+    const linked = await after.json() as {
+      status: string; payment: { entryId: string; evidenceRef: string }
+    }
+    assert.equal(linked.status, 'pending_attribution')
+    assert.equal(linked.payment.entryId, savedEntry.entryId)
+    assert.equal(linked.payment.evidenceRef, 'BANK-LOCAL-LL166-001')
+
+    const reverseLookup = await api(world.app, 'GET',
+      `/admin/ledger/entries/${savedEntry.entryId}/order-evidence`, { session })
+    assert.equal(reverseLookup.status, 200)
+    assert.equal((await reverseLookup.json() as { order: { orderId: string } }).order.orderId,
+      world.localOrderId)
+
+    const noReason = await api(world.app, 'POST', '/admin/ledger/attributions', {
+      session, body: { entryId: savedEntry.entryId, staffId: world.gridStaffId },
+    })
+    assert.equal(noReason.status, 400, 'linked payments require a promotion evidence note')
+
+    const confirmation = await api(world.app, 'POST', '/admin/ledger/attributions', {
+      session, body: {
+        entryId: savedEntry.entryId, staffId: world.gridStaffId,
+        note: '现场邀请记录核验与订单确认一致',
+      },
+    })
+    assert.equal(confirmation.status, 201)
+    const verified = await api(world.app, 'GET',
+      `/admin/ledger/orders/${world.localOrderId}/evidence`, { session })
+    assert.equal(verified.status, 200)
+    const verifiedBody = await verified.json() as {
+      status: string; payment: { confirmation: { note: string; staffId: string } }
+    }
+    assert.equal(verifiedBody.status, 'evidence_recorded')
+    assert.equal(verifiedBody.payment.confirmation.staffId, world.gridStaffId)
+    assert.match(verifiedBody.payment.confirmation.note, /现场邀请/)
+
+    const reversed = await api(world.app, 'POST',
+      `/admin/ledger/payments/${savedEntry.entryId}/reverse`, {
+        session, body: { staffId: world.operatorStaffId, reason: '收款作废，原单留痕' },
+      })
+    assert.equal(reversed.status, 201)
+    const afterReversal = await api(world.app, 'GET',
+      `/admin/ledger/orders/${world.localOrderId}/evidence`, { session })
+    assert.equal((await afterReversal.json() as { status: string }).status, 'reversed')
+
+    assert.equal((world.sqlite.prepare('SELECT count(*) AS n FROM ledger_payment_order_links')
+      .get() as { n: number }).n, 1)
+    assert.throws(() => world.sqlite.prepare(
+      'DELETE FROM ledger_payment_order_links WHERE order_id=?',
+    ).run(world.localOrderId), /append-only/)
+  } finally {
+    world.cleanup()
+  }
+})
+
+test('linked receipt: duplicate/ref replay and wrong-community attempts never create extra money', async () => {
+  const world = await makeWorld()
+  try {
+    const session = await adminSession(world.app)
+    markOrderVerified(world, world.localOrderId)
+    markOrderVerified(world, world.otherOrderId)
+    const csrfMissing = await world.app.request('/admin/ledger/payments', {
+      method: 'POST',
+      headers: {
+        cookie: session.cookies,
+        origin: ADMIN_ORIGIN,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(linkedReceiptRequest(world)),
+    })
+    assert.equal(csrfMissing.status, 403)
+
+    const cross = await api(world.app, 'POST', '/admin/ledger/payments', {
+      session,
+      body: linkedReceiptRequest(world, { orderId: world.otherOrderId }),
+    })
+    assert.equal(cross.status, 403)
+
+    const [a, b] = await Promise.all([
+      api(world.app, 'POST', '/admin/ledger/payments', {
+        session, body: linkedReceiptRequest(world, { sourceId: 'concurrent-one' }),
+      }),
+      api(world.app, 'POST', '/admin/ledger/payments', {
+        session, body: linkedReceiptRequest(world, { sourceId: 'concurrent-two' }),
+      }),
+    ])
+    assert.deepEqual([a.status, b.status].sort(), [201, 409])
+    const retry = await api(world.app, 'POST', '/admin/ledger/payments', {
+      session, body: linkedReceiptRequest(world, { sourceId: 'concurrent-one' }),
+    })
+    assert.equal(retry.status, 409)
+
+    const extraOrder = randomUUID()
+    world.db.insert(localOrders).values({
+      id: extraOrder,
+      communityId: world.communityId,
+      productId: (world.sqlite.prepare(
+        'SELECT product_id AS value FROM local_orders WHERE id=?',
+      ).get(world.localOrderId) as { value: string }).value,
+      residentUserId: (world.sqlite.prepare(
+        'SELECT resident_user_id AS value FROM local_orders WHERE id=?',
+      ).get(world.localOrderId) as { value: string }).value,
+      idempotencyKey: randomUUID(),
+      status: 'registered',
+      recordSource: 'resident',
+      productName: '青菜另单',
+      unitPriceCents: 450,
+      quantity: 2,
+      totalCents: 900,
+      createdAt: new Date('2026-11-06T09:00:00.000Z'),
+      updatedAt: new Date('2026-11-06T09:00:00.000Z'),
+    }).run()
+    markOrderVerified(world, extraOrder)
+    const stolenRef = await api(world.app, 'POST', '/admin/ledger/payments', {
+      session,
+      body: linkedReceiptRequest(world, { orderId: extraOrder, sourceId: 'other-source' }),
+    })
+    assert.equal(stolenRef.status, 409)
+    assert.equal((world.sqlite.prepare(
+      'SELECT count(*) AS n FROM ledger_entries WHERE fact_kind=\'payment_received\'',
+    ).get() as { n: number }).n, 1)
+    assert.equal((world.sqlite.prepare('SELECT count(*) AS n FROM ledger_payment_order_links')
+      .get() as { n: number }).n, 1)
+  } finally {
+    world.cleanup()
+  }
+})
+
+test('linked receipt mismatch is visible and blocked without claiming real settlement', async () => {
+  const world = await makeWorld()
+  try {
+    const session = await adminSession(world.app)
+    markOrderVerified(world, world.localOrderId)
+    const recorded = await api(world.app, 'POST', '/admin/ledger/payments', {
+      session,
+      body: linkedReceiptRequest(world, { amountCents: 800, sourceId: 'mismatch-1',
+        evidenceRef: 'BANK-MISMATCH-166' }),
+    })
+    assert.equal(recorded.status, 201)
+    const evidence = await api(world.app, 'GET',
+      `/admin/ledger/orders/${world.localOrderId}/evidence`, { session })
+    assert.equal(evidence.status, 200)
+    const result = await evidence.json() as {
+      status: string; canRecord: boolean; blockingReasons: string[]
+    }
+    assert.equal(result.status, 'amount_mismatch')
+    assert.equal(result.canRecord, false)
+    assert.ok(result.blockingReasons.some((reason) => reason.includes('不一致')))
+  } finally {
+    world.cleanup()
+  }
+})
+
+test('previous unlinked receipt cannot be counted again under a new order/source key', async () => {
+  const world = await makeWorld()
+  try {
+    const session = await adminSession(world.app)
+    markOrderVerified(world, world.localOrderId)
+    const base = linkedReceiptRequest(world)
+    const legacy = await api(world.app, 'POST', '/admin/ledger/payments', {
+      session,
+      body: { ...base, orderId: undefined, sourceId: 'old-unlinked-receipt' },
+    })
+    assert.equal(legacy.status, 201)
+    const duplicateProof = await api(world.app, 'POST', '/admin/ledger/payments', {
+      session,
+      body: { ...base, sourceId: 'new-linked-receipt' },
+    })
+    assert.equal(duplicateProof.status, 409)
+    assert.equal((world.sqlite.prepare('SELECT count(*) AS n FROM ledger_payment_order_links')
+      .get() as { n: number }).n, 0, 'no inferred link for legacy receipts')
+    assert.equal((world.sqlite.prepare(
+      "SELECT count(*) AS n FROM ledger_entries WHERE fact_kind='payment_received'",
+    ).get() as { n: number }).n, 1)
+  } finally {
+    world.cleanup()
+  }
+})
+
+test('linked receipt attribution refuses an operator instead of treating recorder as promoter', async () => {
+  const world = await makeWorld()
+  try {
+    const session = await adminSession(world.app)
+    markOrderVerified(world, world.localOrderId)
+    const saved = await api(world.app, 'POST', '/admin/ledger/payments', {
+      session, body: linkedReceiptRequest(world),
+    })
+    assert.equal(saved.status, 201)
+    const entry = ledgerEntrySchema.parse(await saved.json())
+    const attempted = await api(world.app, 'POST', '/admin/ledger/attributions', {
+      session, body: {
+        entryId: entry.entryId,
+        staffId: world.operatorStaffId,
+        note: '曾经由本人录入，但不具备推广归属身份',
+      },
+    })
+    assert.equal(attempted.status, 400)
+    const evidence = await api(world.app, 'GET',
+      `/admin/ledger/orders/${world.localOrderId}/evidence`, { session })
+    assert.equal((await evidence.json() as { status: string }).status, 'pending_attribution')
+  } finally {
+    world.cleanup()
+  }
+})
+
+test('locked reconciliation periods refuse newly linked receipts, preserving frozen totals', async () => {
+  const world = await makeWorld()
+  try {
+    markOrderVerified(world, world.localOrderId)
+    syncLedgerFacts(world.db, adminActor(world), { from: PERIOD_FROM, to: PERIOD_TO }, { now: CLOCK })
+    const batch = createBatch(world.db, adminActor(world),
+      { periodFrom: PERIOD_FROM, periodTo: PERIOD_TO }, { now: CLOCK })
+    const locked = lockBatch(world.db, adminActor(world), batch.batchId,
+      { expectedUpdatedAt: batch.updatedAt },
+      { now: new Date(CLOCK.getTime() + 60_000) })
+    assert.equal(locked.status, 'locked')
+    const session = await adminSession(world.app)
+    const before = await api(world.app, 'GET',
+      `/admin/ledger/orders/${world.localOrderId}/evidence`, { session })
+    assert.equal((await before.json() as { status: string }).status, 'locked_period')
+
+    const receipt = await api(world.app, 'POST', '/admin/ledger/payments', {
+      session, body: linkedReceiptRequest(world),
+    })
+    assert.equal(receipt.status, 409)
+    assert.equal((world.sqlite.prepare('SELECT count(*) AS n FROM ledger_payment_order_links')
+      .get() as { n: number }).n, 0)
+    const after = getBatchEntries(world.db, batch.batchId, { now: CLOCK })
+    assert.equal(after.stored.totalCents, locked.totalCents)
+  } finally {
+    world.cleanup()
+  }
+})

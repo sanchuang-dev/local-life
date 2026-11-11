@@ -96,6 +96,10 @@ export const LEDGER_ROUTES = {
   adminDiff: '/admin/reconciliation/diff',
   /** Back office: CSV download of one batch or period (Chinese-Excel-readable, redacted). */
   adminExportCsv: '/admin/reconciliation/export.csv',
+  /** Verified local order ↔ one manual receipt, scoped to the operator. */
+  adminOrderEvidence: '/admin/ledger/orders/:orderId/evidence',
+  /** Reverse lookup from a ledger receipt to its linked order. */
+  adminEntryOrderEvidence: '/admin/ledger/entries/:entryId/order-evidence',
 } as const
 
 /**
@@ -416,6 +420,65 @@ export const ledgerEntrySchema = z
   })
 
 export type LedgerEntry = z.infer<typeof ledgerEntrySchema>
+
+/**
+ * Read-only view of the evidence chain for ONE registered local order.
+ * A manual receipt is not bank-confirmed payment and never implies payout.
+ */
+export const ledgerOrderEvidenceSchema = z.strictObject({
+  orderId: uuid,
+  orderDisplayNo: z.string().min(1),
+  communityId: uuid,
+  productName: z.string().min(1),
+  orderStatus: z.string().min(1),
+  registeredAmountCents: cents,
+  canRecord: z.boolean(),
+  status: z.enum([
+    'no_evidence',
+    'pending_order_review',
+    'locked_period',
+    'amount_mismatch',
+    'reversed',
+    'pending_attribution',
+    'evidence_recorded',
+  ]),
+  blockingReasons: z.array(z.string().min(1)),
+  payment: z.strictObject({
+    entryId: uuid,
+    amountCents: cents,
+    receivedAt: isoTimestamp,
+    evidenceKind: ledgerEvidenceKindSchema,
+    evidenceRef: z.string().min(1),
+    recordedByStaffId: uuid,
+    attribution: ledgerAttributionSchema,
+    reversedEntryId: uuid.nullable(),
+    confirmation: z.strictObject({
+      reviewedByUserId: uuid,
+      reviewedByName: z.string().nullable(),
+      staffId: uuid,
+      note: z.string().nullable(),
+      confirmedAt: isoTimestamp,
+    }).nullable(),
+  }).nullable(),
+})
+export type LedgerOrderEvidence = z.infer<typeof ledgerOrderEvidenceSchema>
+export const ledgerEntryOrderEvidenceSchema = z.strictObject({
+  order: ledgerOrderEvidenceSchema.nullable(),
+})
+
+/** Existing manual receipt contract with an optional *new* local-order link. */
+export const ledgerRecordPaymentRequestSchema = z.strictObject({
+  communityId: uuid,
+  orderId: uuid.optional(),
+  amountCents: z.number().int().min(1),
+  evidenceRef: z.string().trim().min(1).max(200),
+  evidenceKind: z.enum(['manual_receipt', 'bank_transfer']),
+  receivedAt: isoTimestamp,
+  staffId: uuid,
+  sourceId: z.string().trim().min(1).max(200).optional(),
+  sourceDisplayNo: z.string().trim().min(1).max(80).optional(),
+})
+export type LedgerRecordPaymentRequest = z.infer<typeof ledgerRecordPaymentRequestSchema>
 
 /* -------------------------------------------------------------------------- */
 /* Overview                                                                   */
