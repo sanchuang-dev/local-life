@@ -883,6 +883,23 @@ export const settlementStatementLineSchema = z.strictObject({
 })
 export type SettlementStatementLine = z.infer<typeof settlementStatementLineSchema>
 
+/** Confirmed CRM service performance contains NO money; it is not a payable line. */
+export const settlementStatementPerformanceSchema = z.strictObject({
+  id: uuid,
+  statementId: uuid,
+  entryId: uuid,
+  sourceId: uuid,
+  sourceDisplayNo: z.string().min(1),
+  communityId: uuid,
+  staffId: uuid,
+  confirmedByUserId: uuid.nullable(),
+  confirmedAt: isoTimestamp,
+  evidenceRef: z.string().nullable(),
+  sourceDigest: z.string().regex(/^[a-f0-9]{64}$/),
+})
+export type SettlementStatementPerformance =
+  z.infer<typeof settlementStatementPerformanceSchema>
+
 export const settlementStatementEventSchema = z.strictObject({
   id: uuid,
   statementId: uuid,
@@ -896,6 +913,7 @@ export const settlementStatementEventSchema = z.strictObject({
 export const settlementStatementDetailSchema = z.strictObject({
   statement: settlementStatementSchema,
   lines: z.array(settlementStatementLineSchema),
+  performance: z.array(settlementStatementPerformanceSchema),
   events: z.array(settlementStatementEventSchema),
   /** Post-lock reversal/anomaly is an explicit dispute, never a rewritten line. */
   postLockDisputes: z.array(z.strictObject({
