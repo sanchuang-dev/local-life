@@ -1710,6 +1710,7 @@ test('settlement candidate API: no contracts, no receipt, correct scoped pending
     assert.equal(result.summary.recordedReceiptGrossCents, 0)
     assert.equal(result.summary.blockedItems, 1)
     assert.equal(result.items[0]?.sellerStatus, 'missing_seller')
+    assert.equal((result.items[0] as {periodSource?:string})?.periodSource, 'order_registration')
     assert.ok(result.items[0]?.blockingReasons.includes('missing_receipt'))
     assert.ok(result.items[0]?.blockingReasons.includes('missing_seller'))
     assert.ok(result.items[0]?.blockingReasons.includes('missing_approved_rule'))
@@ -1735,6 +1736,20 @@ test('settlement candidate: linked receipt, confirmed grid, locked facts and rev
     })
     assert.equal(saved.status, 201)
     const payment = ledgerEntrySchema.parse(await saved.json())
+    // Created Nov 2, but receipt actually received Nov 9: the NOV 9 period
+    // must show this order, not silently lose it by using registration date.
+    const crossPeriod = await api(world.app, 'GET',
+      '/admin/settlement/candidates?communityId=' + world.communityId +
+      '&from=2026-11-09&to=2026-11-09', { session })
+    assert.equal(crossPeriod.status, 200)
+    const crossing = await crossPeriod.json() as {
+      total: number; items: Array<{periodSource: string; periodAt: string}>;
+      periodPolicy: string;
+    }
+    assert.equal(crossing.total, 1)
+    assert.equal(crossing.items[0]?.periodSource, 'linked_receipt')
+    assert.equal(crossing.periodPolicy, 'linked_receipt_else_order_registration')
+    assert.equal(crossing.items[0]?.periodAt, '2026-11-09T01:00:00.000Z')
     const path = '/admin/settlement/candidates?communityId=' + world.communityId
     const before = await api(world.app, 'GET', path, { session })
     const pending = (await before.json() as { items: Array<{ blockingReasons: string[] }> }).items[0]
