@@ -1553,6 +1553,13 @@ test('settlement party API: no configured seller, explicit verified mapping and 
     const carrier = await createParty('guangdian', '测试广电主体', 'TEST-CARRIER-APPROVAL')
     const unverified = await createParty('seller', '尚未核验的商户', null)
     assert.equal(unverified.verifiedAt, null)
+    const replayParty = await api(world.app, 'POST', prefix + '/parties', {
+      session, body: {
+        role: 'seller', legalName: '重复商户版本',
+        registryRef: 'TEST-REG-seller', verificationRef: 'TEST-SELLER-REGISTRY-APPROVAL',
+      },
+    })
+    assert.equal(replayParty.status, 409, 'same verified identity and evidence cannot produce two versions')
 
     const productId = (world.sqlite.prepare('SELECT product_id AS id FROM local_orders WHERE id=?')
       .get(world.localOrderId) as { id: string }).id
@@ -1677,5 +1684,57 @@ test('settlement party routes enforce admin writes, CSRF+Origin, grid rejection 
     assert.throws(() => readOrderPartySnapshot(world.db, stranger, world.otherOrderId), /无权访问/)
   } finally {
     world.cleanup()
+  }
+})
+
+
+test('settlement identity migration 0018 upgrades a populated 0017 DB without touching old facts', async () => {
+  const { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } =
+    await import('node:fs')
+  const root = mkdtempSync(join(tmpdir(), 'll-settlement-upgrade-'))
+  try {
+    const oldMigrations = join(root, 'old')
+    mkdirSync(join(oldMigrations, 'meta'), { recursive: true })
+    for (const name of readdirSync(migrationsFolder)) {
+      if (/^[0-9]{4}_.*\\.sql$/u.test(name) && !name.startsWith('0018_')) {
+        copyFileSync(join(migrationsFolder, name), join(oldMigrations, name))
+      }
+    }
+    const current = JSON.parse(readFileSync(join(migrationsFolder, 'meta/_journal.json'), 'utf8')) as {
+      entries: Array<{ idx: number; tag: string }>
+    }
+    assert.equal(current.entries.at(-1)?.tag, '0018_settlement_parties')
+    current.entries = current.entries.filter((entry) => entry.idx < 18)
+    writeFileSync(join(oldMigrations, 'meta/_journal.json'), JSON.stringify(current))
+    const dbPath = join(root, 'legacy.sqlite')
+    const legacy = createDatabase(dbPath, oldMigrations)
+    const communityId = randomUUID()
+    legacy.db.insert(communities).values({
+      id: communityId, name: '升级前已有社区',
+      createdAt: new Date('2026-11-01T00:00:00Z'),
+    }).run()
+    legacy.sqlite.close()
+
+    const upgraded = createDatabase(dbPath, migrationsFolder)
+    try {
+      const name = upgraded.sqlite.prepare('SELECT name FROM communities WHERE id=?')
+        .get(communityId) as { name: string }
+      assert.equal(name.name, '升级前已有社区')
+      const tables = upgraded.sqlite.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'settlement_%'",
+      ).all() as Array<{ name: string }>
+      assert.deepEqual(tables.map((row) => row.name).sort(), [
+        'settlement_order_party_snapshots',
+        'settlement_parties',
+        'settlement_product_mappings',
+      ])
+      assert.equal((upgraded.sqlite.prepare(
+        'SELECT count(*) AS n FROM ledger_entries',
+      ).get() as { n: number }).n, 0)
+    } finally {
+      upgraded.sqlite.close()
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true })
   }
 })
