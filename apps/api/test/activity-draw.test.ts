@@ -1196,17 +1196,22 @@ test('LL-LOT-002: cryptographic weighted miss, Shanghai day boundary, atomic las
     const productId = await createProduct(fixture)
     const prize = await seedReadyPool(fixture, activityId, productId)
     const userId = await bindStaffUser(fixture, 'admin')
+    // Choose the next Beijing midnight relative to test execution time.
+    // Fixed 2026 dates would make this regression test fail in future years.
+    const currentDay = drawBeijingDay(NOW)
+    const boundary = new Date(currentDay + 'T16:00:00.000Z')
+    const before = new Date(boundary.getTime() - 10_000)
+    const after = new Date(boundary.getTime() + 5_000)
     const noWin = enterDailyDraw(fixture.db, {
       activityId, userId, idempotencyKey: randomUUID(), secret: DRAW_SECRET,
-      now: new Date('2026-11-11T15:59:50Z'), pick: max => max - 1,
+      now: before, pick: max => max - 1,
     })
     assert.equal(noWin.outcome, 'missed')
     assert.equal(noWin.credential, null)
-    assert.equal(drawBeijingDay(new Date('2026-11-11T15:59:59Z')), '2026-11-11')
-    assert.equal(drawBeijingDay(new Date('2026-11-11T16:00:00Z')), '2026-11-12')
+    assert.notEqual(drawBeijingDay(before), drawBeijingDay(after))
     const nextDay = enterDailyDraw(fixture.db, {
       activityId, userId, idempotencyKey: randomUUID(), secret: DRAW_SECRET,
-      now: new Date('2026-11-11T16:00:05Z'), pick: () => 0,
+      now: after, pick: () => 0,
     })
     assert.equal(nextDay.outcome, 'won')
     const prizeStock = fixture.db.select().from(activityDrawPrizes).where(eq(activityDrawPrizes.id, prize.id)).get()
