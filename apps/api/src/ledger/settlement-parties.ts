@@ -22,10 +22,16 @@ import {
   insertAudit,
   iso,
   mapConstraintError,
-  scopeCommunityIds,
   type LocalActor,
 } from '../local/shared.js'
 import { toShanghaiBusinessDate } from './shared.js'
+
+function constraintConflict(error: unknown): never {
+  if (error instanceof Error && /overlapping seller mapping dates|seller mapping community mismatch|must be verified|order mapping is not verified/u.test(error.message)) {
+    throw new LocalError(409, API_ERROR_CODES.conflict, '商户映射期限、主体核验或订单关联冲突，请核对后重试')
+  }
+  return mapConstraintError(error)
+}
 
 /**
  * #183 intentionally stores no financial amounts or contract rates.
@@ -105,7 +111,7 @@ export function createSettlementParty(
       return partyDto(entry)
     })
   } catch (error) {
-    return mapConstraintError(error)
+    return constraintConflict(error)
   }
 }
 
@@ -159,7 +165,7 @@ export function createSettlementMapping(
       return mappingDto(entry)
     })
   } catch (error) {
-    return mapConstraintError(error)
+    return constraintConflict(error)
   }
 }
 
@@ -222,6 +228,6 @@ export function confirmOrderPartySnapshot(
       return snapshotDto(entry)
     })
   } catch (error) {
-    return mapConstraintError(error)
+    return constraintConflict(error)
   }
 }
