@@ -1,0 +1,1050 @@
+{
+  "results": [
+    {
+      "name": "a logged-out confirm visit is sent to the unified login",
+      "ok": true,
+      "detail": "/login?next=%2Fme%2Fcommunity%2Fconfirm%3FcommunityId%3D3b16253c-cd91-437f-86b1-8bf553129d12"
+    },
+    {
+      "name": "the login redirect preserves the confirm target and its communityId",
+      "ok": true,
+      "detail": "next target"
+    },
+    {
+      "name": "login returns to the confirmation page for the same community",
+      "ok": true,
+      "detail": "/me/community/confirm?communityId=3b16253c-cd91-437f-86b1-8bf553129d12"
+    },
+    {
+      "name": "confirm page shows the community name",
+      "ok": true,
+      "detail": "name"
+    },
+    {
+      "name": "confirm page shows the service address",
+      "ok": true,
+      "detail": "address"
+    },
+    {
+      "name": "confirm page states the binding cannot be changed",
+      "ok": true,
+      "detail": "irreversible"
+    },
+    {
+      "name": "confirm page states the resident H5 has no switch/unbind/rebind entry",
+      "ok": true,
+      "detail": "permanence copy"
+    },
+    {
+      "name": "confirm page exposes no control that could unbind or rebind",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "the review step alone cannot submit a binding",
+      "ok": true,
+      "detail": "no submit on step 1"
+    },
+    {
+      "name": "submit is disabled before the acknowledgement is ticked",
+      "ok": true,
+      "detail": "disabled submit"
+    },
+    {
+      "name": "submit becomes available after ticking the acknowledgement",
+      "ok": true,
+      "detail": "enabled submit"
+    },
+    {
+      "name": "location is never presented as residence proof",
+      "ok": true,
+      "detail": "location notice"
+    },
+    {
+      "name": "the picker is titled as a browsing choice",
+      "ok": true,
+      "detail": "picker heading"
+    },
+    {
+      "name": "the picker states it never confirms or changes the permanent community",
+      "ok": true,
+      "detail": "picker footer"
+    },
+    {
+      "name": "the browsed community is labelled as browsing",
+      "ok": true,
+      "detail": "header"
+    },
+    {
+      "name": "the browse-only rule is visible next to it",
+      "ok": true,
+      "detail": "browse notice"
+    },
+    {
+      "name": "browsing a community did not create a binding",
+      "ok": true,
+      "detail": "card state"
+    },
+    {
+      "name": "the unbound card offers the explicit first confirmation",
+      "ok": true,
+      "detail": "confirm CTA"
+    },
+    {
+      "name": "the confirm page is entered for the browsed community",
+      "ok": true,
+      "detail": "/me/community/confirm?communityId=3b16253c-cd91-437f-86b1-8bf553129d12"
+    },
+    {
+      "name": "the confirmation succeeds against the real API",
+      "ok": true,
+      "detail": "success copy"
+    },
+    {
+      "name": "the success state offers no unbind/rebind control",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "我的 shows the confirmed permanent community",
+      "ok": true,
+      "detail": "me card"
+    },
+    {
+      "name": "我的 shows the confirmation date",
+      "ok": true,
+      "detail": "date"
+    },
+    {
+      "name": "我的 offers no switch/unbind/rebind control",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "我的 links to the read-only detail page",
+      "ok": true,
+      "detail": "detail link"
+    },
+    {
+      "name": "我的常驻社区 names the confirmed binding",
+      "ok": true,
+      "detail": "binding name"
+    },
+    {
+      "name": "我的常驻社区 is read-only",
+      "ok": true,
+      "detail": "[\"跳到主要内容\",\"返回我的\",\"去社区首页浏览\",\"活动\",\"惠生活\",\"我的（当前页面）\"]"
+    },
+    {
+      "name": "the discovery page shows the confirmed permanent community",
+      "ok": true,
+      "detail": "permanent card"
+    },
+    {
+      "name": "the browsed community switched",
+      "ok": true,
+      "detail": "browsing other"
+    },
+    {
+      "name": "the permanent community did not change",
+      "ok": true,
+      "detail": "binding preserved"
+    },
+    {
+      "name": "the page explains that browsing does not change the permanent community",
+      "ok": true,
+      "detail": "browse-vs-binding copy"
+    },
+    {
+      "name": "the binding survives a browse-only switch",
+      "ok": true,
+      "detail": "binding after browsing elsewhere"
+    },
+    {
+      "name": "a second permanent binding cannot be confirmed from the H5",
+      "ok": true,
+      "detail": "no confirm action"
+    },
+    {
+      "name": "the refusal names the existing permanent community",
+      "ok": true,
+      "detail": "refusal copy"
+    },
+    {
+      "name": "without a communityId the confirm page defaults to nothing",
+      "ok": true,
+      "detail": "no default community"
+    },
+    {
+      "name": "320px discovery page has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"width\":320,\"scrollWidth\":320,\"overflow\":false}"
+    },
+    {
+      "name": "320px 我的 page has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"width\":320,\"scrollWidth\":320,\"overflow\":false}"
+    },
+    {
+      "name": "320px 我的常驻社区 page has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"width\":320,\"scrollWidth\":320,\"overflow\":false}"
+    },
+    {
+      "name": "320px confirm refusal page has no horizontal overflow",
+      "ok": true,
+      "detail": "{\"width\":320,\"scrollWidth\":320,\"overflow\":false}"
+    },
+    {
+      "name": "exactly one confirm request was sent in this run",
+      "ok": true,
+      "detail": "[{\"url\":\"http://localhost:5173/api/resident-community/confirm\",\"method\":\"POST\"}]"
+    }
+  ],
+  "requests": [
+    {
+      "url": "http://localhost:5173/local-life/",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/@vite/client",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/main.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/@react-refresh",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/node_modules/.vite/deps/react.js?v=c8136dff",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/node_modules/.vite/deps/react-dom_client.js?v=dcedcb3b",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/node_modules/.vite/deps/react-router.js?v=01713786",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/App.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/activity/loginReturn.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/index.css",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/node_modules/.vite/deps/react_jsx-dev-runtime.js?v=c8136dff",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/node_modules/.pnpm/vite@8.3.4_@types+node@24.1_31550c061482022cb50f0774f2c55186/node_modules/vite/dist/client/env.mjs",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/node_modules/.vite/deps/react-XU9BOcOH.js?v=781dcc74",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/shell/AppShell.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/auth/RequireResidentAuth.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/auth/ResidentSiteGate.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/hooks/useResidentAuth.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/CommunityDiscoveryPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/lib/communityHomeRoute.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/CommunityActivityPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/CommunityBroadcastPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/CommunityCulturePage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/CommunityNoticePage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/CommunityPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/ExchangePage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/GdPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/HealthAssistantPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/HealthDevicePage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/HealthDevicesPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/HealthLecturePage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/HealthPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/LifePage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/LocalProductPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/MePage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/ResidentCommunityConfirmPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/ResidentCommunityPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/ResidentLoginPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/MyOrderDetailPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/MyOrdersPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/MyRewardsPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/NotFoundPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/PointsPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/ProductPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/SilverActivityProductsPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/SilverNeighborhoodCampaignPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/workbench/WorkbenchLayout.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/workbench/WorkbenchLeadDetailPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/workbench/WorkbenchLeadNewPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/workbench/WorkbenchLeadsPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/workbench/WorkbenchLocalOrderDetailPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/workbench/WorkbenchLocalOrdersPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/workbench/WorkbenchLoginPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/workbench/WorkbenchOrderDetailPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/workbench/WorkbenchOrderNewPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/workbench/WorkbenchOrdersPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/pages/workbench/WorkbenchVerifyPage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/index.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/node_modules/.vite/deps/rolldown-runtime-SbdDWaPq.js?v=781dcc74",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/shell/BottomTabBar.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/shell/useKeyboardVisible.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/auth/residentLogin.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/auth/residentGate.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/auth/residentGlobalGate.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/hooks/apiError.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/auth/wechatEnvironment.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/services/residentSessionEvents.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/node_modules/.vite/deps/lucide-react.js?v=ab8c6020",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/DemoNote.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/PageHeader.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/PendingNotice.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/hooks/useBackTarget.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/hooks/usePendingNotice.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/mocks/community.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/node_modules/.vite/deps/react-dom.js?v=c8136dff",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/lib/communityGeolocation.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/lib/communityLocationCopy.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/lib/residentCommunity.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/community/ResidentCommunityCard.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/hooks/useResidentCommunity.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/node_modules/.vite/deps/react-dom-DHbhrdcq.js?v=781dcc74",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/community/CommunitySceneCards.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/life/LifeProductCard.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/life/PointsSummaryCard.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/mocks/life.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/mocks/health.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/mocks/gd.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/life/LocalCatalogSection.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/life/ExternalOffersSection.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/life/ShopDealsSection.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/home/SectionHeading.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/hooks/useLocalCatalog.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/life/localOrderLabels.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/services/localOrders.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/services/localApi.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/auth/PhoneVerificationForm.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/activity/share.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/crm/crmLabels.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/hooks/useActivityParticipation.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/hooks/usePublicActivity.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/hooks/useRewardWallet.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/auth/UnifiedLoginView.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/hooks/useLocalOrders.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/crm/FilterChips.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/activity/rewardLabels.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/activity/DrawWalletSection.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/services/residentCommunity.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/hooks/useStaffSession.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/crm/StaffSessionProvider.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/life/ShopProductDetail.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/mocks/silverActivityProducts.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/node_modules/.vite/deps/qrcode__react.js?v=c8e1368e",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/CampaignSheet.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/activity/ParticipationTeamCard.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/activity/RewardProgressCard.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/activity/DailyDrawCard.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/activity/ActivityLoginResult.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/hooks/useRewardProgress.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/hooks/useWechatActivityShare.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/crm/WorkbenchUi.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/crm/StaffGate.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/hooks/useStaffLocalOrders.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/hooks/useCrmApi.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/hooks/useAsyncResource.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/activity/DrawRedeemPanel.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/services/rewards.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/shell/navigation.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/auth/residentLoginUrl.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/node_modules/.vite/deps/zod.js?v=871dbad6",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/rewards.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/identity.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/crmeb.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/ledger.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/user-directory.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/resident-community.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/@fs/E:/tomz/local-life-wt/ll-identity-001/ui/packages/contracts/dist/draw.js",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/activity/wechatShare.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/lib/communityCoordinates.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/life/LocalProductCard.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/hooks/useShopProducts.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/life/ActivitySourceNote.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/life/ShopProductCard.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/life/ShopStateCard.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/services/localCatalog.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/services/draw.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/lib/drawUi.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/life/ShopProductImage.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/life/shop.ts",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/src/components/activity/ActivityLoginCard.tsx",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/auth/session",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/auth/phone/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/auth/methods",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/auth/session",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/auth/phone/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/auth/methods",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/local-life/favicon.svg",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/auth/csrf",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/auth/dev/login",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:5173/api/auth/phone/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/auth/wechat/profile",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/communities/public",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/communities/public",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/communities/public",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/communities/public",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/activities/public?communityId=3b16253c-cd91-437f-86b1-8bf553129d12&limit=50",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/communities/public",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/communities/public",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/confirm",
+      "method": "POST"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/activities/public",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/activities/public",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/activities/public",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/activities/public",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/communities/public",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/communities/public",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/activities/public?communityId=3b16253c-cd91-437f-86b1-8bf553129d12&limit=50",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/activities/public?communityId=7c1f0f2a-5b3d-4e6f-8a90-0b1c2d3e4f50&limit=50",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/communities/public",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/communities/public",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/communities/public",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/communities/public",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/activities/public?communityId=7c1f0f2a-5b3d-4e6f-8a90-0b1c2d3e4f50&limit=50",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/activities/public",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/activities/public",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/activities/public",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/activities/public",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/communities/public",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/resident-community/status",
+      "method": "GET"
+    },
+    {
+      "url": "http://localhost:5173/api/communities/public",
+      "method": "GET"
+    }
+  ]
+}

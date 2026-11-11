@@ -18,9 +18,13 @@ import {
   activityDrawFulfilmentEvents,
   activityDrawPools,
   activityDrawPrizes,
-  residentCommunityAssignments,
 } from '../db/schema.js'
 import { assertCommunityAccess, LocalError, type LocalActor, type LocalTransaction } from '../local/shared.js'
+import {
+  assertResidentOfConfirmedCommunity,
+  hasConfirmedCommunity,
+  readConfirmedBinding,
+} from '../resident-community/service.js'
 import { getPublicDrawPool } from './service.js'
 
 type Db = AppDatabase | LocalTransaction
@@ -58,11 +62,19 @@ function requireActivity(db: Db, activityId: string) {
   return activity
 }
 
+/**
+ * Whether the resident may act on this community (#171 LL-IDENTITY-001).
+ *
+ * This used to read `resident_community_assignments`, i.e. the historical row the
+ * retired #123 OAuth flow wrote automatically at login — so "logged in from an
+ * activity link" silently granted every community-scoped write. The authority is
+ * now the resident's own confirmed binding; the read path stays lenient (returns
+ * `false` so the state endpoint can say "not assigned" instead of throwing), while
+ * the write path in `enterDraw` uses the shared guard and refuses.
+ */
 function isMember(db: Db, userId: string, communityId: string): boolean {
-  return Boolean(db.select({ userId: residentCommunityAssignments.userId })
-    .from(residentCommunityAssignments)
-    .where(and(eq(residentCommunityAssignments.userId, userId), eq(residentCommunityAssignments.communityId, communityId)))
-    .get())
+  return hasConfirmedCommunity(db, userId)
+    && readConfirmedBinding(db, userId)?.communityId === communityId
 }
 function findCredential(db: Db, attemptId: string): Credential | undefined {
   return db.select().from(activityDrawCredentials).where(eq(activityDrawCredentials.attemptId, attemptId)).get()
@@ -168,9 +180,12 @@ export function enterDailyDraw(db: AppDatabase, input: EnterDrawInput): Resident
       if (existing) return toResident(tx, existing, input.secret)
 
       const activity = requireActivity(tx, input.activityId)
-      if (!isMember(tx, input.userId, activity.communityId)) {
-        throw new LocalError(403, API_ERROR_CODES.forbidden, '请先绑定活动所属社区')
-      }
+      // #171 LL-IDENTITY-001: a draw is a community-scoped write, so the authority
+      // is the resident's confirmed binding — not a historical assignment row.
+      // `assertResidentOfConfirmedCommunity` throws the shared 403
+      // `resident_community_not_bound` / `resident_community_conflict`, which the
+      // route maps to the standard envelope.
+      assertResidentOfConfirmedCommunity(tx, input.userId, activity.communityId)
       if (activity.status !== 'published' || activity.startsAt > now || activity.endsAt <= now) {
         throw new LocalError(409, API_ERROR_CODES.activityUnavailable, '活动未开放或已经结束')
       }

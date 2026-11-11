@@ -8,7 +8,8 @@ import type {
 } from '@sanchuang-dev/local-life-contracts'
 import { buildResidentLoginHref } from '../auth/residentLogin'
 import { drawUnavailableText, drawCredentialStatusText } from '../../lib/drawUi'
-import { newIdempotencyKey, describeLocalError } from '../../services/localApi'
+import { residentScopeRefusalText } from '../../lib/residentCommunity'
+import { isLocalApiError, newIdempotencyKey, describeLocalError } from '../../services/localApi'
 import {
   enterResidentDraw,
   getPublicDrawPool,
@@ -108,7 +109,12 @@ export function DailyDrawCard({
       setLastResult(outcome)
       setReload((value) => value + 1)
     } catch (cause) {
-      setError(describeLocalError(cause, '抽奖请求未确认，可使用原请求重试。'))
+      // The community-scope refusals (#171 LL-IDENTITY-001) get residency copy that
+      // names the confirmed community; every other failure keeps its own message.
+      setError(
+        (isLocalApiError(cause) ? residentScopeRefusalText(cause.code, cause.message) : null) ??
+          describeLocalError(cause, '抽奖请求未确认，可使用原请求重试。'),
+      )
       // 4xx errors may reflect the actual server state; refresh before allowing another attempt.
       setReload((value) => value + 1)
     } finally {

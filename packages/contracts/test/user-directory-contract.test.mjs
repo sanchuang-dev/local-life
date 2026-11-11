@@ -237,6 +237,114 @@ describe('userDirectoryEntrySchema / response', () => {
   })
 })
 
+describe('resident community relation (#171)', () => {
+  const confirmedAt = '2026-11-11T04:00:00.000Z'
+  const confirmedEntry = {
+    ...staffEntry,
+    confirmedCommunity: {
+      id: communityA,
+      name: 'A 社区',
+      confirmedAt,
+      source: 'resident_h5_confirmed',
+    },
+    communityRelationSource: 'confirmed_binding',
+    residentCommunityState: 'confirmed',
+  }
+
+  it('keeps 已确认常驻社区 and 历史未确认归属 as independent fields', () => {
+    // History only: the confirmed field stays empty, history stays populated.
+    const historyOnly = userDirectoryEntrySchema.parse({
+      ...staffEntry,
+      confirmedCommunity: null,
+      communityRelationSource: 'historical_assignment',
+      residentCommunityState: 'unbound',
+    })
+    assert.equal(historyOnly.confirmedCommunity, null)
+    assert.deepEqual(historyOnly.residentCommunities.map((x) => x.id), [communityA])
+
+    // Confirmation only: the confirmed field is populated, history is empty.
+    const confirmedOnly = userDirectoryEntrySchema.parse({
+      ...staffEntry,
+      residentCommunities: [],
+      confirmedCommunity: {
+        id: communityB,
+        name: 'B 社区',
+        confirmedAt,
+        source: 'resident_h5_confirmed',
+      },
+      communityRelationSource: 'confirmed_binding',
+      residentCommunityState: 'confirmed',
+    })
+    assert.equal(confirmedOnly.confirmedCommunity.id, communityB)
+    assert.deepEqual(confirmedOnly.residentCommunities, [])
+
+    // Both at once: each field reports its own fact, never a merged one.
+    const both = userDirectoryEntrySchema.parse(confirmedEntry)
+    assert.equal(both.confirmedCommunity.id, communityA)
+    assert.equal(both.confirmedCommunity.source, 'resident_h5_confirmed')
+    assert.equal(both.confirmedCommunity.confirmedAt, confirmedAt)
+    assert.deepEqual(both.residentCommunities.map((x) => x.id), [communityA])
+
+    // Both, but the two facts disagree: still two separate fields.
+    const disagree = userDirectoryEntrySchema.parse({
+      ...confirmedEntry,
+      residentCommunities: [{ id: communityB, name: 'B 社区', joinedAt: confirmedAt }],
+      residentCommunityState: 'conflict',
+    })
+    assert.equal(disagree.confirmedCommunity.id, communityA)
+    assert.deepEqual(disagree.residentCommunities.map((x) => x.id), [communityB])
+  })
+
+  it('refuses to fabricate a confirmation from history or to hide one behind it', () => {
+    const invalid = [
+      // A confirmation flag must carry the confirmation itself.
+      { ...staffEntry, communityRelationSource: 'confirmed_binding' },
+      // History must not be promoted into the confirmed field.
+      { ...staffEntry, communityRelationSource: 'historical_assignment', confirmedCommunity: confirmedEntry.confirmedCommunity },
+      // "no relation" must not coexist with a historical relation.
+      { ...staffEntry, communityRelationSource: 'none' },
+      // A withheld (out-of-scope) confirmation must not leak its community.
+      { ...staffEntry, communityRelationSource: 'out_of_scope', confirmedCommunity: confirmedEntry.confirmedCommunity },
+      // `source` is an enum, not free text.
+      { ...confirmedEntry, confirmedCommunity: { ...confirmedEntry.confirmedCommunity, source: 'client_supplied' } },
+    ]
+    for (const value of invalid) {
+      assert.equal(userDirectoryEntrySchema.safeParse(value).success, false, JSON.stringify(value))
+    }
+    // `none` is fine once history is genuinely empty.
+    assert.equal(
+      userDirectoryEntrySchema.safeParse({
+        ...unassignedEntry,
+        residentCommunities: [],
+        confirmedCommunity: null,
+        communityRelationSource: 'none',
+      }).success,
+      true,
+    )
+  })
+
+  it('accepts every resident-facing state and an omitted (not derivable) one', () => {
+    for (const state of ['unbound', 'confirmed', 'pending_review', 'conflict']) {
+      assert.equal(
+        userDirectoryEntrySchema.safeParse({ ...confirmedEntry, residentCommunityState: state }).success,
+        true,
+        state,
+      )
+    }
+    assert.equal(
+      userDirectoryEntrySchema.safeParse({ ...confirmedEntry, residentCommunityState: null }).success,
+      true,
+    )
+    assert.equal(
+      userDirectoryEntrySchema.safeParse({ ...confirmedEntry, residentCommunityState: 'bound' }).success,
+      false,
+    )
+    // The #171 fields are optional, so an older consumer/fixture still parses.
+    const legacy = { ...unassignedEntry }
+    assert.equal(userDirectoryEntrySchema.safeParse(legacy).success, true)
+  })
+})
+
 describe('userDirectoryDetailSchema', () => {
   it('accepts a staff account whose staff communities differ from resident communities', () => {
     const parsed = userDirectoryDetailSchema.parse(staffDetail)
@@ -335,18 +443,23 @@ describe('userDirectoryDetailSchema', () => {
 
   it('pins the top-level field sets so adding a field is a conscious change', () => {
     assert.deepEqual(Object.keys(userDirectoryEntrySchema.shape).sort(), [
+      'communityRelationSource',
+      'confirmedCommunity',
       'createdAt',
       'displayName',
       'id',
       'identityMethods',
       'localDisplayName',
       'residentCommunities',
+      'residentCommunityState',
       'staffRole',
       'wechatAvatarUrl',
       'wechatNickname',
       'wechatProfileAuthorizedAt',
     ])
     assert.deepEqual(Object.keys(userDirectoryDetailSchema.shape).sort(), [
+      'communityRelationSource',
+      'confirmedCommunity',
       'createdAt',
       'displayName',
       'id',
@@ -354,6 +467,7 @@ describe('userDirectoryDetailSchema', () => {
       'localDisplayName',
       'maskedPhone',
       'residentCommunities',
+      'residentCommunityState',
       'staffAccount',
       'staffRole',
       'wechatAvatarUrl',

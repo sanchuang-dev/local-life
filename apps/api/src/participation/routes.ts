@@ -16,6 +16,7 @@ import {
   confirmParticipation,
   getParticipationState,
 } from './service.js'
+import { ResidentCommunityError } from '../resident-community/service.js'
 
 export interface ParticipationRouteDeps {
   db: AppDatabase
@@ -52,6 +53,14 @@ export function registerParticipationRoutes(
 
   const failWithParticipationError = (c: AppContext, error: unknown): Response => {
     if (error instanceof ParticipationError) {
+      return fail(c, error.status, error.code, error.message)
+    }
+    // #171 LL-IDENTITY-001: joining is community-scoped, so the shared
+    // confirmed-community guard can refuse it. Its 403
+    // `resident_community_not_bound` / `resident_community_conflict` (and the 404
+    // for an unknown community) keep the standard envelope, so the H5 can tell
+    // "confirm your community first" apart from a generic forbidden.
+    if (error instanceof ResidentCommunityError) {
       return fail(c, error.status, error.code, error.message)
     }
     throw error

@@ -2,7 +2,9 @@ import type { ResidentDrawAttempt } from '@sanchuang-dev/local-life-contracts'
 
 const UNAVAILABLE: Record<string, string> = {
   not_authenticated: '登录后即可查看今日剩余抽奖次数。',
-  not_assigned: '请先完成活动所属社区的居民关联。',
+  // #171 LL-IDENTITY-001: the API now derives this reason from the confirmed
+  // permanent community, not from the retired #123 automatic assignment.
+  not_assigned: '请先在「我的」中确认常驻社区，再参与今日抽奖。',
   activity_unavailable: '活动尚未开放或已结束，暂不能抽奖。',
   draw_pool_not_configured: '今日抽奖尚未配置奖品。',
   draw_pool_disabled: '今日抽奖尚未开放，请留意社区通知。',

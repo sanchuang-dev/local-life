@@ -1,10 +1,14 @@
 import { ChevronRight, Users } from 'lucide-react'
 import { Link } from 'react-router'
 import { CommunitySceneCards } from '../components/community/CommunitySceneCards'
+import { ResidentCommunityStrip } from '../components/community/ResidentCommunityCard'
 import { PageHeader } from '../components/PageHeader'
 import { DemoNote } from '../components/DemoNote'
 import { PendingNotice } from '../components/PendingNotice'
 import { usePendingNotice } from '../hooks/usePendingNotice'
+import { useResidentAuth } from '../hooks/useResidentAuth'
+import { useResidentCommunity } from '../hooks/useResidentCommunity'
+import { BROWSE_ONLY_NOTICE } from '../lib/residentCommunity'
 import {
   communityActivityList,
   communityEntries,
@@ -19,6 +23,11 @@ const toneStyles = {
 
 export function CommunityPage() {
   const { message, show, dismiss } = usePendingNotice()
+  const auth = useResidentAuth()
+  const residentCommunity = useResidentCommunity({
+    sessionKey: auth.session?.user.id ?? null,
+    authLoading: auth.loading,
+  })
 
   return (
     <div className="px-4 pb-7 pt-4">
@@ -27,6 +36,19 @@ export function CommunityPage() {
         title="社区"
         subtitle="街坊日常生活入口"
       />
+
+      {/*
+        The permanent community is read-only here (#171 LL-IDENTITY-001): this
+        legacy 社区 hub lists demo entries and must never offer a switch, unbind or
+        rebind affordance, nor imply that browsing changes the permanent community.
+      */}
+      <div className="mt-3 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+        <p className="text-[13px] font-semibold text-slate-800">常驻社区</p>
+        <div className="mt-1">
+          <ResidentCommunityStrip state={residentCommunity.state} onReload={residentCommunity.reload} />
+        </div>
+        <p className="mt-2 text-[11px] leading-4 text-slate-400">{BROWSE_ONLY_NOTICE}</p>
+      </div>
 
       <DemoNote>
         本页依据 V0.3 社区页迁移，消息、广播与活动均为演示数据，未接入真实社区服务。

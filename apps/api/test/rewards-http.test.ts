@@ -107,7 +107,11 @@ async function login(app: App, username: string, password: string): Promise<Sess
   }
 }
 
-async function residentSession(app: App, displayName: string): Promise<Session> {
+async function residentSession(
+  app: App,
+  displayName: string,
+  communityId?: string,
+): Promise<Session> {
   const csrfState = await csrf(app)
   const response = await app.request('/auth/dev/login', {
     method: 'POST',
@@ -121,11 +125,30 @@ async function residentSession(app: App, displayName: string): Promise<Session> 
   })
   assert.equal(response.status, 200, 'resident dev login must succeed')
   const body = (await response.json()) as { user: { id: string }; csrfToken: string }
-  return {
+  const session: Session = {
     cookies: cookieHeader(cookiePair(response, 'll_session'), cookiePair(response, 'll_csrf')),
     csrfToken: body.csrfToken,
     userId: body.user.id,
   }
+  // #171 LL-IDENTITY-001: login no longer attributes a community. Everything
+  // community-scoped (joining a team, check-in, claim, draw, purchase link) now
+  // requires the resident's own confirmed binding, so tests that perform such a
+  // write confirm the community here — the same `POST /resident-community/confirm`
+  // call a real resident makes, with the real CSRF token and Origin.
+  if (communityId !== undefined) {
+    const confirmed = await app.request('/resident-community/confirm', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        cookie: session.cookies,
+        'x-csrf-token': session.csrfToken,
+        origin: WEB_ORIGIN,
+      },
+      body: JSON.stringify({ communityId }),
+    })
+    assert.equal(confirmed.status, 200, `resident confirmation must succeed: ${await confirmed.clone().text()}`)
+  }
+  return session
 }
 
 interface ApiOptions {
@@ -534,9 +557,9 @@ test('a forged resident identity is rejected instead of ignored; CSRF and Origin
   const fixture = await createFixture()
   const { app } = fixture
   const activityId = await createActivity(fixture)
-  const residentA = await residentSession(app, '居民A')
-  const residentB = await residentSession(app, '居民B')
-  await joinTeam(app, [residentA, residentB, await residentSession(app, '居民C')], activityId)
+  const residentA = await residentSession(app, '居民A', fixture.communityId)
+  const residentB = await residentSession(app, '居民B', fixture.communityId)
+  await joinTeam(app, [residentA, residentB, await residentSession(app, '居民C', fixture.communityId)], activityId)
 
   // Naming another resident in the body is a contract violation, not a no-op.
   const forgedCheckin = await api(app, 'POST', `/activities/${activityId}/checkin`, {
@@ -585,7 +608,7 @@ test('resident self check-in is idempotent, unverified, and does not unlock the 
   const fixture = await createFixture()
   const activityId = await createActivity(fixture)
   const residents = await Promise.all(
-    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(fixture.app, name)),
+    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(fixture.app, name, fixture.communityId)),
   )
   await joinTeam(fixture.app, residents, activityId)
 
@@ -639,7 +662,7 @@ test('claim issues one 10-character code; a repeat claim is idempotent and never
   const { app } = fixture
   const activityId = await createActivity(fixture)
   const residents = await Promise.all(
-    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name)),
+    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name, fixture.communityId)),
   )
   await joinTeam(app, residents, activityId)
   for (const resident of residents) await selfCheckin(app, resident, activityId)
@@ -686,7 +709,7 @@ test('claim issues one 10-character code; a repeat claim is idempotent and never
   assert.ok(!('code' in credential), 'the plaintext code must never be returned by a read')
 
   // A non-member's credential read is a 404, not a leak.
-  const outsider = await residentSession(app, '路人丁')
+  const outsider = await residentSession(app, '路人丁', fixture.communityId)
   const outsiderResponse = await api(app, 'GET', `/activities/${activityId}/rewards/credential`, {
     session: outsider,
   })
@@ -698,7 +721,7 @@ test('redeem is exactly once; forged, superseded and cross-community codes are r
   const { app } = fixture
   const activityId = await createActivity(fixture)
   const residents = await Promise.all(
-    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name)),
+    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name, fixture.communityId)),
   )
   const { code } = await issuedCredential(fixture, activityId, residents)
 
@@ -748,7 +771,7 @@ test('redeem is exactly once; forged, superseded and cross-community codes are r
   // A grid worker of another community is out of scope: 403 and an audit row.
   const secondActivity = await createActivity(fixture)
   const secondResidents = await Promise.all(
-    ['居民戊', '居民己', '居民庚'].map((name) => residentSession(app, name)),
+    ['居民戊', '居民己', '居民庚'].map((name) => residentSession(app, name, fixture.communityId)),
   )
   const second = await issuedCredential(fixture, secondActivity, secondResidents)
   const before = auditRows(fixture.db, 'reward.access_denied')
@@ -787,7 +810,7 @@ test('staff surfaces deny residents, cross-community staff and CSRF-less writes,
   const fixture = await createFixture()
   const { app } = fixture
   const activityId = await createActivity(fixture)
-  const outsiderResident = await residentSession(app, '普通居民')
+  const outsiderResident = await residentSession(app, '普通居民', fixture.communityId)
 
   // A resident session has no staff identity at all.
   const residentList = await api(app, 'GET', `/admin/activities/${activityId}/checkins`, {
@@ -883,7 +906,7 @@ test('staff surfaces deny residents, cross-community staff and CSRF-less writes,
 test('a draft activity, a missing reward plan and a closed window all answer reward_unavailable', async () => {
   const fixture = await createFixture()
   const { app } = fixture
-  const resident = await residentSession(app, '居民甲')
+  const resident = await residentSession(app, '居民甲', fixture.communityId)
 
   const draftActivityId = await createActivity(fixture, { publish: false })
   const draftCheckin = await api(app, 'POST', `/activities/${draftActivityId}/checkin`, {
@@ -949,7 +972,7 @@ test('a draft activity, a missing reward plan and a closed window all answer rew
     }),
   })
   const closedResidents = await Promise.all(
-    ['居民A1', '居民A2', '居民A3'].map((name) => residentSession(app, name)),
+    ['居民A1', '居民A2', '居民A3'].map((name) => residentSession(app, name, fixture.communityId)),
   )
   await joinTeam(app, closedResidents, closedActivityId)
   const closedCheckin = await api(app, 'POST', `/activities/${closedActivityId}/checkin`, {
@@ -974,7 +997,7 @@ test('revoking a check-in after issuance makes the credential unusable', async (
   const { app } = fixture
   const activityId = await createActivity(fixture)
   const residents = await Promise.all(
-    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name)),
+    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name, fixture.communityId)),
   )
   const { code } = await issuedCredential(fixture, activityId, residents)
 
@@ -1039,7 +1062,7 @@ test('revoking a check-in of an already redeemed prize moves the grant to disput
   const { app } = fixture
   const activityId = await createActivity(fixture)
   const residents = await Promise.all(
-    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name)),
+    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name, fixture.communityId)),
   )
   const { code, grantId } = await issuedCredential(fixture, activityId, residents)
 
@@ -1087,7 +1110,7 @@ test('grant revocation and dispute threads are staff-only, append-only and scope
   const { app } = fixture
   const activityId = await createActivity(fixture)
   const residents = await Promise.all(
-    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name)),
+    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name, fixture.communityId)),
   )
   const { grantId, code } = await issuedCredential(fixture, activityId, residents)
 
@@ -1155,7 +1178,7 @@ test('grant revocation and dispute threads are staff-only, append-only and scope
   // A revoked (unredeemed) grant can be revoked through the staff surface once.
   const secondActivity = await createActivity(fixture)
   const secondResidents = await Promise.all(
-    ['居民戊', '居民己', '居民庚'].map((name) => residentSession(app, name)),
+    ['居民戊', '居民己', '居民庚'].map((name) => residentSession(app, name, fixture.communityId)),
   )
   const secondGrant = await issuedCredential(fixture, secondActivity, secondResidents)
   const revoked = await api(
@@ -1180,7 +1203,7 @@ test('an expired credential is refused even though its hash still matches', asyn
   const { app } = fixture
   const activityId = await createActivity(fixture)
   const residents = await Promise.all(
-    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name)),
+    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name, fixture.communityId)),
   )
   const { code, grantId } = await issuedCredential(fixture, activityId, residents)
 
@@ -1243,7 +1266,7 @@ test('pausing before any check-in leaves both surfaces closed and leaks no prize
   const { app } = fixture
   const activityId = await createActivity(fixture)
   const residents = await Promise.all(
-    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name)),
+    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name, fixture.communityId)),
   )
   await joinTeam(app, residents, activityId)
 
@@ -1301,7 +1324,7 @@ test('responses stay on-contract for every success path (shared schemas parse th
   const { app } = fixture
   const activityId = await createActivity(fixture)
   const residents = await Promise.all(
-    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name)),
+    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name, fixture.communityId)),
   )
   await joinTeam(app, residents, activityId)
   for (const resident of residents) await selfCheckin(app, resident, activityId)
@@ -1393,7 +1416,7 @@ test('F1: a non-recipient cannot rotate the recipient credential after a grant e
     plan: rewardPlan({ claimRecipient: 'leader' }),
   })
   const residents = await Promise.all(
-    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name)),
+    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name, fixture.communityId)),
   )
   await joinTeam(app, residents, activityId)
   for (const resident of residents) await selfCheckin(app, resident, activityId)
@@ -1441,7 +1464,7 @@ test('F2: re-claiming a redeemed grant mints no dead code and codesActive stays 
   const { app } = fixture
   const activityId = await createActivity(fixture)
   const residents = await Promise.all(
-    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name)),
+    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name, fixture.communityId)),
   )
   await joinTeam(app, residents, activityId)
   for (const resident of residents) await selfCheckin(app, resident, activityId)
@@ -1484,7 +1507,7 @@ test('F3: pausing after qualification closes claim, and consumes no stock or bud
   const { app } = fixture
   const activityId = await createActivity(fixture)
   const residents = await Promise.all(
-    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name)),
+    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name, fixture.communityId)),
   )
   await joinTeam(app, residents, activityId)
   // The real sequence: qualify first, THEN pause. The old test paused first, so
@@ -1527,7 +1550,7 @@ test('F3: ending after qualification closes claim with an activity_ended reason'
   const { app } = fixture
   const activityId = await createActivity(fixture)
   const residents = await Promise.all(
-    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name)),
+    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name, fixture.communityId)),
   )
   await joinTeam(app, residents, activityId)
   for (const resident of residents) await selfCheckin(app, resident, activityId)
@@ -1560,7 +1583,7 @@ test('F3: pausing after a claim closes redemption, leaving the ledger untouched'
   const { app } = fixture
   const activityId = await createActivity(fixture)
   const residents = await Promise.all(
-    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name)),
+    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name, fixture.communityId)),
   )
   await joinTeam(app, residents, activityId)
   for (const resident of residents) await selfCheckin(app, resident, activityId)
@@ -1604,7 +1627,7 @@ test('F3: ending after a claim closes redemption too', async () => {
   const { app } = fixture
   const activityId = await createActivity(fixture)
   const residents = await Promise.all(
-    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name)),
+    ['居民甲', '居民乙', '居民丙'].map((name) => residentSession(app, name, fixture.communityId)),
   )
   await joinTeam(app, residents, activityId)
   for (const resident of residents) await selfCheckin(app, resident, activityId)
@@ -1635,7 +1658,7 @@ test('an exhausted prize pool answers 200 with stock_exhausted, not a 500', asyn
     plan: rewardPlan({ totalPrizeQuantity: 1, prizeUnitCostCents: 5_000, budgetCapCents: 5_000 }),
   })
   const first = await Promise.all(
-    ['甲队甲', '甲队乙', '甲队丙'].map((name) => residentSession(app, name)),
+    ['甲队甲', '甲队乙', '甲队丙'].map((name) => residentSession(app, name, fixture.communityId)),
   )
   await joinTeam(app, first, activityId)
   for (const resident of first) await selfCheckin(app, resident, activityId)
@@ -1644,7 +1667,7 @@ test('an exhausted prize pool answers 200 with stock_exhausted, not a 500', asyn
 
   // A second qualified team now finds the pool empty.
   const second = await Promise.all(
-    ['乙队甲', '乙队乙', '乙队丙'].map((name) => residentSession(app, name)),
+    ['乙队甲', '乙队乙', '乙队丙'].map((name) => residentSession(app, name, fixture.communityId)),
   )
   await joinTeam(app, second, activityId)
   for (const resident of second) await selfCheckin(app, resident, activityId)
@@ -1688,7 +1711,7 @@ test('an exhausted budget answers 200 with budget_exhausted, not a 500', async (
     plan: rewardPlan({ totalPrizeQuantity: 2, prizeUnitCostCents: 5_000, budgetCapCents: 5_000 }),
   })
   const first = await Promise.all(
-    ['甲队甲', '甲队乙', '甲队丙'].map((name) => residentSession(app, name)),
+    ['甲队甲', '甲队乙', '甲队丙'].map((name) => residentSession(app, name, fixture.communityId)),
   )
   await joinTeam(app, first, activityId)
   for (const resident of first) await selfCheckin(app, resident, activityId)
@@ -1696,7 +1719,7 @@ test('an exhausted budget answers 200 with budget_exhausted, not a 500', async (
   await claimReward(app, first[0]!, activityId)
 
   const second = await Promise.all(
-    ['乙队甲', '乙队乙', '乙队丙'].map((name) => residentSession(app, name)),
+    ['乙队甲', '乙队乙', '乙队丙'].map((name) => residentSession(app, name, fixture.communityId)),
   )
   await joinTeam(app, second, activityId)
   for (const resident of second) await selfCheckin(app, resident, activityId)

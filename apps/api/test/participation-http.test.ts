@@ -21,6 +21,7 @@ import {
   activityTeams,
   communities,
 } from '../src/db/schema.js'
+import { confirmCommunityOrFail } from './resident-community-fixtures.js'
 
 const migrationsFolder = fileURLToPath(new URL('../db/migrations', import.meta.url))
 const ORIGIN = 'http://localhost:5173'
@@ -74,8 +75,20 @@ async function csrf(app: App) {
   return { token: body.csrfToken, cookie: cookiePair(response, 'll_csrf') }
 }
 
-/** Creates a real resident account and session through the documented dev login. */
-async function residentSession(app: App, displayName: string): Promise<ResidentSession> {
+/**
+ * Creates a real resident account and session through the documented dev login,
+ * then — #171 LL-IDENTITY-001 — confirms `communityId` as the resident's permanent
+ * community through `POST /resident-community/confirm`.
+ *
+ * Joining a team is a community-scoped write, so without that confirmation the
+ * service now answers 403 `resident_community_not_bound`. The confirmation here is
+ * the resident's own real first confirmation, not a test bypass.
+ */
+async function residentSession(
+  app: App,
+  displayName: string,
+  communityId: string,
+): Promise<ResidentSession> {
   const csrfState = await csrf(app)
   const response = await app.request('/auth/dev/login', {
     method: 'POST',
@@ -94,11 +107,13 @@ async function residentSession(app: App, displayName: string): Promise<ResidentS
     csrfToken: string
   }
   assert.equal(body.authenticated, true)
-  return {
+  const session: ResidentSession = {
     cookies: cookieHeader(cookiePair(response, 'll_session'), cookiePair(response, 'll_csrf')),
     csrfToken: body.csrfToken,
     userId: body.user.id,
   }
+  await confirmCommunityOrFail(app, session, communityId, ORIGIN)
+  return session
 }
 
 interface ApiOptions {
@@ -233,10 +248,10 @@ function testContext(): Fixture {
 test('A/B/C form a locked 3/3 team over HTTP; the fourth is rejected and re-confirm is idempotent', async () => {
   const { app, db, sqlite, communityId } = testContext()
   try {
-    const residentA = await residentSession(app, '居民A')
-    const residentB = await residentSession(app, '居民B')
-    const residentC = await residentSession(app, '居民C')
-    const residentD = await residentSession(app, '居民D')
+    const residentA = await residentSession(app, '居民A', communityId)
+    const residentB = await residentSession(app, '居民B', communityId)
+    const residentC = await residentSession(app, '居民C', communityId)
+    const residentD = await residentSession(app, '居民D', communityId)
     const activityId = addActivity(db, communityId, residentA.userId)
 
     const firstResponse = await postConfirm(app, residentA, activityId)
@@ -340,8 +355,8 @@ test('A/B/C form a locked 3/3 team over HTTP; the fourth is rejected and re-conf
 test('participation HTTP rejects missing session/CSRF, forged userId and invalid invite codes without writes', async () => {
   const { app, db, sqlite, communityId } = testContext()
   try {
-    const residentA = await residentSession(app, '居民A')
-    const residentB = await residentSession(app, '居民B')
+    const residentA = await residentSession(app, '居民A', communityId)
+    const residentB = await residentSession(app, '居民B', communityId)
     const activityId = addActivity(db, communityId, residentA.userId)
     const path = participationPath(activityId)
 
@@ -454,9 +469,9 @@ test('participation HTTP rejects missing session/CSRF, forged userId and invalid
 test('first confirmed attribution stays frozen and the same resident can team up in another activity', async () => {
   const { app, db, sqlite, communityId } = testContext()
   try {
-    const residentA = await residentSession(app, '居民A')
-    const residentB = await residentSession(app, '居民B')
-    const residentC = await residentSession(app, '居民C')
+    const residentA = await residentSession(app, '居民A', communityId)
+    const residentB = await residentSession(app, '居民B', communityId)
+    const residentC = await residentSession(app, '居民C', communityId)
     const firstActivityId = addActivity(db, communityId, residentA.userId)
     const secondActivityId = addActivity(db, communityId, residentA.userId)
 
@@ -512,11 +527,11 @@ test('first confirmed attribution stays frozen and the same resident can team up
 test('concurrent HTTP confirms never create a fourth seat', async () => {
   const { app, db, sqlite, communityId } = testContext()
   try {
-    const residentA = await residentSession(app, '居民A')
-    const residentB = await residentSession(app, '居民B')
-    const residentC = await residentSession(app, '居民C')
-    const residentD = await residentSession(app, '居民D')
-    const residentE = await residentSession(app, '居民E')
+    const residentA = await residentSession(app, '居民A', communityId)
+    const residentB = await residentSession(app, '居民B', communityId)
+    const residentC = await residentSession(app, '居民C', communityId)
+    const residentD = await residentSession(app, '居民D', communityId)
+    const residentE = await residentSession(app, '居民E', communityId)
     const activityId = addActivity(db, communityId, residentA.userId)
 
     const leaderResponse = await postConfirm(app, residentA, activityId)
