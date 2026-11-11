@@ -61,6 +61,8 @@ apps/admin/src/
 - 日期区间只传 `YYYY-MM-DD` 字符串（`{ start?, end? }`），由页面/API 定义时区与开闭区间语义；组件不自行猜测。
 - 排序与分页：点击表头只发出 `sort` 意图并回到第 1 页，不在本地重排当前页；分页大小变化回到第 1 页。`pagination=false` 用于完整的小数据集。
 - 表格/卡片：同一 `rows` 两种视图；卡片视图需要页面提供 `renderCard`。所有行操作由页面注入，组件不写业务实体。
+- **业务列表优先复用 DataPanel**：页面级主要创建动作放 `PageHeader.extra`；列表相关的导入/导出/下载模板等自定义按钮通过已有 `toolbarExtra` 插槽注入；刷新使用 `onRefresh`，编辑/上下架等动作使用 `rowActions`。这些扩展能力已经开放，不应为了添加业务按钮重复搭建 `Table + Toolbar + Pagination`。
+- 若 API 当前只提供完整列表而不支持分页/查询，页面负责筛选和切片并向受控 `PanelQuery` 回传结果；不得伪装成服务端查询或让 `DataPanel` 私自抓取/缓存业务数据。
 - 列设置：显示/隐藏、上下移动、表格密度（紧凑/标准/宽松）、视图模式按 `id` 隔离保存在 `localStorage` 的 `ll:data-panel-prefs`（版本化、白名单、上限 30 面板/60 列）。新增列默认显示；至少保留一列；`hideable=false` 的列不可隐藏。
 - 状态：加载中不显示「暂无数据」；失败态提供 `errorTitle`/`message` 与「重试」；空态区分「无匹配筛选」与页码过期，后者提供「回到第一页」。筛选摘要不写入 URL（LL-UI-003）。
 - 组件验收页：`/#/system/components`（`pages/ComponentPreviewPage.tsx`）使用 14 条本地样例数据，明确标注为开发预览，不代表居民/订单/业绩等真实业务；样例数据与状态切换仅用于验收组件状态，不写库、不调 API。
