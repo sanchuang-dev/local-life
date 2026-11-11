@@ -2059,6 +2059,73 @@ export const activityDrawEvents = sqliteTable(
  * Curated external platform promotions. Never a payable product or a reward.
  * An offer starts disabled; operators must verify the link before publication.
  */
+
+/* Real daily draw attempts, separate from the three-seat group reward. */
+export const activityDrawAttempts = sqliteTable('activity_draw_attempts', {
+  id: text('id').primaryKey(),
+  activityId: text('activity_id').notNull().references(() => activities.id, { onDelete: 'restrict' }),
+  poolId: text('pool_id').notNull().references(() => activityDrawPools.id, { onDelete: 'restrict' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  day: text('day').notNull(),
+  sequence: integer('sequence').notNull(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  outcome: text('outcome').$type<'won' | 'missed'>().notNull(),
+  prizeId: text('prize_id').references(() => activityDrawPrizes.id, { onDelete: 'restrict' }),
+  prizeName: text('prize_name'),
+  prizeImageUrl: text('prize_image_url'),
+  prizeCostCents: integer('prize_cost_cents'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  uniqueIndex('draw_attempts_idempotency_uq').on(table.activityId, table.userId, table.idempotencyKey),
+  uniqueIndex('draw_attempts_daily_slot_uq').on(table.activityId, table.userId, table.day, table.sequence),
+  index('draw_attempts_user_day_idx').on(table.userId, table.activityId, table.day),
+  check('draw_attempts_seq_check', sql`${table.sequence} >= 1`),
+  check('draw_attempts_outcome_check', sql`${table.outcome} IN ('won','missed')`),
+  check('draw_attempts_snapshot_check', sql`(
+    (${table.outcome}='missed' AND ${table.prizeId} IS NULL AND ${table.prizeName} IS NULL AND ${table.prizeCostCents} IS NULL)
+    OR (${table.outcome}='won' AND ${table.prizeId} IS NOT NULL AND ${table.prizeName} IS NOT NULL AND ${table.prizeCostCents} >= 0)
+  )`),
+])
+
+export const activityDrawCredentials = sqliteTable('activity_draw_credentials', {
+  id: text('id').primaryKey(),
+  attemptId: text('attempt_id').notNull().unique().references(() => activityDrawAttempts.id, { onDelete: 'restrict' }),
+  activityId: text('activity_id').notNull().references(() => activities.id, { onDelete: 'restrict' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  prizeId: text('prize_id').notNull().references(() => activityDrawPrizes.id, { onDelete: 'restrict' }),
+  codeHash: text('code_hash').notNull().unique(),
+  codeSuffix: text('code_suffix').notNull(),
+  status: text('status').$type<'active'|'redeemed'|'revoked'>().notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  redeemedAt: integer('redeemed_at', { mode: 'timestamp_ms' }),
+  redeemedByStaffId: text('redeemed_by_staff_id').references(() => staffAccounts.id, { onDelete: 'restrict' }),
+  revokedAt: integer('revoked_at', { mode: 'timestamp_ms' }),
+  revokedByStaffId: text('revoked_by_staff_id').references(() => staffAccounts.id, { onDelete: 'restrict' }),
+  revokeReason: text('revoke_reason'),
+}, (table) => [
+  index('draw_credentials_activity_status_idx').on(table.activityId, table.status),
+  check('draw_credentials_status_check', sql`${table.status} IN ('active','redeemed','revoked')`),
+  check('draw_credentials_stamps_check', sql`(
+    (${table.status}='active' AND ${table.redeemedAt} IS NULL AND ${table.revokedAt} IS NULL)
+    OR (${table.status}='redeemed' AND ${table.redeemedAt} IS NOT NULL AND ${table.redeemedByStaffId} IS NOT NULL AND ${table.revokedAt} IS NULL)
+    OR (${table.status}='revoked' AND ${table.revokedAt} IS NOT NULL AND ${table.revokedByStaffId} IS NOT NULL AND ${table.redeemedAt} IS NULL)
+  )`),
+])
+
+export const activityDrawFulfilmentEvents = sqliteTable('activity_draw_fulfilment_events', {
+  id: text('id').primaryKey(),
+  activityId: text('activity_id').notNull().references(() => activities.id, { onDelete: 'restrict' }),
+  credentialId: text('credential_id').notNull().references(() => activityDrawCredentials.id, { onDelete: 'restrict' }),
+  kind: text('kind').$type<'issued'|'redeemed'|'revoked'|'disputed'>().notNull(),
+  actorUserId: text('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
+  staffId: text('staff_id').references(() => staffAccounts.id, { onDelete: 'set null' }),
+  note: text('note'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  index('draw_fulfilment_events_credential_idx').on(table.credentialId, table.createdAt),
+  check('draw_fulfilment_events_kind_check', sql`${table.kind} IN ('issued','redeemed','revoked','disputed')`),
+])
+
 export const externalOffers = sqliteTable(
   'external_offers',
   {
@@ -2121,6 +2188,9 @@ export const schema = {
   activityDrawPools,
   activityDrawPrizes,
   activityDrawEvents,
+  activityDrawAttempts,
+  activityDrawCredentials,
+  activityDrawFulfilmentEvents,
   localProducts,
   localOrders,
   localOrderEvents,

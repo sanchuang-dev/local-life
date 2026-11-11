@@ -30,6 +30,12 @@ export const ACTIVITY_DRAW_MAX_DAILY_LIMIT = 100
 export const ACTIVITY_DRAW_ROUTES = {
   /** Resident: read the validated, enabled prize pool of a published activity. */
   publicPool: '/activities/public/:activityId/draw-pool',
+  state: '/activities/:activityId/draw-state',
+  enter: '/activities/:activityId/draw',
+  history: '/activities/:activityId/draw-history',
+  adminVerify: '/admin/activities/:activityId/draw-verify',
+  adminRedeem: '/admin/activities/:activityId/draw-redeem',
+  adminRevoke: '/admin/activities/:activityId/draw-revoke',
   /** Staff: read the activity's draw pool (or the honest "not configured" state). */
   adminPool: '/admin/activities/:activityId/draw-pool',
   /** Staff: create or update the per-activity daily rule (idempotent upsert). */
@@ -248,3 +254,69 @@ export const publicActivityDrawPoolSchema = z
   })
 
 export type PublicActivityDrawPool = z.infer<typeof publicActivityDrawPoolSchema>
+
+/* LL-LOT-002: resident draw outcomes and one-use fulfilment, separate from team rewards. */
+const drawDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+export const drawAttemptRequestSchema = z.strictObject({
+  idempotencyKey: z.string().uuid(),
+})
+export const drawCodeSchema = z.string().regex(/^DL-[0-9A-F]{24}$/)
+export const drawCredentialSchema = z.strictObject({
+  id: z.string().uuid(),
+  status: z.enum(['active', 'redeemed', 'revoked']),
+  codeSuffix: z.string().length(4),
+  /** Deterministic HMAC derivation (key only on server). Never persisted as plaintext. */
+  code: drawCodeSchema.nullable(),
+})
+export const residentDrawAttemptSchema = z.strictObject({
+  id: z.string().uuid(),
+  activityId: z.string().uuid(),
+  day: drawDay,
+  sequence: z.number().int().positive(),
+  outcome: z.enum(['won', 'missed']),
+  prize: z.strictObject({
+    name: z.string(),
+    imageUrl: z.string().nullable(),
+  }).nullable(),
+  credential: drawCredentialSchema.nullable(),
+  createdAt: isoTimestamp,
+})
+export const residentDrawStateSchema = z.strictObject({
+  activityId: z.string().uuid(),
+  authenticated: z.boolean(),
+  available: z.boolean(),
+  unavailableReason: z.enum([
+    'not_authenticated', 'not_assigned', 'activity_unavailable',
+    'draw_pool_not_configured', 'draw_pool_disabled', 'no_prize_available',
+    'draw_service_not_configured', 'daily_limit_reached',
+  ]).nullable(),
+  dailyLimit: z.number().int().nonnegative(),
+  todayCount: z.number().int().nonnegative(),
+  remainingToday: z.number().int().nonnegative(),
+  day: drawDay,
+})
+export const residentDrawHistorySchema = z.strictObject({
+  /** Recent attempts are bounded to avoid unbounded history responses. */
+  attempts: z.array(residentDrawAttemptSchema),
+  /** All outstanding awards, even when the winning draw is older than the history window. */
+  activeAwards: z.array(residentDrawAttemptSchema),
+})
+export const drawStaffCodeRequestSchema = z.strictObject({
+  code: drawCodeSchema,
+})
+export const drawStaffRevokeRequestSchema = z.strictObject({
+  credentialId: z.string().uuid(),
+  reason: z.string().trim().min(2).max(200),
+})
+export const drawStaffCredentialSchema = z.strictObject({
+  credentialId: z.string().uuid(),
+  attemptId: z.string().uuid(),
+  prizeName: z.string(),
+  status: z.enum(['active', 'redeemed', 'revoked']),
+  codeSuffix: z.string().length(4),
+  redeemedAt: isoTimestamp.nullable(),
+  createdAt: isoTimestamp,
+})
+export type ResidentDrawState = z.infer<typeof residentDrawStateSchema>
+export type ResidentDrawAttempt = z.infer<typeof residentDrawAttemptSchema>
+export type DrawStaffCredential = z.infer<typeof drawStaffCredentialSchema>

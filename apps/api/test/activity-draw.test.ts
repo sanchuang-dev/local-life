@@ -28,6 +28,10 @@ import { createDatabase, type AppDatabase } from '../src/db/client.js'
 import {
   activityDrawEvents,
   activityDrawPrizes,
+  activityDrawAttempts,
+  activityDrawCredentials,
+  activityDrawFulfilmentEvents,
+  residentCommunityAssignments,
   communities,
   localProducts,
   staffAccounts,
@@ -35,6 +39,7 @@ import {
   users,
 } from '../src/db/schema.js'
 import { hashPassword } from '../src/auth/security.js'
+import { drawBeijingDay, enterDailyDraw } from '../src/draw/engine.js'
 
 const migrationsFolder = fileURLToPath(new URL('../db/migrations', import.meta.url))
 const ADMIN_ORIGIN = 'http://localhost:5174'
@@ -42,6 +47,7 @@ const ADMIN_PASSWORD = 'Admin-Password-123!'
 const OPERATOR_PASSWORD = 'Operator-Password-123!'
 const GRID_PASSWORD = 'Grid-Worker-Password-123!'
 const NOW = new Date()
+const DRAW_SECRET = 'll-test-only-not-a-real-deployment-key-123456789'
 
 type App = ReturnType<typeof createApp>
 
@@ -180,7 +186,7 @@ async function seedStaff(
 
 async function createFixture(databasePath = ':memory:'): Promise<Fixture> {
   const { db, sqlite } = createDatabase(databasePath, migrationsFolder)
-  const config = loadConfig({ NODE_ENV: 'test', AUTH_DEV_ENABLED: 'true' })
+  const config = loadConfig({ NODE_ENV: 'test', AUTH_DEV_ENABLED: 'true', DRAW_CREDENTIAL_SECRET: DRAW_SECRET })
   const app = createApp({ db, config, logRequests: false })
 
   const communityId = randomUUID()
@@ -439,7 +445,7 @@ test('a published pool persists real product snapshots and survives a restart', 
   }
 
   const reopened = createDatabase(databasePath, migrationsFolder)
-  const config = loadConfig({ NODE_ENV: 'test', AUTH_DEV_ENABLED: 'true' })
+  const config = loadConfig({ NODE_ENV: 'test', AUTH_DEV_ENABLED: 'true', DRAW_CREDENTIAL_SECRET: DRAW_SECRET })
   const app = createApp({ db: reopened.db, config, logRequests: false })
   try {
     const admin = await login(app, 'admin', ADMIN_PASSWORD)
@@ -1050,6 +1056,277 @@ test('migration 0015 upgrades an older database in place and keeps its data', as
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
+})
+
+
+
+async function bindStaffUser(fixture: Fixture, username: string, communityId = fixture.communityId): Promise<string> {
+  const staff = fixture.db.select().from(staffAccounts).where(eq(staffAccounts.username, username)).get()
+  assert.ok(staff)
+  fixture.db.insert(residentCommunityAssignments).values({
+    userId: staff.userId, communityId, createdAt: new Date(),
+  }).onConflictDoNothing().run()
+  return staff.userId
+}
+
+test('LL-LOT-002: authenticated HTTP draw is persisted, idempotent, quota-bound and redeemed once', async () => {
+  const fixture = await createFixture()
+  try {
+    const activityId = await createActivity(fixture)
+    const productId = await createProduct(fixture, { priceCents: 12_345 })
+    const prize = await seedReadyPool(fixture, activityId, productId)
+    const userId = await bindStaffUser(fixture, 'admin')
+    // Force an actual award: no-prize weight is zero, never a mocked win.
+    const enabled = await getPool(fixture, activityId)
+    const configResponse = await savePool(fixture, activityId, {
+      expectedUpdatedAt: enabled.updatedAt, enabled: true,
+      dailyDrawLimitPerResident: 1, noPrizeWeight: 0,
+    })
+    assert.equal(configResponse.status, 200)
+
+    const drawPath = path(ACTIVITY_DRAW_ROUTES.enter, activityId)
+    const key = randomUUID()
+    const drawn = await api(fixture.app, 'POST', drawPath, {
+      session: fixture.admin, body: { idempotencyKey: key },
+    })
+    assert.equal(drawn.status, 200)
+    const win = await drawn.json() as {
+      id: string; outcome: string; credential: { code: string; codeSuffix: string; id: string }
+    }
+    assert.equal(win.outcome, 'won')
+    assert.match(win.credential.code, /^DL-[0-9A-F]{24}$/)
+    const same = await api(fixture.app, 'POST', drawPath, {
+      session: fixture.admin, body: { idempotencyKey: key },
+    })
+    assert.equal(same.status, 200)
+    assert.deepEqual(await same.json(), win, 'replay returns same result and code')
+    const extra = await api(fixture.app, 'POST', drawPath, {
+      session: fixture.admin, body: { idempotencyKey: randomUUID() },
+    })
+    assert.equal(extra.status, 409)
+    assert.equal(await errorCode(extra), API_ERROR_CODES.drawDailyLimit)
+    const spoofed = await api(fixture.app, 'POST', drawPath, {
+      session: fixture.admin, body: { idempotencyKey: randomUUID(), userId },
+    })
+    assert.equal(spoofed.status, 400)
+    const noCsrf = await api(fixture.app, 'POST', drawPath, {
+      session: fixture.admin, csrf: false, body: { idempotencyKey: randomUUID() },
+    })
+    assert.equal(noCsrf.status, 403)
+    const unauth = await api(fixture.app, 'POST', drawPath, {
+      body: { idempotencyKey: randomUUID() },
+    })
+    assert.equal(unauth.status, 401)
+
+    const dbCredential = fixture.db.select().from(activityDrawCredentials)
+      .where(eq(activityDrawCredentials.attemptId, win.id)).get()
+    assert.ok(dbCredential)
+    assert.equal(dbCredential.codeSuffix, win.credential.codeSuffix)
+    assert.equal(dbCredential.codeHash.length, 64)
+    assert.equal(JSON.stringify(dbCredential).includes(win.credential.code), false, 'plaintext never persisted')
+    const remaining = fixture.db.select().from(activityDrawPrizes)
+      .where(eq(activityDrawPrizes.id, prize.id)).get()
+    assert.equal(remaining?.drawnQuantity, 1)
+    assert.equal(remaining?.remainingQuantity, 4)
+
+    const history = await api(fixture.app, 'GET', path(ACTIVITY_DRAW_ROUTES.history, activityId), { session: fixture.admin })
+    assert.equal(history.status, 200)
+    const saved = await history.json() as { attempts: Array<{ credential: { code: string } }> }
+    assert.equal(saved.attempts.length, 1)
+    assert.equal(saved.attempts[0]?.credential.code, win.credential.code)
+
+    const verifyPath = path(ACTIVITY_DRAW_ROUTES.adminVerify, activityId)
+    const redeemPath = path(ACTIVITY_DRAW_ROUTES.adminRedeem, activityId)
+    const verified = await api(fixture.app, 'POST', verifyPath, { session: fixture.operator, body: { code: win.credential.code } })
+    assert.equal(verified.status, 200)
+    const redeemed = await api(fixture.app, 'POST', redeemPath, { session: fixture.operator, body: { code: win.credential.code } })
+    assert.equal(redeemed.status, 200)
+    assert.equal((await redeemed.json() as { status: string }).status, 'redeemed')
+    const replayRedeem = await api(fixture.app, 'POST', redeemPath, { session: fixture.operator, body: { code: win.credential.code } })
+    assert.equal(replayRedeem.status, 409)
+    assert.equal(await errorCode(replayRedeem), API_ERROR_CODES.drawAlreadyRedeemed)
+    const after = await api(fixture.app, 'GET', path(ACTIVITY_DRAW_ROUTES.history, activityId), { session: fixture.admin })
+    const postHistory = await after.json() as { attempts: Array<{ credential: { code: string | null; status: string } }> }
+    assert.equal(postHistory.attempts[0]?.credential.code, null)
+    assert.equal(postHistory.attempts[0]?.credential.status, 'redeemed')
+    const events = fixture.db.select().from(activityDrawFulfilmentEvents).all()
+    assert.deepEqual(events.map(e => e.kind).sort(), ['issued', 'redeemed'])
+  } finally { fixture.sqlite.close() }
+})
+
+test('LL-LOT-002: disabled pool, missing community and cross-community staff are rejected', async () => {
+  const fixture = await createFixture()
+  try {
+    const activityId = await createActivity(fixture)
+    const productId = await createProduct(fixture)
+    await seedReadyPool(fixture, activityId, productId)
+    const userId = fixture.db.select().from(staffAccounts).where(eq(staffAccounts.username, 'admin')).get()?.userId
+    assert.ok(userId)
+    const missingMembership = await api(fixture.app, 'POST', path(ACTIVITY_DRAW_ROUTES.enter, activityId), {
+      session: fixture.admin, body: { idempotencyKey: randomUUID() },
+    })
+    assert.equal(missingMembership.status, 403)
+    await bindStaffUser(fixture, 'admin')
+    const pool = await getPool(fixture, activityId)
+    const closed = await savePool(fixture, activityId, {
+      expectedUpdatedAt: pool.updatedAt, enabled: false,
+      dailyDrawLimitPerResident: 1, noPrizeWeight: 0,
+    })
+    assert.equal(closed.status, 200)
+    const disabled = await api(fixture.app, 'POST', path(ACTIVITY_DRAW_ROUTES.enter, activityId), {
+      session: fixture.admin, body: { idempotencyKey: randomUUID() },
+    })
+    assert.equal(disabled.status, 409)
+    const status = await api(fixture.app, 'GET', path(ACTIVITY_DRAW_ROUTES.state, activityId), { session: fixture.admin })
+    assert.equal(status.status, 200)
+    assert.equal((await status.json() as { available: boolean }).available, false)
+    assert.equal(fixture.db.select().from(activityDrawAttempts).all().length, 0)
+    const otherActivity = await createActivity(fixture, { communityId: fixture.otherCommunityId })
+    const scope = await api(fixture.app, 'POST', path(ACTIVITY_DRAW_ROUTES.adminVerify, otherActivity), {
+      session: fixture.operator, body: { code: 'DL-' + 'A'.repeat(24) },
+    })
+    assert.equal(scope.status, 403)
+  } finally { fixture.sqlite.close() }
+})
+
+test('LL-LOT-002: cryptographic weighted miss, Shanghai day boundary, atomic last stock and revoked audit', async () => {
+  const fixture = await createFixture()
+  try {
+    const activityId = await createActivity(fixture)
+    const productId = await createProduct(fixture)
+    const prize = await seedReadyPool(fixture, activityId, productId)
+    const userId = await bindStaffUser(fixture, 'admin')
+    // Choose the next Beijing midnight relative to test execution time.
+    // Fixed 2026 dates would make this regression test fail in future years.
+    const currentDay = drawBeijingDay(NOW)
+    const boundary = new Date(currentDay + 'T16:00:00.000Z')
+    const before = new Date(boundary.getTime() - 10_000)
+    const after = new Date(boundary.getTime() + 5_000)
+    const noWin = enterDailyDraw(fixture.db, {
+      activityId, userId, idempotencyKey: randomUUID(), secret: DRAW_SECRET,
+      now: before, pick: max => max - 1,
+    })
+    assert.equal(noWin.outcome, 'missed')
+    assert.equal(noWin.credential, null)
+    assert.notEqual(drawBeijingDay(before), drawBeijingDay(after))
+    const nextDay = enterDailyDraw(fixture.db, {
+      activityId, userId, idempotencyKey: randomUUID(), secret: DRAW_SECRET,
+      now: after, pick: () => 0,
+    })
+    assert.equal(nextDay.outcome, 'won')
+    const prizeStock = fixture.db.select().from(activityDrawPrizes).where(eq(activityDrawPrizes.id, prize.id)).get()
+    assert.equal(prizeStock?.drawnQuantity, 1)
+    const revoked = await api(fixture.app, 'POST', path(ACTIVITY_DRAW_ROUTES.adminRevoke, activityId), {
+      session: fixture.admin, body: { credentialId: nextDay.credential?.id, reason: '奖品损坏需要人工处理' },
+    })
+    assert.equal(revoked.status, 200)
+    const events = fixture.db.select().from(activityDrawFulfilmentEvents).all()
+    assert.ok(events.some(e => e.kind === 'revoked'))
+    assert.throws(() => fixture.sqlite.prepare('DELETE FROM activity_draw_attempts').run(), /immutable/)
+    assert.throws(() => fixture.sqlite.prepare('DELETE FROM activity_draw_fulfilment_events').run(), /immutable/)
+  } finally { fixture.sqlite.close() }
+})
+
+
+
+test('LL-LOT-002: two residents compete for the last real prize and exactly one wins', async () => {
+  const fixture = await createFixture()
+  try {
+    const activityId = await createActivity(fixture)
+    const productId = await createProduct(fixture)
+    const prize = await seedReadyPool(fixture, activityId, productId)
+    await bindStaffUser(fixture, 'admin')
+    await bindStaffUser(fixture, 'operator.a')
+    const reduced = await updatePrize(fixture, activityId, prize.id, {
+      expectedUpdatedAt: prize.updatedAt,
+      totalQuantity: 1,
+    })
+    assert.equal(reduced.status, 200)
+    const pool = await getPool(fixture, activityId)
+    const config = await savePool(fixture, activityId, {
+      expectedUpdatedAt: pool.updatedAt, enabled: true, dailyDrawLimitPerResident: 1, noPrizeWeight: 0,
+    })
+    assert.equal(config.status, 200)
+    const url = path(ACTIVITY_DRAW_ROUTES.enter, activityId)
+    const idempotency1 = randomUUID()
+    const idempotency2 = randomUUID()
+    const results = await Promise.all([
+      api(fixture.app, 'POST', url, { session: fixture.admin, body: { idempotencyKey: idempotency1 } }),
+      api(fixture.app, 'POST', url, { session: fixture.operator, body: { idempotencyKey: idempotency2 } }),
+    ])
+    assert.deepEqual(results.map(r => r.status).sort(), [200, 409])
+    const stock = fixture.db.select().from(activityDrawPrizes).where(eq(activityDrawPrizes.id, prize.id)).get()
+    assert.equal(stock?.drawnQuantity, 1)
+    assert.equal(stock?.remainingQuantity, 0)
+    assert.equal(fixture.db.select().from(activityDrawAttempts).all().length, 1)
+    assert.equal(fixture.db.select().from(activityDrawCredentials).all().length, 1)
+  } finally { fixture.sqlite.close() }
+})
+
+test('LL-LOT-002: missing credential secret refuses awards without consuming stock', async () => {
+  const fixture = await createFixture()
+  try {
+    const activityId = await createActivity(fixture)
+    const productId = await createProduct(fixture)
+    const prize = await seedReadyPool(fixture, activityId, productId)
+    const adminUserId = await bindStaffUser(fixture, 'admin')
+    const config = loadConfig({ NODE_ENV: 'test', AUTH_DEV_ENABLED: 'true' })
+    const withoutSecret = createApp({ db: fixture.db, config, logRequests: false })
+    const blocked = await api(withoutSecret, 'POST', path(ACTIVITY_DRAW_ROUTES.enter, activityId), {
+      session: fixture.admin, body: { idempotencyKey: randomUUID() },
+    })
+    assert.equal(blocked.status, 409)
+    assert.equal(await errorCode(blocked), API_ERROR_CODES.drawPoolNotConfigured)
+    assert.equal(fixture.db.select().from(activityDrawPrizes).where(eq(activityDrawPrizes.id, prize.id)).get()?.drawnQuantity, 0)
+    assert.equal(fixture.db.select().from(activityDrawAttempts).all().length, 0)
+    assert.ok(adminUserId)
+  } finally { fixture.sqlite.close() }
+})
+
+
+test('LL-LOT-002: outstanding winner stays accessible beyond 200 recent attempts', async () => {
+  const fixture = await createFixture()
+  try {
+    const activityId = await createActivity(fixture)
+    const productId = await createProduct(fixture)
+    await seedReadyPool(fixture, activityId, productId)
+    const userId = await bindStaffUser(fixture, 'admin')
+    const prize = enterDailyDraw(fixture.db, {
+      activityId, userId, secret: DRAW_SECRET, idempotencyKey: randomUUID(),
+      pick: () => 0,
+    })
+    assert.equal(prize.outcome, 'won')
+    const pool = fixture.sqlite.prepare('SELECT id FROM activity_draw_pools WHERE activity_id = ?')
+      .get(activityId) as { id: string }
+    const insert = fixture.sqlite.prepare(
+      'INSERT INTO activity_draw_attempts (id,activity_id,pool_id,user_id,day,sequence,idempotency_key,outcome,created_at) VALUES (?,?,?,?,?,?,?,\'missed\',?)',
+    )
+    // Seed a long historical feed directly: unlike a real draw, this avoids
+    // 201 separate fake public requests while exercising the real SQLite index.
+    const now = Date.now()
+    for (let index = 1; index <= 201; index += 1) {
+      insert.run(randomUUID(), activityId, pool.id, userId, drawBeijingDay(new Date(now)),
+        index + 1, randomUUID(), now + index * 1000)
+    }
+    const history = await api(fixture.app, 'GET', path(ACTIVITY_DRAW_ROUTES.history, activityId), {
+      session: fixture.admin,
+    })
+    assert.equal(history.status, 200)
+    const data = await history.json() as {
+      attempts: Array<{ id: string }>
+      activeAwards: Array<{ id: string; credential: { code: string | null } | null }>
+    }
+    assert.equal(data.attempts.length, 200)
+    assert.equal(data.attempts.some(a => a.id === prize.id), false)
+    assert.equal(data.activeAwards.length, 1)
+    assert.equal(data.activeAwards[0]?.id, prize.id)
+    assert.equal(data.activeAwards[0]?.credential?.code, prize.credential?.code)
+    const operatorHistory = await api(fixture.app, 'GET', path(ACTIVITY_DRAW_ROUTES.history, activityId), {
+      session: fixture.operator,
+    })
+    assert.equal(operatorHistory.status, 200)
+    assert.equal((await operatorHistory.json() as { activeAwards: unknown[] }).activeAwards.length, 0)
+  } finally { fixture.sqlite.close() }
 })
 
 /** Minimal recursive mkdir without importing more fs surface than needed. */

@@ -6,6 +6,9 @@ import {
   createActivityDrawPrizeRequestSchema,
   saveActivityDrawPoolRequestSchema,
   updateActivityDrawPrizeRequestSchema,
+  drawAttemptRequestSchema,
+  drawStaffCodeRequestSchema,
+  drawStaffRevokeRequestSchema,
   type ApiErrorCode,
 } from '@sanchuang-dev/local-life-contracts'
 import type { ApiConfig } from '../config.js'
@@ -13,6 +16,7 @@ import type { AppDatabase } from '../db/client.js'
 import type { AppBindings, AppContext, AuthSession, HttpErrorStatus } from '../http.js'
 import type { LocalActor } from '../local/shared.js'
 import { LocalError } from '../local/shared.js'
+import { enterDailyDraw, getMyDrawHistory, getMyDrawState, verifyDrawCredential, redeemDrawCredential, revokeDrawCredential } from './engine.js'
 import {
   createDrawPrize,
   getAdminDrawPool,
@@ -99,6 +103,94 @@ export function registerDrawRoutes(app: Hono<AppBindings>, deps: DrawRouteDeps):
     }
     return parsed.data
   }
+
+
+  /* LL-LOT-002: all resident identity comes from the existing secure cookie. */
+  const requireResident = (c: AppContext): AuthSession | Response => {
+    const session = c.get('authSession')
+    if (!session) return fail(c, 401, API_ERROR_CODES.unauthorized, '请先登录居民账户')
+    return session
+  }
+  const csrfFor = (c: AppContext, session: AuthSession): Response | null => {
+    if (!validCsrf(c, config, session)) {
+      return fail(c, 403, API_ERROR_CODES.forbidden, 'CSRF 或来源校验失败')
+    }
+    return null
+  }
+
+  app.get(ACTIVITY_DRAW_ROUTES.state, (c) => {
+    const activityId = requireParam(c, 'activityId', '活动不存在')
+    if (activityId instanceof Response) return activityId
+    try {
+      return c.json(getMyDrawState(db, activityId, c.get('authSession')?.userId ?? null, config.drawCredentialSecret))
+    } catch (error) { return failWithDrawError(c, error) }
+  })
+
+  app.get(ACTIVITY_DRAW_ROUTES.history, (c) => {
+    const session = requireResident(c)
+    if (session instanceof Response) return session
+    const activityId = requireParam(c, 'activityId', '活动不存在')
+    if (activityId instanceof Response) return activityId
+    try {
+      return c.json(getMyDrawHistory(db, activityId, session.userId, config.drawCredentialSecret))
+    } catch (error) { return failWithDrawError(c, error) }
+  })
+
+  app.post(ACTIVITY_DRAW_ROUTES.enter, async (c) => {
+    const session = requireResident(c)
+    if (session instanceof Response) return session
+    const rejected = csrfFor(c, session)
+    if (rejected) return rejected
+    const activityId = requireParam(c, 'activityId', '活动不存在')
+    if (activityId instanceof Response) return activityId
+    const body = bodySchemaError(await c.req.json().catch(() => null), drawAttemptRequestSchema)
+    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '抽奖请求格式不正确')
+    try {
+      return c.json(enterDailyDraw(db, {
+        activityId, userId: session.userId, idempotencyKey: body.idempotencyKey,
+        secret: config.drawCredentialSecret,
+      }))
+    } catch (error) { return failWithDrawError(c, error) }
+  })
+
+  app.post(ACTIVITY_DRAW_ROUTES.adminVerify, async (c) => {
+    const guard = requireStaff(c)
+    if (guard instanceof Response) return guard
+    const rejected = csrfFor(c, guard.session)
+    if (rejected) return rejected
+    const activityId = requireParam(c, 'activityId', '活动不存在')
+    if (activityId instanceof Response) return activityId
+    const body = bodySchemaError(await c.req.json().catch(() => null), drawStaffCodeRequestSchema)
+    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '核销码格式不正确')
+    try { return c.json(verifyDrawCredential(db, actorOf(guard), activityId, body.code)) }
+    catch (error) { return failWithDrawError(c, error) }
+  })
+
+  app.post(ACTIVITY_DRAW_ROUTES.adminRedeem, async (c) => {
+    const guard = requireStaff(c)
+    if (guard instanceof Response) return guard
+    const rejected = csrfFor(c, guard.session)
+    if (rejected) return rejected
+    const activityId = requireParam(c, 'activityId', '活动不存在')
+    if (activityId instanceof Response) return activityId
+    const body = bodySchemaError(await c.req.json().catch(() => null), drawStaffCodeRequestSchema)
+    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '核销码格式不正确')
+    try { return c.json(redeemDrawCredential(db, actorOf(guard), activityId, body.code)) }
+    catch (error) { return failWithDrawError(c, error) }
+  })
+
+  app.post(ACTIVITY_DRAW_ROUTES.adminRevoke, async (c) => {
+    const guard = requireDrawManager(c)
+    if (guard instanceof Response) return guard
+    const rejected = csrfFor(c, guard.session)
+    if (rejected) return rejected
+    const activityId = requireParam(c, 'activityId', '活动不存在')
+    if (activityId instanceof Response) return activityId
+    const body = bodySchemaError(await c.req.json().catch(() => null), drawStaffRevokeRequestSchema)
+    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '撤销原因或凭据不正确')
+    try { return c.json(revokeDrawCredential(db, actorOf(guard), activityId, body.credentialId, body.reason)) }
+    catch (error) { return failWithDrawError(c, error) }
+  })
 
   /* ------------------------------- Resident ------------------------------- */
 
