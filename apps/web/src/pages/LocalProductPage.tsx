@@ -493,10 +493,7 @@ export function LocalProductPage() {
                           <TeamOptionChoice
                             key={option.team.id}
                             option={option}
-                            checked={
-                              (attempt?.attribution.sourceTeamId ?? selectedTeamId) ===
-                              option.team.id
-                            }
+                            checked={selectedTeamId === option.team.id}
                             disabled={inputsLocked}
                             onChange={() => setSelectedTeamId(option.team.id)}
                           />
