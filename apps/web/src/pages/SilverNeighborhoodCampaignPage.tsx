@@ -13,6 +13,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import type { PublicActivityDetail } from '@sanchuang-dev/local-life-contracts'
 import { CampaignSheet } from '../components/CampaignSheet'
 import { ParticipationTeamCard } from '../components/activity/ParticipationTeamCard'
+import { PurchaseRewardCard } from '../components/activity/PurchaseRewardCard'
 import { RewardProgressCard } from '../components/activity/RewardProgressCard'
 import { DailyDrawCard } from '../components/activity/DailyDrawCard'
 import { ActivityLoginMarkerCleanup } from '../components/activity/ActivityLoginResult'
@@ -28,7 +29,9 @@ import {
 } from '../components/activity/rewardLabels'
 import { buildActivityShareUrl, parseInviteParam } from '../components/activity/share'
 import { useActivityParticipation } from '../hooks/useActivityParticipation'
+import { useCouponWallet } from '../hooks/useCouponWallet'
 import { usePublicActivity, type PublicActivityLoadState } from '../hooks/usePublicActivity'
+import { usePurchaseRewardProgress } from '../hooks/usePurchaseRewardProgress'
 import { useResidentAuth } from '../hooks/useResidentAuth'
 import { useRewardProgress } from '../hooks/useRewardProgress'
 import { useWechatActivityShare } from '../hooks/useWechatActivityShare'
@@ -283,6 +286,26 @@ export function SilverNeighborhoodCampaignPage() {
     participation.state.status === 'ready' ? participation.state.data : null
   const team = participationState?.team ?? null
   const selfParticipation = participationState?.participation ?? null
+  // Participation is the only page-local writer that can change consumption
+  // eligibility. Re-reading on a seat change keeps both task cards consistent
+  // after the third member joins from the card above.
+  const purchaseRefreshKey = participationState
+    ? `${participationState.team?.id ?? ''}:${participationState.team?.seatsFilled ?? 0}:${participationState.team?.status ?? ''}:${participationState.participation?.joinedAt ?? ''}`
+    : ''
+  // An activity without a real plan must not even trigger reward reads; the old
+  // demonstration "消费组队" data is not a fallback source.
+  const purchaseActivityId = activity?.purchaseReward ? activity.id : null
+  const purchaseProgress = usePurchaseRewardProgress({
+    activityId: purchaseActivityId,
+    sessionKey: auth.session?.user.id ?? null,
+    authLoading: auth.loading,
+    refreshKey: purchaseRefreshKey,
+  })
+  const couponWallet = useCouponWallet({
+    sessionKey: purchaseActivityId ? (auth.session?.user.id ?? null) : null,
+    authLoading: auth.loading,
+    refreshKey: purchaseRefreshKey,
+  })
   const remainingSeats = team ? Math.max(0, team.seatsTotal - team.seatsFilled) : 0
   // The single share URL used by QR, native share and copy-link. It only exists
   // when the resident is a member of an open team that still has a real invite
@@ -453,6 +476,17 @@ export function SilverNeighborhoodCampaignPage() {
         loginResult={loginResult}
         onShare={openShareSheet}
       />
+
+      {activity?.purchaseReward ? (
+        <PurchaseRewardCard
+          activity={activity}
+          auth={auth}
+          progress={purchaseProgress}
+          coupons={couponWallet}
+          inviteCode={inviteParam.code}
+          inviteInvalid={inviteParam.invalid}
+        />
+      ) : null}
 
       {activity ? (
         <DailyDrawCard
