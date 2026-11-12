@@ -324,10 +324,11 @@ test('the browse picker never becomes a confirmation target', () => {
   assert.match(discovery, /\{BROWSE_ONLY_NOTICE\}/)
   assert.match(discovery, /这里只改变浏览的社区，不会确认或改变你的常驻社区。/)
   assert.match(discovery, /确认浏览这个社区/)
-  // Location is labelled as a recommendation, never as a residence proof, and the
-  // manual picker stays available regardless of geolocation state.
-  assert.match(discovery, /\{LOCATION_NOT_PROOF_NOTICE\}/)
-  assert.match(discovery, /手动选择社区/)
+  // The approved compact home no longer repeats the location notice here.
+  // Browse-only wording remains in the selector; location never confirms residence.
+  assert.doesNotMatch(discovery, /\{LOCATION_NOT_PROOF_NOTICE\}/)
+  assert.match(discovery, /选择社区\s*<\/button>/)
+  assert.match(discovery, /id="home-community-title" className="sr-only">选择社区/)
 })
 
 test('no resident page offers a switch, unbind or rebind control', () => {
