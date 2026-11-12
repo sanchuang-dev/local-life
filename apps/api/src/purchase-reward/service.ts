@@ -29,7 +29,10 @@ import {
   assertCommunityAccess,
   iso,
   type LocalActor,
+  type LocalTransaction,
 } from '../local/shared.js'
+
+type PurchaseRewardReader = AppDatabase | LocalTransaction
 
 /**
  * Read-only effective-paid projection for a consumption team (LL-PUR-005, #210).
@@ -160,7 +163,7 @@ interface MemberRow {
   joinedAt: Date
 }
 
-function listTeamMembers(db: AppDatabase, teamIds: string[]): Map<string, MemberRow[]> {
+function listTeamMembers(db: PurchaseRewardReader, teamIds: string[]): Map<string, MemberRow[]> {
   const byTeam = new Map<string, MemberRow[]>()
   if (teamIds.length === 0) return byTeam
   const rows = db
@@ -205,7 +208,7 @@ function rosterDisplayName(displayName: string | null): string {
  * from ever producing a negative contribution.
  */
 function readContributions(
-  db: AppDatabase,
+  db: PurchaseRewardReader,
   activityId: string,
   teamIds: string[],
 ): Map<string, Map<string, number>> {
@@ -294,6 +297,27 @@ function buildTeamProgress(
     remainingCents,
     eligible: teamFull && totalEffectivePaidCents >= thresholdCents,
   })
+}
+
+/**
+ * Reuse the exact #210 net-paid/seat eligibility projection inside an existing
+ * BEGIN IMMEDIATE transaction when deciding whether to issue three coupons.
+ * Do not fork contribution arithmetic into the issuance writer.
+ */
+export function readTeamProgressForIssuance(
+  db: PurchaseRewardReader,
+  activityId: string,
+  teamId: string,
+  plan: PurchaseRewardPlan,
+): PurchaseRewardTeamProgress | null {
+  const team = db.select({ id: activityTeams.id, status: activityTeams.status })
+    .from(activityTeams)
+    .where(and(eq(activityTeams.id, teamId), eq(activityTeams.activityId, activityId)))
+    .get()
+  if (!team) return null
+  const members = listTeamMembers(db, [teamId]).get(teamId) ?? []
+  const amounts = readContributions(db, activityId, [teamId]).get(teamId) ?? new Map()
+  return buildTeamProgress(team, members, amounts, plan, '')
 }
 
 function buildEmptyProgress(
