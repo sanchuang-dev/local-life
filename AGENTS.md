@@ -5,8 +5,9 @@
 ## 1. 阶段与定位
 
 - 自 [Issue #57](https://github.com/sanchuang-dev/local-life/issues/57) 起，本仓库进入 **Pre-MVP 真实工程基座**：pnpm workspace + 居民 H5 + 管理台 + Node API。
-- **居民 H5** 保留已评审页面、视觉和路由；居民主身份现已接入账户 API。微信网页授权只有在公众号 AppID、AppSecret、授权回调域名等真实配置齐备后才可使用。
-- **管理台** 已具备管理员/运营员/网格员登录、退出、会话、社区分配和居民列表的服务端权限校验；**活动创建/发布/暂停和居民 H5 公开读取已由 LL-MVP-003 落地**。参与/三人团与网格员 CRM 已分别由 LL-MVP-004/005 合入 `dev`，但不是已部署的线上能力；奖励履约、商城、分账等仍由后续业务卡处理。
+- **居民 H5** 保留已评审页面、视觉和路由；居民主身份现已接入账户 API。微信网页授权只有在公众号 AppID、AppSecret、授权回调域名等真实配置齐备后才可使用；CRMEB 商品与购买跳转也只读取服务端真实配置，未配置时必须明确不可用。
+- **管理台与 API** 已具备管理员/运营员/网格员登录、退出、会话、社区分配和居民目录的服务端权限校验。`dev` 代码已经包含活动创建/发布/暂停与居民公开读取（LL-MVP-003）、三人团（LL-MVP-004）、网格员 CRM（LL-MVP-005）、签到与奖励履约（LL-MVP-006）、CRMEB adapter（LL-MVP-007）、统一经营流水/对账/结算（LL-MVP-008 及后续 SET 卡）、本地商品目录与居民订单（LL-MVP-010）、消费返券和抽奖（PUR/LOT 卡）等模块；每个模块的真实边界仍以 `docs/engineering/` 对应文档、当前代码和测试为准。
+- **代码存在不等于线上可用**：`dev` 上的实现和测试不等于已部署到 `mvp`，也不等于真实微信、CRMEB 或支付依赖已经可用。`mvp` 的实际能力只以对应晋级部署的 SHA、健康检查和验收证据为准；在线支付、自动分账/自动佣金等仍未由现行代码证明可用。
 - **API** 使用 SQLite + Drizzle 持久化用户、微信身份、后台账户、社区范围、会话、OAuth state、限流与审计记录。数据库只允许落在 `apps/api` 内。
 - 所有未实现业务必须显式标注，不得用 Mock 成功、写死数据或假鉴权伪装。
 - 产品仍按 MVP 任务卡逐步收敛；旧 [V0.3](https://github.com/sanchuang-dev/base-prototype/blob/demo/local-life/docs/PRD-V0.3.md) 只是历史参考。
@@ -17,7 +18,7 @@
 
 ```text
 apps/web/       # 居民移动端 H5，保留 /local-life/ Pages base
-apps/admin/     # 管理台：身份登录、社区/后台账户管理、社区居民只读列表
+apps/admin/     # 管理台：身份、活动/CRM、商品订单、业绩对账、系统配置
 apps/api/       # Node + Hono API、SQLite/Drizzle schema 与 migrations
 packages/contracts/  # 共享 zod schema 与类型；API 与客户端不得各自复制 DTO
 docs/engineering/    # 工程边界、身份/权限、安全配置与验证证据
@@ -54,7 +55,7 @@ pnpm --filter @sanchuang-dev/local-life-api bootstrap-admin  # 初始化首个�
 - H5 账户状态通过 `hooks/useResidentAuth.ts` 访问 API；真实 API 调用不得散落复制 DTO，加载、空、错误、禁用状态必须如实展示。
 - 管理台由 `App.tsx` 先校验真实后台会话，成功后才渲染 `app/shell/AppShell.tsx`；由 `app/auth-context.tsx` 统一传递会话到顶部身份/退出与真实功能路由。前端菜单隐藏不能替代 API 鉴权。管理员可管理社区与后台账户；运营员/网格员只能访问服务器分配的社区范围。
 - AppShell（导航/页签/主题）与 DataPanel（受控数据面板）沿用 Benefit Hub 已验证设计思路，但保持 Local Life 自身的 Token 与 URL 单一真相源。业务查询状态由页面管理，不在 DataPanel 自造 API 缓存；详见 `docs/engineering/admin-foundation.md`。
-- 内容、奖励履约、商城及对账等未完成/未验收模块必须标注真实状态，不显示虚构业务数据；已合入代码的活动发布、三人团和 CRM 不得误写为完全未实现，更不得误称已经线上部署。
+- 内容、奖励履约、商城及对账结算等模块若仍有未完成或未验收边界，必须标注真实状态，不显示虚构业务数据；活动发布、三人团、CRM、签到奖励、本地商品与订单、消费返券、抽奖、经营流水与对账结算已有 `dev` 代码，不得误写为完全未实现，更不得把代码存在误称已经线上部署或真实外部依赖已可用。
 
 ## 5. API、身份与持久化
 
@@ -73,6 +74,7 @@ pnpm --filter @sanchuang-dev/local-life-api bootstrap-admin  # 初始化首个�
 ## 6. 分支、验证与牛马
 
 - `main` 是默认分支和工作流入口，**不是生产分支**；业务施工仍从最新 `dev` 开 `feat/*` 并向 `dev` 提交 Draft PR。**本仓库在线 MVP 验收环境的已批准例外为 `dev → mvp`**：仅经维护者验收的增量以独立晋级 PR 进入 `mvp`，合并后自动部署；居民 H5 使用 `https://local.proto.3cgroup.cn/`、管理后台使用 `https://local-admin.proto.3cgroup.cn/`，两域名各自同源 `/api/*` 代理到同一 Hono/SQLite；`mvp` 不是商用生产分支。现有 `test/prod` 继续承担 GitHub Pages 静态展示兼容，部署设计与授权边界详见 [在线 MVP 环境决策](docs/engineering/mvp-online-preview.md)。
+- 工程规约与 `mvp` 的当前差异、核对命令和晋级同步步骤见 [AGENTS 同步说明](docs/engineering/agents-sync.md)；`mvp` 不得直接修改，未经授权不得晋级或部署。
 - 小步施工，只修改任务范围；不顺手迁移旧页面、重构无关模块或删除历史证据。
 - **按改动范围和风险验证，不按整个应用规模验收**：施工者优先运行能证明本次变更的最低充分检查（相关类型/静态检查、受影响单元/契约/集成测试、必要构建）；普通小卡不默认做全站 E2E、无关 SQL/迁移回归或重复全量自测。需要安装依赖时使用 `pnpm install --frozen-lockfile`；仓库 `pnpm check` 仍是全量质量检查，按现有 CI/分支门禁执行，不能为省时关闭或弱化必需检查，但不再要求每个低风险施工 Agent 在自己的执行预算内重复跑完它。
 - **前端与浏览器**：普通文案、样式、局部组件和低风险路由调整以相关类型检查、组件/路由测试与构建为主；**紧迫交付时，375/320 视口截图、视觉自验收及完整浏览器 E2E 不是施工 Agent 的统一交付硬指标**。涉及响应式布局本身、关键可见交互、鉴权回跳或跨页面核心流程，或任务明确要求视觉比对时，按具体风险安排有成熟浏览器/真机工具的执行者验证；无该能力者明确记录未验证项，不临时发明 CDP 自动化反复排障。
