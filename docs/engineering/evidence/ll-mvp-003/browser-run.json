@@ -1,0 +1,329 @@
+{
+  "generatedAt": "2026-11-03T17:10:19.929Z",
+  "chrome": "Chrome/156.0.8078.79",
+  "adminUrl": "http://localhost:5274/#/activities",
+  "h5DeepLink": "http://localhost:5273/local-life/#/community/activity/silver-neighborhood?activityId=94dbbadd-9116-4e5f-a185-76a31f0d47d9",
+  "activityTitle": "QA 浏览器验收·银龄欢乐季 1709",
+  "activityId": "94dbbadd-9116-4e5f-a185-76a31f0d47d9",
+  "checks": [
+    {
+      "name": "admin login form rendered from real session check",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "admin logged in through real /api/auth/login",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "date range committed through the real RangePicker",
+      "ok": true,
+      "detail": "2026-12-01 10:00 ~ 2026-12-01 18:00"
+    },
+    {
+      "name": "draft created through real POST /admin/activities",
+      "ok": true,
+      "detail": "201 id=94dbbadd-9116-4e5f-a185-76a31f0d47d9"
+    },
+    {
+      "name": "draft row shows 草稿 and unfrozen rules",
+      "ok": true,
+      "detail": "QA 浏览器验收·银龄欢乐季 1709 QA 验收社区 草稿 2026-12-01 10:00 2026-12-01 18:00 未冻结 2026-11-04 01:09 编辑 发布 暂停 恢复 结束 规则版本 审计"
+    },
+    {
+      "name": "publish confirmed in the real dialog and accepted",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "published row shows 已发布 and v1",
+      "ok": true,
+      "detail": "QA 浏览器验收·银龄欢乐季 1709 QA 验收社区 已发布 2026-12-01 10:00 2026-12-01 18:00 v1 2026-11-04 01:10 编辑 发布 暂停 恢复 结束 规则版本 审计"
+    },
+    {
+      "name": "published rule change creates v2",
+      "ok": true,
+      "detail": "ruleVersion=2"
+    },
+    {
+      "name": "rule version drawer lists frozen v1 and v2 with the old rule text preserved",
+      "ok": true,
+      "detail": "规则版本 · QA 浏览器验收·银龄欢乐季 1709 v2 创建于 2026-11-04 01:10 活动时间 2026-12-01 10:00 至 2026-12-01 18:00 举办地点 QA 验收社区党群服务中心 预算上限 ¥7777.77 奖品数量上限 66 参与资格 本社区 60 岁以上居民 签到 / 参与方式 现场签到并领取 QA 浏览器验收参与卡 购买要求 购买指定套餐一份 奖品领"
+    },
+    {
+      "name": "audit drawer shows created/published/rule-version events",
+      "ok": true,
+      "detail": "操作审计 · QA 浏览器验收·银龄欢乐季 1709 生成规则版本 2026-11-04 01:10 操作者：QA 验收管理员 {\"version\":\"2\"} 更新活动 2026-11-04 01:10 操作者：QA 验收管理员 {\"status\":\"published\",\"ruleVersion\":\"2\"} 生成规则版本 2026-11-04 01:10 操作者：QA 验收管理员 {\"versi"
+    },
+    {
+      "name": "audit drawer shows the real operator",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "H5 deep link reads the published activity by id",
+      "ok": true,
+      "detail": "http://localhost:5273/local-life/#/community/activity/silver-neighborhood?activityId=94dbbadd-9116-4e5f-a185-76a31f0d47d9"
+    },
+    {
+      "name": "H5 shows community, location and frozen version",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "H5 status is 活动即将开始 for the upcoming activity",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "H5 rules sheet shows v2 and the current rule text",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "H5 rules sheet no longer shows the replaced v1 text",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "H5 reflects pause after a real reload",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "H5 reflects resume as 活动即将开始",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "H5 reflects end and blocks participation",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "two independent reloads return the same activity content",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "re-entering the deep link returns the same ended activity",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "H5 at 320 has no horizontal page overflow",
+      "ok": true,
+      "detail": "overflow=0px"
+    },
+    {
+      "name": "admin console still renders its list at 375 wide",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "failures": 0,
+  "pageErrors": [],
+  "consoleErrors": [
+    {
+      "page": "admin",
+      "text": "Warning: [antd: Spin] `tip` is deprecated. Please use `description` instead."
+    },
+    {
+      "page": "admin",
+      "text": "Warning: [antd: Timeline] `items.children` is deprecated. Please use `items.content` instead."
+    },
+    {
+      "page": "admin",
+      "text": "Warning: [antd: Spin] `tip` is deprecated. Please use `description` instead."
+    }
+  ],
+  "network": [
+    {
+      "page": "admin",
+      "method": "GET",
+      "path": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "GET",
+      "path": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "GET",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "POST",
+      "path": "/api/auth/login",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "GET",
+      "path": "/api/admin/communities",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "GET",
+      "path": "/api/admin/activities?page=1&pageSize=20",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "POST",
+      "path": "/api/admin/activities",
+      "status": 201
+    },
+    {
+      "page": "admin",
+      "method": "GET",
+      "path": "/api/admin/activities?page=1&pageSize=20",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "POST",
+      "path": "/api/admin/activities/94dbbadd-9116-4e5f-a185-76a31f0d47d9/publish",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "GET",
+      "path": "/api/admin/activities?page=1&pageSize=20",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "GET",
+      "path": "/api/admin/activities/94dbbadd-9116-4e5f-a185-76a31f0d47d9",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "PATCH",
+      "path": "/api/admin/activities/94dbbadd-9116-4e5f-a185-76a31f0d47d9",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "GET",
+      "path": "/api/admin/activities?page=1&pageSize=20",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "GET",
+      "path": "/api/admin/activities/94dbbadd-9116-4e5f-a185-76a31f0d47d9/rule-versions",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "GET",
+      "path": "/api/admin/activities/94dbbadd-9116-4e5f-a185-76a31f0d47d9/audit",
+      "status": 200
+    },
+    {
+      "page": "h5",
+      "method": "GET",
+      "path": "/api/activities/public/94dbbadd-9116-4e5f-a185-76a31f0d47d9",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "POST",
+      "path": "/api/admin/activities/94dbbadd-9116-4e5f-a185-76a31f0d47d9/pause",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "GET",
+      "path": "/api/admin/activities?page=1&pageSize=20",
+      "status": 200
+    },
+    {
+      "page": "h5",
+      "method": "GET",
+      "path": "/api/activities/public/94dbbadd-9116-4e5f-a185-76a31f0d47d9",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "POST",
+      "path": "/api/admin/activities/94dbbadd-9116-4e5f-a185-76a31f0d47d9/resume",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "GET",
+      "path": "/api/admin/activities?page=1&pageSize=20",
+      "status": 200
+    },
+    {
+      "page": "h5",
+      "method": "GET",
+      "path": "/api/activities/public/94dbbadd-9116-4e5f-a185-76a31f0d47d9",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "POST",
+      "path": "/api/admin/activities/94dbbadd-9116-4e5f-a185-76a31f0d47d9/end",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "GET",
+      "path": "/api/admin/activities?page=1&pageSize=20",
+      "status": 200
+    },
+    {
+      "page": "h5",
+      "method": "GET",
+      "path": "/api/activities/public/94dbbadd-9116-4e5f-a185-76a31f0d47d9",
+      "status": 200
+    },
+    {
+      "page": "h5",
+      "method": "GET",
+      "path": "/api/activities/public/94dbbadd-9116-4e5f-a185-76a31f0d47d9",
+      "status": 200
+    },
+    {
+      "page": "h5",
+      "method": "GET",
+      "path": "/api/activities/public/94dbbadd-9116-4e5f-a185-76a31f0d47d9",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "GET",
+      "path": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "GET",
+      "path": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "GET",
+      "path": "/api/admin/communities",
+      "status": 200
+    },
+    {
+      "page": "admin",
+      "method": "GET",
+      "path": "/api/admin/activities?page=1&pageSize=20",
+      "status": 200
+    }
+  ]
+}

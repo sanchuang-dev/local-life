@@ -1,0 +1,304 @@
+{
+  "note": "POST-t8 focus regression. Chrome headless 156 via CDP; real Node API pointed at isolated simulated CRMEB. SIMULATED data, not a real CRMEB instance.",
+  "capturedAt": "2026-11-04T05:25:50.930Z",
+  "actA": "e36ebd0a-5c1b-420d-9c0e-8ae8a574790d",
+  "actB": "30fcacf9-7768-4d2c-8cd8-3ad7194e4c27",
+  "gridStaff": "690fdc9b-1f00-42fa-b94b-8ae8b4aed293",
+  "scenarios": {
+    "post-t8-ready-list-375": {
+      "url": "http://localhost:5173/local-life/#/life?tab=deals",
+      "width": 375,
+      "scrollWidth": 375,
+      "noHorizontalOverflow": true,
+      "text": "9:41\n惠生活\n惠生活\n\n居民权益 · 积分好礼 · 本地服务\n\n优惠购接入真实 CRMEB 商品（只读展示与购买跳转，平台不代下单、不代支付）； 积分兑换与本地生活仍为示例数据，不会真实扣积分或产生订单。加载失败或未配置时如实提示，不展示模拟商品。\n\n积分兑换\n优惠购\n本地生活\n优惠购\n真实商城商品\n模拟生鲜\n模拟有机蔬菜礼盒（SIMULATED CRMEB）\n¥12.30\n¥19.90\n模拟生鲜\n模拟水果拼盘（SIMULATED CRMEB）\n¥8.00\n\n当前展示 2 件已上架商品；商城返回的记录可能包含已下架商品。 商品、价格与图片来自 CRMEB 商城（outapi）。\n\n平台不代下单、不代支付，库存与可售状态以商城为准。\n\n首页\n社区\n健康\n惠生活\n（当前）\n我的",
+      "images": [
+        {
+          "src": "http://127.0.0.1:4099/sim-assets/product-101.svg",
+          "naturalWidth": 240,
+          "complete": true
+        },
+        {
+          "src": "http://127.0.0.1:4099/sim-assets/product-102.svg",
+          "naturalWidth": 240,
+          "complete": true
+        }
+      ],
+      "screenshot": "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-007/docs/engineering/evidence/ll-mvp-007/post-t8-01-ready-list-375.png",
+      "apiRequests": [
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/integrations/crmeb/status",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/integrations/crmeb/status",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/integrations/crmeb/products?page=1&limit=100",
+          "postData": null
+        }
+      ]
+    },
+    "post-t8-natural-detail-375": {
+      "url": "http://localhost:5173/local-life/#/life/product/101",
+      "width": 375,
+      "scrollWidth": 375,
+      "noHorizontalOverflow": true,
+      "text": "9:41\n商品详情\n返回惠生活\n商品详情\n\n真实 CRMEB 商城 · 价格与库存以商城为准\n\n模拟生鲜\nCRMEB 商城\n模拟有机蔬菜礼盒（SIMULATED CRMEB）\n\n隔离 mock 契约数据，不是真实商品\n\n¥12.30\n¥19.90\n价格单位为商城标价\n\n库存与可售状态以商城为准：平台接口不返回库存，因此无法判断是否售罄。\n\n分类：模拟生鲜\n\n规格与价格\n标准装\n¥12.30\n家庭装\n¥15.00\n\n规格库存同样以商城为准。\n\n商品详情\n\nSIMULATED CRMEB 商品详情，仅用于契约验证。\n\n以上为商城商品详情的文字内容；图片与富文本请以商城页面为准。\n\n购买与来源\n购买方式\n跳转 CRMEB 商城 H5，由商城完成登录、下单与支付\n活动来源\n未携带（普通商品购买）\n推荐码\n未携带\n\n已登录居民账户：t8 验证居民。CSRF 取自当前会话。\n\n去 CRMEB 商城购买\n\n购买前须知\n\n库存与可售状态以 CRMEB 商城为准，平台无法判断是否售罄\n需先在商城完成登录才能下单；平台不代下单、不代支付\n商城 H5 深链依赖 CRMEB 部署层 SPA 回退，上线前必须用真实域名实测\n返回惠生活\n首页\n社区\n健康\n惠生活\n（当前）\n我的",
+      "images": [
+        {
+          "src": "http://127.0.0.1:4099/sim-assets/product-101.svg",
+          "naturalWidth": 240,
+          "complete": true
+        }
+      ],
+      "screenshot": "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-007/docs/engineering/evidence/ll-mvp-007/post-t8-02-natural-detail-375.png",
+      "apiRequests": [
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/integrations/crmeb/status",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/auth/session",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/auth/methods",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/integrations/crmeb/status",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/auth/session",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/auth/methods",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/integrations/crmeb/products/101",
+          "postData": null
+        }
+      ]
+    },
+    "post-t8-natural-purchase-375": {
+      "url": "http://localhost:5173/local-life/#/life/product/101",
+      "width": 375,
+      "scrollWidth": 375,
+      "noHorizontalOverflow": true,
+      "text": "9:41\n商品详情\n返回惠生活\n商品详情\n\n真实 CRMEB 商城 · 价格与库存以商城为准\n\n模拟生鲜\nCRMEB 商城\n模拟有机蔬菜礼盒（SIMULATED CRMEB）\n\n隔离 mock 契约数据，不是真实商品\n\n¥12.30\n¥19.90\n价格单位为商城标价\n\n库存与可售状态以商城为准：平台接口不返回库存，因此无法判断是否售罄。\n\n分类：模拟生鲜\n\n规格与价格\n标准装\n¥12.30\n家庭装\n¥15.00\n\n规格库存同样以商城为准。\n\n商品详情\n\nSIMULATED CRMEB 商品详情，仅用于契约验证。\n\n以上为商城商品详情的文字内容；图片与富文本请以商城页面为准。\n\n购买与来源\n购买方式\n跳转 CRMEB 商城 H5，由商城完成登录、下单与支付\n活动来源\n未携带（普通商品购买）\n推荐码\n未携带\n\n已登录居民账户：t8 验证居民。CSRF 取自当前会话。\n\n去 CRMEB 商城购买\n\n已生成商城跳转并记录本次点击\n\n来源已记录为未确认：未提供有效推荐码，或推荐码不属于本社区在职网格员。\n\n活动来源：未携带（普通商品购买）\n\n库存与可售状态以 CRMEB 商城为准，平台无法判断是否售罄\n需先在商城完成登录才能下单；平台不代下单、不代支付\n商城 H5 深链依赖 CRMEB 部署层 SPA 回退，上线前必须用真实域名实测\n若商城未自动打开，点此进入\n\n购买前须知\n\n库存与可售状态以 CRMEB 商城为准，平台无法判断是否售罄\n需先在商城完成登录才能下单；平台不代下单、不代支付\n商城 H5 深链依赖 CRMEB 部署层 SPA 回退，上线前必须用真实域名实测\n返回惠生活\n首页\n社区\n健康\n惠生活\n（当前）\n我的",
+      "images": [
+        {
+          "src": "http://127.0.0.1:4099/sim-assets/product-101.svg",
+          "naturalWidth": 240,
+          "complete": true
+        }
+      ],
+      "screenshot": "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-007/docs/engineering/evidence/ll-mvp-007/post-t8-03-natural-purchase-375.png",
+      "openedTargets": [
+        "http://127.0.0.1:4099/pages/goods_details/index?id=101"
+      ],
+      "apiRequests": [
+        {
+          "method": "POST",
+          "url": "http://localhost:5173/api/integrations/crmeb/purchase-link",
+          "postData": "{\"crmebProductId\":101}"
+        }
+      ]
+    },
+    "post-t8-activity-detail-375": {
+      "url": "http://localhost:5173/local-life/#/life/product/101?activityId=e36ebd0a-5c1b-420d-9c0e-8ae8a574790d&ref=690fdc9b-1f00-42fa-b94b-8ae8b4aed293",
+      "width": 375,
+      "scrollWidth": 375,
+      "noHorizontalOverflow": true,
+      "text": "9:41\n商品详情\n返回惠生活\n商品详情\n\n真实 CRMEB 商城 · 价格与库存以商城为准\n\n模拟生鲜\nCRMEB 商城\n模拟有机蔬菜礼盒（SIMULATED CRMEB）\n\n隔离 mock 契约数据，不是真实商品\n\n¥12.30\n¥19.90\n价格单位为商城标价\n\n库存与可售状态以商城为准：平台接口不返回库存，因此无法判断是否售罄。\n\n分类：模拟生鲜\n\n规格与价格\n标准装\n¥12.30\n家庭装\n¥15.00\n\n规格库存同样以商城为准。\n\n商品详情\n\nSIMULATED CRMEB 商品详情，仅用于契约验证。\n\n以上为商城商品详情的文字内容；图片与富文本请以商城页面为准。\n\n购买与来源\n购买方式\n跳转 CRMEB 商城 H5，由商城完成登录、下单与支付\n活动来源\n深链携带，提交前核验\n推荐码\n深链携带，由服务端解析归属\n\n来源活动：验证活动A（SIMULATED 来源）\n\n验证社区A（隔离） · 已发布\n\n购买时只提交该 activityId，由服务端核验活动与社区归属；推荐码同样由服务端解析。\n\n已登录居民账户：t8 验证居民。CSRF 取自当前会话。\n\n去 CRMEB 商城购买\n\n购买前须知\n\n库存与可售状态以 CRMEB 商城为准，平台无法判断是否售罄\n需先在商城完成登录才能下单；平台不代下单、不代支付\n商城 H5 深链依赖 CRMEB 部署层 SPA 回退，上线前必须用真实域名实测\n返回惠生活\n首页\n社区\n健康\n惠生活\n（当前）\n我的",
+      "images": [
+        {
+          "src": "http://127.0.0.1:4099/sim-assets/product-101.svg",
+          "naturalWidth": 240,
+          "complete": true
+        }
+      ],
+      "screenshot": "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-007/docs/engineering/evidence/ll-mvp-007/post-t8-04-activity-detail-375.png",
+      "apiRequests": [
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/integrations/crmeb/status",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/auth/session",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/auth/methods",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/activities/public/e36ebd0a-5c1b-420d-9c0e-8ae8a574790d",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/integrations/crmeb/status",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/auth/session",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/auth/methods",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/activities/public/e36ebd0a-5c1b-420d-9c0e-8ae8a574790d",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/integrations/crmeb/products/101",
+          "postData": null
+        }
+      ]
+    },
+    "post-t8-activity-purchase-375": {
+      "url": "http://localhost:5173/local-life/#/life/product/101?activityId=e36ebd0a-5c1b-420d-9c0e-8ae8a574790d&ref=690fdc9b-1f00-42fa-b94b-8ae8b4aed293",
+      "width": 375,
+      "scrollWidth": 375,
+      "noHorizontalOverflow": true,
+      "text": "9:41\n商品详情\n返回惠生活\n商品详情\n\n真实 CRMEB 商城 · 价格与库存以商城为准\n\n模拟生鲜\nCRMEB 商城\n模拟有机蔬菜礼盒（SIMULATED CRMEB）\n\n隔离 mock 契约数据，不是真实商品\n\n¥12.30\n¥19.90\n价格单位为商城标价\n\n库存与可售状态以商城为准：平台接口不返回库存，因此无法判断是否售罄。\n\n分类：模拟生鲜\n\n规格与价格\n标准装\n¥12.30\n家庭装\n¥15.00\n\n规格库存同样以商城为准。\n\n商品详情\n\nSIMULATED CRMEB 商品详情，仅用于契约验证。\n\n以上为商城商品详情的文字内容；图片与富文本请以商城页面为准。\n\n购买与来源\n购买方式\n跳转 CRMEB 商城 H5，由商城完成登录、下单与支付\n活动来源\n深链携带，提交前核验\n推荐码\n深链携带，由服务端解析归属\n\n来源活动：验证活动A（SIMULATED 来源）\n\n验证社区A（隔离） · 已发布\n\n购买时只提交该 activityId，由服务端核验活动与社区归属；推荐码同样由服务端解析。\n\n已登录居民账户：t8 验证居民。CSRF 取自当前会话。\n\n去 CRMEB 商城购买\n\n已生成商城跳转并记录本次点击\n\n来源已记录为本社区网格员认领；这是弱关联，需后续对账核实，平台不会把它当作已确认成交。\n\n活动来源：已关联\n\n库存与可售状态以 CRMEB 商城为准，平台无法判断是否售罄\n需先在商城完成登录才能下单；平台不代下单、不代支付\n商城 H5 深链依赖 CRMEB 部署层 SPA 回退，上线前必须用真实域名实测\n若商城未自动打开，点此进入\n\n购买前须知\n\n库存与可售状态以 CRMEB 商城为准，平台无法判断是否售罄\n需先在商城完成登录才能下单；平台不代下单、不代支付\n商城 H5 深链依赖 CRMEB 部署层 SPA 回退，上线前必须用真实域名实测\n返回惠生活\n首页\n社区\n健康\n惠生活\n（当前）\n我的",
+      "images": [
+        {
+          "src": "http://127.0.0.1:4099/sim-assets/product-101.svg",
+          "naturalWidth": 240,
+          "complete": true
+        }
+      ],
+      "screenshot": "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-007/docs/engineering/evidence/ll-mvp-007/post-t8-05-activity-purchase-375.png",
+      "openedTargets": [
+        "http://127.0.0.1:4099/pages/goods_details/index?id=101"
+      ],
+      "apiRequests": [
+        {
+          "method": "POST",
+          "url": "http://localhost:5173/api/integrations/crmeb/purchase-link",
+          "postData": "{\"activityId\":\"e36ebd0a-5c1b-420d-9c0e-8ae8a574790d\",\"crmebProductId\":101,\"referralCode\":\"690fdc9b-1f00-42fa-b94b-8ae8b4aed293\"}"
+        }
+      ]
+    },
+    "post-t8-cross-community-ready-375": {
+      "url": "http://localhost:5173/local-life/#/life/product/101?activityId=30fcacf9-7768-4d2c-8cd8-3ad7194e4c27",
+      "width": 375,
+      "scrollWidth": 375,
+      "noHorizontalOverflow": true,
+      "text": "9:41\n商品详情\n返回惠生活\n商品详情\n\n真实 CRMEB 商城 · 价格与库存以商城为准\n\n模拟生鲜\nCRMEB 商城\n模拟有机蔬菜礼盒（SIMULATED CRMEB）\n\n隔离 mock 契约数据，不是真实商品\n\n¥12.30\n¥19.90\n价格单位为商城标价\n\n库存与可售状态以商城为准：平台接口不返回库存，因此无法判断是否售罄。\n\n分类：模拟生鲜\n\n规格与价格\n标准装\n¥12.30\n家庭装\n¥15.00\n\n规格库存同样以商城为准。\n\n商品详情\n\nSIMULATED CRMEB 商品详情，仅用于契约验证。\n\n以上为商城商品详情的文字内容；图片与富文本请以商城页面为准。\n\n购买与来源\n购买方式\n跳转 CRMEB 商城 H5，由商城完成登录、下单与支付\n活动来源\n深链携带，提交前核验\n推荐码\n未携带\n\n来源活动：验证活动B（SIMULATED 来源）\n\n验证社区B（隔离） · 已发布\n\n购买时只提交该 activityId，由服务端核验活动与社区归属；推荐码同样由服务端解析。\n\n已登录居民账户：t8 验证居民。CSRF 取自当前会话。\n\n去 CRMEB 商城购买\n\n购买前须知\n\n库存与可售状态以 CRMEB 商城为准，平台无法判断是否售罄\n需先在商城完成登录才能下单；平台不代下单、不代支付\n商城 H5 深链依赖 CRMEB 部署层 SPA 回退，上线前必须用真实域名实测\n返回惠生活\n首页\n社区\n健康\n惠生活\n（当前）\n我的",
+      "images": [
+        {
+          "src": "http://127.0.0.1:4099/sim-assets/product-101.svg",
+          "naturalWidth": 240,
+          "complete": true
+        }
+      ],
+      "screenshot": "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-007/docs/engineering/evidence/ll-mvp-007/post-t8-06-cross-community-ready-375.png",
+      "apiRequests": [
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/integrations/crmeb/status",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/auth/session",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/auth/methods",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/activities/public/30fcacf9-7768-4d2c-8cd8-3ad7194e4c27",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/integrations/crmeb/status",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/auth/session",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/auth/methods",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/activities/public/30fcacf9-7768-4d2c-8cd8-3ad7194e4c27",
+          "postData": null
+        },
+        {
+          "method": "GET",
+          "url": "http://localhost:5173/api/integrations/crmeb/products/101",
+          "postData": null
+        }
+      ]
+    },
+    "post-t8-cross-community-403-375": {
+      "url": "http://localhost:5173/local-life/#/life/product/101?activityId=30fcacf9-7768-4d2c-8cd8-3ad7194e4c27",
+      "width": 375,
+      "scrollWidth": 375,
+      "noHorizontalOverflow": true,
+      "text": "9:41\n商品详情\n返回惠生活\n商品详情\n\n真实 CRMEB 商城 · 价格与库存以商城为准\n\n模拟生鲜\nCRMEB 商城\n模拟有机蔬菜礼盒（SIMULATED CRMEB）\n\n隔离 mock 契约数据，不是真实商品\n\n¥12.30\n¥19.90\n价格单位为商城标价\n\n库存与可售状态以商城为准：平台接口不返回库存，因此无法判断是否售罄。\n\n分类：模拟生鲜\n\n规格与价格\n标准装\n¥12.30\n家庭装\n¥15.00\n\n规格库存同样以商城为准。\n\n商品详情\n\nSIMULATED CRMEB 商品详情，仅用于契约验证。\n\n以上为商城商品详情的文字内容；图片与富文本请以商城页面为准。\n\n购买与来源\n购买方式\n跳转 CRMEB 商城 H5，由商城完成登录、下单与支付\n活动来源\n深链携带，提交前核验\n推荐码\n未携带\n\n来源活动：验证活动B（SIMULATED 来源）\n\n验证社区B（隔离） · 已发布\n\n购买时只提交该 activityId，由服务端核验活动与社区归属；推荐码同样由服务端解析。\n\n已登录居民账户：t8 验证居民。CSRF 取自当前会话。\n\n去 CRMEB 商城购买\n\n无法提交购买来源\n\n该活动不属于你所在的社区，无法参与 请确认活动来源与本人所在社区是否一致。\n\n错误代码：forbidden\n\n购买前须知\n\n库存与可售状态以 CRMEB 商城为准，平台无法判断是否售罄\n需先在商城完成登录才能下单；平台不代下单、不代支付\n商城 H5 深链依赖 CRMEB 部署层 SPA 回退，上线前必须用真实域名实测\n返回惠生活\n首页\n社区\n健康\n惠生活\n（当前）\n我的",
+      "images": [
+        {
+          "src": "http://127.0.0.1:4099/sim-assets/product-101.svg",
+          "naturalWidth": 240,
+          "complete": true
+        }
+      ],
+      "screenshot": "/Users/tao/Desktop/workspace/new-local-life/ll-mvp-007/docs/engineering/evidence/ll-mvp-007/post-t8-07-cross-community-403-375.png",
+      "openedTargets": [],
+      "apiRequests": [
+        {
+          "method": "POST",
+          "url": "http://localhost:5173/api/integrations/crmeb/purchase-link",
+          "postData": "{\"activityId\":\"30fcacf9-7768-4d2c-8cd8-3ad7194e4c27\",\"crmebProductId\":101}"
+        }
+      ]
+    }
+  },
+  "residentLogin": {
+    "authenticated": true,
+    "user": {
+      "id": "7eea41f2-388c-4d0b-9f59-71e85dab998f",
+      "displayName": "t8 验证居民"
+    },
+    "staff": null,
+    "csrfToken": "x7pVf17cmpbP7Wi_dYgKpd9ATcKQtIkOQk9E1eKKJps"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "source": "antd theme.getDesignToken(adminTheme)",
+  "capturedAt": "2026-11-05T06:00:59.621Z",
+  "tokenConfig": {
+    "colorPrimary": "#116d63",
+    "colorLink": "#116d63",
+    "colorInfo": "#1677ff",
+    "colorSuccess": "#138b79"
+  },
+  "derived": {
+    "colorPrimary": "#116d63",
+    "colorLink": "#116d63",
+    "colorInfo": "#1677ff",
+    "colorSuccess": "#138b79",
+    "colorWarning": "#faad14",
+    "colorError": "#ff4d4f",
+    "colorInfoBg": "#e6f4ff",
+    "colorInfoBorder": "#91caff",
+    "colorInfoText": "#1677ff",
+    "colorSuccessBg": "#c0ccc8",
+    "colorSuccessBorder": "#6fb3a2",
+    "colorSuccessText": "#138b79",
+    "colorWarningBg": "#fffbe6",
+    "colorWarningBorder": "#ffe58f",
+    "colorWarningText": "#faad14",
+    "colorErrorBg": "#fff2f0",
+    "colorErrorBorder": "#ffccc7",
+    "colorErrorText": "#ff4d4f"
+  }
+}

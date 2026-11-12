@@ -1,0 +1,181 @@
+/*
+ * Sidebar shell: brand area, menu search and the Ant Design Menu.
+ * The layout hierarchy stays inside the white operations console.
+ */
+.app-sider {
+  position: sticky !important;
+  top: 0;
+  height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: #fff;
+  scrollbar-width: thin;
+}
+
+.app-sider::after {
+  content: '';
+  position: absolute;
+  top: 52px;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  background: #e3ebe7;
+  pointer-events: none;
+}
+
+.app-brand {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border-bottom: 1px solid #eef0f2;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* Brand mark: a restrained teal tile with the 生 character. Decorative only;
+   the wordmark next to it carries the accessible name. */
+.app-brand-mark {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: #116d63;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.app-brand-text {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.app-brand-name {
+  color: #1f2937;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.app-brand-sub {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border: 1px solid #dfe7e3;
+  border-radius: 4px;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+/*
+ * The search row is exactly as tall as the work-tab strip on the right (38px),
+ * so the input sits on the same line as the tabs instead of floating lower.
+ */
+.app-sidebar-search {
+  display: flex;
+  align-items: center;
+  height: 38px;
+  padding: 4px 12px 0;
+}
+
+.app-sidebar-search .ant-input-affix-wrapper {
+  border-radius: 6px;
+}
+
+.app-nav {
+  padding: 8px 0 16px;
+  border-inline-end: 0 !important;
+}
+
+.app-nav .ant-menu-submenu-title {
+  font-weight: 600;
+}
+
+.app-nav-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* A quiet dot marks an unimplemented page without renaming the menu entry. */
+.app-nav-pending {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #d9a441;
+}
+
+.app-sidebar-empty {
+  margin: 24px 12px;
+}
+
+.app-sidebar-empty .ant-empty-description {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.app-sidebar-toggle {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: #64748b;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.app-sidebar-toggle:hover {
+  background: #e8f6f0;
+  color: #116d63;
+}
+
+.app-sidebar-toggle:focus-visible {
+  outline: 2px solid #116d63;
+  outline-offset: 2px;
+}
+
+.app-brand-collapsed {
+  gap: 4px;
+  padding-inline: 6px;
+}
+
+.app-brand-collapsed .app-brand-text {
+  display: none;
+}
+
+.app-brand-collapsed .app-brand-mark {
+  width: 24px;
+  height: 24px;
+  font-size: 13px;
+}
+
+.app-sidebar-drawer {
+  background: #fff;
+  min-height: 100%;
+}
+
+.app-sidebar-drawer .app-sidebar-search {
+  margin-top: 8px;
+}
+
+@media (max-width: 991px) {
+  .app-sider.ant-layout-sider-collapsed .app-brand-text {
+    display: none;
+  }
+}

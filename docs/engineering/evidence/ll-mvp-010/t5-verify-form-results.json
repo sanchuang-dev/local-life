@@ -1,0 +1,40 @@
+{
+  "generatedAt": "2026-11-06T08:29:25.359Z",
+  "order": "5be88730-c4d6-466f-b6c2-7e837617e1b9",
+  "transitions": [
+    {
+      "status": "processing",
+      "http": 200,
+      "resultingStatus": "processing"
+    },
+    {
+      "status": "pending_review",
+      "http": 200,
+      "resultingStatus": "pending_review"
+    }
+  ],
+  "drawer": {
+    "opened": true,
+    "drawerOpen": true,
+    "title": "订单详情 · 社区助农蔬菜包 r2e2e",
+    "buttons": [
+      "标记未通过",
+      "确认人工核验通过",
+      "驳 回"
+    ],
+    "hasVerifyForm": true,
+    "hasNoteField": true,
+    "hasRejectOption": true,
+    "disclaims": true,
+    "forbidden": [],
+    "text": "订单详情 · 社区助农蔬菜包 r2e2e | 状态\t待人工核验 | 商品快照\t | 名称 | 社区助农蔬菜包 r2e2e | 单价 | ¥19.90 | 数量 | 2 | 合计 | ¥39.80 | 社区\t幸福社区 | 居民\tt5 冒烟居民 8960 | 登记来源\t居民自助登记 | 代录工作人员\t— | 归属网格员\t— | 来源活动\t— | 居民备注\tt5 视觉冒烟 | 最近处理备注\tt5 视觉冒烟：推进到 pending_review | 登记时间\t2026-11-06 16:15 | 最后更新\t2026-11-06 16:29 | 本订单只登记办理意向 | 本平台不收款、不代办业务；「人工核验通过」是运营员对订单事实的人工确认。 | 处理状态 | 标记未通过 | 运营人工核验 | 核验通过后订单进入「人工核验通过」；驳回会保留备注原因。两者都会写入订单时间线。 | 0 / 500 | 确认人工核验通过 | 驳 回 | 订单时间线 | 居民登记订单 | 2026-11-06 16:15 | — → 已登记 | 操作者：t5 冒烟居民 8960 | 处理状态变更 | 2026-11-06 16:29 | 已登记 → 处理中 | 操作者：R2 运营员 | t5 视觉冒烟：推进到 processing | 处理状态变更 | 2026-11-06 16:29 | 处理中 → 待人工核验 | 操作者：R2 运营员 | t5 视觉冒烟：推进到 pending_review",
+    "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-admin-order-verify-1440.png"
+  },
+  "assertions": {
+    "verifyFormRendered": true,
+    "verifyNoteFieldRendered": true,
+    "rejectOptionRendered": true,
+    "copyDisclaimsPaymentAndActivation": true,
+    "noForbiddenCopy": true
+  }
+}

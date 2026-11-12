@@ -1,0 +1,109 @@
+/*
+ * Local catalogue + resident order console (#109 / LL-MVP-010 R2).
+ *
+ * Page-local composition on top of the shell, PageHeader and DataPanel. No new
+ * visual system: colours come from the antd theme tokens already mounted by the
+ * admin provider, and the only additions are the drawer sections and the two
+ * compact confirmation/empty blocks.
+ */
+
+.local-drawer .local-drawer-loading {
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+}
+
+.local-drawer .local-form {
+  margin-top: 16px;
+}
+
+.local-drawer .local-form-error {
+  margin-bottom: 16px;
+}
+
+.local-drawer .local-section {
+  border: 1px solid var(--ant-color-border-secondary, #e8f0ec);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.local-drawer .local-section + .local-section {
+  margin-top: 16px;
+}
+
+.local-drawer .local-section .ant-descriptions,
+.local-drawer .local-section .ant-timeline {
+  margin-top: 12px;
+}
+
+.local-drawer .local-timeline-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.local-drawer .local-timeline-note {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.local-drawer .local-review-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.local-drawer .local-reject-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.local-drawer .local-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.local-confirm-body p {
+  margin: 4px 0;
+}
+
+.local-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  text-align: center;
+}
+
+.local-empty p {
+  margin: 0;
+}
+
+.local-empty-hint {
+  color: var(--ant-color-text-description, #64748b);
+}
+
+/* Order snapshot block: money is always read from the frozen snapshot. */
+.local-snapshot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.local-snapshot-item {
+  display: flex;
+  gap: 4px;
+  min-width: 120px;
+}
+
+.local-snapshot-item-label {
+  color: var(--ant-color-text-description, #64748b);
+}
+
+.local-snapshot-item-value {
+  font-variant-numeric: tabular-nums;
+}

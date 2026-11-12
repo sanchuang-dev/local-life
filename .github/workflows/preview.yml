@@ -1,6 +1,9 @@
 # A GitHub Pages repository has one site. Publish dev at the existing root
 # and the separately built prod branch under /prod/ in one atomic artifact.
 # The source for the production showcase is always the prod branch.
+#
+# dev is already a pnpm workspace. prod may still be the legacy single-package
+# layout until it is promoted, so the prod build keeps a documented fallback.
 name: Local Life Pages (Dev and Prod)
 
 on:
@@ -54,34 +57,53 @@ jobs:
           path: prod-source
           persist-credentials: false
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.19.0
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: dev-source/package-lock.json
+          cache: pnpm
+          cache-dependency-path: dev-source/pnpm-lock.yaml
 
       - name: Check and build development preview
         working-directory: dev-source
         run: |
-          npm ci --no-audit --no-fund
-          npm run check
+          pnpm install --frozen-lockfile
+          pnpm check
 
       - name: Check and build production showcase from prod
         working-directory: prod-source
         run: |
-          npm ci --no-audit --no-fund
-          npm run check
-          # --base overrides both old and new prod Vite configurations.
-          # This works on the very first dev deploy, before prod is promoted.
-          npx vite build --base /local-life/prod/
+          set -euo pipefail
+          if [ -f pnpm-lock.yaml ] && [ -f apps/web/package.json ]; then
+            echo "prod source is a pnpm workspace"
+            pnpm install --frozen-lockfile
+            pnpm --filter @sanchuang-dev/local-life-web build:prod-preview
+          else
+            echo "prod source is the legacy single-package layout"
+            npm ci --no-audit --no-fund
+            npm run check
+            # --base keeps the prod showcase under /local-life/prod/ even
+            # before the prod branch is promoted to the monorepo layout.
+            npx vite build --base /local-life/prod/
+          fi
 
       - name: Assemble both environments in one Pages artifact
         shell: bash
         run: |
           set -euo pipefail
+          if [ -d prod-source/apps/web/dist ]; then
+            prod_dist=prod-source/apps/web/dist
+          else
+            prod_dist=prod-source/dist
+          fi
+          test -f dev-source/apps/web/dist/index.html
+          test -f "$prod_dist/index.html"
           mkdir -p pages-site/prod
-          cp -a dev-source/dist/. pages-site/
-          cp -a prod-source/dist/. pages-site/prod/
+          cp -a dev-source/apps/web/dist/. pages-site/
+          cp -a "$prod_dist/." pages-site/prod/
           touch pages-site/.nojekyll
           test -f pages-site/index.html
           test -f pages-site/prod/index.html

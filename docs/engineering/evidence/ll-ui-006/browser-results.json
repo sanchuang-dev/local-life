@@ -1,0 +1,174 @@
+{
+  "ranAt": "2026-11-05T06:43:47.824Z",
+  "baseUrl": "http://localhost:5191",
+  "data": "local seeded demo rows (25 leads / 3 orders) via repository CRM services on the local SQLite; not production data",
+  "results": [
+    {
+      "name": "login",
+      "passed": true,
+      "detail": "verify.admin local bootstrap account"
+    },
+    {
+      "name": "default /customers shows leads tab",
+      "passed": true,
+      "detail": "{\"tabDefault\":\"客户线索\",\"urlDefault\":\"/customers\"}"
+    },
+    {
+      "name": "tabs live inside white sticky PageHeader",
+      "passed": true,
+      "detail": "{\"headerTop\":91,\"headerBottom\":204.609375,\"headerBg\":\"rgb(255, 255, 255)\",\"subnavTop\":157.609375,\"subnavBottom\":203.609375,\"navBottom\":203.609375,\"gapToHeaderBottom\":1,\"navRuleWidth\":\"0px\",\"contentBg\":\"rgb(245, 247, 247)\"}"
+    },
+    {
+      "name": "antd tab rule line removed in header",
+      "passed": true,
+      "detail": "border-bottom=0px"
+    },
+    {
+      "name": "gray work area starts below header",
+      "passed": true,
+      "detail": "contentBg=rgb(245, 247, 247)"
+    },
+    {
+      "name": "deep link /customers?view=orders opens orders",
+      "passed": true,
+      "detail": "{\"tabOrders\":\"业务受理单\",\"urlOrders\":\"/customers?view=orders\"}"
+    },
+    {
+      "name": "refresh keeps orders view from URL",
+      "passed": true,
+      "detail": "tab=业务受理单"
+    },
+    {
+      "name": "history back/forward replays views",
+      "passed": true,
+      "detail": "{\"backSearch\":\"\",\"forwardSearch\":\"?view=orders\"}"
+    },
+    {
+      "name": "invalid ?view falls back to leads",
+      "passed": true,
+      "detail": "tab=客户线索"
+    },
+    {
+      "name": "tab click pushes ?view=orders and keeps AppShell",
+      "passed": true,
+      "detail": "{\"tabAfterClick\":\"业务受理单\",\"shellBefore\":\"same\",\"shellAfter\":\"same\"}"
+    },
+    {
+      "name": "unsubmitted filter draft survives tab switch",
+      "passed": true,
+      "detail": "value=演示客户25"
+    },
+    {
+      "name": "keyword filter reaches the real leads API",
+      "passed": true,
+      "detail": "{\"url\":\"http://localhost:5191/api/admin/crm/leads?page=1&pageSize=20&keyword=%E6%BC%94%E7%A4%BA%E5%AE%A2%E6%88%B725\"}"
+    },
+    {
+      "name": "pagination page 2 loads real rows",
+      "passed": true,
+      "detail": "rows=5, first=演示客户22138****2200UI-006 演示社区演示网格员到访登记新线索2026-11-06 12:2502026-11-05 14:25详情"
+    },
+    {
+      "name": "lead detail drawer opens with real endpoint data",
+      "passed": true,
+      "detail": "客户线索 · 演示客户22社区UI-006 演示社区归属网格员演示网格员创建人Verify Admin联系人演示客户22联系电话13800002200状态新线索来源类型到访登记来源归属到访登记下次联系2026-11-06 12:25最近联系—跟进次数0创建时间2026-11-05 14:25更新时间2026-11-05 14:25跟进记录暂无数据暂无跟进记录线索审计时间线创建线索2026-11-0"
+    },
+    {
+      "name": "order detail drawer keeps review + timeline sections",
+      "passed": true,
+      "detail": "{\"text\":\"业务受理单 · UI006-0001受理单号UI006-0001社区UI-006 演示社区业务类型广电手机卡状态待核验客户姓名演示客户04联系电话13800000400创建人Verify Admin提交时间2026-11-05 14:25更新时间2026-11-05 14:25凭据引用未登记备注LL-UI-006 本地演示受理单成交归属快照归属网格员（创建时冻结）演示网格员来源活动无推广网格员无事件时间线创建受理单2026-11-05 14:25操作者：Verify Admi\",\"hasReview\":true,\"hasTimeline\":true}"
+    },
+    {
+      "name": "sticky header keeps both nav levels visible without overlap",
+      "passed": true,
+      "detail": "{\"scrollTop\":700,\"contentTop\":91,\"headerTop\":91,\"headerBottom\":204.609375,\"tabsBarBottom\":91,\"subnavTop\":157.609375,\"subnavBottom\":203.609375,\"overlapTabsHeader\":false,\"headerPinned\":true,\"subnavVisible\":true}"
+    },
+    {
+      "name": "11-leads-1024 width 1024 has no horizontal overflow",
+      "passed": true,
+      "detail": "{\"innerWidth\":1024,\"docScrollWidth\":1024,\"bodyScrollWidth\":1024,\"contentScrollWidth\":761,\"contentClientWidth\":761,\"headerRight\":1009}"
+    },
+    {
+      "name": "11-leads-1024 width 1024 keeps sticky header + subnav visible",
+      "passed": true,
+      "detail": "{\"scrollTop\":400,\"overlapTabsHeader\":false,\"headerPinned\":true,\"subnavVisible\":true}"
+    },
+    {
+      "name": "12-orders-1024 width 1024 has no horizontal overflow",
+      "passed": true,
+      "detail": "{\"innerWidth\":1024,\"docScrollWidth\":1024,\"bodyScrollWidth\":1024,\"contentScrollWidth\":776,\"contentClientWidth\":776,\"headerRight\":1024}"
+    },
+    {
+      "name": "12-orders-1024 width 1024 keeps sticky header + subnav visible",
+      "passed": true,
+      "detail": "{\"scrollTop\":0,\"overlapTabsHeader\":false,\"headerPinned\":true,\"subnavVisible\":true}"
+    },
+    {
+      "name": "13-leads-768 width 768 has no horizontal overflow",
+      "passed": true,
+      "detail": "{\"innerWidth\":768,\"docScrollWidth\":768,\"bodyScrollWidth\":768,\"contentScrollWidth\":685,\"contentClientWidth\":685,\"headerRight\":753}"
+    },
+    {
+      "name": "13-leads-768 width 768 keeps sticky header + subnav visible",
+      "passed": true,
+      "detail": "{\"scrollTop\":400,\"overlapTabsHeader\":false,\"headerPinned\":true,\"subnavVisible\":true}"
+    },
+    {
+      "name": "14-orders-768 width 768 has no horizontal overflow",
+      "passed": true,
+      "detail": "{\"innerWidth\":768,\"docScrollWidth\":768,\"bodyScrollWidth\":768,\"contentScrollWidth\":700,\"contentClientWidth\":700,\"headerRight\":768}"
+    },
+    {
+      "name": "14-orders-768 width 768 keeps sticky header + subnav visible",
+      "passed": true,
+      "detail": "{\"scrollTop\":0,\"overlapTabsHeader\":false,\"headerPinned\":true,\"subnavVisible\":true}"
+    },
+    {
+      "name": "15-leads-390 width 390 has no horizontal overflow",
+      "passed": true,
+      "detail": "{\"innerWidth\":390,\"docScrollWidth\":390,\"bodyScrollWidth\":390,\"contentScrollWidth\":390,\"contentClientWidth\":390,\"headerRight\":390}"
+    },
+    {
+      "name": "15-leads-390 width 390 keeps sticky header + subnav visible",
+      "passed": true,
+      "detail": "{\"scrollTop\":400,\"overlapTabsHeader\":false,\"headerPinned\":true,\"subnavVisible\":true}"
+    },
+    {
+      "name": "16-orders-390 width 390 has no horizontal overflow",
+      "passed": true,
+      "detail": "{\"innerWidth\":390,\"docScrollWidth\":390,\"bodyScrollWidth\":390,\"contentScrollWidth\":390,\"contentClientWidth\":390,\"headerRight\":390}"
+    },
+    {
+      "name": "16-orders-390 width 390 keeps sticky header + subnav visible",
+      "passed": true,
+      "detail": "{\"scrollTop\":0,\"overlapTabsHeader\":false,\"headerPinned\":true,\"subnavVisible\":true}"
+    },
+    {
+      "name": "AppShell top-level work tabs stay intact",
+      "passed": true,
+      "detail": "{\"tabs\":[\"经营工作台\",\"客户与业务单\"],\"active\":\"客户与业务单\"}"
+    }
+  ],
+  "screenshots": [
+    "01-leads-1440.png",
+    "02-orders-deeplink-1440.png",
+    "03-orders-refresh-1440.png",
+    "04a-back-leads-1440.png",
+    "04b-forward-orders-1440.png",
+    "05-invalid-fallback-1440.png",
+    "06-filter-keyword-1440.png",
+    "07-pagination-page2-1440.png",
+    "08-lead-drawer-1440.png",
+    "09-order-drawer-1440.png",
+    "10-sticky-scrolled-1440.png",
+    "11-leads-1024.png",
+    "12-orders-1024.png",
+    "13-leads-768.png",
+    "14-orders-768.png",
+    "15-leads-390.png",
+    "16-orders-390.png",
+    "17-shell-tabs-1440.png"
+  ],
+  "passed": 29,
+  "failed": 0
+}

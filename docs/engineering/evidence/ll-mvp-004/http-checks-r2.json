@@ -1,0 +1,1369 @@
+{
+  "task": "t6 / #60 LL-MVP-004 real-HTTP verification",
+  "base": "http://127.0.0.1:4080",
+  "origin": "http://localhost:5173",
+  "runTag": "20261104035157",
+  "startedAt": "2026-11-04T03:51:57.498Z",
+  "databasePath": "/tmp/ll-mvp-004-verify/verify-r2.sqlite",
+  "setup": [
+    {
+      "step": "staff login",
+      "status": 200,
+      "user": {
+        "id": "30c49c02-8da9-4b4b-bc24-1ac5de4f9cf3",
+        "displayName": "QA 验收管理员 R2"
+      }
+    },
+    {
+      "step": "community created",
+      "status": 201,
+      "body": {
+        "id": "59200bd3-3ba6-47e6-994b-6a484de7c007",
+        "name": "LL-MVP-004 验收社区 20261104035157"
+      }
+    },
+    {
+      "step": "activities created and transitioned through real admin API",
+      "communityId": "59200bd3-3ba6-47e6-994b-6a484de7c007",
+      "primary": {
+        "id": "db78d9ed-1a26-4115-9c77-d57f2d7a50f7",
+        "status": "published",
+        "publishedAt": "2026-11-04T03:51:57.306Z"
+      },
+      "secondary": {
+        "id": "a5ebc177-c757-4d04-b2c2-bab37fb90b0b",
+        "status": "published"
+      },
+      "concurrency": {
+        "id": "792b24bc-67f1-4e50-9909-5c5d4fa4e145",
+        "status": "published"
+      },
+      "paused": {
+        "id": "cd26158a-87b3-43af-a538-6f0d47fffaed",
+        "status": "paused"
+      },
+      "ended": {
+        "id": "61dd48dd-dea5-4230-8940-33feff074342",
+        "status": "ended"
+      },
+      "expired": {
+        "id": "63433639-3cb2-4073-b849-33eb6a34f6dc",
+        "status": "published",
+        "startsAt": "2026-10-05T03:51:57.349Z",
+        "endsAt": "2026-11-02T03:51:57.349Z"
+      },
+      "draft": {
+        "id": "899f55c8-063f-46fe-9c6c-d40d37f5ea36",
+        "status": "draft"
+      },
+      "pauseStatus": 200,
+      "endStatus": 200
+    },
+    {
+      "step": "dev resident logins",
+      "accounts": [
+        {
+          "displayName": "居民A",
+          "userId": "e5ea1b35-fd8b-4633-8e9a-d0e1dd4b9876"
+        },
+        {
+          "displayName": "居民B",
+          "userId": "2e551d18-e105-4dd5-9509-696dd8008154"
+        },
+        {
+          "displayName": "居民C",
+          "userId": "c822b9f8-9b66-45fb-a7e4-c7647c375b13"
+        },
+        {
+          "displayName": "居民D",
+          "userId": "d2f757d5-f39b-4e62-bb3b-415cf1b8dea8"
+        },
+        {
+          "displayName": "居民E",
+          "userId": "43131adf-b3ca-4224-90d7-713cc2facdd9"
+        },
+        {
+          "displayName": "团长L",
+          "userId": "4aed5c79-e264-444a-aaba-ff7190906f00"
+        },
+        {
+          "displayName": "抢席1",
+          "userId": "4de9aeb1-2d98-4b4c-bcf1-30953dee7ad2"
+        },
+        {
+          "displayName": "抢席2",
+          "userId": "2690f464-71a5-4c13-8150-6fcd955b9c56"
+        },
+        {
+          "displayName": "抢席3",
+          "userId": "32efee94-4153-40be-8145-0bc79c7512ad"
+        },
+        {
+          "displayName": "抢席4",
+          "userId": "d9c61382-12ec-4490-96e8-f5c0b115fb7c"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "displayName": "居民A",
+      "userId": "e5ea1b35-fd8b-4633-8e9a-d0e1dd4b9876"
+    },
+    {
+      "displayName": "居民B",
+      "userId": "2e551d18-e105-4dd5-9509-696dd8008154"
+    },
+    {
+      "displayName": "居民C",
+      "userId": "c822b9f8-9b66-45fb-a7e4-c7647c375b13"
+    },
+    {
+      "displayName": "居民D",
+      "userId": "d2f757d5-f39b-4e62-bb3b-415cf1b8dea8"
+    },
+    {
+      "displayName": "居民E",
+      "userId": "43131adf-b3ca-4224-90d7-713cc2facdd9"
+    },
+    {
+      "displayName": "团长L",
+      "userId": "4aed5c79-e264-444a-aaba-ff7190906f00"
+    },
+    {
+      "displayName": "抢席1",
+      "userId": "4de9aeb1-2d98-4b4c-bcf1-30953dee7ad2"
+    },
+    {
+      "displayName": "抢席2",
+      "userId": "2690f464-71a5-4c13-8150-6fcd955b9c56"
+    },
+    {
+      "displayName": "抢席3",
+      "userId": "32efee94-4153-40be-8145-0bc79c7512ad"
+    },
+    {
+      "displayName": "抢席4",
+      "userId": "d9c61382-12ec-4490-96e8-f5c0b115fb7c"
+    }
+  ],
+  "totalChecks": 40,
+  "passed": 40,
+  "failed": 0,
+  "checks": [
+    {
+      "id": "http-01",
+      "description": "A 未参与时读取活动参与状态",
+      "expected": "200 + participation null + joinable true",
+      "actual": {
+        "status": 200,
+        "body": {
+          "activityId": "db78d9ed-1a26-4115-9c77-d57f2d7a50f7",
+          "activityStatus": "published",
+          "joinable": true,
+          "unavailableReason": null,
+          "participation": null,
+          "team": null
+        },
+        "requestId": "61c0d4de-92d1-40fc-aa9a-8d6b5a3ab081"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-02",
+      "description": "A 自行确认参与，成为团长占第 1 席",
+      "expected": "200 created=true leader seat1 1/3 open",
+      "actual": {
+        "status": 200,
+        "body": {
+          "created": true,
+          "state": {
+            "activityId": "db78d9ed-1a26-4115-9c77-d57f2d7a50f7",
+            "activityStatus": "published",
+            "joinable": false,
+            "unavailableReason": null,
+            "participation": {
+              "id": "d0255450-f677-4955-bad8-bc089d5f39b8",
+              "teamId": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+              "seatNo": 1,
+              "role": "leader",
+              "inviteSource": "self",
+              "invitationId": null,
+              "inviterDisplayName": null,
+              "joinedAt": "2026-11-04T03:51:57.401Z"
+            },
+            "team": {
+              "id": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+              "status": "open",
+              "seatsTotal": 3,
+              "seatsFilled": 1,
+              "inviteCode": "d16af3653251432fd2f09545b9015f61",
+              "members": [
+                {
+                  "seatNo": 1,
+                  "displayName": "居民A",
+                  "role": "leader",
+                  "isSelf": true,
+                  "joinedAt": "2026-11-04T03:51:57.401Z"
+                }
+              ]
+            }
+          }
+        },
+        "requestId": "7c883f43-34ad-4a38-9eca-89fb886e8957"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-03",
+      "description": "B 用 A 的邀请码确认，进入第 2 席并冻结邀请归属",
+      "expected": "200 created=true seat2 invite 2/3",
+      "actual": {
+        "status": 200,
+        "body": {
+          "created": true,
+          "state": {
+            "activityId": "db78d9ed-1a26-4115-9c77-d57f2d7a50f7",
+            "activityStatus": "published",
+            "joinable": false,
+            "unavailableReason": null,
+            "participation": {
+              "id": "2a92babd-e398-4c0b-a322-b2c680c5209c",
+              "teamId": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+              "seatNo": 2,
+              "role": "member",
+              "inviteSource": "invite",
+              "invitationId": "325c8376-924a-48db-a438-9b2f294b090e",
+              "inviterDisplayName": "居民A",
+              "joinedAt": "2026-11-04T03:51:57.407Z"
+            },
+            "team": {
+              "id": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+              "status": "open",
+              "seatsTotal": 3,
+              "seatsFilled": 2,
+              "inviteCode": "d16af3653251432fd2f09545b9015f61",
+              "members": [
+                {
+                  "seatNo": 1,
+                  "displayName": "居民A",
+                  "role": "leader",
+                  "isSelf": false,
+                  "joinedAt": "2026-11-04T03:51:57.401Z"
+                },
+                {
+                  "seatNo": 2,
+                  "displayName": "居民B",
+                  "role": "member",
+                  "isSelf": true,
+                  "joinedAt": "2026-11-04T03:51:57.407Z"
+                }
+              ]
+            }
+          }
+        },
+        "requestId": "c7f1758a-f97a-408d-a53f-0a4f64fe1d42"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-04",
+      "description": "C 用 A 的邀请码确认，3/3 成团并锁定",
+      "expected": "200 created=true seat3 locked 3/3 inviteCode null",
+      "actual": {
+        "status": 200,
+        "body": {
+          "created": true,
+          "state": {
+            "activityId": "db78d9ed-1a26-4115-9c77-d57f2d7a50f7",
+            "activityStatus": "published",
+            "joinable": false,
+            "unavailableReason": null,
+            "participation": {
+              "id": "053aa65e-8701-4467-b701-427d98e066cd",
+              "teamId": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+              "seatNo": 3,
+              "role": "member",
+              "inviteSource": "invite",
+              "invitationId": "325c8376-924a-48db-a438-9b2f294b090e",
+              "inviterDisplayName": "居民A",
+              "joinedAt": "2026-11-04T03:51:57.411Z"
+            },
+            "team": {
+              "id": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+              "status": "locked",
+              "seatsTotal": 3,
+              "seatsFilled": 3,
+              "inviteCode": null,
+              "members": [
+                {
+                  "seatNo": 1,
+                  "displayName": "居民A",
+                  "role": "leader",
+                  "isSelf": false,
+                  "joinedAt": "2026-11-04T03:51:57.401Z"
+                },
+                {
+                  "seatNo": 2,
+                  "displayName": "居民B",
+                  "role": "member",
+                  "isSelf": false,
+                  "joinedAt": "2026-11-04T03:51:57.407Z"
+                },
+                {
+                  "seatNo": 3,
+                  "displayName": "居民C",
+                  "role": "member",
+                  "isSelf": true,
+                  "joinedAt": "2026-11-04T03:51:57.411Z"
+                }
+              ]
+            }
+          }
+        },
+        "requestId": "9651bd6d-b329-4ef1-ad20-a8ae8aadc692"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-05",
+      "description": "第四人 D 持邀请码确认被 409 team_full 拒绝",
+      "expected": "409 team_full",
+      "actual": {
+        "status": 409,
+        "body": {
+          "error": {
+            "code": "team_full",
+            "message": "该三人团已满 3 人",
+            "requestId": "6facb249-b8cd-41c6-95b0-4321c5a30e5d"
+          }
+        },
+        "requestId": "6facb249-b8cd-41c6-95b0-4321c5a30e5d"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-06",
+      "description": "D 被拒后在本活动没有参与记录",
+      "expected": "200 participation null",
+      "actual": {
+        "status": 200,
+        "body": {
+          "activityId": "db78d9ed-1a26-4115-9c77-d57f2d7a50f7",
+          "activityStatus": "published",
+          "joinable": true,
+          "unavailableReason": null,
+          "participation": null,
+          "team": null
+        },
+        "requestId": "7a1aca47-9c98-4fcb-a853-a4450d1347d1"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-07",
+      "description": "第四人被拒后主活动团仍为 3 席",
+      "expected": "200 locked 3/3",
+      "actual": {
+        "status": 200,
+        "body": {
+          "activityId": "db78d9ed-1a26-4115-9c77-d57f2d7a50f7",
+          "activityStatus": "published",
+          "joinable": false,
+          "unavailableReason": null,
+          "participation": {
+            "id": "d0255450-f677-4955-bad8-bc089d5f39b8",
+            "teamId": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+            "seatNo": 1,
+            "role": "leader",
+            "inviteSource": "self",
+            "invitationId": null,
+            "inviterDisplayName": null,
+            "joinedAt": "2026-11-04T03:51:57.401Z"
+          },
+          "team": {
+            "id": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+            "status": "locked",
+            "seatsTotal": 3,
+            "seatsFilled": 3,
+            "inviteCode": null,
+            "members": [
+              {
+                "seatNo": 1,
+                "displayName": "居民A",
+                "role": "leader",
+                "isSelf": true,
+                "joinedAt": "2026-11-04T03:51:57.401Z"
+              },
+              {
+                "seatNo": 2,
+                "displayName": "居民B",
+                "role": "member",
+                "isSelf": false,
+                "joinedAt": "2026-11-04T03:51:57.407Z"
+              },
+              {
+                "seatNo": 3,
+                "displayName": "居民C",
+                "role": "member",
+                "isSelf": false,
+                "joinedAt": "2026-11-04T03:51:57.411Z"
+              }
+            ]
+          }
+        },
+        "requestId": "7ebbd2e0-edd2-4c11-90e3-412a87f567de"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-08",
+      "description": "A 重复确认幂等：created=false、同团同席、人数不增",
+      "expected": "200 created=false same team 3/3",
+      "actual": {
+        "status": 200,
+        "body": {
+          "created": false,
+          "state": {
+            "activityId": "db78d9ed-1a26-4115-9c77-d57f2d7a50f7",
+            "activityStatus": "published",
+            "joinable": false,
+            "unavailableReason": null,
+            "participation": {
+              "id": "d0255450-f677-4955-bad8-bc089d5f39b8",
+              "teamId": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+              "seatNo": 1,
+              "role": "leader",
+              "inviteSource": "self",
+              "invitationId": null,
+              "inviterDisplayName": null,
+              "joinedAt": "2026-11-04T03:51:57.401Z"
+            },
+            "team": {
+              "id": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+              "status": "locked",
+              "seatsTotal": 3,
+              "seatsFilled": 3,
+              "inviteCode": null,
+              "members": [
+                {
+                  "seatNo": 1,
+                  "displayName": "居民A",
+                  "role": "leader",
+                  "isSelf": true,
+                  "joinedAt": "2026-11-04T03:51:57.401Z"
+                },
+                {
+                  "seatNo": 2,
+                  "displayName": "居民B",
+                  "role": "member",
+                  "isSelf": false,
+                  "joinedAt": "2026-11-04T03:51:57.407Z"
+                },
+                {
+                  "seatNo": 3,
+                  "displayName": "居民C",
+                  "role": "member",
+                  "isSelf": false,
+                  "joinedAt": "2026-11-04T03:51:57.411Z"
+                }
+              ]
+            }
+          }
+        },
+        "requestId": "a5b26779-d1b7-44ef-b39f-0f2d8245f79d"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-09",
+      "description": "B 已加入后重复 confirm 幂等且不换团",
+      "expected": "200 created=false same team seat2",
+      "actual": {
+        "status": 200,
+        "body": {
+          "created": false,
+          "state": {
+            "activityId": "db78d9ed-1a26-4115-9c77-d57f2d7a50f7",
+            "activityStatus": "published",
+            "joinable": false,
+            "unavailableReason": null,
+            "participation": {
+              "id": "2a92babd-e398-4c0b-a322-b2c680c5209c",
+              "teamId": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+              "seatNo": 2,
+              "role": "member",
+              "inviteSource": "invite",
+              "invitationId": "325c8376-924a-48db-a438-9b2f294b090e",
+              "inviterDisplayName": "居民A",
+              "joinedAt": "2026-11-04T03:51:57.407Z"
+            },
+            "team": {
+              "id": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+              "status": "locked",
+              "seatsTotal": 3,
+              "seatsFilled": 3,
+              "inviteCode": null,
+              "members": [
+                {
+                  "seatNo": 1,
+                  "displayName": "居民A",
+                  "role": "leader",
+                  "isSelf": false,
+                  "joinedAt": "2026-11-04T03:51:57.401Z"
+                },
+                {
+                  "seatNo": 2,
+                  "displayName": "居民B",
+                  "role": "member",
+                  "isSelf": true,
+                  "joinedAt": "2026-11-04T03:51:57.407Z"
+                },
+                {
+                  "seatNo": 3,
+                  "displayName": "居民C",
+                  "role": "member",
+                  "isSelf": false,
+                  "joinedAt": "2026-11-04T03:51:57.411Z"
+                }
+              ]
+            }
+          }
+        },
+        "requestId": "735ca993-027a-4c5a-89d7-005d04fefbe3"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-10",
+      "description": "未登录读取参与状态返回 401",
+      "expected": "401 unauthorized",
+      "actual": {
+        "status": 401,
+        "body": {
+          "error": {
+            "code": "unauthorized",
+            "message": "请先登录居民账户",
+            "requestId": "827aaca7-236d-4ecc-8895-017a4eabca18"
+          }
+        },
+        "requestId": "827aaca7-236d-4ecc-8895-017a4eabca18"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-11",
+      "description": "未登录确认参与返回 401",
+      "expected": "401 unauthorized",
+      "actual": {
+        "status": 401,
+        "body": {
+          "error": {
+            "code": "unauthorized",
+            "message": "请先登录居民账户",
+            "requestId": "a9e28c51-9669-4e7f-9ddb-34b0f9540229"
+          }
+        },
+        "requestId": "a9e28c51-9669-4e7f-9ddb-34b0f9540229"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-12",
+      "description": "已登录但缺少 CSRF 头返回 403",
+      "expected": "403 forbidden",
+      "actual": {
+        "status": 403,
+        "body": {
+          "error": {
+            "code": "forbidden",
+            "message": "CSRF 校验失败，请刷新页面后重试",
+            "requestId": "e8444253-e27e-4555-9a19-b2cba834343d"
+          }
+        },
+        "requestId": "e8444253-e27e-4555-9a19-b2cba834343d"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-13",
+      "description": "CSRF 正确但 Origin 不可信返回 403",
+      "expected": "403 forbidden",
+      "actual": {
+        "status": 403,
+        "body": {
+          "error": {
+            "code": "forbidden",
+            "message": "CSRF 校验失败，请刷新页面后重试",
+            "requestId": "566782dd-65b6-4d20-b6ed-14388eeb4d0e"
+          }
+        },
+        "requestId": "566782dd-65b6-4d20-b6ed-14388eeb4d0e"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-14",
+      "description": "伪造 userId 字段被严格 schema 拒绝（400）",
+      "expected": "400 invalid_request",
+      "actual": {
+        "status": 400,
+        "body": {
+          "error": {
+            "code": "invalid_request",
+            "message": "参与信息不正确",
+            "requestId": "d43c9108-0708-4df8-8dd3-2e9ac712f509"
+          }
+        },
+        "requestId": "d43c9108-0708-4df8-8dd3-2e9ac712f509"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-15",
+      "description": "伪造 userId 未给 D 产生任何归属",
+      "expected": "200 participation null",
+      "actual": {
+        "status": 200,
+        "body": {
+          "activityId": "db78d9ed-1a26-4115-9c77-d57f2d7a50f7",
+          "activityStatus": "published",
+          "joinable": true,
+          "unavailableReason": null,
+          "participation": null,
+          "team": null
+        },
+        "requestId": "ab622aad-2984-4131-a092-f1913640599c"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-16",
+      "description": "同时伪造 userId 与邀请码仍按 strict schema 400，不落库",
+      "expected": "400 invalid_request",
+      "actual": {
+        "status": 400,
+        "body": {
+          "error": {
+            "code": "invalid_request",
+            "message": "参与信息不正确",
+            "requestId": "e758d97c-e94e-4592-b560-154086406224"
+          }
+        },
+        "requestId": "e758d97c-e94e-4592-b560-154086406224"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-17",
+      "description": "无效邀请码返回 400 invite_invalid 且零归属",
+      "expected": "400 invite_invalid",
+      "actual": {
+        "status": 400,
+        "body": {
+          "error": {
+            "code": "invite_invalid",
+            "message": "邀请码无效或不属于本活动",
+            "requestId": "984bc555-8b64-46f0-ba15-3b9ced6ef7cd"
+          }
+        },
+        "requestId": "984bc555-8b64-46f0-ba15-3b9ced6ef7cd"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-18",
+      "description": "无效邀请码未给 E 写入参与记录",
+      "expected": "200 participation null",
+      "actual": {
+        "status": 200,
+        "body": {
+          "activityId": "db78d9ed-1a26-4115-9c77-d57f2d7a50f7",
+          "activityStatus": "published",
+          "joinable": true,
+          "unavailableReason": null,
+          "participation": null,
+          "team": null
+        },
+        "requestId": "077c29c6-12fe-48e6-9e88-d06a0e8a2a42"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-19",
+      "description": "跨活动使用他场邀请码返回 400 invite_invalid",
+      "expected": "400 invite_invalid",
+      "actual": {
+        "status": 400,
+        "body": {
+          "error": {
+            "code": "invite_invalid",
+            "message": "邀请码无效或不属于本活动",
+            "requestId": "732bdd82-03e5-4fb2-b8ab-0c0103daebbb"
+          }
+        },
+        "requestId": "732bdd82-03e5-4fb2-b8ab-0c0103daebbb"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-20",
+      "description": "跨活动邀请码未在目标活动落入归属",
+      "expected": "200 participation null",
+      "actual": {
+        "status": 200,
+        "body": {
+          "activityId": "a5ebc177-c757-4d04-b2c2-bab37fb90b0b",
+          "activityStatus": "published",
+          "joinable": true,
+          "unavailableReason": null,
+          "participation": null,
+          "team": null
+        },
+        "requestId": "576dacb5-3482-4dbb-a1e5-6a1af179e4f4"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-21",
+      "description": "草稿活动读取参与状态返回 404",
+      "expected": "404 not_found",
+      "actual": {
+        "status": 404,
+        "body": {
+          "error": {
+            "code": "not_found",
+            "message": "活动不存在或尚未发布",
+            "requestId": "0c4aecee-ab1a-48d4-a746-23d5767da806"
+          }
+        },
+        "requestId": "0c4aecee-ab1a-48d4-a746-23d5767da806"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-22",
+      "description": "草稿活动确认参与返回 404 且零写入",
+      "expected": "404 not_found",
+      "actual": {
+        "status": 404,
+        "body": {
+          "error": {
+            "code": "not_found",
+            "message": "活动不存在或尚未发布",
+            "requestId": "f41ed1d5-bf02-41a3-8e17-bfaa9724c2fe"
+          }
+        },
+        "requestId": "f41ed1d5-bf02-41a3-8e17-bfaa9724c2fe"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-23",
+      "description": "不存在活动读取参与状态返回 404",
+      "expected": "404 not_found",
+      "actual": {
+        "status": 404,
+        "body": {
+          "error": {
+            "code": "not_found",
+            "message": "活动不存在",
+            "requestId": "ac165366-cb8e-4aa6-b2da-db3aedd015bc"
+          }
+        },
+        "requestId": "ac165366-cb8e-4aa6-b2da-db3aedd015bc"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-24",
+      "description": "不存在活动确认参与返回 404",
+      "expected": "404 not_found",
+      "actual": {
+        "status": 404,
+        "body": {
+          "error": {
+            "code": "not_found",
+            "message": "活动不存在",
+            "requestId": "284aab82-a64d-49c2-b83c-139049fd63a6"
+          }
+        },
+        "requestId": "284aab82-a64d-49c2-b83c-139049fd63a6"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-25",
+      "description": "暂停活动状态：joinable=false、unavailableReason=activity_not_published",
+      "expected": "200 paused not joinable",
+      "actual": {
+        "status": 200,
+        "body": {
+          "activityId": "cd26158a-87b3-43af-a538-6f0d47fffaed",
+          "activityStatus": "paused",
+          "joinable": false,
+          "unavailableReason": "activity_not_published",
+          "participation": null,
+          "team": null
+        },
+        "requestId": "7ee3b1cc-2b75-45ae-987a-8138aaccf318"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-26",
+      "description": "暂停活动确认参与返回 409 activity_unavailable",
+      "expected": "409 activity_unavailable",
+      "actual": {
+        "status": 409,
+        "body": {
+          "error": {
+            "code": "activity_unavailable",
+            "message": "活动当前不可参与",
+            "requestId": "5077b8e3-ea2e-4c97-a4b5-b67d8a122594"
+          }
+        },
+        "requestId": "5077b8e3-ea2e-4c97-a4b5-b67d8a122594"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-27",
+      "description": "结束活动状态：joinable=false、unavailableReason=activity_ended",
+      "expected": "200 ended not joinable",
+      "actual": {
+        "status": 200,
+        "body": {
+          "activityId": "61dd48dd-dea5-4230-8940-33feff074342",
+          "activityStatus": "ended",
+          "joinable": false,
+          "unavailableReason": "activity_ended",
+          "participation": null,
+          "team": null
+        },
+        "requestId": "11d3ddf0-8770-4eff-9ffe-4579050c5aac"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-28",
+      "description": "结束活动确认参与返回 409 activity_unavailable",
+      "expected": "409 activity_unavailable",
+      "actual": {
+        "status": 409,
+        "body": {
+          "error": {
+            "code": "activity_unavailable",
+            "message": "活动已结束，无法参与",
+            "requestId": "486d93cc-2604-4229-8130-df9b7de13822"
+          }
+        },
+        "requestId": "486d93cc-2604-4229-8130-df9b7de13822"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-29",
+      "description": "已过 endsAt 的已发布活动不可参与（409 前置状态）",
+      "expected": "200 published joinable=false reason activity_ended",
+      "actual": {
+        "status": 200,
+        "body": {
+          "activityId": "63433639-3cb2-4073-b849-33eb6a34f6dc",
+          "activityStatus": "published",
+          "joinable": false,
+          "unavailableReason": "activity_ended",
+          "participation": null,
+          "team": null
+        },
+        "requestId": "4a21e423-13a7-4df7-b437-a441637b6d46"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-30",
+      "description": "已过期活动确认参与返回 409 activity_unavailable",
+      "expected": "409 activity_unavailable",
+      "actual": {
+        "status": 409,
+        "body": {
+          "error": {
+            "code": "activity_unavailable",
+            "message": "活动已结束，无法参与",
+            "requestId": "725be756-cf0a-49ae-acbd-bc01e071be3e"
+          }
+        },
+        "requestId": "725be756-cf0a-49ae-acbd-bc01e071be3e"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-31",
+      "description": "A 在另一场已发布活动重新组队成功",
+      "expected": "200 created=true new team seat1",
+      "actual": {
+        "status": 200,
+        "body": {
+          "created": true,
+          "state": {
+            "activityId": "a5ebc177-c757-4d04-b2c2-bab37fb90b0b",
+            "activityStatus": "published",
+            "joinable": false,
+            "unavailableReason": null,
+            "participation": {
+              "id": "757f9d34-9694-4aab-83ec-3dba620ec47c",
+              "teamId": "f757963c-9ea5-4d94-b9ed-7ba1508798fd",
+              "seatNo": 1,
+              "role": "leader",
+              "inviteSource": "self",
+              "invitationId": null,
+              "inviterDisplayName": null,
+              "joinedAt": "2026-11-04T03:51:57.473Z"
+            },
+            "team": {
+              "id": "f757963c-9ea5-4d94-b9ed-7ba1508798fd",
+              "status": "open",
+              "seatsTotal": 3,
+              "seatsFilled": 1,
+              "inviteCode": "0c409cca58973da35e02c81e1971ea42",
+              "members": [
+                {
+                  "seatNo": 1,
+                  "displayName": "居民A",
+                  "role": "leader",
+                  "isSelf": true,
+                  "joinedAt": "2026-11-04T03:51:57.473Z"
+                }
+              ]
+            }
+          }
+        },
+        "requestId": "94cb52c3-1cc4-48dd-8d29-57441d981620"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-32",
+      "description": "A 跨活动组队后主活动团籍不变",
+      "expected": "200 primary team id unchanged 3/3",
+      "actual": {
+        "status": 200,
+        "body": {
+          "activityId": "db78d9ed-1a26-4115-9c77-d57f2d7a50f7",
+          "activityStatus": "published",
+          "joinable": false,
+          "unavailableReason": null,
+          "participation": {
+            "id": "d0255450-f677-4955-bad8-bc089d5f39b8",
+            "teamId": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+            "seatNo": 1,
+            "role": "leader",
+            "inviteSource": "self",
+            "invitationId": null,
+            "inviterDisplayName": null,
+            "joinedAt": "2026-11-04T03:51:57.401Z"
+          },
+          "team": {
+            "id": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+            "status": "locked",
+            "seatsTotal": 3,
+            "seatsFilled": 3,
+            "inviteCode": null,
+            "members": [
+              {
+                "seatNo": 1,
+                "displayName": "居民A",
+                "role": "leader",
+                "isSelf": true,
+                "joinedAt": "2026-11-04T03:51:57.401Z"
+              },
+              {
+                "seatNo": 2,
+                "displayName": "居民B",
+                "role": "member",
+                "isSelf": false,
+                "joinedAt": "2026-11-04T03:51:57.407Z"
+              },
+              {
+                "seatNo": 3,
+                "displayName": "居民C",
+                "role": "member",
+                "isSelf": false,
+                "joinedAt": "2026-11-04T03:51:57.411Z"
+              }
+            ]
+          }
+        },
+        "requestId": "a4f67062-6dbe-485f-8df1-62f2950f1746"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-33",
+      "description": "A 在第二场活动的团独立存在（1/3 open）",
+      "expected": "200 secondary team 1/3 open",
+      "actual": {
+        "status": 200,
+        "body": {
+          "activityId": "a5ebc177-c757-4d04-b2c2-bab37fb90b0b",
+          "activityStatus": "published",
+          "joinable": false,
+          "unavailableReason": null,
+          "participation": {
+            "id": "757f9d34-9694-4aab-83ec-3dba620ec47c",
+            "teamId": "f757963c-9ea5-4d94-b9ed-7ba1508798fd",
+            "seatNo": 1,
+            "role": "leader",
+            "inviteSource": "self",
+            "invitationId": null,
+            "inviterDisplayName": null,
+            "joinedAt": "2026-11-04T03:51:57.473Z"
+          },
+          "team": {
+            "id": "f757963c-9ea5-4d94-b9ed-7ba1508798fd",
+            "status": "open",
+            "seatsTotal": 3,
+            "seatsFilled": 1,
+            "inviteCode": "0c409cca58973da35e02c81e1971ea42",
+            "members": [
+              {
+                "seatNo": 1,
+                "displayName": "居民A",
+                "role": "leader",
+                "isSelf": true,
+                "joinedAt": "2026-11-04T03:51:57.473Z"
+              }
+            ]
+          }
+        },
+        "requestId": "831216bb-29de-4096-9a55-dd5e493f0164"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-34",
+      "description": "E 在同一活动另建独立三人团并取得邀请码",
+      "expected": "200 created=true 1/3 open",
+      "actual": {
+        "status": 200,
+        "body": {
+          "created": true,
+          "state": {
+            "activityId": "db78d9ed-1a26-4115-9c77-d57f2d7a50f7",
+            "activityStatus": "published",
+            "joinable": false,
+            "unavailableReason": null,
+            "participation": {
+              "id": "8d56963f-f52c-46d1-a576-41293ab7c9d4",
+              "teamId": "bc2f135b-a0ac-46ff-a2b3-c6d0719dd700",
+              "seatNo": 1,
+              "role": "leader",
+              "inviteSource": "self",
+              "invitationId": null,
+              "inviterDisplayName": null,
+              "joinedAt": "2026-11-04T03:51:57.480Z"
+            },
+            "team": {
+              "id": "bc2f135b-a0ac-46ff-a2b3-c6d0719dd700",
+              "status": "open",
+              "seatsTotal": 3,
+              "seatsFilled": 1,
+              "inviteCode": "d1857c3aa485379dadbb0d69c033b409",
+              "members": [
+                {
+                  "seatNo": 1,
+                  "displayName": "居民E",
+                  "role": "leader",
+                  "isSelf": true,
+                  "joinedAt": "2026-11-04T03:51:57.480Z"
+                }
+              ]
+            }
+          }
+        },
+        "requestId": "d4379662-aa55-4865-b0ad-d87a263dc0a8"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-35",
+      "description": "B 已加入后使用另一团队的邀请码不改变归属与团队",
+      "expected": "200 created=false same team seat2 inviteSource invite",
+      "actual": {
+        "status": 200,
+        "body": {
+          "created": false,
+          "state": {
+            "activityId": "db78d9ed-1a26-4115-9c77-d57f2d7a50f7",
+            "activityStatus": "published",
+            "joinable": false,
+            "unavailableReason": null,
+            "participation": {
+              "id": "2a92babd-e398-4c0b-a322-b2c680c5209c",
+              "teamId": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+              "seatNo": 2,
+              "role": "member",
+              "inviteSource": "invite",
+              "invitationId": "325c8376-924a-48db-a438-9b2f294b090e",
+              "inviterDisplayName": "居民A",
+              "joinedAt": "2026-11-04T03:51:57.407Z"
+            },
+            "team": {
+              "id": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+              "status": "locked",
+              "seatsTotal": 3,
+              "seatsFilled": 3,
+              "inviteCode": null,
+              "members": [
+                {
+                  "seatNo": 1,
+                  "displayName": "居民A",
+                  "role": "leader",
+                  "isSelf": false,
+                  "joinedAt": "2026-11-04T03:51:57.401Z"
+                },
+                {
+                  "seatNo": 2,
+                  "displayName": "居民B",
+                  "role": "member",
+                  "isSelf": true,
+                  "joinedAt": "2026-11-04T03:51:57.407Z"
+                },
+                {
+                  "seatNo": 3,
+                  "displayName": "居民C",
+                  "role": "member",
+                  "isSelf": false,
+                  "joinedAt": "2026-11-04T03:51:57.411Z"
+                }
+              ]
+            }
+          }
+        },
+        "requestId": "71cddd26-4d1b-47c3-936e-c47ede83b7db"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-36",
+      "description": "E 的团没有被 B 加入（仍 1/3）",
+      "expected": "200 1/3 open",
+      "actual": {
+        "status": 200,
+        "body": {
+          "activityId": "db78d9ed-1a26-4115-9c77-d57f2d7a50f7",
+          "activityStatus": "published",
+          "joinable": false,
+          "unavailableReason": null,
+          "participation": {
+            "id": "8d56963f-f52c-46d1-a576-41293ab7c9d4",
+            "teamId": "bc2f135b-a0ac-46ff-a2b3-c6d0719dd700",
+            "seatNo": 1,
+            "role": "leader",
+            "inviteSource": "self",
+            "invitationId": null,
+            "inviterDisplayName": null,
+            "joinedAt": "2026-11-04T03:51:57.480Z"
+          },
+          "team": {
+            "id": "bc2f135b-a0ac-46ff-a2b3-c6d0719dd700",
+            "status": "open",
+            "seatsTotal": 3,
+            "seatsFilled": 1,
+            "inviteCode": "d1857c3aa485379dadbb0d69c033b409",
+            "members": [
+              {
+                "seatNo": 1,
+                "displayName": "居民E",
+                "role": "leader",
+                "isSelf": true,
+                "joinedAt": "2026-11-04T03:51:57.480Z"
+              }
+            ]
+          }
+        },
+        "requestId": "6dcb6f16-fd37-4d41-82a7-7b5c8da73383"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-37",
+      "description": "并发活动团长 L 建团 1/3",
+      "expected": "200 created=true 1/3",
+      "actual": {
+        "status": 200,
+        "body": {
+          "created": true,
+          "state": {
+            "activityId": "792b24bc-67f1-4e50-9909-5c5d4fa4e145",
+            "activityStatus": "published",
+            "joinable": false,
+            "unavailableReason": null,
+            "participation": {
+              "id": "bbf6030b-9fe1-49bb-9ea4-004175d66364",
+              "teamId": "206dea8a-6a04-43e4-8d12-3f13fbddff31",
+              "seatNo": 1,
+              "role": "leader",
+              "inviteSource": "self",
+              "invitationId": null,
+              "inviterDisplayName": null,
+              "joinedAt": "2026-11-04T03:51:57.488Z"
+            },
+            "team": {
+              "id": "206dea8a-6a04-43e4-8d12-3f13fbddff31",
+              "status": "open",
+              "seatsTotal": 3,
+              "seatsFilled": 1,
+              "inviteCode": "fc66a22943ed04881d718a1ad675f7da",
+              "members": [
+                {
+                  "seatNo": 1,
+                  "displayName": "团长L",
+                  "role": "leader",
+                  "isSelf": true,
+                  "joinedAt": "2026-11-04T03:51:57.488Z"
+                }
+              ]
+            }
+          }
+        },
+        "requestId": "ce623249-152f-4267-9d96-d18f64f62e2c"
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-38",
+      "description": "4 个并发确认恰好 2 个成功、2 个 409 team_full",
+      "expected": "[200,200,409,409]",
+      "actual": {
+        "status": 200,
+        "body": {
+          "statuses": [
+            200,
+            200,
+            409,
+            409
+          ]
+        }
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-39",
+      "description": "并发成功的两人落在第 2、3 席且同团",
+      "expected": "[2,3] same team",
+      "actual": {
+        "status": 200,
+        "body": {
+          "successSeats": [
+            2,
+            3
+          ]
+        }
+      },
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "id": "http-40",
+      "description": "并发后团队恒为 3 席且已锁定",
+      "expected": "200 locked 3/3",
+      "actual": {
+        "status": 200,
+        "body": {
+          "activityId": "792b24bc-67f1-4e50-9909-5c5d4fa4e145",
+          "activityStatus": "published",
+          "joinable": false,
+          "unavailableReason": null,
+          "participation": {
+            "id": "bbf6030b-9fe1-49bb-9ea4-004175d66364",
+            "teamId": "206dea8a-6a04-43e4-8d12-3f13fbddff31",
+            "seatNo": 1,
+            "role": "leader",
+            "inviteSource": "self",
+            "invitationId": null,
+            "inviterDisplayName": null,
+            "joinedAt": "2026-11-04T03:51:57.488Z"
+          },
+          "team": {
+            "id": "206dea8a-6a04-43e4-8d12-3f13fbddff31",
+            "status": "locked",
+            "seatsTotal": 3,
+            "seatsFilled": 3,
+            "inviteCode": null,
+            "members": [
+              {
+                "seatNo": 1,
+                "displayName": "团长L",
+                "role": "leader",
+                "isSelf": true,
+                "joinedAt": "2026-11-04T03:51:57.488Z"
+              },
+              {
+                "seatNo": 2,
+                "displayName": "抢席1",
+                "role": "member",
+                "isSelf": false,
+                "joinedAt": "2026-11-04T03:51:57.491Z"
+              },
+              {
+                "seatNo": 3,
+                "displayName": "抢席2",
+                "role": "member",
+                "isSelf": false,
+                "joinedAt": "2026-11-04T03:51:57.492Z"
+              }
+            ]
+          }
+        },
+        "requestId": "e786c24b-bc44-4398-b275-f8c704ee9766"
+      },
+      "pass": true,
+      "detail": ""
+    }
+  ],
+  "sessionUserIds": {
+    "A": "e5ea1b35-fd8b-4633-8e9a-d0e1dd4b9876",
+    "B": "2e551d18-e105-4dd5-9509-696dd8008154",
+    "C": "c822b9f8-9b66-45fb-a7e4-c7647c375b13",
+    "D": "d2f757d5-f39b-4e62-bb3b-415cf1b8dea8"
+  }
+}
