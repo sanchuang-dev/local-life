@@ -20,7 +20,7 @@ import {
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { Rule } from 'antd/es/form'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type {
   SettlementPaymentOverview,
   SettlementStatement,
@@ -41,6 +41,7 @@ import {
   SETTLEMENT_PAYMENT_STATE_LABELS,
   SETTLEMENT_STATEMENT_STATUS_LABELS,
   createSettlementStatement,
+  disputeSettlementPayment,
   downloadSettlementCsv,
   getSettlementPaymentOverview,
   getSettlementStatement,
@@ -48,6 +49,7 @@ import {
   lockSettlementStatement,
   recordSettlementPayment,
   reviewSettlementStatement,
+  verifySettlementPayment,
 } from '../services/settlement'
 import './ledger.css'
 
@@ -294,19 +296,31 @@ export function SettlementStatementPanel() {
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [paymentError, setPaymentError] = useState<Error | null>(null)
   const [paymentToken, setPaymentToken] = useState(0)
+  const [paymentTabOpened, setPaymentTabOpened] = useState(false)
+  // Tracks the (statement, token) pair already requested so opening the tab or
+  // re-rendering the Drawer cannot silently re-fetch the same overview.
+  const paymentRequestRef = useRef<{ detailId: string | null; token: number }>({
+    detailId: null,
+    token: -1,
+  })
 
   useEffect(() => {
     if (detailId === null) return
-    // Locked statements pre-load the payment overview as soon as the Drawer opens;
-    // for any other status it is read when the 付款凭据 tab is first opened. This
-    // keeps a detail-only read from issuing a payment request nobody asked for.
     const statementLocked = detail?.statement.status === 'locked'
-    if (detailTab !== 'payments' && !statementLocked) return
+    if (!paymentTabOpened && !statementLocked) return
+    const requested = paymentRequestRef.current
+    if (
+      requested.detailId === detailId &&
+      requested.token === paymentToken &&
+      paymentOverview !== null
+    ) {
+      return
+    }
+    paymentRequestRef.current = { detailId, token: paymentToken }
     let active = true
     const controller = new AbortController()
     setPaymentLoading(true)
     setPaymentError(null)
-    setPaymentOverview(null)
     getSettlementPaymentOverview(detailId, controller.signal)
       .then((result) => {
         if (active) setPaymentOverview(result)
@@ -323,13 +337,17 @@ export function SettlementStatementPanel() {
       active = false
       controller.abort()
     }
-  }, [detailId, paymentToken, detailTab, detail?.statement.status])
+    // paymentOverview is intentionally not a dependency: the ref guard reads the
+    // current value, and re-running on every fetch result would be pointless.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailId, paymentToken, paymentTabOpened, detail?.statement.status])
 
   const openDetail = (row: SettlementStatement) => {
     setDetailRow(row)
     setDetailId(row.id)
     setDetailTab('lines')
     setPaymentError(null)
+    setPaymentTabOpened(false)
   }
 
   const closeDetail = () => {
@@ -343,6 +361,7 @@ export function SettlementStatementPanel() {
     setExportError(null)
     setPaymentOverview(null)
     setPaymentError(null)
+    setPaymentTabOpened(false)
   }
 
   /* ---------------------- independent review / one-way lock ---------------- */
@@ -814,7 +833,10 @@ export function SettlementStatementPanel() {
             <StatementDetail
               detail={detail}
               tab={detailTab}
-              onTabChange={setDetailTab}
+              onTabChange={(key) => {
+                setDetailTab(key)
+                if (key === 'payments') setPaymentTabOpened(true)
+              }}
               paymentOverview={paymentOverview}
               paymentLoading={paymentLoading}
               paymentError={paymentError}
@@ -1528,13 +1550,112 @@ function PaymentTab({
     }
   }
 
+  /* ---------------------- independent verify / dispute --------------------- */
+
+  type PaymentActionKind = 'verify' | 'dispute'
+  type PaymentRecord = SettlementPaymentOverview['records'][number]
+
+  const [actionKind, setActionKind] = useState<PaymentActionKind | null>(null)
+  const [actionRecord, setActionRecord] = useState<PaymentRecord | null>(null)
+  // One event idempotency key per logical action: generated when the human opens
+  // the action dialog, kept across failed retries, replaced only by a new action.
+  const [actionKey, setActionKey] = useState<string>(() => newIdempotencyKey())
+  const [actionSubmitting, setActionSubmitting] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [actionForm] = Form.useForm<ActionFormValues>()
+
+  const openAction = (kind: PaymentActionKind, record: PaymentRecord) => {
+    setActionKind(kind)
+    setActionRecord(record)
+    setActionKey(newIdempotencyKey())
+    setActionError(null)
+    actionForm.resetFields()
+  }
+
+  const closeAction = () => {
+    if (actionSubmitting) return
+    setActionKind(null)
+    setActionRecord(null)
+    setActionError(null)
+    actionForm.resetFields()
+  }
+
+  const submitAction = async (values: ActionFormValues) => {
+    if (!actionKind || !actionRecord || actionSubmitting) return
+    const evidenceRef = (values.evidenceRef ?? '').trim()
+    if (evidenceRef.length < 2 || evidenceRef.length > 200) return
+    const kind = actionKind
+    setActionSubmitting(true)
+    setActionError(null)
+    try {
+      const updated =
+        kind === 'verify'
+          ? await verifySettlementPayment(csrfToken, statement.id, actionRecord.id, {
+              eventIdempotencyKey: actionKey,
+              evidenceRef,
+            })
+          : await disputeSettlementPayment(csrfToken, statement.id, actionRecord.id, {
+              eventIdempotencyKey: actionKey,
+              evidenceRef,
+            })
+      // Re-render the whole payment section from the server's overview; the page
+      // never flips a record to 已核销/争议 locally.
+      onRecorded(updated)
+      setActionKind(null)
+      setActionRecord(null)
+      actionForm.resetFields()
+      message.success(
+        kind === 'verify'
+          ? '付款凭据已核验：状态与核销金额以服务端返回为准，核验不发起任何转账。'
+          : '付款凭据已标记争议：状态与总览以服务端返回为准，不会发起任何转账。',
+      )
+    } catch (cause: unknown) {
+      setActionError(
+        describeLocalError(cause, kind === 'verify' ? '核验付款凭据失败' : '标记付款争议失败'),
+      )
+      // A 409 means the server's truth changed (already reviewed / not locked /
+      // key reused): refresh from the server instead of guessing a rollback.
+      if (isLocalApiError(cause) && cause.status === 409) onRetry()
+    } finally {
+      setActionSubmitting(false)
+    }
+  }
+
+  const recordColumns: ColumnsType<PaymentRecord> = isAdmin
+    ? [
+        ...paymentRecordColumns,
+        {
+          title: '操作',
+          key: 'actions',
+          render: (_value, row) =>
+            row.state === 'pending_review' ? (
+              <Space size={0} wrap>
+                <Button type="link" size="small" onClick={() => openAction('verify', row)}>
+                  核验
+                </Button>
+                <Button
+                  type="link"
+                  size="small"
+                  danger
+                  onClick={() => openAction('dispute', row)}
+                >
+                  标记争议
+                </Button>
+              </Space>
+            ) : (
+              <Typography.Text type="secondary">无可用操作</Typography.Text>
+            ),
+        },
+      ]
+    : paymentRecordColumns
+
   return (
     <Space orientation="vertical" size={12} style={{ width: '100%' }}>
       <Alert
         type="info"
         showIcon
         title="登记付款凭据 ≠ 复核核销"
-        description="登记只录入真实线下付款凭据，不触发任何转账，也不等于已核销；金额与受款人必须来自真实线下付款凭据。核验与争议由后续卡提供，本视图不提供这些入口。"
+        description="登记只录入真实线下付款凭据，不触发任何转账；锁定 ≠ 已付，凭据登记 ≠ 已核销。核验与标记争议仅由管理员在凭据列表逐条执行，二次确认后也只会改变该凭据的付款状态，绝不发起任何转账。金额与受款人必须来自真实线下付款凭据。"
       />
 
       {error ? (
@@ -1597,7 +1718,7 @@ function PaymentTab({
               pagination={false}
               scroll={{ x: 'max-content' }}
               dataSource={overview.records}
-              columns={paymentRecordColumns}
+              columns={recordColumns}
               style={{ marginTop: 8 }}
               locale={{
                 emptyText: (
@@ -1633,6 +1754,9 @@ function PaymentTab({
                   ))}
               </Space>
             )}
+            <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+              历史事件只读：记录谁在什么时候做了什么（sequence / actorUserId / evidenceRef / 时间），本视图不提供编辑或删除。
+            </Typography.Paragraph>
           </section>
 
           {!isAdmin ? (
@@ -1760,6 +1884,93 @@ function PaymentTab({
               </Typography.Paragraph>
             </section>
           )}
+
+          {isAdmin ? (
+            <Modal
+              title={
+                actionKind === 'verify' ? '核验付款凭据（人工核验）' : '标记付款争议'
+              }
+              open={actionKind !== null}
+              onCancel={closeAction}
+              onOk={() => actionForm.submit()}
+              okText={actionKind === 'verify' ? '确认核验' : '确认标记争议'}
+              cancelText="取消"
+              confirmLoading={actionSubmitting}
+              destroyOnHidden
+            >
+              {actionRecord ? (
+                <Descriptions size="small" column={1} bordered style={{ marginBottom: 12 }}>
+                  <Descriptions.Item label="凭据金额">
+                    {formatCents(actionRecord.amountCents)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="付款时间">
+                    {formatDateTime(actionRecord.paidAt)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="脱敏凭据引用">
+                    {actionRecord.proofRefMasked}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="当前状态">
+                    {SETTLEMENT_PAYMENT_RECORD_STATE_LABELS[actionRecord.state]}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="登记人">
+                    <Typography.Text className="ledger-cell-mono" style={{ fontSize: 12 }}>
+                      {actionRecord.recorderUserId}
+                    </Typography.Text>
+                  </Descriptions.Item>
+                </Descriptions>
+              ) : null}
+
+              {actionKind === 'verify' ? (
+                <Alert
+                  type="info"
+                  showIcon
+                  title="核验会改变这条凭据的付款状态并计入核销统计"
+                  description="确认后该凭据从待复核变为已核销，进入核销金额统计；这不发起任何转账，也不是付款动作。登记人不能核验自己登记的凭据，独立性由服务端强制。"
+                  style={{ marginBottom: 12 }}
+                />
+              ) : (
+                <Alert
+                  type="warning"
+                  showIcon
+                  title="标记争议会改变该凭据状态并影响总览"
+                  description="确认后该凭据置为争议，并影响付款总览的已登记/核销统计；不会发起任何转账，也不会改写历史事件。"
+                  style={{ marginBottom: 12 }}
+                />
+              )}
+
+              {actionError ? (
+                <Alert
+                  type="error"
+                  showIcon
+                  title={actionKind === 'verify' ? '核验未完成' : '争议未标记'}
+                  description={actionError}
+                  style={{ marginBottom: 12 }}
+                />
+              ) : null}
+
+              <Form<ActionFormValues>
+                form={actionForm}
+                layout="vertical"
+                onFinish={(values) => void submitAction(values)}
+              >
+                <Form.Item
+                  name="evidenceRef"
+                  label={actionKind === 'verify' ? '核验依据' : '争议依据'}
+                  rules={evidenceRule(actionKind === 'verify' ? '核验依据' : '争议依据')}
+                  tooltip="人工填写的可核对依据（2-200 字），页面不预填。"
+                >
+                  <Input maxLength={200} placeholder="人工填写依据，不预填" />
+                </Form.Item>
+              </Form>
+              <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
+                本次事件幂等键：
+                <span className="ledger-cell-mono" data-testid="payment-action-idempotency-key">
+                  {actionKey}
+                </span>
+                （失败重试复用同一键；成功后重新操作才生成新键）
+              </Typography.Paragraph>
+            </Modal>
+          ) : null}
         </>
       )}
     </Space>

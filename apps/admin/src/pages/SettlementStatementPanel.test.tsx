@@ -1479,3 +1479,390 @@ describe('SettlementStatementPanel · 付款凭据（#225）', () => {
     expect(screen.queryByRole('button', { name: /转账/ })).toBeNull()
   })
 })
+
+describe('SettlementStatementPanel · 付款核验与争议（#226）', () => {
+  function lockedStatement(): SettlementStatement {
+    return statement({
+      status: 'locked',
+      revision: 3,
+      reviewedByUserId: USER_ID,
+      reviewEvidenceRef: '复核单 2026-11-08',
+      reviewedAt: '2026-11-08T03:00:00.000Z',
+      lockedByUserId: USER_ID,
+      lockEvidenceRef: '锁单依据 2026-11-09',
+      lockedAt: '2026-11-09T01:00:00.000Z',
+    })
+  }
+
+  function verifiedOverview(): SettlementPaymentOverview {
+    const base = paymentOverview()
+    return {
+      ...base,
+      state: 'verified',
+      verifiedCents: 500,
+      records: [{ ...base.records[0]!, state: 'verified' }],
+      events: [
+        ...base.events,
+        {
+          id: '123e4567-e89b-42d3-a456-426614174f04',
+          paymentRecordId: PAYMENT_RECORD_ID,
+          statementId: STATEMENT_ID,
+          kind: 'verified',
+          sequence: 2,
+          actorUserId: USER_ID,
+          evidenceRef: '银行回单核对 2026-11-10',
+          state: 'verified',
+          createdAt: '2026-11-10T02:00:00.000Z',
+        },
+      ],
+    }
+  }
+
+  function disputedOverview(): SettlementPaymentOverview {
+    const base = paymentOverview()
+    return {
+      ...base,
+      state: 'disputed',
+      records: [{ ...base.records[0]!, state: 'disputed' }],
+      events: [
+        ...base.events,
+        {
+          id: '123e4567-e89b-42d3-a456-426614174f05',
+          paymentRecordId: PAYMENT_RECORD_ID,
+          statementId: STATEMENT_ID,
+          kind: 'disputed',
+          sequence: 2,
+          actorUserId: USER_ID,
+          evidenceRef: '金额与回单不符',
+          state: 'disputed',
+          createdAt: '2026-11-10T02:00:00.000Z',
+        },
+      ],
+    }
+  }
+
+  type ActionPost = (url: string, init?: RequestInit) => Response | Promise<Response>
+
+  function actionRoutes(options: {
+    overview?: () => SettlementPaymentOverview
+    post?: ActionPost
+  } = {}): readonly [string, Handler] {
+    return [
+      STATEMENTS_ROUTE,
+      (url, init) => {
+        const path = new URL(url, 'http://localhost').pathname
+        if (path === STATEMENTS_ROUTE) {
+          return json({ items: [lockedStatement()], total: 1, page: 1, pageSize: 20 })
+        }
+        if (/\/payments\/[^/]+\/(verify|dispute)$/u.test(path)) {
+          if (init?.method === 'POST' && options.post) return options.post(url, init)
+          return json({ error: { code: 'not_found', message: '付款凭据不存在' } }, 404)
+        }
+        if (path.endsWith('/payments')) {
+          return json(options.overview ? options.overview() : paymentOverview())
+        }
+        return json({ ...detail(), statement: lockedStatement() })
+      },
+    ]
+  }
+
+  async function openPaymentArea() {
+    await screen.findByText('STL-20261101-0001')
+    await openDetailDrawer()
+    fireEvent.click(await screen.findByRole('tab', { name: /付款凭据/ }))
+    await screen.findByText('BANK-20261109-001')
+  }
+
+  async function openVerifyModal(button: HTMLElement) {
+    fireEvent.click(button)
+    await screen.findByText('核验付款凭据（人工核验）')
+    expect(screen.getByText(/核验会改变这条凭据的付款状态并计入核销统计/)).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('核验依据'), {
+      target: { value: '银行回单核对 2026-11-10' },
+    })
+  }
+
+  function actionKey(): string {
+    return screen.getByTestId('payment-action-idempotency-key').textContent ?? ''
+  }
+
+  it('verifies a pending proof and re-renders the whole section from the server overview', async () => {
+    const posts: FetchCall[] = []
+    stubApi([
+      actionRoutes({
+        post: (url, init) => {
+          posts.push({ url, init })
+          return json(verifiedOverview())
+        },
+      }),
+    ])
+    renderPanel(ADMIN_SESSION)
+    await openPaymentArea()
+
+    expect(screen.getByText('待复核')).toBeTruthy()
+    await openVerifyModal(screen.getByRole('button', { name: /核\s*验/ }))
+    const displayedKey = actionKey()
+
+    fireEvent.click(within(modalElement()).getByRole('button', { name: '确认核验' }))
+
+    await waitFor(() => expect(posts).toHaveLength(1))
+    const post = posts[0]!
+    expect(urlOf(post).pathname).toBe(
+      `${STATEMENTS_ROUTE}/${STATEMENT_ID}/payments/${PAYMENT_RECORD_ID}/verify`,
+    )
+    expect(post.init?.method).toBe('POST')
+    expect(headersOf(post)['x-csrf-token']).toBe(CSRF_TOKEN)
+    expect(JSON.parse(String(post.init?.body))).toEqual({
+      eventIdempotencyKey: displayedKey,
+      evidenceRef: '银行回单核对 2026-11-10',
+    })
+
+    expect(await screen.findByText(/付款凭据已核验/)).toBeTruthy()
+    // Server truth only: the record and the overview now say verified/已核销.
+    expect((await screen.findAllByText('已核销')).length).toBeGreaterThan(0)
+    // Verification is not a payment.
+    expect(document.body.textContent).not.toMatch(/已付款/)
+  })
+
+  it('shows the server self-review 403 verbatim without implying verification', async () => {
+    stubApi([
+      actionRoutes({
+        post: () =>
+          json(
+            { error: { code: 'forbidden', message: '付款登记人不能复核自己的付款凭据' } },
+            403,
+          ),
+      }),
+    ])
+    renderPanel(ADMIN_SESSION)
+    await openPaymentArea()
+    await openVerifyModal(screen.getByRole('button', { name: /核\s*验/ }))
+    fireEvent.click(within(modalElement()).getByRole('button', { name: '确认核验' }))
+
+    expect(
+      await screen.findByText(/没有权限：付款登记人不能复核自己的付款凭据/),
+    ).toBeTruthy()
+    // The dialog stays open, no success message, and nothing claims 已核验/已核销.
+    expect(screen.getByLabelText('核验依据')).toBeTruthy()
+    expect(screen.queryByText(/付款凭据已核验/)).toBeNull()
+    expect(screen.queryAllByText('已核销')).toHaveLength(0)
+  })
+
+  it('marks a pending proof as disputed and refreshes from the server overview', async () => {
+    const posts: FetchCall[] = []
+    stubApi([
+      actionRoutes({
+        post: (url, init) => {
+          posts.push({ url, init })
+          return json(disputedOverview())
+        },
+      }),
+    ])
+    renderPanel(ADMIN_SESSION)
+    await openPaymentArea()
+
+    fireEvent.click(screen.getByRole('button', { name: '标记争议' }))
+    expect(await screen.findByText('标记付款争议')).toBeTruthy()
+    expect(screen.getByText(/标记争议会改变该凭据状态并影响总览/)).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('争议依据'), {
+      target: { value: '金额与回单不符' },
+    })
+    const disputeKey = actionKey()
+    fireEvent.click(within(modalElement()).getByRole('button', { name: '确认标记争议' }))
+
+    await waitFor(() => expect(posts).toHaveLength(1))
+    expect(urlOf(posts[0]!).pathname).toBe(
+      `${STATEMENTS_ROUTE}/${STATEMENT_ID}/payments/${PAYMENT_RECORD_ID}/dispute`,
+    )
+    expect(JSON.parse(String(posts[0]!.init?.body))).toEqual({
+      eventIdempotencyKey: disputeKey,
+      evidenceRef: '金额与回单不符',
+    })
+    expect(await screen.findByText(/付款凭据已标记争议/)).toBeTruthy()
+    expect((await screen.findAllByText('争议')).length).toBeGreaterThan(0)
+  })
+
+  it('sends only one request while the confirmation is submitting', async () => {
+    let resolvePost: ((response: Response) => void) | undefined
+    const pending = new Promise<Response>((resolve) => {
+      resolvePost = resolve
+    })
+    const posts: FetchCall[] = []
+    stubApi([
+      actionRoutes({
+        post: (url, init) => {
+          posts.push({ url, init })
+          return pending
+        },
+      }),
+    ])
+    renderPanel(ADMIN_SESSION)
+    await openPaymentArea()
+    await openVerifyModal(screen.getByRole('button', { name: /核\s*验/ }))
+
+    const ok = within(modalElement()).getByRole('button', { name: '确认核验' })
+    fireEvent.click(ok)
+    await waitFor(() => expect(posts).toHaveLength(1))
+    // A second click while the confirmation is still submitting is ignored.
+    fireEvent.click(ok)
+    expect(posts).toHaveLength(1)
+
+    resolvePost?.(json(verifiedOverview()))
+    expect(await screen.findByText(/付款凭据已核验/)).toBeTruthy()
+    expect(posts).toHaveLength(1)
+  })
+
+  it('refreshes from the server truth after a 409 instead of guessing a rollback', async () => {
+    let overviewReads = 0
+    const posts: FetchCall[] = []
+    stubApi([
+      actionRoutes({
+        overview: () => {
+          overviewReads += 1
+          return overviewReads === 1 ? paymentOverview() : verifiedOverview()
+        },
+        post: (url, init) => {
+          posts.push({ url, init })
+          return json(
+            {
+              error: {
+                code: 'settlement_payment_already_reviewed',
+                message: '该付款凭据已经完成复核，不能重复或改写结论',
+              },
+            },
+            409,
+          )
+        },
+      }),
+    ])
+    renderPanel(ADMIN_SESSION)
+    await openPaymentArea()
+    await openVerifyModal(screen.getByRole('button', { name: /核\s*验/ }))
+    fireEvent.click(within(modalElement()).getByRole('button', { name: '确认核验' }))
+
+    expect(
+      await screen.findByText(/数据已被更新：该付款凭据已经完成复核/),
+    ).toBeTruthy()
+    // The area is re-read from the server; its truth (已核销) replaces the guess.
+    await waitFor(() => expect(overviewReads).toBeGreaterThanOrEqual(2))
+    expect((await screen.findAllByText('已核销')).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/付款凭据已核验/)).toBeNull()
+    expect(posts).toHaveLength(1)
+  })
+
+  it('reuses the event idempotency key after an uncertain failure and rotates it for a new action', async () => {
+    const twoRecords = paymentOverview()
+    const secondRecord = {
+      ...twoRecords.records[0]!,
+      id: '123e4567-e89b-42d3-a456-426614174f06',
+      proofRefMasked: 'BANK-20261109-003',
+      amountCents: 200,
+    }
+    const withTwo = paymentOverview({ records: [twoRecords.records[0]!, secondRecord] })
+    const afterVerify = {
+      ...withTwo,
+      records: [{ ...withTwo.records[0]!, state: 'verified' as const }, secondRecord],
+    }
+    let attempt = 0
+    const posts: FetchCall[] = []
+    stubApi([
+      actionRoutes({
+        overview: () => withTwo,
+        post: (url, init) => {
+          posts.push({ url, init })
+          attempt += 1
+          if (attempt === 1) throw new Error('network down')
+          return json(afterVerify)
+        },
+      }),
+    ])
+    renderPanel(ADMIN_SESSION)
+    await openPaymentArea()
+
+    await openVerifyModal(screen.getAllByRole('button', { name: /核\s*验/ })[0]!)
+    const firstKey = actionKey()
+    fireEvent.click(within(modalElement()).getByRole('button', { name: '确认核验' }))
+    expect(await screen.findByText(/无法连接管理后台 API/)).toBeTruthy()
+    expect(posts).toHaveLength(1)
+
+    fireEvent.click(within(modalElement()).getByRole('button', { name: '确认核验' }))
+    await waitFor(() => expect(posts).toHaveLength(2))
+    const bodies = posts.map((post) => JSON.parse(String(post.init?.body)) as {
+      eventIdempotencyKey: string
+      evidenceRef: string
+    })
+    expect(bodies[1]!.eventIdempotencyKey).toBe(bodies[0]!.eventIdempotencyKey)
+    expect(bodies[0]!.eventIdempotencyKey).toBe(firstKey)
+    expect(await screen.findByText(/付款凭据已核验/)).toBeTruthy()
+
+    // A new logical action starts a new key.
+    fireEvent.click(screen.getByRole('button', { name: '标记争议' }))
+    expect(await screen.findByText('标记付款争议')).toBeTruthy()
+    expect(actionKey()).not.toBe(firstKey)
+  })
+
+  it('shows an operator no verify/dispute entry at all', async () => {
+    stubApi([
+      [
+        STATEMENTS_ROUTE,
+        (url) => {
+          const path = new URL(url, 'http://localhost').pathname
+          if (path === STATEMENTS_ROUTE) {
+            return json({ items: [lockedStatement()], total: 1, page: 1, pageSize: 20 })
+          }
+          if (path.endsWith('/payments')) {
+            return json(
+              { error: { code: 'forbidden', message: '只有管理员可登记或复核线下付款凭据' } },
+              403,
+            )
+          }
+          return json({ ...detail(), statement: lockedStatement() })
+        },
+      ],
+    ])
+    renderPanel(OPERATOR_SESSION)
+    await screen.findByText('STL-20261101-0001')
+    await openDetailDrawer()
+    fireEvent.click(await screen.findByRole('tab', { name: /付款凭据/ }))
+
+    expect(
+      (await screen.findAllByText(/只有管理员可登记或复核线下付款凭据/)).length,
+    ).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: /核\s*验/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /标记争议/ })).toBeNull()
+  })
+
+  it('keeps the audit events read-only with who/when/what visible', async () => {
+    stubApi([
+      actionRoutes({
+        overview: () => verifiedOverview(),
+      }),
+    ])
+    renderPanel(ADMIN_SESSION)
+    await openPaymentArea()
+
+    // Both recorded and verified events are visible with the server fields.
+    expect(screen.getByText('sequence 1')).toBeTruthy()
+    expect(screen.getByText('sequence 2')).toBeTruthy()
+    expect(screen.getAllByText(USER_ID).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/银行回单核对 2026-11-10/).length).toBeGreaterThan(0)
+    expect(
+      screen.getByText(/历史事件只读：记录谁在什么时候做了什么/),
+    ).toBeTruthy()
+    // No edit/delete control anywhere in the payment tab.
+    expect(screen.queryByRole('button', { name: /编辑/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /删除/ })).toBeNull()
+  })
+
+  it('never describes verification as a payment or opens a transfer entry', async () => {
+    stubApi([actionRoutes({ overview: () => verifiedOverview() })])
+    renderPanel(ADMIN_SESSION)
+    await openPaymentArea()
+
+    expect(screen.getAllByText(/锁定 ≠ 已付/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/凭据登记 ≠ 已核销/).length).toBeGreaterThan(0)
+    expect(document.body.textContent).not.toMatch(/已付款/)
+    expect(screen.queryByRole('button', { name: /发起付款/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /转账/ })).toBeNull()
+  })
+})
