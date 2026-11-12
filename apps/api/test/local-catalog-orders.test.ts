@@ -576,6 +576,9 @@ test('catalogue -> registration -> staff handling -> operations verification end
       unitPriceCents: 450,
       quantity: 3,
       totalCents: 1350,
+      couponId: null,
+      couponDiscountCents: 0,
+      netPayableCents: 1350,
     })
     assert.equal(registered.verification, null, 'nothing is verified yet')
     assert.equal(registered.events.length, 1)
