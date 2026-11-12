@@ -337,6 +337,17 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+/**
+ * A real zero coupon discount is valid; an invented zero payable, receipt or
+ * verified payment is not. Keep assertions tied to the financial meaning,
+ * rather than banning every ¥0.00 anywhere on the page.
+ */
+function expectNoInventedZeroFinancialAmount(text: string | null | undefined) {
+  expect(text ?? '').not.toMatch(
+    /(?:应分金额|实际应付|凭据实收|人工收款凭据金额|核销金额|付款金额)[：:\\s]*¥0\\.00/u,
+  )
+}
+
 describe('SettlementsPage 双 Tab 宿主', () => {
   it('defaults to 经营对账, keeps the old page working, and only fetches candidates after switching', async () => {
     const calls = stubApi([
@@ -367,7 +378,7 @@ describe('SettlementsPage 双 Tab 宿主', () => {
     expect(await screen.findByText('有凭据实收毛额（仅当前页）')).toBeTruthy()
     expect(screen.getAllByText('待核定').length).toBeGreaterThan(0)
     expect(screen.getAllByText('本看板未查询付款记录').length).toBeGreaterThan(0)
-    expect(document.body.textContent).not.toContain('¥0.00')
+    expectNoInventedZeroFinancialAmount(document.body.textContent)
     expect(document.body.textContent).not.toMatch(/已付款|已结清|已核销/)
 
     // 切回经营对账：旧内容仍在且没有额外请求候选接口。
@@ -456,8 +467,8 @@ describe('SettlementCandidatePanel list and KPI', () => {
       '只有服务端核验通过的付款确认才算核销',
     )
 
-    // No zero currency, no percentage estimate, no paid/settled wording.
-    expect(document.body.textContent).not.toContain('¥0.00')
+    // No invented zero payable/receipt, percentage estimate, or paid/settled wording.
+    expectNoInventedZeroFinancialAmount(document.body.textContent)
     expect(document.body.textContent).not.toMatch(/已付款|已结清|已核销/)
     expect(document.body.textContent).not.toMatch(/\d+(\.\d+)?%/)
   })
@@ -474,11 +485,13 @@ describe('SettlementCandidatePanel list and KPI', () => {
     expect(screen.getAllByText('¥35.00').length).toBeGreaterThan(0)
     // The unpaid order must say so instead of showing ¥0.00 as 实收.
     expect(screen.getByText('无收款凭据')).toBeTruthy()
+    // A real zero coupon is valid and MUST be shown; the receipt stays unknown.
+    expect(screen.getAllByText('优惠券抵扣：¥0.00').length).toBeGreaterThan(0)
 
     const rows = document.querySelectorAll<HTMLElement>('.ant-table-tbody tr.ant-table-row')
     expect(rows).toHaveLength(2)
     expect(rows[1]?.textContent).toContain('无收款凭据')
-    expect(rows[1]?.textContent).not.toContain('¥0.00')
+    expectNoInventedZeroFinancialAmount(rows[1]?.textContent)
     // An order without a confirmed seller says so instead of guessing a party.
     expect(rows[1]?.textContent).toContain('未指定实际销售商户')
     // A verified order still carries the "not a payment" qualifier.
@@ -611,7 +624,7 @@ describe('SettlementCandidatePanel drawer', () => {
     expect(within(drawer).getByText(/服务端未返回主体快照/)).toBeTruthy()
     // 登记金额 is shown, but it is never promoted to 实收.
     expect(within(drawer).getByText('¥29.90')).toBeTruthy()
-    expect(drawer.textContent).not.toContain('¥0.00')
+    expectNoInventedZeroFinancialAmount(drawer.textContent)
     expect(drawer.textContent).not.toMatch(/已付款|已结清|已核销/)
   })
 })
@@ -738,7 +751,7 @@ describe('SettlementCandidatePanel states', () => {
     // Even the empty page uses the page-scoped summary without fake zeros.
     expect(screen.getByText('当前页无凭据实收')).toBeTruthy()
     expect(screen.getByText(/当前页无冲正/)).toBeTruthy()
-    expect(document.body.textContent).not.toContain('¥0.00')
+    expectNoInventedZeroFinancialAmount(document.body.textContent)
   })
 
   it('explains an out-of-range page and offers a way back to page 1', async () => {
@@ -1004,7 +1017,7 @@ describe('SettlementCandidatePanel anti-misleading wording', () => {
     expect(within(drawer).getByText(/本页不做差额计算/)).toBeTruthy()
     expect(drawer.textContent).not.toContain('¥4.80')
     expect(drawer.textContent).not.toContain('¥74.80')
-    expect(drawer.textContent).not.toContain('¥0.00')
+    expectNoInventedZeroFinancialAmount(drawer.textContent)
     expect(drawer.textContent).not.toMatch(/已付款|已结清|已核销|付款成功|已转账/)
     // Payment evidence is unknown in this candidate view, not absent or verified.
     expect(drawer.textContent).toContain('无法据此判断是否登记、复核或完成线下支付')
@@ -1114,7 +1127,7 @@ describe('SettlementCandidatePanel status semantics', () => {
       '含已全额冲正的原始收款；冲正单独列出，不在此处抵扣',
     )
     // …and the netted zero is never rendered as if it were the receipt amount.
-    expect(document.body.textContent).not.toContain('¥0.00')
+    expectNoInventedZeroFinancialAmount(document.body.textContent)
     expect(document.body.textContent).not.toMatch(/已付款|已结清|已核销/)
   })
 })
