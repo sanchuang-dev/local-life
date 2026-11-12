@@ -1009,6 +1009,34 @@ export const couponIssueEvents = sqliteTable(
   ],
 )
 
+/**
+ * Immutable recovery/exception record. A disputed grant retains its original
+ * three-coupon budget reservation; no automatic re-award or cash refund is
+ * implied. A source reversal can auto-void unspent coupons, but an already
+ * redeemed or outstanding order always requires a human decision.
+ */
+export const couponRewardDisputes = sqliteTable(
+  'coupon_reward_disputes',
+  {
+    id: text('id').primaryKey(),
+    disputeKey: text('dispute_key').notNull(),
+    kind: text('kind').$type<'reward_eligibility_lost' | 'redeemed_payment_reversed'>().notNull(),
+    grantId: text('grant_id').notNull().references(() => couponTeamGrants.id, { onDelete: 'restrict' }),
+    couponId: text('coupon_id').references(() => couponIssues.id, { onDelete: 'restrict' }),
+    sourceOrderId: text('source_order_id').notNull().references((): AnySQLiteColumn => localOrders.id, { onDelete: 'restrict' }),
+    reversalEntryId: text('reversal_entry_id').notNull().references((): AnySQLiteColumn => ledgerEntries.id, { onDelete: 'restrict' }),
+    resolution: text('resolution').$type<'auto_void' | 'pending_manual'>().notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('coupon_reward_disputes_key_uq').on(table.disputeKey),
+    index('coupon_reward_disputes_grant_idx').on(table.grantId),
+    index('coupon_reward_disputes_reversal_idx').on(table.reversalEntryId),
+    check('coupon_reward_disputes_kind_check', sql`${table.kind} IN ('reward_eligibility_lost', 'redeemed_payment_reversed')`),
+    check('coupon_reward_disputes_resolution_check', sql`${table.resolution} IN ('auto_void', 'pending_manual')`),
+  ],
+)
+
 /* -------------------------------------------------------------------------- */
 /* CRMEB adapter domain (LL-MVP-007, Issue #63)                               */
 /* -------------------------------------------------------------------------- */
@@ -1751,7 +1779,11 @@ export const localOrders = sqliteTable(
     index('local_orders_product_idx').on(table.productId),
     index('local_orders_created_by_staff_idx').on(table.createdByStaffId),
     index('local_orders_source_team_idx').on(table.sourceTeamId),
-    uniqueIndex('local_orders_coupon_uq').on(table.couponId),
+    // A cancelled/rejected order keeps its immutable coupon snapshot, but no
+    // longer occupies the coupon for a future order. SQLite enforces one
+    // concurrent ACTIVE order per coupon across all writers.
+    uniqueIndex('local_orders_active_coupon_uq').on(table.couponId)
+      .where(sql`${table.couponId} IS NOT NULL AND ${table.status} NOT IN ('cancelled', 'rejected')`),
     check('local_orders_coupon_amount_check', sql`${table.couponDiscountCents} >= 0 AND ${table.couponDiscountCents} <= ${table.totalCents}`),
     check('local_orders_coupon_presence_check', sql`(${table.couponId} IS NULL AND ${table.couponDiscountCents} = 0) OR (${table.couponId} IS NOT NULL AND ${table.couponDiscountCents} > 0)`),
     check('local_orders_quantity_check', sql`${table.quantity} >= 1 AND ${table.quantity} <= 99`),

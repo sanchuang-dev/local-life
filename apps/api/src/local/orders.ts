@@ -54,6 +54,7 @@ import {
 } from './shared.js'
 import { requireProduct, type ProductRow } from './products.js'
 import { readCouponForOrder, reserveCouponForOrder, redeemCouponForOrder } from '../purchase-reward/coupon-usage.js'
+import { assertCouponStillReservedForOrder, releaseUnpaidOrderCoupon } from '../purchase-reward/coupon-recovery.js'
 
 /* ------------------------------- Selections ------------------------------- */
 
@@ -940,6 +941,11 @@ export function updateOrderStatus(
       if (result.changes !== 1) {
         throw new LocalError(409, API_ERROR_CODES.conflict, '订单已被其他操作更新，请刷新后重试')
       }
+      if (next === 'cancelled' || next === 'rejected') {
+        // Terminal unpaid orders release exactly one reservation, but never
+        // delete the original coupon/order snapshot or mint a second coupon.
+        releaseUnpaidOrderCoupon(tx, orderId, now)
+      }
       insertOrderEvent(tx, {
         orderId,
         actorUserId: actor.userId,
@@ -958,7 +964,7 @@ export function updateOrderStatus(
         now,
         { fromStatus: row.status, toStatus: next },
       )
-    })
+    }, { behavior: 'immediate' })
   } catch (error) {
     mapConstraintError(error)
   }
@@ -1034,6 +1040,13 @@ export function verifyOrder(
           API_ERROR_CODES.conflict,
           '订单已被其他操作核验，请刷新后重试',
         )
+      }
+      if (body.decision === 'reject') {
+        releaseUnpaidOrderCoupon(tx, orderId, now)
+      } else {
+        // Invalidated source coupons cannot be turned into a valid order by
+        // a business verification after the grant was revoked.
+        assertCouponStillReservedForOrder(tx, orderId)
       }
       // Fully subsidised orders have net cash 0: no fake payment receipt.
       // Actual business verification consumes the reserved coupon atomically.

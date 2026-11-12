@@ -55,6 +55,7 @@ import { cutoffMsOf, membershipConditions } from './reconciliation-service.js'
 import { isOrderInLockedPeriod } from './payment-evidence.js'
 import { tryIssueEligibleTeamCoupons } from '../purchase-reward/coupon-issuance.js'
 import { redeemCouponForOrder } from '../purchase-reward/coupon-usage.js'
+import { reconcileCouponRewardsAfterFullReversal } from '../purchase-reward/coupon-recovery.js'
 
 /**
  * Write side of the ledger (LL-MVP-008, Issue #64): fact ingestion, manual
@@ -996,6 +997,14 @@ export function reversePayment(
         evidenceKind: body.evidenceKind ?? (original.evidenceKind === 'none' ? 'manual_receipt' : original.evidenceKind),
         evidenceRef,
         createdAt: now,
+      })
+      // The original receipt, full reversal, grant validity, coupon voids,
+      // and any human-review dispute are one atomic ledger transaction.
+      reconcileCouponRewardsAfterFullReversal(tx, {
+        receiptEntryId: entryId,
+        reversalEntryId: appended.entryId,
+        actorUserId: actor.userId,
+        now,
       })
       insertAudit(tx, actor.userId, 'ledger.payment.reversed', appended.entryId, now, {
         communityId: original.communityId,
