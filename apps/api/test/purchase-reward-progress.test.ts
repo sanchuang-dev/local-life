@@ -36,6 +36,9 @@ import {
 } from '../src/db/schema.js'
 import { hashPassword } from '../src/auth/security.js'
 import { issueEligibleTeamCoupons } from '../src/purchase-reward/coupon-issuance.js'
+import { readOrderPaymentEvidence } from '../src/ledger/payment-evidence.js'
+import { readSettlementCandidate } from '../src/ledger/settlement-candidates.js'
+import { readCouponForOrder } from '../src/purchase-reward/coupon-usage.js'
 import { confirmCommunityOrFail } from './resident-community-fixtures.js'
 
 const migrationsFolder = fileURLToPath(new URL('../db/migrations', import.meta.url))
@@ -1036,4 +1039,161 @@ test('failure inserting the second coupon rolls back third seat, grant, budget a
   await confirmParticipation(app, c, activityId, inviteCode)
   assert.equal(db.select().from(couponIssues).all().length, 3)
   assert.equal((await couponStock(app, operator, activityId)).issuedTeams, 1)
+})
+
+
+/* -------------------------------------------------------------------------- */
+/* #212 One coupon per order: net actual cash, no double-counting             */
+/* -------------------------------------------------------------------------- */
+
+async function couponEarnedWorld() {
+  const w = await world()
+  const { app, db, admin, operator, operatorId, communityId } = w
+  const starter = await createOnShelfProduct(app, admin, communityId, 1_000)
+  const product = await createOnShelfProduct(app, admin, communityId, 10_000)
+  const exactFaceProduct = await createOnShelfProduct(app, admin, communityId, 2_000)
+  const tooCheapProduct = await createOnShelfProduct(app, admin, communityId, 1_000)
+  const activityId = addActivity(db, communityId, w.adminUser.userId, {
+    thresholdCents: 1_000, couponFaceValueCents: 2_000, maxRewardedTeams: 2,
+  })
+  const a = await w.resident('甲')
+  const b = await w.resident('乙')
+  const c = await w.resident('丙')
+  const { teamId, inviteCode } = await startTeam(app, a, activityId)
+  await confirmParticipation(app, b, activityId, inviteCode)
+  await confirmParticipation(app, c, activityId, inviteCode)
+  const purchase = await registerOrder(app, a, { productId: starter.id, activityId, teamId })
+  const verified = await markVerified(app, operator, purchase)
+  await recordPayment(app, operator, {
+    communityId, staffId: operatorId, orderId: verified.id,
+    amountCents: 1_000, evidenceRef: 'COUPON-NET-STARTER',
+  })
+  const couponId = (await myCouponWallet(app, a)).items[0]?.id
+  assert.ok(couponId, 'verified receipt must have issued a resident coupon')
+  return { ...w, starter, product, exactFaceProduct, tooCheapProduct,
+    a, b, c, activityId, teamId, couponId }
+}
+
+test('100 yuan gross - 20 yuan coupon = 80 yuan cash; replay is safe and only real net earns team progress', async () => {
+  const w = await couponEarnedWorld()
+  const { app, db, operator, operatorId, communityId, a, b, product, activityId, teamId, couponId } = w
+  const idempotencyKey = randomUUID()
+  const intent = {
+    productId: product.id, quantity: 1, couponId, idempotencyKey,
+    sourceActivityId: activityId, sourceTeamId: teamId,
+  }
+  const register = (session: ResidentSession, body: unknown) => api(app, 'POST', '/local-orders', {
+    session, origin: RESIDENT_ORIGIN, body,
+  })
+  const first = await register(a, intent)
+  assert.equal(first.status, 201)
+  const created = (await first.json()) as { created: boolean; order: unknown }
+  assert.equal(created.created, true)
+  const order = localOrderDetailSchema.parse(created.order)
+  assert.equal(order.snapshot.totalCents, 10_000)
+  assert.equal(order.snapshot.couponDiscountCents, 2_000)
+  assert.equal(order.snapshot.netPayableCents, 8_000)
+  assert.equal(order.snapshot.couponId, couponId)
+  assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'reserved')
+  assert.equal((await myCouponWallet(app, a)).items[0]?.reservedOrderId, order.id)
+  assert.equal(db.select().from(couponIssueEvents).all().length, 4, 'three issued + one reservation event')
+
+  const retry = await register(a, intent)
+  assert.equal(retry.status, 200)
+  assert.equal(((await retry.json()) as { created: boolean }).created, false)
+  assert.equal(db.select().from(couponIssueEvents).all().length, 4)
+
+  const changed = await register(a, { ...intent, couponId: (await myCouponWallet(app, b)).items[0]!.id })
+  assert.equal(changed.status, 409)
+  assert.equal(await errorCode(changed), API_ERROR_CODES.orderIdempotencyConflict)
+  const reuse = await register(a, { ...intent, idempotencyKey: randomUUID() })
+  assert.equal(reuse.status, 409, 'same coupon cannot reserve a second order')
+  const stolen = await register(b, { productId: product.id, quantity: 1,
+    couponId, idempotencyKey: randomUUID() })
+  assert.equal(stolen.status, 409, 'another resident cannot use the coupon')
+  const forged = await register(a, { productId: product.id, quantity: 1, couponId,
+    idempotencyKey: randomUUID(), couponDiscountCents: 1 })
+  assert.equal(forged.status, 400, 'client may not declare a discount')
+
+  const verified = await markVerified(app, operator, order)
+  assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'reserved',
+    'business verification alone is not positive cash evidence')
+
+  const wrong = await api(app, 'POST', '/admin/ledger/payments', { session: operator, body: {
+    communityId, orderId: verified.id, amountCents: 10_000,
+    evidenceRef: 'COUPON-GROSS-IS-NOT-CASH', evidenceKind: 'manual_receipt',
+    receivedAt: new Date().toISOString(), staffId: operatorId,
+  } })
+  assert.equal(wrong.status, 409)
+  assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'reserved')
+  assert.equal(db.select().from(ledgerPaymentOrderLinks).where(eq(ledgerPaymentOrderLinks.orderId, order.id)).get(), undefined)
+
+  await recordPayment(app, operator, { communityId, staffId: operatorId, orderId: verified.id,
+    amountCents: 8_000, evidenceRef: 'COUPON-NET-8000' })
+  const wallet = await myCouponWallet(app, a)
+  assert.equal(wallet.items[0]?.status, 'redeemed')
+  assert.equal(db.select().from(couponIssueEvents).all().length, 5, 'one append-only redemption')
+  const progress = await myProgress(app, a, activityId)
+  assert.equal(progress.progress?.totalEffectivePaidCents, 9_000,
+    '1,000 real starter receipt + 8,000 net; coupon face is never added as cash')
+  const actor = { userId: w.adminUser.userId, staffId: null, role: 'admin' as const }
+  const evidence = readOrderPaymentEvidence(db, actor, order.id)
+  assert.equal(evidence.registeredAmountCents, 10_000)
+  assert.equal(evidence.couponDiscountCents, 2_000)
+  assert.equal(evidence.netPayableCents, 8_000)
+  assert.equal(evidence.payment?.amountCents, 8_000)
+  const candidate = readSettlementCandidate(db, actor, order.id)
+  assert.equal(candidate.registeredAmountCents, 10_000)
+  assert.equal(candidate.couponDiscountCents, 2_000)
+  assert.equal(candidate.netPayableCents, 8_000)
+  assert.ok(!candidate.blockingReasons.includes('amount_mismatch'))
+  assert.equal((await register(a, { ...intent, idempotencyKey: randomUUID() })).status, 409)
+})
+
+test('full-face coupon allows zero net payable, redeems at staff verification without fake cash', async () => {
+  const w = await couponEarnedWorld()
+  const { app, db, a, operator, communityId, operatorId, exactFaceProduct, tooCheapProduct, couponId, activityId } = w
+  const invalid = await api(app, 'POST', '/local-orders', { session: a, origin: RESIDENT_ORIGIN, body: {
+    productId: tooCheapProduct.id, quantity: 1, couponId, idempotencyKey: randomUUID(),
+  } })
+  assert.equal(invalid.status, 400)
+  assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'available')
+  const orderResponse = await api(app, 'POST', '/local-orders', { session: a, origin: RESIDENT_ORIGIN, body: {
+    productId: exactFaceProduct.id, quantity: 1, couponId, idempotencyKey: randomUUID(),
+  } })
+  assert.equal(orderResponse.status, 201)
+  const order = localOrderDetailSchema.parse(((await orderResponse.json()) as {order: unknown}).order)
+  assert.equal(order.snapshot.totalCents, 2_000)
+  assert.equal(order.snapshot.couponDiscountCents, 2_000)
+  assert.equal(order.snapshot.netPayableCents, 0)
+  assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'reserved')
+  const verified = await markVerified(app, operator, order)
+  assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'redeemed')
+  const actor = { userId: w.adminUser.userId, staffId: null, role: 'admin' as const }
+  const evidence = readOrderPaymentEvidence(db, actor, order.id)
+  assert.equal(evidence.canRecord, false)
+  assert.equal(evidence.status, 'coupon_only_verified')
+  assert.equal(evidence.payment, null)
+  const fakeCash = await api(app, 'POST', '/admin/ledger/payments', { session: operator, body: {
+    communityId, orderId: verified.id, amountCents: 1,
+    evidenceRef: 'COUPON-ZERO-FAKE', evidenceKind: 'manual_receipt',
+    receivedAt: new Date().toISOString(), staffId: operatorId,
+  } })
+  assert.equal(fakeCash.status, 409)
+  assert.equal(db.select().from(ledgerPaymentOrderLinks)
+    .where(eq(ledgerPaymentOrderLinks.orderId, order.id)).get(), undefined)
+  const progress = await myProgress(app, a, activityId)
+  assert.equal(progress.progress?.totalEffectivePaidCents, 1_000,
+    'zero-cash subsidised order never counts as actual paid spend')
+})
+
+test('expired coupon is rejected by the same SQLite reservation guard, not a browser clock', async () => {
+  const w = await couponEarnedWorld()
+  const expiredAt = new Date(Date.now() + 31 * 24 * 3600 * 1000)
+  assert.throws(() => w.db.transaction((tx) => readCouponForOrder(tx, {
+    couponId: w.couponId, buyerUserId: w.a.userId, communityId: w.communityId,
+    grossCents: 10_000, now: expiredAt,
+  }), { behavior: 'immediate' }), /消费券无效|已过期/)
+  assert.equal((await myCouponWallet(w.app, w.a)).items[0]?.status, 'available',
+    'a failed future-quote cannot accidentally reserve the real coupon now')
 })

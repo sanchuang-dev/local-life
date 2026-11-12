@@ -54,6 +54,7 @@ import {
 import { cutoffMsOf, membershipConditions } from './reconciliation-service.js'
 import { isOrderInLockedPeriod } from './payment-evidence.js'
 import { tryIssueEligibleTeamCoupons } from '../purchase-reward/coupon-issuance.js'
+import { redeemCouponForOrder } from '../purchase-reward/coupon-usage.js'
 
 /**
  * Write side of the ledger (LL-MVP-008, Issue #64): fact ingestion, manual
@@ -795,8 +796,15 @@ export function recordPayment(
         if (order.status !== 'verified') {
           throw new LocalError(409, API_ERROR_CODES.conflict, '订单尚未人工核验，不能登记对应收款')
         }
-        if (order.totalCents <= 0) {
-          throw new LocalError(409, API_ERROR_CODES.conflict, '零金额订单不能登记实收凭据')
+        const netPayableCents = order.totalCents - order.couponDiscountCents
+        if (netPayableCents <= 0) {
+          throw new LocalError(409, API_ERROR_CODES.conflict, '零应付订单不得虚构现金收款凭据')
+        }
+        // Legacy mismatched manual evidence remains auditable (but blocked);
+        // a new coupon-backed order may ONLY bind its exact positive net cash.
+        if (order.couponId && body.amountCents !== netPayableCents) {
+          throw new LocalError(409, API_ERROR_CODES.conflict,
+            '用券订单实际收款必须等于券抵扣后的净应付金额')
         }
         if (tx.select({ orderId: ledgerPaymentOrderLinks.orderId })
           .from(ledgerPaymentOrderLinks)
@@ -854,6 +862,10 @@ export function recordPayment(
           evidenceKey,
           createdAt: now,
         }).run()
+        // Receipt and coupon redemption are one SQLite atomic write, not two
+        // independently successful transactions. The receipt was checked against
+        // immutable net payable above; discount is never a payment_received fact.
+        redeemCouponForOrder(tx, body.orderId, now)
         insertAudit(tx, actor.userId, 'ledger.order_payment.linked', body.orderId, now, {
           entryId: appended.entryId,
           communityId: body.communityId,

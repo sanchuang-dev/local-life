@@ -53,6 +53,7 @@ import {
   type LocalTransaction,
 } from './shared.js'
 import { requireProduct, type ProductRow } from './products.js'
+import { readCouponForOrder, reserveCouponForOrder, redeemCouponForOrder } from '../purchase-reward/coupon-usage.js'
 
 /* ------------------------------- Selections ------------------------------- */
 
@@ -69,6 +70,8 @@ const orderSelection = {
   unitPriceCents: localOrders.unitPriceCents,
   quantity: localOrders.quantity,
   totalCents: localOrders.totalCents,
+  couponDiscountCents: localOrders.couponDiscountCents,
+  couponId: localOrders.couponId,
   note: localOrders.note,
   createdByStaffId: localOrders.createdByStaffId,
   attributedStaffId: localOrders.attributedStaffId,
@@ -94,6 +97,8 @@ interface OrderRow {
   unitPriceCents: number
   quantity: number
   totalCents: number
+  couponDiscountCents: number
+  couponId: string | null
   note: string | null
   createdByStaffId: string | null
   attributedStaffId: string | null
@@ -250,6 +255,9 @@ function toSummary(row: OrderRow, maps: RefMaps): LocalOrderSummary {
       unitPriceCents: row.unitPriceCents,
       quantity: row.quantity,
       totalCents: row.totalCents,
+      couponId: row.couponId,
+      couponDiscountCents: row.couponDiscountCents,
+      netPayableCents: row.totalCents - row.couponDiscountCents,
     },
     status: row.status,
     recordSource: row.recordSource,
@@ -344,6 +352,7 @@ interface RegistrationInput {
   note?: string
   sourceActivityId?: string
   sourceTeamId?: string
+  couponId?: string
   idempotencyKey: string
   /** Present only on the staff on-behalf path; resolved server-side from the session. */
   onBehalfOf?: { residentUserId: string; staffId: string }
@@ -355,7 +364,8 @@ function matchesIntent(row: OrderRow, input: RegistrationInput): boolean {
     row.quantity === input.quantity &&
     (row.note ?? null) === (input.note ?? null) &&
     (row.sourceActivityId ?? null) === (input.sourceActivityId ?? null) &&
-    (row.sourceTeamId ?? null) === (input.sourceTeamId ?? null)
+    (row.sourceTeamId ?? null) === (input.sourceTeamId ?? null) &&
+    (row.couponId ?? null) === (input.couponId ?? null)
   )
 }
 
@@ -577,8 +587,19 @@ function registerOrder(db: AppDatabase, input: RegistrationInput): LocalOrderCre
   })
 
   const orderId = randomUUID()
+  const grossCents = product.unitPriceCents * input.quantity
   try {
     db.transaction((tx) => {
+      // The discount and the order are born under the SAME SQLite write lock.
+      const discountCents = input.couponId
+        ? readCouponForOrder(tx, {
+            couponId: input.couponId,
+            buyerUserId: residentUserId,
+            communityId: product.communityId,
+            grossCents,
+            now,
+          })
+        : 0
       tx.insert(localOrders)
         .values({
           id: orderId,
@@ -592,7 +613,9 @@ function registerOrder(db: AppDatabase, input: RegistrationInput): LocalOrderCre
           productName: product.name,
           unitPriceCents: product.unitPriceCents,
           quantity: input.quantity,
-          totalCents: product.unitPriceCents * input.quantity,
+          totalCents: grossCents,
+          couponId: input.couponId ?? null,
+          couponDiscountCents: discountCents,
           note: input.note ?? null,
           createdByStaffId,
           attributedStaffId: createdByStaffId,
@@ -605,6 +628,9 @@ function registerOrder(db: AppDatabase, input: RegistrationInput): LocalOrderCre
           updatedAt: now,
         })
         .run()
+      if (input.couponId) {
+        reserveCouponForOrder(tx, input.couponId, orderId, residentUserId, now)
+      }
       insertOrderEvent(tx, {
         orderId,
         actorUserId: input.actor.userId,
@@ -624,13 +650,16 @@ function registerOrder(db: AppDatabase, input: RegistrationInput): LocalOrderCre
           productId: product.id,
           residentUserId,
           quantity: String(input.quantity),
-          totalCents: String(product.unitPriceCents * input.quantity),
+          totalCents: String(grossCents),
+          couponDiscountCents: String(discountCents),
+          netPayableCents: String(grossCents - discountCents),
+          ...(input.couponId ? { couponId: input.couponId } : {}),
           ...(attribution.activityId ? { sourceActivityId: attribution.activityId } : {}),
           ...(attribution.teamId ? { sourceTeamId: attribution.teamId } : {}),
           ...(input.onBehalfOf ? { delegatedBy: 'staff', recordSource } : { recordSource }),
         },
       )
-    })
+    }, { behavior: 'immediate' })
   } catch (error) {
     // A concurrent writer may have won the UNIQUE race: in that case the correct
     // answer is still "one order exists", not a 500.
@@ -674,6 +703,7 @@ export function registerResidentOrder(
     ...(body.note === undefined ? {} : { note: body.note }),
     ...(body.sourceActivityId === undefined ? {} : { sourceActivityId: body.sourceActivityId }),
     ...(body.sourceTeamId === undefined ? {} : { sourceTeamId: body.sourceTeamId }),
+    ...(body.couponId === undefined ? {} : { couponId: body.couponId }),
   })
 }
 
@@ -694,6 +724,7 @@ export function registerOrderOnBehalf(
     ...(body.note === undefined ? {} : { note: body.note }),
     ...(body.sourceActivityId === undefined ? {} : { sourceActivityId: body.sourceActivityId }),
     ...(body.sourceTeamId === undefined ? {} : { sourceTeamId: body.sourceTeamId }),
+    ...(body.couponId === undefined ? {} : { couponId: body.couponId }),
   })
 }
 
@@ -1004,6 +1035,12 @@ export function verifyOrder(
           '订单已被其他操作核验，请刷新后重试',
         )
       }
+      // Fully subsidised orders have net cash 0: no fake payment receipt.
+      // Actual business verification consumes the reserved coupon atomically.
+      if (body.decision === 'verify' && row.couponId &&
+          row.totalCents === row.couponDiscountCents) {
+        redeemCouponForOrder(tx, orderId, now)
+      }
       insertOrderEvent(tx, {
         orderId,
         actorUserId: actor.userId,
@@ -1022,7 +1059,7 @@ export function verifyOrder(
         now,
         { fromStatus: 'pending_review', toStatus: target, decision: body.decision },
       )
-    })
+    }, { behavior: 'immediate' })
   } catch (error) {
     mapConstraintError(error)
   }

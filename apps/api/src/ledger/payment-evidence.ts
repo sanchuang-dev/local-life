@@ -109,8 +109,9 @@ export function readOrderPaymentEvidence(
   }
 
   const locked = isOrderInLockedPeriod(db, order)
+  const netPayableCents = order.totalCents - order.couponDiscountCents
   const canRecord = !link && order.status === 'verified' &&
-    order.totalCents > 0 && !locked
+    netPayableCents > 0 && !locked
 
   const blockingReasons: string[] = []
   let status: LedgerOrderEvidence['status'] = 'no_evidence'
@@ -118,7 +119,7 @@ export function readOrderPaymentEvidence(
     if (reversal) {
       status = 'reversed'
       blockingReasons.push('该笔收款已全额冲正，不能进入后续结算')
-    } else if (receipt.amountCents !== order.totalCents) {
+    } else if (receipt.amountCents !== netPayableCents) {
       status = 'amount_mismatch'
       blockingReasons.push('凭据实收与订单登记金额不一致，需人工复核')
     } else if (receipt.attribution.state !== 'attributed' || !confirmed) {
@@ -127,6 +128,9 @@ export function readOrderPaymentEvidence(
     } else {
       status = 'evidence_recorded'
     }
+  } else if (order.status === 'verified' && netPayableCents === 0 && order.couponId) {
+    status = 'coupon_only_verified'
+    blockingReasons.push('消费券全额抵扣，实际应收0元；无现金凭据，补贴结算须另按合同核对')
   } else if (order.status !== 'verified') {
     status = 'pending_order_review'
     blockingReasons.push('订单尚未完成业务核验，不能登记收款关联')
@@ -144,6 +148,8 @@ export function readOrderPaymentEvidence(
     productName: order.productName,
     orderStatus: order.status,
     registeredAmountCents: order.totalCents,
+    couponDiscountCents: order.couponDiscountCents,
+    netPayableCents,
     canRecord,
     status,
     blockingReasons,

@@ -246,6 +246,10 @@ function readContributions(
         eq(localOrders.sourceActivityId, activityId),
         inArray(localOrders.sourceTeamId, teamIds),
         eq(localOrders.status, 'verified'),
+        // A mismatched historical manual receipt is evidence, not effective
+        // paid consumption. Only the order's immutable NET cash can count.
+        eq(ledgerEntries.amountCents,
+          sql`${localOrders.totalCents} - ${localOrders.couponDiscountCents}`),
         eq(ledgerEntries.factKind, 'payment_received'),
         eq(ledgerEntries.sourceSystem, 'manual'),
       ),
