@@ -27,14 +27,18 @@ import {
   createSettlementParty,
   createSettlementRuleVersion,
   createSettlementStatement,
+  downloadSettlementCsv,
   getSettlementStatement,
   listSettlementMappings,
   listSettlementParties,
   listSettlementRuleVersions,
   listSettlementStatements,
+  lockSettlementStatement,
   quoteSettlementOrder,
   readSettlementOrderParty,
+  reviewSettlementStatement,
   type SettlementOrderPartyResponse,
+  type SettlementStatementActionRequest,
 } from './settlement'
 
 /**
@@ -100,6 +104,33 @@ function stubJson(status: number, payload: unknown): void {
 
 function stubRejection(cause: unknown): void {
   fetchMock.mockRejectedValueOnce(cause)
+}
+
+interface FileStub {
+  status?: number
+  contentType: string | null
+  disposition?: string | null
+  body?: string
+}
+
+/** A file-like response for the CSV channel (text + blob + headers). */
+function stubFile({
+  status = 200,
+  contentType,
+  disposition = null,
+  body = 'statement_no,period_from,period_to\r\nST-20261101-0001,2026-11-01,2026-11-15\r\n',
+}: FileStub): void {
+  const headerMap: Record<string, string | null> = {
+    'content-type': contentType,
+    'content-disposition': disposition,
+  }
+  fetchMock.mockResolvedValueOnce({
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (name: string) => headerMap[name.toLowerCase()] ?? null },
+    text: async () => body,
+    blob: async () => new Blob([body]),
+  } as unknown as Response)
 }
 
 function lastCall(): { url: string; init: RequestInit; headers: Record<string, string> } {
@@ -1449,5 +1480,307 @@ describe('getSettlementStatement', () => {
 
     expect(failure).toBeInstanceOf(LocalApiError)
     expect((failure as LocalApiError).code).toBe('invalid_response')
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* #224 — review / lock / CSV downloads                                       */
+/* -------------------------------------------------------------------------- */
+
+const REVIEW_REQUEST: SettlementStatementActionRequest = {
+  expectedRevision: 2,
+  evidenceRef: '复核签认单 2026-11-16',
+}
+
+const LOCK_REQUEST: SettlementStatementActionRequest = {
+  expectedRevision: 3,
+  evidenceRef: '锁单确认单 2026-11-17',
+}
+
+describe('reviewSettlementStatement', () => {
+  it('POST /review：带 CSRF、body 严格 {expectedRevision, evidenceRef}，200 detail 直接返回', async () => {
+    stubJson(200, STATEMENT_DETAIL)
+
+    const detail = await reviewSettlementStatement(
+      'csrf-token-review',
+      STATEMENT_ID,
+      REVIEW_REQUEST,
+    )
+
+    const { url, init, headers } = lastCall()
+    expect(url).toBe(`/api/admin/settlement/statements/${STATEMENT_ID}/review`)
+    expect(init.method).toBe('POST')
+    expect(init.credentials).toBe('include')
+    expect(headers['x-csrf-token']).toBe('csrf-token-review')
+    expect(headers['content-type']).toBe('application/json')
+    const body: unknown = JSON.parse(String(init.body))
+    expect(body).toEqual(REVIEW_REQUEST)
+    expect(Object.keys(body as Record<string, unknown>).sort()).toEqual([
+      'evidenceRef',
+      'expectedRevision',
+    ])
+    // The real API answers 200 with a full detail, so the drawer can re-render.
+    expect(detail).toEqual(STATEMENT_DETAIL)
+  })
+
+  it('409 冲突（版本过期/状态不允许）：status/code/message 原样冒泡，不伪造成功', async () => {
+    stubJson(409, {
+      error: { code: 'conflict', message: '草案状态或版本已变化，不能重复复核' },
+    })
+
+    const failure = await reviewSettlementStatement(
+      'csrf-token-review',
+      STATEMENT_ID,
+      REVIEW_REQUEST,
+    ).catch((cause: unknown) => cause)
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).status).toBe(409)
+    expect((failure as LocalApiError).code).toBe('conflict')
+    expect((failure as LocalApiError).message).toBe('草案状态或版本已变化，不能重复复核')
+  })
+
+  it('403 自复核被服务端拒绝：message 原样展示（前端不自行判断）', async () => {
+    stubJson(403, {
+      error: { code: 'forbidden', message: '制单人不能复核自己的结算草案' },
+    })
+
+    const failure = await reviewSettlementStatement(
+      'csrf-token-review',
+      STATEMENT_ID,
+      REVIEW_REQUEST,
+    ).catch((cause: unknown) => cause)
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).status).toBe(403)
+    expect((failure as LocalApiError).code).toBe('forbidden')
+    expect((failure as LocalApiError).message).toBe('制单人不能复核自己的结算草案')
+  })
+})
+
+describe('lockSettlementStatement', () => {
+  it('POST /lock：带 CSRF、body 严格，200 detail 返回，且与 review 走不同路由', async () => {
+    stubJson(200, STATEMENT_DETAIL)
+    await reviewSettlementStatement('csrf-token-review', STATEMENT_ID, REVIEW_REQUEST)
+    const reviewUrl = lastCall().url
+
+    stubJson(200, STATEMENT_DETAIL)
+    const detail = await lockSettlementStatement('csrf-token-lock', STATEMENT_ID, LOCK_REQUEST)
+    const { url, init, headers } = lastCall()
+
+    expect(url).toBe(`/api/admin/settlement/statements/${STATEMENT_ID}/lock`)
+    expect(url).not.toBe(reviewUrl)
+    expect(url).not.toContain('/review')
+    expect(init.method).toBe('POST')
+    expect(headers['x-csrf-token']).toBe('csrf-token-lock')
+    expect(JSON.parse(String(init.body))).toEqual(LOCK_REQUEST)
+    expect(detail).toEqual(STATEMENT_DETAIL)
+  })
+
+  it('409 冲突（缺少另一位管理员复核签认/版本变化）原样冒泡', async () => {
+    stubJson(409, {
+      error: {
+        code: 'conflict',
+        message: '缺少另一位真实管理员的复核签认，或草案版本已经变化',
+      },
+    })
+
+    const failure = await lockSettlementStatement(
+      'csrf-token-lock',
+      STATEMENT_ID,
+      LOCK_REQUEST,
+    ).catch((cause: unknown) => cause)
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).status).toBe(409)
+    expect((failure as LocalApiError).code).toBe('conflict')
+    expect((failure as LocalApiError).message).toBe('缺少另一位真实管理员的复核签认，或草案版本已经变化')
+  })
+
+  it('404（结算单不存在）冒泡', async () => {
+    stubJson(404, { error: { code: 'not_found', message: '结算单不存在' } })
+
+    const failure = await lockSettlementStatement(
+      'csrf-token-lock',
+      STATEMENT_ID,
+      LOCK_REQUEST,
+    ).catch((cause: unknown) => cause)
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).status).toBe(404)
+    expect((failure as LocalApiError).code).toBe('not_found')
+  })
+})
+
+describe('review/lock local contract validation', () => {
+  const invalidCases: Array<{ name: string; request: unknown }> = [
+    {
+      name: '缺 evidenceRef',
+      request: { expectedRevision: 2 },
+    },
+    {
+      name: 'evidenceRef 少于 2 字符',
+      request: { expectedRevision: 2, evidenceRef: 'x' },
+    },
+    {
+      name: 'expectedRevision < 1',
+      request: { expectedRevision: 0, evidenceRef: '复核单' },
+    },
+    {
+      name: 'expectedRevision 非整数',
+      request: { expectedRevision: 1.5, evidenceRef: '复核单' },
+    },
+  ]
+
+  it.each(invalidCases)('$name：本地拒绝，review 与 lock 都不发请求', async ({ request }) => {
+    const reviewed = await reviewSettlementStatement(
+      'csrf-token-review',
+      STATEMENT_ID,
+      request as SettlementStatementActionRequest,
+    ).catch((cause: unknown) => cause)
+    const locked = await lockSettlementStatement(
+      'csrf-token-lock',
+      STATEMENT_ID,
+      request as SettlementStatementActionRequest,
+    ).catch((cause: unknown) => cause)
+
+    expect(reviewed).not.toBeInstanceOf(LocalApiError)
+    expect(locked).not.toBeInstanceOf(LocalApiError)
+    expect(reviewed).toBeInstanceOf(Error)
+    expect(locked).toBeInstanceOf(Error)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('downloadSettlementCsv', () => {
+  const CSV_BODY =
+    'statement_no,period_from,period_to\r\nST-20261101-0001,2026-11-01,2026-11-15\r\n'
+  const CSV_BYTES = new Blob([CSV_BODY]).size
+
+  it('entity：GET entity.csv、accept text/csv、Content-Disposition 解析文件名并保存', async () => {
+    const save = vi.fn<(blob: Blob, filename: string) => void>()
+    stubFile({
+      contentType: 'text/csv; charset=utf-8',
+      disposition: `attachment; filename="settlement-${STATEMENT_ID}-entity.csv"`,
+      body: CSV_BODY,
+    })
+
+    const result = await downloadSettlementCsv(STATEMENT_ID, 'entity', { save })
+
+    const { url, init, headers } = lastCall()
+    expect(url).toBe(`/api/admin/settlement/statements/${STATEMENT_ID}/entity.csv`)
+    expect(init.method).toBe('GET')
+    expect(init.credentials).toBe('include')
+    expect(headers.accept).toBe('text/csv')
+    expect(result.filename).toBe(`settlement-${STATEMENT_ID}-entity.csv`)
+    expect(result.byteLength).toBe(CSV_BYTES)
+    expect(result.contentType).toBe('text/csv; charset=utf-8')
+    expect(save).toHaveBeenCalledTimes(1)
+    expect(save.mock.calls[0]?.[1]).toBe(result.filename)
+    expect(save.mock.calls[0]?.[0]?.size).toBe(CSV_BYTES)
+  })
+
+  it('performance：命中 performance.csv 路由并回调 save', async () => {
+    const save = vi.fn<(blob: Blob, filename: string) => void>()
+    stubFile({
+      contentType: 'text/csv; charset=utf-8',
+      disposition: `attachment; filename="settlement-${STATEMENT_ID}-grid-performance.csv"`,
+      body: CSV_BODY,
+    })
+
+    const result = await downloadSettlementCsv(STATEMENT_ID, 'performance', { save })
+
+    expect(lastCall().url).toBe(
+      `/api/admin/settlement/statements/${STATEMENT_ID}/performance.csv`,
+    )
+    expect(result.filename).toBe(`settlement-${STATEMENT_ID}-grid-performance.csv`)
+    expect(save).toHaveBeenCalledTimes(1)
+  })
+
+  it('filename* 优先于 filename，并按 UTF-8 解码', async () => {
+    const save = vi.fn<(blob: Blob, filename: string) => void>()
+    stubFile({
+      contentType: 'text/csv; charset=utf-8',
+      disposition:
+        `attachment; filename="fallback.csv"; filename*=UTF-8''${encodeURIComponent('主体结算.csv')}`,
+      body: CSV_BODY,
+    })
+
+    const result = await downloadSettlementCsv(STATEMENT_ID, 'entity', { save })
+
+    expect(result.filename).toBe('主体结算.csv')
+  })
+
+  it('缺 Content-Disposition：使用确定性回退文件名', async () => {
+    const save = vi.fn<(blob: Blob, filename: string) => void>()
+    stubFile({ contentType: 'text/csv; charset=utf-8', body: CSV_BODY })
+
+    const result = await downloadSettlementCsv(STATEMENT_ID, 'entity', { save })
+
+    // statementId 前 8 位（去掉分隔符后）
+    expect(result.filename).toBe('settlement-entity-123e4567.csv')
+  })
+
+  it('非 2xx 错误 envelope：抛 LocalApiError，save 绝不被调用', async () => {
+    const save = vi.fn<(blob: Blob, filename: string) => void>()
+    stubFile({
+      status: 403,
+      contentType: 'application/json; charset=utf-8',
+      body: JSON.stringify({ error: { code: 'forbidden', message: '当前后台身份无权执行结算操作' } }),
+    })
+
+    const failure = await downloadSettlementCsv(STATEMENT_ID, 'entity', { save }).catch(
+      (cause: unknown) => cause,
+    )
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).status).toBe(403)
+    expect((failure as LocalApiError).code).toBe('forbidden')
+    expect((failure as LocalApiError).message).toBe('当前后台身份无权执行结算操作')
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('200 + content-type: application/json：抛错且 save 未被调用（错误文档不得存成 CSV）', async () => {
+    const save = vi.fn<(blob: Blob, filename: string) => void>()
+    stubFile({
+      status: 200,
+      contentType: 'application/json; charset=utf-8',
+      body: JSON.stringify({ error: { code: 'not_found', message: '结算单不存在' } }),
+    })
+
+    const failure = await downloadSettlementCsv(STATEMENT_ID, 'performance', { save }).catch(
+      (cause: unknown) => cause,
+    )
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).status).toBe(200)
+    expect((failure as LocalApiError).code).toBe('not_found')
+    expect((failure as LocalApiError).message).toBe('结算单不存在')
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('网络失败：LocalApiError status 0、network_error，save 未被调用', async () => {
+    const save = vi.fn<(blob: Blob, filename: string) => void>()
+    stubRejection(new TypeError('Failed to fetch'))
+
+    const failure = await downloadSettlementCsv(STATEMENT_ID, 'entity', { save }).catch(
+      (cause: unknown) => cause,
+    )
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).status).toBe(0)
+    expect((failure as LocalApiError).code).toBe('network_error')
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('statementId 在 CSV 路径中正确编码', async () => {
+    const save = vi.fn<(blob: Blob, filename: string) => void>()
+    stubFile({ contentType: 'text/csv; charset=utf-8', body: CSV_BODY })
+
+    await downloadSettlementCsv('stm 1/2?x=1', 'entity', { save })
+
+    expect(lastCall().url).toBe(
+      '/api/admin/settlement/statements/stm%201%2F2%3Fx%3D1/entity.csv',
+    )
   })
 })
