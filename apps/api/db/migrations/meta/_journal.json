@@ -183,6 +183,13 @@
       "when": 1794441500000,
       "tag": "0025_coupon_issuance",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1794443500000,
+      "tag": "0026_local_order_coupon_net",
+      "breakpoints": true
     }
   ]
 }
