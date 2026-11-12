@@ -1487,6 +1487,12 @@ export const LOCAL_ORDER_ROUTES = {
   myOrders: '/local-orders',
   myOrderDetail: '/local-orders/:localOrderId',
   /**
+   * Resident: the consumption teams this resident may attribute a new order to
+   * (#207). Only the caller's own participation rows are read; no roster, no
+   * other resident, no invite code. Must be registered before `myOrderDetail`.
+   */
+  myTeamOptions: '/local-orders/team-options',
+  /**
    * Staff surface (all three roles, community-scoped). It exists separately from
    * `/admin/*` because `/admin/*` rejects grid workers by convention, while the
    * grid worker must be able to process orders for their assigned communities.
@@ -1701,6 +1707,17 @@ export const localOrderSnapshotSchema = z
   })
 export type LocalOrderSnapshot = z.infer<typeof localOrderSnapshotSchema>
 
+/**
+ * The consumption team an order is permanently attributed to (#207 LL-PUR-003).
+ * `activityId` repeats the order's `sourceActivityId` so readers never have to
+ * assume the two agree; the database rejects a team that belongs elsewhere.
+ */
+export const localOrderTeamRefSchema = z.object({
+  id: z.string().uuid(),
+  activityId: z.string().uuid(),
+})
+export type LocalOrderTeamRef = z.infer<typeof localOrderTeamRefSchema>
+
 export const localOrderSummarySchema = z.object({
   id: z.string().uuid(),
   community: authCommunitySchema,
@@ -1713,6 +1730,11 @@ export const localOrderSummarySchema = z.object({
   /** Optional grid-worker attribution / activity source frozen at registration. */
   attributedStaff: crmStaffRefSchema.nullable(),
   sourceActivity: crmActivityRefSchema.nullable(),
+  /**
+   * Frozen consumption-team attribution. `null` means the order contributes to
+   * no team; there is no "default team", and it can never be filled in later.
+   */
+  sourceTeam: localOrderTeamRefSchema.nullable(),
   note: z.string().nullable(),
   createdAt: isoTimestamp,
   updatedAt: isoTimestamp,
@@ -1788,6 +1810,12 @@ export const createLocalOrderRequestSchema = z.strictObject({
   note: z.string().trim().max(200).optional(),
   /** Optional activity attribution; the activity must belong to the product's community. */
   sourceActivityId: z.string().uuid().optional(),
+  /**
+   * Optional consumption-team attribution (#207). Requires `sourceActivityId`,
+   * and the resident (never the caller) must already be in that exact team of
+   * that exact activity. A team is never inferred from the activity.
+   */
+  sourceTeamId: z.string().uuid().optional(),
   /** Client-generated UUID; a replay returns the same order instead of a second one. */
   idempotencyKey: z.string().uuid(),
 })
@@ -2060,6 +2088,41 @@ export const activityParticipationConfirmResponseSchema = z.object({
 
 export type ActivityParticipationConfirmResponse = z.infer<
   typeof activityParticipationConfirmResponseSchema
+>
+
+/* -------------------------------------------------------------------------- */
+/* Resident consumption-team options for local orders (#207 LL-PUR-003)      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Read-only options for `GET /local-orders/team-options?productId=...`.
+ *
+ * Lives after the participation contract so `participationTeamStatusSchema` stays
+ * the single source of truth for team state. Only the caller's own participation
+ * is described: the activity id/title, the team id/state and when the resident
+ * joined. The roster, invite code and other residents are deliberately absent —
+ * team selection must never become a directory of somebody else's team.
+ */
+export const localOrderTeamOptionsQuerySchema = z.object({
+  productId: z.string().uuid(),
+})
+export type LocalOrderTeamOptionsQuery = z.infer<typeof localOrderTeamOptionsQuerySchema>
+
+export const localOrderTeamOptionSchema = z.object({
+  activity: crmActivityRefSchema,
+  team: z.object({
+    id: z.string().uuid(),
+    status: participationTeamStatusSchema,
+  }),
+  joinedAt: isoTimestamp,
+})
+export type LocalOrderTeamOption = z.infer<typeof localOrderTeamOptionSchema>
+
+export const localOrderTeamOptionListResponseSchema = z.object({
+  items: z.array(localOrderTeamOptionSchema),
+})
+export type LocalOrderTeamOptionListResponse = z.infer<
+  typeof localOrderTeamOptionListResponseSchema
 >
 
 export * from './identity.js'

@@ -70,6 +70,7 @@ function summary(overrides: Partial<LocalOrderSummary> = {}): LocalOrderSummary 
     createdByStaff: null,
     attributedStaff: null,
     sourceActivity: null,
+    sourceTeam: null,
     note: '希望周末自提',
     createdAt: '2026-11-04T02:00:00.000Z',
     updatedAt: '2026-11-04T02:00:00.000Z',

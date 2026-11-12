@@ -1638,6 +1638,19 @@ export const localOrders = sqliteTable(
     sourceActivityId: text('source_activity_id').references(() => activities.id, {
       onDelete: 'restrict',
     }),
+    /**
+     * The one consumption team this order is attributed to (#207 LL-PUR-003).
+     *
+     * A single nullable column is the whole "one order, at most one team" rule:
+     * there is no join table, so a second attribution has nowhere to live. The
+     * migration adds triggers that (a) accept the team only when the resident
+     * really joined that team of `source_activity_id` no later than the order's
+     * `created_at`, and (b) reject any later change to either attribution column.
+     * Existing orders stay NULL: #207 never guesses a team from a bare activity.
+     */
+    sourceTeamId: text('source_team_id').references(() => activityTeams.id, {
+      onDelete: 'restrict',
+    }),
     verifiedByUserId: text('verified_by_user_id').references(() => users.id, {
       onDelete: 'set null',
     }),
@@ -1656,6 +1669,7 @@ export const localOrders = sqliteTable(
     index('local_orders_resident_created_idx').on(table.residentUserId, table.createdAt),
     index('local_orders_product_idx').on(table.productId),
     index('local_orders_created_by_staff_idx').on(table.createdByStaffId),
+    index('local_orders_source_team_idx').on(table.sourceTeamId),
     check('local_orders_quantity_check', sql`${table.quantity} >= 1 AND ${table.quantity} <= 99`),
     check(
       'local_orders_total_check',

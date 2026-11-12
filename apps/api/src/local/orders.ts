@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, count, desc, eq, inArray, or, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, or, sql, type SQL } from 'drizzle-orm'
 import {
   API_ERROR_CODES,
   LOCAL_ORDER_EVENT_SOURCE_TYPE,
@@ -10,6 +10,7 @@ import {
   localOrderEventSchema,
   localOrderListResponseSchema,
   localOrderSummarySchema,
+  localOrderTeamOptionListResponseSchema,
   type CreateLocalOrderOnBehalfRequest,
   type CreateLocalOrderRequest,
   type LocalOrderCreateResponse,
@@ -20,6 +21,7 @@ import {
   type LocalOrderListResponse,
   type LocalOrderStatus,
   type LocalOrderSummary,
+  type LocalOrderTeamOptionListResponse,
   type LocalOrderTransitionStatus,
   type LocalOrderVerifyRequest,
   type UpdateLocalOrderStatusRequest,
@@ -27,6 +29,8 @@ import {
 import type { AppDatabase } from '../db/client.js'
 import {
   activities,
+  activityParticipations,
+  activityTeams,
   communities,
   localOrderEvents,
   localOrders,
@@ -69,6 +73,7 @@ const orderSelection = {
   createdByStaffId: localOrders.createdByStaffId,
   attributedStaffId: localOrders.attributedStaffId,
   sourceActivityId: localOrders.sourceActivityId,
+  sourceTeamId: localOrders.sourceTeamId,
   verifiedByUserId: localOrders.verifiedByUserId,
   verifiedAt: localOrders.verifiedAt,
   verificationNote: localOrders.verificationNote,
@@ -93,6 +98,7 @@ interface OrderRow {
   createdByStaffId: string | null
   attributedStaffId: string | null
   sourceActivityId: string | null
+  sourceTeamId: string | null
   verifiedByUserId: string | null
   verifiedAt: Date | null
   verificationNote: string | null
@@ -253,6 +259,10 @@ function toSummary(row: OrderRow, maps: RefMaps): LocalOrderSummary {
       row.sourceActivityId === null
         ? null
         : maps.activities.get(row.sourceActivityId) ?? null,
+    sourceTeam:
+      row.sourceTeamId === null || row.sourceActivityId === null
+        ? null
+        : { id: row.sourceTeamId, activityId: row.sourceActivityId },
     note: row.note,
     createdAt: iso(row.createdAt),
     updatedAt: iso(row.updatedAt),
@@ -333,6 +343,7 @@ interface RegistrationInput {
   quantity: number
   note?: string
   sourceActivityId?: string
+  sourceTeamId?: string
   idempotencyKey: string
   /** Present only on the staff on-behalf path; resolved server-side from the session. */
   onBehalfOf?: { residentUserId: string; staffId: string }
@@ -343,7 +354,8 @@ function matchesIntent(row: OrderRow, input: RegistrationInput): boolean {
     row.productId === input.productId &&
     row.quantity === input.quantity &&
     (row.note ?? null) === (input.note ?? null) &&
-    (row.sourceActivityId ?? null) === (input.sourceActivityId ?? null)
+    (row.sourceActivityId ?? null) === (input.sourceActivityId ?? null) &&
+    (row.sourceTeamId ?? null) === (input.sourceTeamId ?? null)
   )
 }
 
@@ -365,6 +377,118 @@ function assertResidentOfCommunity(
   communityId: string,
 ): void {
   assertResidentOfConfirmedCommunity(db, residentUserId, communityId)
+}
+
+interface SourceAttribution {
+  activityId: string | null
+  teamId: string | null
+}
+
+/**
+ * Validates the optional activity/team attribution of a **new** order (#207).
+ *
+ * - no activity -> no team; a bare team id is a client bug, not a default;
+ * - the activity must exist, belong to the order's community, and still be
+ *   participable (draft is invisible, paused/ended/past-`ends_at` is refused);
+ * - a team must belong to that activity and the resident must have joined that
+ *   exact team no later than the order's creation time. Another activity's team
+ *   and another resident's team get the same message, so neither is enumerable;
+ * - nothing is inferred: an activity without an explicit team yields an order
+ *   that contributes to no team.
+ *
+ * The migration repeats the membership rule in a trigger against
+ * `NEW.resident_user_id`, so a service bug cannot write a fabricated relation.
+ */
+function resolveSourceAttribution(
+  db: AppDatabase,
+  input: {
+    communityId: string
+    residentUserId: string
+    sourceActivityId?: string
+    sourceTeamId?: string
+    now: Date
+  },
+): SourceAttribution {
+  if (!input.sourceActivityId) {
+    if (input.sourceTeamId) {
+      throw new LocalError(
+        400,
+        API_ERROR_CODES.invalidRequest,
+        '指定消费团时必须同时指定来源活动',
+      )
+    }
+    return { activityId: null, teamId: null }
+  }
+
+  const activity = db
+    .select({
+      id: activities.id,
+      communityId: activities.communityId,
+      status: activities.status,
+      endsAt: activities.endsAt,
+      purchaseRewardPlanJson: activities.purchaseRewardPlanJson,
+    })
+    .from(activities)
+    .where(eq(activities.id, input.sourceActivityId))
+    .get()
+  if (!activity) throw new LocalError(404, API_ERROR_CODES.notFound, '来源活动不存在')
+  if (activity.communityId !== input.communityId) {
+    throw new LocalError(400, API_ERROR_CODES.invalidRequest, '来源活动不属于该社区')
+  }
+  if (activity.status === 'draft') {
+    throw new LocalError(404, API_ERROR_CODES.notFound, '来源活动不存在或尚未发布')
+  }
+  if (activity.status !== 'published' || input.now.getTime() > activity.endsAt.getTime()) {
+    throw new LocalError(
+      409,
+      API_ERROR_CODES.activityUnavailable,
+      '来源活动当前不可参与，无法登记归属',
+    )
+  }
+
+  if (!input.sourceTeamId) return { activityId: activity.id, teamId: null }
+
+  // Source-only orders remain compatible; a *consumption team* must belong
+  // to an activity that actually promises a consumption reward.
+  if (activity.purchaseRewardPlanJson === null) {
+    throw new LocalError(
+      409,
+      API_ERROR_CODES.activityUnavailable,
+      '来源活动未配置消费组团奖励，不能绑定消费团',
+    )
+  }
+
+  const team = db
+    .select({ id: activityTeams.id, activityId: activityTeams.activityId })
+    .from(activityTeams)
+    .where(eq(activityTeams.id, input.sourceTeamId))
+    .get()
+  const participation =
+    team === undefined
+      ? undefined
+      : db
+          .select({ joinedAt: activityParticipations.joinedAt })
+          .from(activityParticipations)
+          .where(
+            and(
+              eq(activityParticipations.teamId, team.id),
+              eq(activityParticipations.userId, input.residentUserId),
+            ),
+          )
+          .get()
+  if (
+    !team ||
+    team.activityId !== activity.id ||
+    !participation ||
+    participation.joinedAt.getTime() > input.now.getTime()
+  ) {
+    throw new LocalError(
+      400,
+      API_ERROR_CODES.invalidRequest,
+      '所选消费团不是本人已加入的该活动团队',
+    )
+  }
+  return { activityId: activity.id, teamId: team.id }
 }
 
 /**
@@ -407,16 +531,12 @@ function registerOrder(db: AppDatabase, input: RegistrationInput): LocalOrderCre
     assertResidentOfCommunity(db, residentUserId, product.communityId)
   }
 
-  if (input.sourceActivityId) {
-    const activity = db
-      .select({ id: activities.id, communityId: activities.communityId })
-      .from(activities)
-      .where(eq(activities.id, input.sourceActivityId))
-      .get()
-    if (!activity) throw new LocalError(404, API_ERROR_CODES.notFound, '来源活动不存在')
-    if (activity.communityId !== product.communityId) {
-      throw new LocalError(400, API_ERROR_CODES.invalidRequest, '来源活动不属于该社区')
-    }
+  if (input.sourceTeamId && !input.sourceActivityId) {
+    throw new LocalError(
+      400,
+      API_ERROR_CODES.invalidRequest,
+      '指定消费团时必须同时指定来源活动',
+    )
   }
 
   const replay = findByIdempotencyKey(
@@ -444,6 +564,18 @@ function registerOrder(db: AppDatabase, input: RegistrationInput): LocalOrderCre
   }
 
   const now = new Date()
+  // Validated only for a fresh write: a genuine replay must still return the
+  // existing order even if the activity has ended in the meantime.
+  const attribution = resolveSourceAttribution(db, {
+    communityId: product.communityId,
+    residentUserId,
+    ...(input.sourceActivityId === undefined
+      ? {}
+      : { sourceActivityId: input.sourceActivityId }),
+    ...(input.sourceTeamId === undefined ? {} : { sourceTeamId: input.sourceTeamId }),
+    now,
+  })
+
   const orderId = randomUUID()
   try {
     db.transaction((tx) => {
@@ -464,7 +596,8 @@ function registerOrder(db: AppDatabase, input: RegistrationInput): LocalOrderCre
           note: input.note ?? null,
           createdByStaffId,
           attributedStaffId: createdByStaffId,
-          sourceActivityId: input.sourceActivityId ?? null,
+          sourceActivityId: attribution.activityId,
+          sourceTeamId: attribution.teamId,
           verifiedByUserId: null,
           verifiedAt: null,
           verificationNote: null,
@@ -492,6 +625,8 @@ function registerOrder(db: AppDatabase, input: RegistrationInput): LocalOrderCre
           residentUserId,
           quantity: String(input.quantity),
           totalCents: String(product.unitPriceCents * input.quantity),
+          ...(attribution.activityId ? { sourceActivityId: attribution.activityId } : {}),
+          ...(attribution.teamId ? { sourceTeamId: attribution.teamId } : {}),
           ...(input.onBehalfOf ? { delegatedBy: 'staff', recordSource } : { recordSource }),
         },
       )
@@ -538,6 +673,7 @@ export function registerResidentOrder(
     idempotencyKey: body.idempotencyKey,
     ...(body.note === undefined ? {} : { note: body.note }),
     ...(body.sourceActivityId === undefined ? {} : { sourceActivityId: body.sourceActivityId }),
+    ...(body.sourceTeamId === undefined ? {} : { sourceTeamId: body.sourceTeamId }),
   })
 }
 
@@ -557,6 +693,7 @@ export function registerOrderOnBehalf(
     onBehalfOf: { residentUserId: body.residentUserId, staffId: actor.staffId },
     ...(body.note === undefined ? {} : { note: body.note }),
     ...(body.sourceActivityId === undefined ? {} : { sourceActivityId: body.sourceActivityId }),
+    ...(body.sourceTeamId === undefined ? {} : { sourceTeamId: body.sourceTeamId }),
   })
 }
 
@@ -582,6 +719,53 @@ function listOrders(
     total,
     page: query.page,
     pageSize: query.pageSize,
+  })
+}
+
+/**
+ * Read-only "teams I may attribute a new order to" for one product's community
+ * (#207, consumed by PUR-004).
+ *
+ * Reads only the caller's own `activity_participations`: no roster, no invite
+ * code, no other resident's row. Teams in a different community, in a draft /
+ * paused / ended activity, or past `ends_at` are not offered, because an order
+ * attributed to them would be refused by `resolveSourceAttribution` anyway.
+ */
+export function listMyTeamOptions(
+  db: AppDatabase,
+  actor: LocalActor,
+  productId: string,
+): LocalOrderTeamOptionListResponse {
+  const product = requireProduct(db, productId)
+  const now = new Date()
+  const rows = db
+    .select({
+      activityId: activities.id,
+      activityTitle: activities.title,
+      teamId: activityTeams.id,
+      teamStatus: activityTeams.status,
+      joinedAt: activityParticipations.joinedAt,
+    })
+    .from(activityParticipations)
+    .innerJoin(activityTeams, eq(activityParticipations.teamId, activityTeams.id))
+    .innerJoin(activities, eq(activityParticipations.activityId, activities.id))
+    .where(
+      and(
+        eq(activityParticipations.userId, actor.userId),
+        eq(activities.communityId, product.communityId),
+        eq(activities.status, 'published'),
+        isNotNull(activities.purchaseRewardPlanJson),
+        gte(activities.endsAt, now),
+      ),
+    )
+    .orderBy(desc(activityParticipations.joinedAt))
+    .all()
+  return localOrderTeamOptionListResponseSchema.parse({
+    items: rows.map((row) => ({
+      activity: { id: row.activityId, title: row.activityTitle },
+      team: { id: row.teamId, status: row.teamStatus },
+      joinedAt: iso(row.joinedAt),
+    })),
   })
 }
 
