@@ -20,6 +20,7 @@ import {
   auditLogs,
   users,
 } from '../db/schema.js'
+import { tryIssueEligibleTeamCoupons } from '../purchase-reward/coupon-issuance.js'
 import { assertResidentOfConfirmedCommunity } from '../resident-community/service.js'
 
 /**
@@ -631,6 +632,9 @@ function lockTeam(
       '并发参与冲突，请刷新后重试',
     )
   }
+  // The third seat can qualify a team that already paid before it filled.
+  // Still inside participation's BEGIN IMMEDIATE: all-or-nothing with seat 3.
+  tryIssueEligibleTeamCoupons(tx, input.activityId, input.teamId, input.now)
   // The resident who took seat 3 caused the lock; audit records that actor.
   insertAudit(tx, input.actorUserId, 'team.locked', input.activityId, input.now, {
     teamId: input.teamId,
