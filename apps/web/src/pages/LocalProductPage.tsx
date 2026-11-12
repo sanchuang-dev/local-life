@@ -35,6 +35,7 @@ import {
   buildLocalOrderRegistration,
   chooseTeamOption,
   describeOrderAttribution,
+  mayDiscardRejectedOrderAttempt,
   resolveOrderAttribution,
   resolveSubmissionAttempt,
   shortTeamId,
@@ -131,6 +132,7 @@ export function LocalProductPage() {
   // One attempt = one idempotency key + one frozen consumption-team attribution.
   // A network retry replays both, so it can neither duplicate nor switch teams.
   const [attempt, setAttempt] = useState<LocalOrderSubmissionAttempt | null>(null)
+  const [attemptMayReset, setAttemptMayReset] = useState(false)
 
   const product = state.status === 'ready' ? state.product : null
   const totalCents = product ? product.priceCents * quantity : 0
@@ -184,6 +186,7 @@ export function LocalProductPage() {
       newIdempotencyKey,
     )
     setAttempt(nextAttempt)
+    setAttemptMayReset(false)
     setSubmitting(true)
     setSubmitError(null)
     try {
@@ -200,6 +203,7 @@ export function LocalProductPage() {
       setRegisteredOrder(order)
       setAttempt(null)
     } catch (cause) {
+      setAttemptMayReset(isLocalApiError(cause) && mayDiscardRejectedOrderAttempt(cause))
       setSubmitError(describeLocalError(cause, '登记订单失败，请稍后重试'))
       if (isLocalApiError(cause) && (cause.status === 401 || cause.status === 409)) {
         // The snapshot or the shelf state changed, or the session expired: re-read
@@ -219,9 +223,11 @@ export function LocalProductPage() {
   }
 
   const editRegistration = () => {
-    // Explicitly discard the frozen attempt; the next submit gets a new key and
-    // may choose another team. A silent re-selection alone never reaches here.
+    // Only after a definitive server rejection: a lost response may hide a
+    // successfully written order, so changing its key would risk duplication.
+    if (!attemptMayReset) return
     setAttempt(null)
+    setAttemptMayReset(false)
     setSubmitError(null)
   }
 
@@ -440,7 +446,14 @@ export function LocalProductPage() {
                 </div>
               ) : teamOptions.state.status === 'ready' ? (
                 <>
-                  {teamMode === 'none' ? (
+                  {attempt ? (
+                    <p className="mt-1.5 break-words text-[11px] leading-5 text-slate-600">
+                      本次登记原选归属：{attempt.attribution.sourceTeamId
+                        ? `${teamItems.find((option) => option.team.id === attempt.attribution.sourceTeamId)?.activity.title ?? '原消费团'} · 团号 ${shortTeamId(attempt.attribution.sourceTeamId)}（已锁定重试）`
+                        : '不参与消费团（已锁定重试）'}
+                    </p>
+                  ) : null}
+                  {!attempt && teamMode === 'none' ? (
                     <>
                       <p className="mt-1.5 text-[12px] font-semibold text-slate-700">不参与消费团</p>
                       <p className="mt-0.5 text-[11px] leading-5 text-slate-500">
@@ -449,7 +462,7 @@ export function LocalProductPage() {
                     </>
                   ) : null}
 
-                  {teamMode === 'auto' && teamItems[0] ? (
+                  {!attempt && teamMode === 'auto' && teamItems[0] ? (
                     <>
                       <p className="mt-1.5 text-[11px] leading-5 text-slate-500">
                         你当前只有一个符合条件的消费团，已自动选中；本单将计入该团，提交后不能转团。
@@ -469,7 +482,7 @@ export function LocalProductPage() {
                     </>
                   ) : null}
 
-                  {teamMode === 'choice' ? (
+                  {!attempt && teamMode === 'choice' ? (
                     <>
                       <p className="mt-1.5 text-[11px] leading-5 text-slate-500">
                         你有多个符合条件的消费团，请主动选择一个；提交后归属不能更改。
@@ -498,14 +511,20 @@ export function LocalProductPage() {
                         <LockKeyhole size={12} className="mt-0.5 shrink-0" aria-hidden="true" />
                         本次重试会沿用原消费团归属与幂等键，不会切换归属。
                       </p>
-                      <button
-                        type="button"
-                        onClick={editRegistration}
-                        disabled={submitting}
-                        className="mt-1.5 inline-flex min-h-[36px] items-center rounded-full border border-slate-300 px-3 text-[11px] font-semibold text-slate-600 disabled:opacity-60"
-                      >
-                        修改登记信息
-                      </button>
+                      {attemptMayReset ? (
+                        <button
+                          type="button"
+                          onClick={editRegistration}
+                          disabled={submitting}
+                          className="mt-1.5 inline-flex min-h-[36px] items-center rounded-full border border-slate-300 px-3 text-[11px] font-semibold text-slate-600 disabled:opacity-60"
+                        >
+                          修改登记信息
+                        </button>
+                      ) : (
+                        <p className="mt-1.5 text-[10px] leading-4 text-slate-500">
+                          若请求结果不明，请沿用原请求重试或先去“我的订单”核对，避免重复登记。
+                        </p>
+                      )}
                     </div>
                   ) : teamChoiceMissing ? (
                     <p className="mt-1.5 text-[10px] leading-4 text-[#a96b2f]">
