@@ -1108,8 +1108,6 @@ describe('SettlementStatementPanel · 运营员与口径', () => {
     expect(screen.queryAllByText('应付')).toHaveLength(0)
     expect(screen.queryAllByText('已付款')).toHaveLength(0)
     expect(screen.queryAllByText('已结清')).toHaveLength(0)
-    expect(screen.queryAllByText('已付款')).toHaveLength(0)
-    expect(screen.queryAllByText('已结清')).toHaveLength(0)
     // A real zero fee/receipt in a server summary is valid; only fake payable is not.
     expect(document.body.textContent).not.toMatch(/应付金额[：:\s]*¥0\.00/u)
   })
@@ -1479,7 +1477,6 @@ describe('SettlementStatementPanel · 付款凭据（#225）', () => {
 
     expect(screen.getByText('登记付款凭据 ≠ 复核核销')).toBeTruthy()
     expect(screen.getByText(/不触发任何转账/)).toBeTruthy()
-    expect(screen.queryAllByText('已付款')).toHaveLength(0)
     expect(screen.queryAllByText('已付款')).toHaveLength(0)
     expect(screen.queryByRole('button', { name: /发起付款/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /转账/ })).toBeNull()
