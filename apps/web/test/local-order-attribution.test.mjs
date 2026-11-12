@@ -4,6 +4,7 @@ import {
   buildLocalOrderRegistration,
   chooseTeamOption,
   describeOrderAttribution,
+  mayDiscardRejectedOrderAttempt,
   resolveOrderAttribution,
   resolveSubmissionAttempt,
   shortTeamId,
@@ -150,4 +151,26 @@ test('the frozen attribution is described without inventing a team or a name', (
     }),
     `周末惠邻消费团 · 团号 123e4567…（已锁定）`,
   )
+})
+
+
+test('ambiguous transport failures must keep the original idempotency key', () => {
+  for (const failure of [
+    { status: 0, code: 'network_error' },
+    { status: 500, code: 'server_error' },
+    { status: 200, code: 'invalid_response' },
+    { status: 409, code: 'order_idempotency_conflict' },
+  ]) {
+    assert.equal(mayDiscardRejectedOrderAttempt(failure), false, JSON.stringify(failure))
+  }
+})
+
+test('definitive server rejections may unlock editing without risking duplicate registration', () => {
+  for (const failure of [
+    { status: 400, code: 'invalid_request' },
+    { status: 404, code: 'not_found' },
+    { status: 409, code: 'activity_unavailable' },
+  ]) {
+    assert.equal(mayDiscardRejectedOrderAttempt(failure), true, JSON.stringify(failure))
+  }
 })
