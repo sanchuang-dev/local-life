@@ -4,6 +4,7 @@ import {
   createSettlementMappingRequestSchema,
   createSettlementPartyRequestSchema,
   createSettlementRuleRequestSchema,
+  createSettlementStatementRequestSchema,
   settlementMappingListResponseSchema,
   settlementMappingSchema,
   settlementOrderPartyResponseSchema,
@@ -14,14 +15,21 @@ import {
   settlementQuoteResponseSchema,
   settlementRuleListResponseSchema,
   settlementRuleVersionSchema,
+  settlementStatementDetailSchema,
+  settlementStatementListResponseSchema,
+  settlementStatementSchema,
   type CreateSettlementMappingRequest,
   type CreateSettlementPartyRequest,
   type CreateSettlementRuleRequest,
+  type CreateSettlementStatementRequest,
   type SettlementMapping,
   type SettlementOrderPartySnapshot,
   type SettlementParty,
   type SettlementQuoteResponse,
   type SettlementRuleVersion,
+  type SettlementStatement,
+  type SettlementStatementDetail,
+  type SettlementStatementListResponse,
 } from '@sanchuang-dev/local-life-contracts'
 import { fillRoute, parsePayload, requestLocalJson, withQuery } from './localApi'
 
@@ -50,6 +58,12 @@ import { fillRoute, parsePayload, requestLocalJson, withQuery } from './localApi
  * （按已核准规则逐笔计算，但不落库、不产生账单），响应中 `quoteOnly` 恒为 `true`、
  * `payableAmountCents` 恒为 `null`。它**不是**应付金额、不是结算单、不是付款指令：
  * 前端不得据此生成任何 payable 数字，也不得把 `allocation` 当作应付或已付款。
+ *
+ * 「结算单」（LL-SET-011A / #223）是**期间快照**：草案创建、复核、锁定都是人工
+ * 事实，`paymentState` 只来自服务端登记的 #187 付款凭据。**锁定不等于已付款**：
+ * `status='locked'` 只说明快照不可再改，付款状态必须另看 `paymentState`。页面只能
+ * 原样展示服务端给出的状态与金额；`allocation: null` 的 blocked 行不得补 0，汇总
+ * 金额也不得被当成应付或已付。
  *
  * 硬规则：
  *
@@ -405,4 +419,124 @@ export async function quoteSettlementOrder(
     signal,
   })
   return parsePayload(settlementQuoteResponseSchema, payload, '订单分成试算结果')
+}
+
+/* -------------------------------------------------------------------------- */
+/* Settlement statements (#223) — period snapshots, locking ≠ payment         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The only paging shape the statements endpoint accepts. `page`/`pageSize` are
+ * required here (the contract gives the server defaults, but the page always knows
+ * what it is asking for); `communityId` is sent only when explicitly provided.
+ */
+export interface SettlementStatementListQuery {
+  communityId?: string
+  page: number
+  pageSize: number
+}
+
+/**
+ * Snapshot lifecycle wording.
+ *
+ * `locked` deliberately says only 「已锁定」: locking freezes the snapshot and is
+ * **not** a payment. Whether money arrived is `paymentState` (below), never this
+ * label.
+ */
+export const SETTLEMENT_STATEMENT_STATUS_LABELS: Record<
+  'draft' | 'reviewed' | 'locked' | 'superseded',
+  string
+> = {
+  draft: '草案未复核',
+  reviewed: '已复核未锁定',
+  locked: '已锁定',
+  superseded: '已被替代',
+}
+
+/**
+ * Payment truth comes from #187 offline evidence only. These labels must not be
+ * merged with `status`: a `locked` statement is usually `awaiting_payment`.
+ */
+export const SETTLEMENT_PAYMENT_STATE_LABELS: Record<
+  'not_recorded' | 'awaiting_payment' | 'pending_review' | 'partial' | 'verified' | 'disputed',
+  string
+> = {
+  not_recorded: '未登记付款',
+  awaiting_payment: '待付款',
+  pending_review: '已登记待复核',
+  partial: '部分支付',
+  verified: '已核销',
+  disputed: '争议',
+}
+
+/**
+ * GET /admin/settlement/statements — server-paged statement list.
+ *
+ * The whole response (`items`, `total`, `page`, `pageSize`) is returned because
+ * the page must show the server's pagination; it must never re-count rows into a
+ * client-side total. An empty `items` is a real 「该范围暂无结算单」 state, while a
+ * failed request throws, so a transport error can never render as an empty list.
+ */
+export async function listSettlementStatements(
+  query: SettlementStatementListQuery,
+  signal?: AbortSignal,
+): Promise<SettlementStatementListResponse> {
+  const communityId = query.communityId?.trim()
+  const payload = await requestLocalJson(
+    withQuery(`/api${LEDGER_ROUTES.adminSettlementStatements}`, {
+      communityId: communityId ? communityId : undefined,
+      page: query.page,
+      pageSize: query.pageSize,
+    }),
+    { signal },
+  )
+  return parsePayload(settlementStatementListResponseSchema, payload, '结算单列表')
+}
+
+/**
+ * POST /admin/settlement/statements — generate a draft snapshot for a period.
+ *
+ * The body is parsed locally first, so `periodFrom > periodTo` and a one-sided
+ * `replaceStatementId`/`expectedRevision` pair are rejected before any request is
+ * sent (the shared `superRefine` owns both rules). The POST is CSRF-protected.
+ *
+ * **Server response shape (verified against `apps/api`):** the `201` body is a
+ * `SettlementStatementDetail` (`{ statement, lines, performance, events,
+ * postLockDisputes }`), not a bare statement. This helper therefore validates the
+ * real body with `settlementStatementDetailSchema`, then returns the nested
+ * `statement` (re-validated with `settlementStatementSchema`) so the fixed
+ * `Promise<SettlementStatement>` signature still holds and no fabricated wrapper
+ * is invented. Callers that need the lines/events after creation should
+ * `getSettlementStatement(statement.id)`.
+ */
+export async function createSettlementStatement(
+  csrfToken: string,
+  request: CreateSettlementStatementRequest,
+): Promise<SettlementStatement> {
+  const body = createSettlementStatementRequestSchema.parse(request)
+  const payload = await requestLocalJson(`/api${LEDGER_ROUTES.adminSettlementStatements}`, {
+    method: 'POST',
+    csrfToken,
+    body,
+  })
+  const detail = parsePayload(settlementStatementDetailSchema, payload, '结算单草案创建结果')
+  return parsePayload(settlementStatementSchema, detail.statement, '结算单草案')
+}
+
+/**
+ * GET /admin/settlement/statements/:statementId — the immutable snapshot detail.
+ *
+ * `lines`, `performance`, `events` and `postLockDisputes` are returned exactly as
+ * the server sent them. A blocked line keeps `allocation: null` (never `0`) and a
+ * post-lock dispute stays a separate entry rather than rewriting a line.
+ */
+export async function getSettlementStatement(
+  statementId: string,
+  signal?: AbortSignal,
+): Promise<SettlementStatementDetail> {
+  const payload = await requestLocalJson(
+    `/api${fillRoute(LEDGER_ROUTES.adminSettlementStatement, ':statementId', statementId)}`,
+    { signal },
+  )
+  return parsePayload(settlementStatementDetailSchema, payload, '结算单详情')
 }
