@@ -10,6 +10,8 @@ import {
   settlementOrderPartySnapshotSchema,
   settlementPartyListResponseSchema,
   settlementPartySchema,
+  settlementQuoteRequestSchema,
+  settlementQuoteResponseSchema,
   settlementRuleListResponseSchema,
   settlementRuleVersionSchema,
   type CreateSettlementMappingRequest,
@@ -18,6 +20,7 @@ import {
   type SettlementMapping,
   type SettlementOrderPartySnapshot,
   type SettlementParty,
+  type SettlementQuoteResponse,
   type SettlementRuleVersion,
 } from '@sanchuang-dev/local-life-contracts'
 import { fillRoute, parsePayload, requestLocalJson, withQuery } from './localApi'
@@ -42,6 +45,11 @@ import { fillRoute, parsePayload, requestLocalJson, withQuery } from './localApi
  * `version` / `approvedByUserId` / `approvedAt` 均由服务端生成并以响应为准。前端
  * 不得推断审批结果、不得自行递增版本号、更不得填充任何默认费率——没有登记就没有
  * 规则，没有规则就没有应付金额。
+ *
+ * 「单订单试算」（LL-SET-010B / #222）是**只读模拟**：契约要求以 POST + CSRF 调用
+ * （按已核准规则逐笔计算，但不落库、不产生账单），响应中 `quoteOnly` 恒为 `true`、
+ * `payableAmountCents` 恒为 `null`。它**不是**应付金额、不是结算单、不是付款指令：
+ * 前端不得据此生成任何 payable 数字，也不得把 `allocation` 当作应付或已付款。
  *
  * 硬规则：
  *
@@ -356,4 +364,45 @@ export async function createSettlementRuleVersion(
     body,
   })
   return parsePayload(settlementRuleVersionSchema, payload, '合同规则版本创建结果')
+}
+
+/* -------------------------------------------------------------------------- */
+/* Single-order trial quote (#222) — a simulation, never a payable amount     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * POST /admin/settlement/quotes — trial allocation for exactly one order.
+ *
+ * Why a *read-only* operation is a POST: the shared contract defines it as one
+ * (`settlementQuoteRequestSchema` is a strict body, not a query), so the request
+ * must be `POST` **with CSRF** — never a GET, and never a POST without
+ * `x-csrf-token`. The body is parsed locally first, so an empty or non-UUID
+ * `orderId` is rejected before any request is sent.
+ *
+ * The response is a pure simulation:
+ *
+ * - `quoteOnly` is always `true` and `payableAmountCents` is always `null`; a
+ *   response claiming otherwise fails the shared schema and raises
+ *   `invalid_response`. This endpoint is **not** a payable amount, **not** a
+ *   settlement statement and **not** a payment instruction, and no caller may
+ *   derive a payable figure from `allocation`.
+ * - `status='pending_rule'` / `'blocked'` come with `rule`/`allocation` `null`;
+ *   they are returned as-is and must not be rendered as `¥0` or a zero split.
+ * - 401/403/400/404/409 keep their real status/code/message via `LocalApiError`;
+ *   a network rejection is `status 0 / network_error`. There is no fallback that
+ *   turns a failure into「未试算」or an empty object.
+ */
+export async function quoteSettlementOrder(
+  csrfToken: string,
+  orderId: string,
+  signal?: AbortSignal,
+): Promise<SettlementQuoteResponse> {
+  const body = settlementQuoteRequestSchema.parse({ orderId })
+  const payload = await requestLocalJson(`/api${LEDGER_ROUTES.adminSettlementQuote}`, {
+    method: 'POST',
+    csrfToken,
+    body,
+    signal,
+  })
+  return parsePayload(settlementQuoteResponseSchema, payload, '订单分成试算结果')
 }
