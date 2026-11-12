@@ -39,7 +39,7 @@ export function LifePage() {
       ) : null}
 
       <div className="mt-5">
-        <LocalCatalogSection />
+        <LocalCatalogSection activityId={activityId} />
       </div>
 
       <div className="mt-6 border-t border-slate-100 pt-5">

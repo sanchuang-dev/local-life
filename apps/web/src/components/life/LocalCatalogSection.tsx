@@ -20,7 +20,7 @@ import {
  * Registration happens on the detail page, where the login requirement and the
  * 「登记订单 / 提交办理意向」 CTA live. Browsing stays session-free.
  */
-export function LocalCatalogSection() {
+export function LocalCatalogSection({ activityId = null }: { activityId?: string | null }) {
   const { state, reload } = useLocalCatalog()
 
   return (
@@ -72,7 +72,7 @@ export function LocalCatalogSection() {
         <div className="mt-1">
           <div className="grid grid-cols-2 gap-3">
             {state.items.map((product) => (
-              <LocalProductCard key={product.id} product={product} />
+              <LocalProductCard key={product.id} product={product} activityId={activityId} />
             ))}
           </div>
           <p className="mt-2.5 break-words text-[11px] leading-5 text-slate-400">

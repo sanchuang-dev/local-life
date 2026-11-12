@@ -2,6 +2,7 @@ import { Link } from 'react-router'
 import { AlertTriangle, ChevronRight, MapPin, ShoppingBasket } from 'lucide-react'
 import type { LocalProductSummary } from '@sanchuang-dev/local-life-contracts'
 import { formatLocalPriceCents } from './localOrderLabels'
+import { localProductHref } from './catalogLinks'
 
 /**
  * One real local product.
@@ -10,11 +11,17 @@ import { formatLocalPriceCents } from './localOrderLabels'
  * discount or a stock claim. The whole tile is a link so a 320px viewport has a
  * comfortable touch target instead of a small inline "查看" button.
  */
-export function LocalProductCard({ product }: { product: LocalProductSummary }) {
+export function LocalProductCard({
+  product,
+  activityId = null,
+}: {
+  product: LocalProductSummary
+  activityId?: string | null
+}) {
   return (
     <Link
-      to={`/life/local-products/${product.id}`}
-      state={{ from: '/life' }}
+      to={localProductHref(product.id, activityId)}
+      state={{ from: activityId ? `/life?activityId=${activityId}` : '/life' }}
       aria-label={`${product.name}，${formatLocalPriceCents(product.priceCents)}，查看本地商品详情`}
       className="group flex min-w-0 flex-col overflow-hidden rounded-[18px] border border-slate-100 bg-white shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
     >

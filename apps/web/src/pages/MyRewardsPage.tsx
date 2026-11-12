@@ -7,9 +7,14 @@ import {
   Wallet,
 } from 'lucide-react'
 import { Link } from 'react-router'
+import type {
+  CouponEffectiveStatus,
+  CouponWalletItem,
+} from '@sanchuang-dev/local-life-contracts'
 import { PageHeader } from '../components/PageHeader'
 import {
   credentialExpiryText,
+  formatCents,
   formatRewardDateTime,
   grantRecipientText,
   grantStatusLabels,
@@ -18,12 +23,18 @@ import {
   rewardBucketLabels,
   type RewardBucket,
 } from '../components/activity/rewardLabels'
+import {
+  couponStatusLabels,
+  couponStatusView,
+} from '../components/activity/purchaseRewardUi'
 import { FilterChipRow } from '../components/crm/FilterChips'
 import { useBackTarget } from '../hooks/useBackTarget'
+import { useCouponWallet } from '../hooks/useCouponWallet'
 import { useResidentAuth } from '../hooks/useResidentAuth'
 import { buildResidentLoginHref } from '../components/auth/residentLogin'
 import { useRewardWallet, type RewardWalletEntry } from '../hooks/useRewardWallet'
 import { DrawWalletSection } from '../components/activity/DrawWalletSection'
+import { shortTeamId } from '../components/life/localOrderAttribution'
 
 const BUCKET_ORDER: RewardBucket[] = ['claimable', 'pending', 'redeemed', 'disputed', 'void']
 
@@ -32,15 +43,34 @@ const bucketOptions = BUCKET_ORDER.map((bucket) => ({
   label: rewardBucketLabels[bucket],
 }))
 
+const COUPON_STATUS_ORDER: CouponEffectiveStatus[] = [
+  'available',
+  'reserved',
+  'redeemed',
+  'void',
+  'expired',
+]
+
+const couponOptions = COUPON_STATUS_ORDER.map((status) => ({
+  value: status,
+  label: couponStatusLabels[status],
+}))
+
+const couponToneClasses = {
+  slate: 'bg-slate-100 text-slate-500',
+  orange: 'bg-[#fff3e6] text-[#a96b2f]',
+  teal: 'bg-[#e8f6f0] text-teal-700',
+  rose: 'bg-rose-50 text-rose-600',
+} as const
+
 /**
  * 我的奖励 — the resident activity wallet.
  *
- * There is no cross-activity wallet endpoint in the contracts, so the page
- * composes real ones: the published activity list, then each activity's
- * team-reward state (which carries the grant and the *masked* credential).
- * The plaintext code is never stored client-side; it is only shown once at claim
- * time on the campaign page, so this page can honestly say it shows the last four
- * characters only.
+ * Team check-in rewards are composed from the published activity list and each
+ * activity's team-reward state. Consumption coupons are read from their own
+ * global wallet endpoint, so a coupon can never disappear merely because its
+ * activity is outside a shortened activity list. The plaintext check-in code is
+ * never stored client-side; it is only shown once at claim time.
  */
 export function MyRewardsPage() {
   const { backTo, backLabel } = useBackTarget('/me', '返回我的')
@@ -49,15 +79,37 @@ export function MyRewardsPage() {
     sessionKey: auth.session?.user.id ?? null,
     authLoading: auth.loading,
   })
+  const couponWallet = useCouponWallet({
+    sessionKey: auth.session?.user.id ?? null,
+    authLoading: auth.loading,
+  })
   const [bucket, setBucket] = useState<RewardBucket | ''>('')
+  const [couponStatus, setCouponStatus] = useState<CouponEffectiveStatus | ''>('')
 
   const entries = wallet.state.status === 'ready' ? wallet.state.entries : []
   const drawEntries = wallet.state.status === 'ready' ? wallet.state.drawEntries : []
+  const couponItems = couponWallet.state.status === 'ready' ? couponWallet.state.items : []
+  const walletLoading = wallet.state.status === 'loading' || auth.loading
+  const couponLoading = couponWallet.state.status === 'loading'
   const visible = bucket === '' ? entries : entries.filter((item) => item.bucket === bucket)
+  const visibleCoupons =
+    couponStatus === ''
+      ? couponItems
+      : couponItems.filter((item) => item.status === couponStatus)
   const counts = BUCKET_ORDER.reduce<Record<string, number>>((accumulator, key) => {
     accumulator[key] = entries.filter((item) => item.bucket === key).length
     return accumulator
   }, {})
+  const couponCounts = COUPON_STATUS_ORDER.reduce<Record<string, number>>((accumulator, key) => {
+    accumulator[key] = couponItems.filter((item) => item.status === key).length
+    return accumulator
+  }, {})
+  const noRewards =
+    wallet.state.status === 'ready' &&
+    entries.length === 0 &&
+    drawEntries.length === 0 &&
+    couponWallet.state.status === 'ready' &&
+    couponItems.length === 0
 
   return (
     <div className="px-4 pb-7 pt-3">
@@ -66,7 +118,7 @@ export function MyRewardsPage() {
         backLabel={backLabel}
         icon={Wallet}
         title="我的奖励"
-        subtitle="奖励 · 领取凭据 · 核销状态"
+        subtitle="奖励 · 领取凭据 · 消费券状态"
       />
 
       {wallet.state.status === 'ready' && entries.length > 0 ? (
@@ -84,7 +136,7 @@ export function MyRewardsPage() {
         </div>
       ) : null}
 
-      {wallet.state.status === 'loading' || auth.loading ? (
+      {walletLoading ? (
         <p
           className="mt-6 flex items-center justify-center gap-2 text-[12px] font-medium text-slate-500"
           role="status"
@@ -128,14 +180,14 @@ export function MyRewardsPage() {
         </section>
       ) : null}
 
-      {wallet.state.status === 'ready' && entries.length === 0 && drawEntries.length === 0 ? (
+      {noRewards ? (
         <section className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
           <p className="flex items-center gap-1.5 text-[14px] font-bold text-slate-800">
             <Gift size={16} className="shrink-0 text-teal-700" aria-hidden="true" />
             暂无活动奖励
           </p>
           <p className="mt-1 text-[12px] leading-5 text-slate-500">
-            暂时没有团队奖励或抽奖中奖。参与社区活动后，可以在这里查看自己的真实奖励与核销凭据。
+            暂时没有团队奖励、消费券或抽奖中奖。参与社区活动后，可以在这里查看自己的真实奖励与核销凭据。
           </p>
           <Link
             to="/community/activity"
@@ -154,6 +206,69 @@ export function MyRewardsPage() {
 
       <DrawWalletSection entries={drawEntries} />
 
+      {couponLoading ? (
+        <p
+          className="mt-5 flex items-center justify-center gap-2 text-[12px] font-medium text-slate-500"
+          role="status"
+          aria-live="polite"
+        >
+          <span
+            className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-teal-700/25 border-t-teal-700"
+            aria-hidden="true"
+          />
+          正在读取消费券包…
+        </p>
+      ) : null}
+
+      {couponWallet.state.status === 'error' ? (
+        <section className="mt-5 rounded-[18px] border border-[#f0d5bd] bg-[#fff7f0] p-4">
+          <p className="flex items-center gap-1.5 text-[13px] font-bold text-[#7a4a2c]">
+            <AlertTriangle size={15} className="shrink-0" aria-hidden="true" />
+            消费券包读取失败
+          </p>
+          <p className="mt-1 break-words text-[12px] leading-5 text-[#7a4a2c]">
+            {couponWallet.state.message}
+          </p>
+          <button
+            type="button"
+            onClick={couponWallet.reload}
+            className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-full bg-[#7a4a2c] px-4 text-[12px] font-semibold text-white"
+          >
+            <RefreshCw size={14} aria-hidden="true" />
+            重新读取券包
+          </button>
+        </section>
+      ) : null}
+
+      {couponWallet.state.status === 'ready' && couponItems.length > 0 ? (
+        <section className="mt-5" aria-labelledby="coupon-wallet-heading">
+          <h2 id="coupon-wallet-heading" className="mb-3 text-[17px] font-bold text-slate-900">
+            消费团奖励券
+          </h2>
+          <FilterChipRow
+            label="消费券状态"
+            value={couponStatus}
+            options={couponOptions.map((option) => ({
+              ...option,
+              label: `${option.label} ${couponCounts[option.value] ?? 0}`,
+            }))}
+            onChange={(value) => setCouponStatus(value as CouponEffectiveStatus | '')}
+            allLabel={`全部 ${couponItems.length}`}
+          />
+          {visibleCoupons.length === 0 ? (
+            <p className="mt-3 rounded-[16px] border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-[12px] leading-5 text-slate-500">
+              当前筛选下没有消费券。
+            </p>
+          ) : (
+            <ul className="mt-3 grid gap-3">
+              {visibleCoupons.map((coupon) => (
+                <CouponWalletCard key={coupon.id} coupon={coupon} />
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
+
       {visible.length > 0 ? (
         <section className="mt-5" aria-labelledby="team-wallet-heading">
           <h2 id="team-wallet-heading" className="mb-3 text-[17px] font-bold text-slate-900">团队签到奖励</h2>
@@ -166,9 +281,49 @@ export function MyRewardsPage() {
       ) : null}
 
       <p className="mt-5 text-[11px] leading-[1.7] text-slate-400">
-        团队签到奖励凭据请在领取时保存；抽奖中奖的有效核销码可在本页查看，请勿公开分享。
+        团队签到奖励凭据请在领取时保存；抽奖中奖的有效核销码可在本页查看；消费券状态来自全量券包，请勿公开分享兑换信息。
       </p>
     </div>
+  )
+}
+
+function CouponWalletCard({ coupon }: { coupon: CouponWalletItem }) {
+  const status = couponStatusView(coupon)
+  return (
+    <li className="rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="flex items-center gap-1.5 text-[14px] font-bold text-slate-900">
+            <Ticket size={15} className="shrink-0 text-[#a96b2f]" aria-hidden="true" />
+            消费团奖励券
+          </p>
+          <p className="mt-0.5 truncate text-[11px] text-slate-400">
+            团号 {shortTeamId(coupon.teamId)} · 发放于 {formatRewardDateTime(coupon.issuedAt)}
+          </p>
+        </div>
+        <span
+          className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${
+            couponToneClasses[status.tone]
+          }`}
+        >
+          {status.label}
+        </span>
+      </div>
+
+      <p className="mt-2 text-[24px] font-bold leading-none text-[#a96b2f]">
+        {formatCents(coupon.faceValueCents)}
+      </p>
+      <p className="mt-1.5 break-words text-[12px] leading-5 text-slate-500">{status.detail}</p>
+      <p className="mt-1 text-[11px] leading-5 text-slate-400">{status.expiresText}</p>
+
+      <Link
+        to={`/community/activity/silver-neighborhood?activityId=${coupon.activityId}`}
+        state={{ from: '/me/rewards' }}
+        className="mt-3 flex min-h-[44px] items-center justify-center rounded-[13px] bg-[#f2f7f4] px-3 text-[13px] font-semibold text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+      >
+        查看活动与消费团进度
+      </Link>
+    </li>
   )
 }
 
