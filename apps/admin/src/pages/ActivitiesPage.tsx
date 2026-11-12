@@ -2013,7 +2013,7 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
                         }
                         description={
                           getFieldValue('purchaseRewardPlanBaseline')
-                            ? '当前活动已配置过消费组团奖励。关闭开关再保存会显式清空它，并生成新规则版本；已发放奖励与既有签到奖励不受影响。'
+                            ? '当前为草稿活动。关闭开关并保存会清空消费奖励配置；草稿修改不会生成规则版本，也不会影响既有签到奖励。'
                             : '未启用消费组团奖励不影响既有签到奖励；发布后居民端只展示门槛与每人券面额。'
                         }
                       />
