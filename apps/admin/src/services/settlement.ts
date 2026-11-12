@@ -13,6 +13,7 @@ import {
   settlementOrderPartySnapshotSchema,
   settlementPartyListResponseSchema,
   settlementPartySchema,
+  settlementPaymentActionRequestSchema,
   settlementPaymentOverviewSchema,
   settlementQuoteRequestSchema,
   settlementQuoteResponseSchema,
@@ -30,6 +31,7 @@ import {
   type SettlementMapping,
   type SettlementOrderPartySnapshot,
   type SettlementParty,
+  type SettlementPaymentActionRequest,
   type SettlementPaymentOverview,
   type SettlementQuoteResponse,
   type SettlementRuleVersion,
@@ -827,4 +829,101 @@ export async function recordSettlementPayment(
     { method: 'POST', csrfToken, body },
   )
   return parsePayload(settlementPaymentOverviewSchema, payload, '付款凭据登记结果')
+}
+
+/* -------------------------------------------------------------------------- */
+/* Payment verification / dispute (#226) — independent review, server states  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Shared POST for the two terminal payment actions.
+ *
+ * Measured against `apps/api` (#187):
+ *
+ * - `POST /admin/settlement/statements/:statementId/payments/:paymentId/verify`
+ *   and `.../dispute`; both admin-only (`guard('admin')`) and CSRF-protected →
+ *   401 unauthenticated, 403 for non-admin / grid_worker / bad CSRF.
+ * - A non-UUID `statementId`/`paymentId` → **404**「付款凭据不存在」; a body that
+ *   fails `settlementPaymentActionRequestSchema` → **400**.
+ * - Success is **HTTP 200** (not 200/201 distinction: no explicit status) with the
+ *   whole `SettlementPaymentOverview`, so the page refreshes from one response.
+ * - Failure branches, all preserved verbatim:
+ *   • recorder verifying own record → **403**「付款登记人不能复核自己的付款凭据」
+ *     (independent-review rule; the client never guesses who may review);
+ *   • statement not locked → **409**「只有锁定结算单的付款凭据可以复核」;
+ *   • record not in statement → **404**「付款凭据不存在」;
+ *   • event idempotency key reused for another event → **409**;
+ *   • already terminal (verified/disputed) → **409**「该付款凭据已经完成复核，
+ *     不能重复或改写结论」;
+ *   • beneficiary snapshot mismatch or verify-overpay → **409**.
+ *
+ * The `eventIdempotencyKey` is supplied by the caller and passed through
+ * **verbatim** — this service never generates, replaces, mutates or retries it.
+ * The user asked for one key per logical action; an identical replay returns the
+ * current overview from the server, while a reused key with different content is
+ * a `409`.
+ */
+async function postSettlementPaymentAction(
+  csrfToken: string,
+  routeTemplate: string,
+  statementId: string,
+  paymentId: string,
+  request: SettlementPaymentActionRequest,
+  label: string,
+): Promise<SettlementPaymentOverview> {
+  const body = settlementPaymentActionRequestSchema.parse(request)
+  const path = `/api${fillRoute(
+    fillRoute(routeTemplate, ':statementId', statementId),
+    ':paymentId',
+    paymentId,
+  )}`
+  const payload = await requestLocalJson(path, { method: 'POST', csrfToken, body })
+  return parsePayload(settlementPaymentOverviewSchema, payload, label)
+}
+
+/**
+ * POST /admin/settlement/statements/:statementId/payments/:paymentId/verify —
+ * mark one registered proof as 已核销.
+ *
+ * Only the caller-supplied evidence + event key are sent; the resulting states
+ * (`record.state`, per-beneficiary state, overall state) come **only** from the
+ * returned overview. Nothing here infers 「已核销」 locally.
+ */
+export async function verifySettlementPayment(
+  csrfToken: string,
+  statementId: string,
+  paymentId: string,
+  request: SettlementPaymentActionRequest,
+): Promise<SettlementPaymentOverview> {
+  return postSettlementPaymentAction(
+    csrfToken,
+    LEDGER_ROUTES.adminSettlementPaymentVerify,
+    statementId,
+    paymentId,
+    request,
+    '付款凭据核验结果',
+  )
+}
+
+/**
+ * POST /admin/settlement/statements/:statementId/payments/:paymentId/dispute —
+ * mark one registered proof as 争议.
+ *
+ * Uses a distinct route from verification; a disputed proof can never be silently
+ * verified afterwards — the server answers `409` and the client keeps that error.
+ */
+export async function disputeSettlementPayment(
+  csrfToken: string,
+  statementId: string,
+  paymentId: string,
+  request: SettlementPaymentActionRequest,
+): Promise<SettlementPaymentOverview> {
+  return postSettlementPaymentAction(
+    csrfToken,
+    LEDGER_ROUTES.adminSettlementPaymentDispute,
+    statementId,
+    paymentId,
+    request,
+    '付款凭据争议标记结果',
+  )
 }
