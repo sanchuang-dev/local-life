@@ -6,8 +6,8 @@
 
 | 路径 | 角色 | 是否发布 |
 | --- | --- | --- |
-| `apps/web` | 居民移动端 H5，保留已评审页面与 HashRouter | 是，GitHub Pages 静态预览 |
-| `apps/admin` | 管理台：后台登录、社区/后台账户管理、社区居民只读列表 | 否 |
+| `apps/web` | 居民移动端 H5，保留已评审页面、活动/奖励/本地商品订单入口与 HashRouter | 是，GitHub Pages 静态预览 |
+| `apps/admin` | 管理台：身份登录、活动/CRM、商品订单、业绩对账与系统配置 | 否 |
 | `apps/api` | Hono API、Drizzle/SQLite、认证与社区范围鉴权 | 否 |
 | `packages/contracts` | API 与客户端共享 zod schema、DTO 和路由常量 | workspace 依赖 |
 
@@ -30,7 +30,7 @@ H5 与管理台开发服务器均把 `/api/*` 去掉前缀后代理到 API 实�
 - `GET /healthz` 返回共享 `healthResponseSchema` 校验后的 payload。
 - 每个请求生成 `x-request-id`；404/500 返回共享结构化错误信封。
 - SQLite + Drizzle 仅在 `apps/api` 内：schema 位于 `src/db/schema.ts`，迁移位于 `db/migrations/`，服务启动时自动应用迁移。
-- 默认数据库路径为仓库根目录 `.data/local-life.sqlite`，由 `.gitignore` 忽略；生产环境必须显式配置持久卷/备份策略。
+- 裸 API 的默认数据库路径为仓库根目录 `.data/local-life.sqlite`；`pnpm dev:local` 使用 `.data/local-life-dev.sqlite`。两者均由 `.gitignore` 忽略；生产环境必须显式配置持久卷/备份策略。
 - `packages/contracts` 是 API、H5、管理台共享 DTO 的唯一来源；客户端不得另造相同接口的数据结构。
 
 ## 4. 身份与权限（LL-MVP-002）
@@ -45,11 +45,20 @@ H5 与管理台开发服务器均把 `/api/*` 去掉前缀后代理到 API 实�
 
 完整配置、接口和安全说明见 [identity-auth.md](identity-auth.md)。
 
-## 5. 当前未实现的业务边界
+## 5. 当前业务边界（2026-11-12 按 `dev` 代码核对）
 
-本阶段没有实现活动配置/发布、三人成团、客户线索跟进、广电业务受理、CRMEB 商品/订单映射、支付、奖励核销、业绩确认、空中分账与对账。这些能力不得以 Mock 成功或静态演示数据宣称已可运营。
+以下能力在 `dev` 已包含真实 schema、API、页面或 adapter，并有对应测试/证据：
 
-CRMEB 继续作为独立仓库/系统，通过后续明确的 adapter 与订单契约接入；不将 PHP 商城源码复制进 workspace。
+- 活动创建、发布、暂停与居民公开读取（LL-MVP-003）；
+- 三人团与网格员 CRM（LL-MVP-004/005）；
+- 签到、团队奖励资格、奖品库存与一次性核销（LL-MVP-006）；
+- CRMEB adapter、本地商品目录与居民订单（LL-MVP-007/010）；
+- 统一经营流水、对账与结算（LL-MVP-008 及后续 SET 卡）；
+- 消费返券与抽奖（PUR/LOT 卡）。
+
+这些是**代码事实，不等于 `mvp` 已部署，也不等于真实微信、CRMEB 或支付依赖已经配置可用**。以下事项不能由 `dev` 代码存在推导为可用：在线支付、自动分账/自动佣金、CRMEB 真实生产凭证与完整商城履约、真实公众号 OAuth 真机验收、线上部署与备份恢复验收。模块边界以 [rewards-fulfillment.md](rewards-fulfillment.md)、[ll-mvp-008-ledger-reconciliation.md](ll-mvp-008-ledger-reconciliation.md)、[crmeb-adapter.md](crmeb-adapter.md)、[participation-teams.md](participation-teams.md)、[ll-mvp-005-crm.md](ll-mvp-005-crm.md)、[activity-draw-execution.md](activity-draw-execution.md) 及当前代码为准。
+
+CRMEB 继续作为独立仓库/系统，通过 adapter 与订单契约接入；不将 PHP 商城源码复制进 workspace。
 
 ## 6. GitHub Pages 双预览
 
@@ -63,7 +72,6 @@ GitHub Pages 只发布静态 H5：
 
 ## 7. 验证
 
-- `pnpm install --frozen-lockfile`
-- `pnpm check`：Oxlint → contracts 构建 + 各包 typecheck → API 测试 → workspace 构建。
-- API 测试覆盖后台登录、账户创建、社区越权拒绝、CSRF、登出、开发登录隔离、WeChat OAuth state/nonce/重放与重复授权。
-- 浏览器仍需验证 H5 375 × 812 / 320 宽度和管理台登录/账户管理交互；真实微信授权、生产 HTTPS Cookie、部署、备份恢复及真机验收必须在真实环境完成。
+按 [AGENTS.md §6](../../AGENTS.md) 的按风险分层口径执行：低风险文案、样式、局部组件或纯文档改动至少运行 `git diff --check` 并核对引用路径；涉及 API 行为、金额、认证、迁移、持久化、并发或结算时，使用真实 HTTP/SQLite 边界及必要正反例，不以 Mock 替代被测能力。`pnpm check` 仍是全量质量检查，按现有 CI/分支门禁执行，不再要求每个低风险施工重复跑完。
+
+真实微信授权、生产 HTTPS Cookie、部署、备份恢复及真机验收必须在真实环境完成。
