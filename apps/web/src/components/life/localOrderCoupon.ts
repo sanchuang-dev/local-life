@@ -69,6 +69,14 @@ export function chooseUsableCoupon(
   return options.find((option) => option.coupon.id === selectedCouponId && option.usable) ?? null
 }
 
+/** A selected coupon must never silently become a no-coupon order on wallet refresh failure. */
+export function hasUnresolvedCouponSelection(
+  selectedCouponId: string | null,
+  resolved: LocalOrderCouponOption | null,
+): boolean {
+  return selectedCouponId !== null && resolved === null
+}
+
 export type LocalOrderAmountLabel = '商品总额' | '券抵扣' | '待实际支付'
 
 export interface LocalOrderAmountLine {
