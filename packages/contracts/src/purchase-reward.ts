@@ -18,6 +18,18 @@ import { z } from 'zod'
  * check-in `rewardPlan` untouched.
  */
 
+/**
+ * Read-only progress routes (LL-PUR-005).
+ *
+ * The resident surface only ever describes the caller's own current team. The
+ * staff surface describes every team of one activity, but the API still applies
+ * the caller's `staff_community_assignments` before returning anything.
+ */
+export const PURCHASE_REWARD_ROUTES = {
+  myProgress: '/activities/:activityId/purchase-reward/progress',
+  staffProgress: '/staff/activities/:activityId/purchase-reward/progress',
+} as const
+
 /** A rewarded team is always the three-person team from LL-MVP-004. */
 export const PURCHASE_REWARD_TEAM_SIZE = 3
 

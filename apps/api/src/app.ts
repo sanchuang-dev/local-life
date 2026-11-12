@@ -76,6 +76,7 @@ import { registerSettlementRuleRoutes } from './ledger/settlement-rule-routes.js
 import { registerSettlementStatementRoutes } from './ledger/settlement-statement-routes.js'
 import { registerReconciliationRoutes } from './ledger/reconciliation-routes.js'
 import { registerParticipationRoutes } from './participation/routes.js'
+import { registerPurchaseRewardRoutes } from './purchase-reward/routes.js'
 import { registerRewardRoutes } from './rewards/routes.js'
 import { registerDrawRoutes } from './draw/routes.js'
 import { registerUserDirectoryRoutes } from './users/routes.js'
@@ -1637,6 +1638,15 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     fail,
     validCsrf,
     bodySchemaError,
+  })
+
+  // Read-only consumption-team effective-paid progress (#210 LL-PUR-005).
+  // No writes, no coupon state: both surfaces recompute from verified orders and
+  // their linked manual receipts.
+  registerPurchaseRewardRoutes(app, {
+    db,
+    fail,
+    ...(options.now === undefined ? {} : { now: options.now }),
   })
 
   // Resident permanent community (#171 LL-IDENTITY-001): the one read behind
