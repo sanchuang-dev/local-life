@@ -739,6 +739,12 @@ function StatementLineCard({ line }: { line: SettlementStatementLine }) {
         <Descriptions.Item label="登记金额">
           {formatCents(line.registeredAmountCents)}
         </Descriptions.Item>
+        <Descriptions.Item label="优惠券抵扣">
+          {formatCents(line.couponDiscountCents)}
+        </Descriptions.Item>
+        <Descriptions.Item label="订单净应付">
+          {formatCents(line.netPayableCents)}
+        </Descriptions.Item>
         <Descriptions.Item label="收款凭据">
           {line.receiptEvidenceRef === null ? (
             '未关联收款凭据'
