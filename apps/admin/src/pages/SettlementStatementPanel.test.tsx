@@ -138,6 +138,8 @@ function calculatedLine() {
     productName: '社区宽带体验套餐',
     periodAt: '2026-11-01T02:00:00.000Z',
     registeredAmountCents: 3980,
+    couponDiscountCents: 0,
+    netPayableCents: 3980,
     receiptEntryId: RECEIPT_ENTRY_ID,
     receiptEvidenceRef: 'BANK-20261101-001',
     receiptReceivedAt: '2026-11-01T03:00:00.000Z',
