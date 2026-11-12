@@ -91,6 +91,9 @@ function lineDto(row: LineRow): SettlementStatementLine {
     orderDisplayNo: row.orderDisplayNo, communityId: row.communityId,
     productId: row.productId, productName: row.productName,
     periodAt: iso(row.periodAt), registeredAmountCents: row.registeredAmountCents,
+    // Old locked snapshots predate coupons: NULL means no discount, NOT missing money.
+    couponDiscountCents: row.couponDiscountCents ?? 0,
+    netPayableCents: row.netPayableCents ?? row.registeredAmountCents,
     receiptEntryId: row.receiptEntryId, receiptEvidenceRef: row.receiptEvidenceRef,
     receiptReceivedAt: row.receiptReceivedAt ? iso(row.receiptReceivedAt) : null,
     receiptAmountCents: row.receiptAmountCents, operatingBatchId: row.operatingBatchId,
@@ -201,6 +204,8 @@ function captureOne(db: AppDatabase, actor: LocalActor, candidate: SettlementCan
     communityId: candidate.communityId, productId: candidate.productId,
     productName: candidate.productName, periodAt: new Date(candidate.periodAt),
     registeredAmountCents: candidate.registeredAmountCents,
+    couponDiscountCents: candidate.couponDiscountCents,
+    netPayableCents: candidate.netPayableCents,
     receiptEntryId: actual?.entryId ?? null, receiptEvidenceRef: actual?.evidenceRef ?? null,
     receiptReceivedAt: actual ? new Date(actual.receivedAt) : null,
     receiptAmountCents: actual?.amountCents ?? null, operatingBatchId,
