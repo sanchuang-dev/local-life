@@ -344,7 +344,7 @@ afterEach(() => {
  */
 function expectNoInventedZeroFinancialAmount(text: string | null | undefined) {
   expect(text ?? '').not.toMatch(
-    /(?:应分金额|实际应付|凭据实收|人工收款凭据金额|核销金额|付款金额)[：:\\s]*¥0\\.00/u,
+    /(?:应分金额|实际应付|凭据实收|人工收款凭据金额|核销金额|付款金额)[：:\s]*¥0\.00/u,
   )
 }
 
