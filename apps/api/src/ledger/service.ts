@@ -53,6 +53,7 @@ import {
 } from './shared.js'
 import { cutoffMsOf, membershipConditions } from './reconciliation-service.js'
 import { isOrderInLockedPeriod } from './payment-evidence.js'
+import { tryIssueEligibleTeamCoupons } from '../purchase-reward/coupon-issuance.js'
 
 /**
  * Write side of the ledger (LL-MVP-008, Issue #64): fact ingestion, manual
@@ -860,6 +861,15 @@ export function recordPayment(
           evidenceRef: body.evidenceRef,
           amountCents: String(body.amountCents),
         })
+        // Payment can qualify a team whose three seats were filled earlier.
+        // No second transaction: receipt + three coupons commit or roll back together.
+        const attributedOrder = tx.select({
+          sourceActivityId: localOrders.sourceActivityId,
+          sourceTeamId: localOrders.sourceTeamId,
+        }).from(localOrders).where(eq(localOrders.id, body.orderId)).get()
+        if (attributedOrder?.sourceActivityId && attributedOrder.sourceTeamId) {
+          tryIssueEligibleTeamCoupons(tx, attributedOrder.sourceActivityId, attributedOrder.sourceTeamId, now)
+        }
       }
       insertAudit(tx, actor.userId, 'ledger.payment.recorded', appended.entryId, now, {
         communityId: body.communityId,
