@@ -7,6 +7,7 @@ import {
   purchaseRewardProgressResponseSchema,
   couponWalletResponseSchema,
   couponStockResponseSchema,
+  couponRewardDisputeListSchema,
   type ApiErrorCode,
 } from '@sanchuang-dev/local-life-contracts'
 import type { AppDatabase } from '../db/client.js'
@@ -17,6 +18,7 @@ import {
   listStaffPurchaseRewardProgress,
 } from './service.js'
 import { getMyCoupons, getCouponStock } from './coupon-issuance.js'
+import { listCouponRewardDisputes } from './coupon-recovery.js'
 
 export interface PurchaseRewardRouteDeps {
   db: AppDatabase
@@ -68,6 +70,25 @@ export function registerPurchaseRewardRoutes(
     const session = c.get('authSession')
     if (!session) return fail(c, 401, API_ERROR_CODES.unauthorized, '请先登录居民账户')
     return c.json(couponWalletResponseSchema.parse(getMyCoupons(db, session.userId, injectedNow?.())))
+  })
+
+  app.get(PURCHASE_REWARD_ROUTES.staffRewardDisputes, (c) => {
+    const session = c.get('authSession')
+    if (!session?.staff) return fail(c, 401, API_ERROR_CODES.unauthorized, '请先登录管理后台')
+    const activityId = requireActivityId(c)
+    if (activityId instanceof Response) return activityId
+    const actor: LocalActor = {
+      userId: session.userId,
+      staffId: session.staff.id,
+      role: session.staff.role,
+    }
+    try {
+      return c.json(couponRewardDisputeListSchema.parse(
+        listCouponRewardDisputes(db, actor, activityId, injectedNow?.()),
+      ))
+    } catch (error) {
+      return failWithPurchaseRewardError(c, error)
+    }
   })
 
   app.get(PURCHASE_REWARD_ROUTES.staffCouponStock, (c) => {
