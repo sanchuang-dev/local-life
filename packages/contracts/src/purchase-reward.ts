@@ -28,6 +28,8 @@ import { z } from 'zod'
 export const PURCHASE_REWARD_ROUTES = {
   myProgress: '/activities/:activityId/purchase-reward/progress',
   staffProgress: '/staff/activities/:activityId/purchase-reward/progress',
+  myCoupons: '/purchase-reward/coupons',
+  staffCouponStock: '/staff/activities/:activityId/purchase-reward/stock',
 } as const
 
 /** A rewarded team is always the three-person team from LL-MVP-004. */
@@ -92,3 +94,48 @@ export const publicPurchaseRewardSchema = z.strictObject({
 })
 
 export type PublicPurchaseReward = z.infer<typeof publicPurchaseRewardSchema>
+
+/* -------------------------------------------------------------------------- */
+/* Single-use coupons and bounded reward inventory (LL-PUR-006)               */
+/* -------------------------------------------------------------------------- */
+
+/** Status `expired` is a read-time projection: stored `available` does not mutate on a timer. */
+export const couponEffectiveStatusSchema = z.enum(['available', 'reserved', 'redeemed', 'void', 'expired'])
+export type CouponEffectiveStatus = z.infer<typeof couponEffectiveStatusSchema>
+
+export const couponWalletItemSchema = z.strictObject({
+  id: z.string().uuid(),
+  activityId: z.string().uuid(),
+  teamId: z.string().uuid(),
+  faceValueCents: z.number().int().positive(),
+  status: couponEffectiveStatusSchema,
+  issuedAt: z.string().datetime({ offset: true }),
+  expiresAt: z.string().datetime({ offset: true }),
+  reservedOrderId: z.string().uuid().nullable(),
+})
+export type CouponWalletItem = z.infer<typeof couponWalletItemSchema>
+
+export const couponWalletResponseSchema = z.strictObject({
+  items: z.array(couponWalletItemSchema),
+  asOf: z.string().datetime({ offset: true }),
+})
+export type CouponWalletResponse = z.infer<typeof couponWalletResponseSchema>
+
+/** Staff-only inventory, computed from immutable coupon team grants. */
+export const couponStockResponseSchema = z.strictObject({
+  activityId: z.string().uuid(),
+  hasPlan: z.boolean(),
+  issuedTeams: z.number().int().nonnegative(),
+  maxRewardedTeams: z.number().int().nonnegative(),
+  remainingTeams: z.number().int().nonnegative(),
+  issuedValueCents: z.number().int().nonnegative(),
+  totalBudgetCents: z.number().int().nonnegative(),
+  asOf: z.string().datetime({ offset: true }),
+}).superRefine((stock, ctx) => {
+  if (stock.issuedTeams > stock.maxRewardedTeams ||
+      stock.remainingTeams !== stock.maxRewardedTeams - stock.issuedTeams ||
+      stock.issuedValueCents > stock.totalBudgetCents) {
+    ctx.addIssue({ code: 'custom', path: ['issuedTeams'], message: 'coupon inventory exceeds its frozen plan budget' })
+  }
+})
+export type CouponStockResponse = z.infer<typeof couponStockResponseSchema>

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
+import { eq } from 'drizzle-orm'
 import {
   API_ERROR_CODES,
   PURCHASE_REWARD_ROUTES,
@@ -11,6 +12,8 @@ import {
   localProductDetailSchema,
   purchaseRewardProgressListResponseSchema,
   purchaseRewardProgressResponseSchema,
+  couponWalletResponseSchema,
+  couponStockResponseSchema,
   type ActivityStatus,
   type LedgerEntry,
   type LocalOrderDetail,
@@ -23,10 +26,16 @@ import { loadConfig } from '../src/config.js'
 import { createDatabase, type AppDatabase } from '../src/db/client.js'
 import {
   activities,
+  activityRuleVersions,
+  couponIssues,
+  couponTeamGrants,
+  couponIssueEvents,
+  ledgerPaymentOrderLinks,
   staffAccounts,
   users,
 } from '../src/db/schema.js'
 import { hashPassword } from '../src/auth/security.js'
+import { issueEligibleTeamCoupons } from '../src/purchase-reward/coupon-issuance.js'
 import { confirmCommunityOrFail } from './resident-community-fixtures.js'
 
 const migrationsFolder = fileURLToPath(new URL('../db/migrations', import.meta.url))
@@ -240,6 +249,7 @@ interface ActivityOptions {
   status?: ActivityStatus
   thresholdCents?: number | null
   couponFaceValueCents?: number
+  maxRewardedTeams?: number
 }
 
 function addActivity(
@@ -253,6 +263,12 @@ function addActivity(
   const thresholdCents = options.thresholdCents ?? 12_000
   const endsAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
   const id = randomUUID()
+  const startsAt = new Date(now.getTime() - 60 * 60 * 1000)
+  const purchasePlan = options.thresholdCents === null ? null : {
+    thresholdCents,
+    couponFaceValueCents: options.couponFaceValueCents ?? 2_000,
+    maxRewardedTeams: options.maxRewardedTeams ?? 5,
+  }
   db.insert(activities)
     .values({
       id,
@@ -261,19 +277,13 @@ function addActivity(
       summary: '验证团队有效实付累计',
       description: 'LL-PUR-005 测试活动',
       status,
-      startsAt: new Date(now.getTime() - 60 * 60 * 1000),
+      startsAt,
       endsAt,
       location: '幸福社区党群服务中心',
       budgetCapCents: 100_000,
       prizeQuantityCap: 100,
       publicRulesJson: ACTIVITY_RULES_JSON,
-      purchaseRewardPlanJson: options.thresholdCents === null
-        ? null
-        : JSON.stringify({
-            thresholdCents,
-            couponFaceValueCents: options.couponFaceValueCents ?? 2_000,
-            maxRewardedTeams: 5,
-          }),
+      purchaseRewardPlanJson: purchasePlan === null ? null : JSON.stringify(purchasePlan),
       currentRuleVersionId: null,
       createdByUserId,
       createdAt: now,
@@ -283,6 +293,29 @@ function addActivity(
       endedAt: status === 'ended' ? now : null,
     })
     .run()
+  if (status !== 'draft') {
+    // Real publication creates an immutable version. Issuance never trusts the
+    // activity's mutable column when deciding the promise or coupon budget.
+    const versionId = randomUUID()
+    db.insert(activityRuleVersions).values({
+      id: versionId,
+      activityId: id,
+      version: 1,
+      snapshotJson: JSON.stringify({
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+        location: '幸福社区党群服务中心',
+        budgetCapCents: 100_000,
+        prizeQuantityCap: 100,
+        publicRules: JSON.parse(ACTIVITY_RULES_JSON),
+        ...(purchasePlan === null ? {} : { purchaseRewardPlan: purchasePlan }),
+      }),
+      createdByUserId,
+      createdAt: now,
+    }).run()
+    db.update(activities).set({ currentRuleVersionId: versionId })
+      .where(eq(activities.id, id)).run()
+  }
   return id
 }
 
@@ -837,4 +870,170 @@ test('resident reads only their own team and staff reads are community-scoped', 
     { session: residentA },
   )
   assert.equal(missingProgress.status, 404)
+})
+
+
+/* -------------------------------------------------------------------------- */
+/* #211 Atomic, one-time equal coupon issuance                                */
+/* -------------------------------------------------------------------------- */
+
+async function myCouponWallet(app: App, resident: ResidentSession) {
+  const response = await api(app, 'GET', PURCHASE_REWARD_ROUTES.myCoupons, { session: resident })
+  assert.equal(response.status, 200)
+  return couponWalletResponseSchema.parse(await response.json())
+}
+
+async function couponStock(app: App, staff: Session, activityId: string) {
+  const response = await api(app, 'GET', route(PURCHASE_REWARD_ROUTES.staffCouponStock, activityId), {
+    session: staff,
+  })
+  assert.equal(response.status, 200)
+  return couponStockResponseSchema.parse(await response.json())
+}
+
+test('third join issues exactly one identical coupon to each member after existing valid spend', async () => {
+  const w = await world()
+  const { app, db, admin, operator, operatorId, communityId } = w
+  const product = await createOnShelfProduct(app, admin, communityId, 500)
+  const activityId = addActivity(db, communityId, w.adminUser.userId, {
+    thresholdCents: 1_000, couponFaceValueCents: 200,
+  })
+  const a = await w.resident('甲')
+  const b = await w.resident('乙')
+  const c = await w.resident('丙')
+  const { teamId, inviteCode } = await startTeam(app, a, activityId)
+  await confirmParticipation(app, b, activityId, inviteCode)
+  const order = await registerOrder(app, a, { productId: product.id, quantity: 2, activityId, teamId })
+  const verified = await markVerified(app, operator, order)
+  await recordPayment(app, operator, {
+    communityId, staffId: operatorId, orderId: verified.id,
+    amountCents: 1_000, evidenceRef: 'COUPON-THIRD-SEAT',
+  })
+  assert.equal((await myCouponWallet(app, a)).items.length, 0, 'two people must not issue')
+  assert.equal((await couponStock(app, operator, activityId)).issuedTeams, 0)
+  await confirmParticipation(app, c, activityId, inviteCode)
+
+  for (const member of [a, b, c]) {
+    const wallet = await myCouponWallet(app, member)
+    assert.equal(wallet.items.length, 1)
+    const coupon = wallet.items[0]!
+    assert.equal(coupon.activityId, activityId)
+    assert.equal(coupon.teamId, teamId)
+    assert.equal(coupon.status, 'available')
+    assert.equal(coupon.faceValueCents, 200)
+    assert.equal(coupon.reservedOrderId, null)
+    assert.equal(Date.parse(coupon.expiresAt) - Date.parse(coupon.issuedAt), 30 * 24 * 3600 * 1000)
+  }
+  const stock = await couponStock(app, operator, activityId)
+  assert.equal(stock.issuedTeams, 1)
+  assert.equal(stock.issuedValueCents, 600)
+  assert.equal(stock.remainingTeams, 4)
+  const grants = db.select().from(couponTeamGrants).all()
+  assert.equal(grants.length, 1)
+  assert.equal(grants[0]?.totalValueCents, 600)
+  assert.equal(db.select().from(couponIssueEvents).all().length, 3)
+  const retry = await confirmParticipation(app, c, activityId, inviteCode)
+  assert.equal(retry.created, false)
+  assert.equal((await myCouponWallet(app, a)).items.length, 1)
+})
+
+test('payment after three joins issues once; team quota exhaustion leaves the second payment intact', async () => {
+  const w = await world()
+  const { app, db, admin, operator, operatorId, communityId } = w
+  const product = await createOnShelfProduct(app, admin, communityId, 500)
+  const activityId = addActivity(db, communityId, w.adminUser.userId, {
+    thresholdCents: 1_000, couponFaceValueCents: 300, maxRewardedTeams: 1,
+  })
+  const a = await w.resident('甲')
+  const b = await w.resident('乙')
+  const c = await w.resident('丙')
+  const { teamId, inviteCode } = await startTeam(app, a, activityId)
+  await confirmParticipation(app, b, activityId, inviteCode)
+  await confirmParticipation(app, c, activityId, inviteCode)
+  assert.equal((await myCouponWallet(app, a)).items.length, 0, 'three seats without spend is not eligible')
+  const order = await registerOrder(app, a, { productId: product.id, quantity: 2, activityId, teamId })
+  const verified = await markVerified(app, operator, order)
+  await recordPayment(app, operator, {
+    communityId, staffId: operatorId, orderId: verified.id,
+    amountCents: 1_000, evidenceRef: 'COUPON-PAID-AFTER-THREE',
+  })
+  assert.equal((await myCouponWallet(app, a)).items.length, 1)
+  assert.equal(issueEligibleTeamCoupons(db, activityId, teamId), 'already_issued')
+  assert.equal(issueEligibleTeamCoupons(db, activityId, teamId), 'already_issued')
+
+  const d = await w.resident('丁')
+  const e = await w.resident('戊')
+  const f = await w.resident('己')
+  const second = await startTeam(app, d, activityId)
+  await confirmParticipation(app, e, activityId, second.inviteCode)
+  await confirmParticipation(app, f, activityId, second.inviteCode)
+  const secondOrder = await registerOrder(app, d, {
+    productId: product.id, quantity: 2, activityId, teamId: second.teamId,
+  })
+  const secondVerified = await markVerified(app, operator, secondOrder)
+  await recordPayment(app, operator, {
+    communityId, staffId: operatorId, orderId: secondVerified.id,
+    amountCents: 1_000, evidenceRef: 'COUPON-QUOTA-EXHAUSTED',
+  })
+  assert.equal(issueEligibleTeamCoupons(db, activityId, second.teamId), 'exhausted')
+  assert.equal((await myCouponWallet(app, d)).items.length, 0, 'budget exhausted: no partial team reward')
+  assert.equal(db.select().from(couponTeamGrants).all().length, 1)
+  assert.equal(db.select().from(couponIssues).all().length, 3)
+  assert.ok(db.select().from(ledgerPaymentOrderLinks).where(eq(ledgerPaymentOrderLinks.orderId, secondVerified.id)).get(),
+    'valid receipt must survive budget exhaustion')
+  const stock = await couponStock(app, operator, activityId)
+  assert.equal(stock.issuedTeams, 1)
+  assert.equal(stock.remainingTeams, 0)
+  assert.equal(stock.issuedValueCents, stock.totalBudgetCents)
+
+  const outsider = await w.resident('不相关居民')
+  assert.deepEqual((await myCouponWallet(app, outsider)).items, [], 'wallet ownership stays server-scoped')
+  const noStaff = await api(app, 'GET', route(PURCHASE_REWARD_ROUTES.staffCouponStock, activityId), {
+    session: outsider,
+  })
+  assert.equal(noStaff.status, 401)
+  const otherCommunity = await createCommunity(app, admin, '别的社区')
+  const otherActivity = addActivity(db, otherCommunity, w.adminUser.userId)
+  const crossCommunity = await api(app, 'GET', route(PURCHASE_REWARD_ROUTES.staffCouponStock, otherActivity), {
+    session: operator,
+  })
+  assert.equal(crossCommunity.status, 403)
+})
+
+test('failure inserting the second coupon rolls back third seat, grant, budget and first coupon', async () => {
+  const w = await world()
+  const { app, db, sqlite, admin, operator, operatorId, communityId } = w
+  const product = await createOnShelfProduct(app, admin, communityId, 500)
+  const activityId = addActivity(db, communityId, w.adminUser.userId, {
+    thresholdCents: 1_000, couponFaceValueCents: 250, maxRewardedTeams: 1,
+  })
+  const a = await w.resident('甲')
+  const b = await w.resident('乙')
+  const c = await w.resident('丙')
+  const { teamId, inviteCode } = await startTeam(app, a, activityId)
+  await confirmParticipation(app, b, activityId, inviteCode)
+  const order = await registerOrder(app, a, { productId: product.id, quantity: 2, activityId, teamId })
+  const verified = await markVerified(app, operator, order)
+  await recordPayment(app, operator, {
+    communityId, staffId: operatorId, orderId: verified.id,
+    amountCents: 1_000, evidenceRef: 'COUPON-ROLLBACK-SECOND',
+  })
+  sqlite.exec(`CREATE TRIGGER test_reject_second_coupon
+    BEFORE INSERT ON coupon_issues WHEN NEW.seat_no = 2
+    BEGIN SELECT RAISE(ABORT, 'test second coupon refused'); END`)
+  try {
+    const failed = await api(app, 'POST', `/activities/${activityId}/participation`, {
+      session: c, origin: RESIDENT_ORIGIN, body: { inviteCode },
+    })
+    assert.ok(failed.status >= 500, 'a DB failure cannot claim joining/funding succeeded')
+    assert.equal(db.select().from(couponTeamGrants).all().length, 0)
+    assert.equal(db.select().from(couponIssues).all().length, 0)
+    assert.equal(db.select().from(couponIssueEvents).all().length, 0)
+    assert.equal((await myProgress(app, a, activityId)).progress?.seatsFilled, 2)
+  } finally {
+    sqlite.exec('DROP TRIGGER test_reject_second_coupon')
+  }
+  await confirmParticipation(app, c, activityId, inviteCode)
+  assert.equal(db.select().from(couponIssues).all().length, 3)
+  assert.equal((await couponStock(app, operator, activityId)).issuedTeams, 1)
 })
