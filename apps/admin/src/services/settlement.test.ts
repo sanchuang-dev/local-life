@@ -3,18 +3,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   CreateSettlementMappingRequest,
   CreateSettlementPartyRequest,
+  CreateSettlementRuleRequest,
   SettlementMapping,
   SettlementOrderPartySnapshot,
   SettlementParty,
+  SettlementRuleVersion,
 } from '@sanchuang-dev/local-life-contracts'
 import { LocalApiError } from './localApi'
 import {
   SETTLEMENT_PARTY_ROLE_LABELS,
+  SETTLEMENT_PROCESSOR_FEE_OWNER_LABELS,
+  SETTLEMENT_RULE_FIXED_POLICY_LABELS,
+  SETTLEMENT_RULE_PARTY_KEY_LABELS,
   confirmSettlementOrderParty,
   createSettlementMapping,
   createSettlementParty,
+  createSettlementRuleVersion,
   listSettlementMappings,
   listSettlementParties,
+  listSettlementRuleVersions,
   readSettlementOrderParty,
   type SettlementOrderPartyResponse,
 } from './settlement'
@@ -600,5 +607,278 @@ describe('confirmSettlementOrderParty', () => {
     expect(failure).not.toBeInstanceOf(LocalApiError)
     expect(failure).toBeInstanceOf(Error)
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* #221 — contract rule versions (human-attested, server-numbered)            */
+/* -------------------------------------------------------------------------- */
+
+const RULE_ID = '123e4567-e89b-42d3-a456-426614174601'
+
+const CREATE_RULE_REQUEST: CreateSettlementRuleRequest = {
+  mappingId: MAPPING_ID,
+  agreementRef: '合作协议 2026-001',
+  approvalEvidenceRef: '合同审批单 2026-1101',
+  approvalOn: '2026-10-28',
+  effectiveFrom: '2026-11-01',
+  effectiveTo: '2026-12-31',
+  feeBase: 'actual_received',
+  processorFeeBps: 60,
+  processorFeeOwner: 'seller',
+  ratesBps: { seller: 6000, sanchuang: 2500, guangdian: 1500 },
+  roundingRecipient: 'guangdian',
+  roundingPolicy: 'floor_then_named_remainder',
+  processorFeeRounding: 'floor',
+  reversalPolicy: 'full_reversal_blocks',
+  partialRefundPolicy: 'unsupported_blocks',
+}
+
+const RULE_VERSION: SettlementRuleVersion = {
+  id: RULE_ID,
+  mappingId: MAPPING_ID,
+  version: 3,
+  communityId: COMMUNITY_ID,
+  productId: PRODUCT_ID,
+  sellerPartyId: SELLER_PARTY_ID,
+  sanchuangPartyId: SANCHUANG_PARTY_ID,
+  guangdianPartyId: GUANGDIAN_PARTY_ID,
+  agreementRef: '合作协议 2026-001',
+  approvalEvidenceRef: '合同审批单 2026-1101',
+  approvalOn: '2026-10-28',
+  effectiveFrom: '2026-11-01',
+  effectiveTo: '2026-12-31',
+  feeBase: 'actual_received',
+  processorFeeBps: 60,
+  processorFeeOwner: 'seller',
+  ratesBps: { seller: 6000, sanchuang: 2500, guangdian: 1500 },
+  roundingRecipient: 'guangdian',
+  roundingPolicy: 'floor_then_named_remainder',
+  processorFeeRounding: 'floor',
+  reversalPolicy: 'full_reversal_blocks',
+  partialRefundPolicy: 'unsupported_blocks',
+  approvalStatus: 'admin_attested',
+  approvedByUserId: USER_ID,
+  approvedAt: '2026-10-28T08:00:00.000Z',
+}
+
+describe('settlement rule labels', () => {
+  it('三方分配主体标签与主体登记口径一致', () => {
+    expect(SETTLEMENT_RULE_PARTY_KEY_LABELS).toEqual({
+      seller: '商品销售商户',
+      sanchuang: '三创主体',
+      guangdian: '广电主体',
+    })
+  })
+
+  it('手续费承担主体标签包含 none 的四选项', () => {
+    expect(SETTLEMENT_PROCESSOR_FEE_OWNER_LABELS).toEqual({
+      none: '无',
+      seller: '由销售商户承担',
+      sanchuang: '由三创承担',
+      guangdian: '由广电承担',
+    })
+  })
+
+  it('固定策略说明以只读文案给出，且不宣称可以自行选择口径', () => {
+    expect(SETTLEMENT_RULE_FIXED_POLICY_LABELS).toEqual({
+      feeBase: '按实际到账金额计算（#166 收款凭据），不是订单金额',
+      roundingPolicy: '先向下取整分摊，剩余分币归指定主体',
+      processorFeeRounding: '手续费向下取整',
+      reversalPolicy: '整单冲正即阻断结算',
+      partialRefundPolicy: '不支持部分退款，一经出现即阻断',
+    })
+  })
+})
+
+describe('listSettlementRuleVersions', () => {
+  it('GET 无 query：只请求 /api/admin/settlement/rules，不补默认范围', async () => {
+    stubJson(200, { items: [RULE_VERSION] })
+
+    const versions = await listSettlementRuleVersions()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const { url, init, headers } = lastCall()
+    expect(url).toBe('/api/admin/settlement/rules')
+    expect(init.method).toBe('GET')
+    expect(init.credentials).toBe('include')
+    expect(headers['x-csrf-token']).toBeUndefined()
+    expect(init.body).toBeUndefined()
+    expect(versions).toEqual([RULE_VERSION])
+  })
+
+  it('GET 只带 communityId：只发送该参数', async () => {
+    stubJson(200, { items: [RULE_VERSION] })
+
+    await listSettlementRuleVersions({ communityId: COMMUNITY_ID })
+
+    const { url } = lastCall()
+    expect(url).toBe(
+      `/api/admin/settlement/rules?communityId=${encodeURIComponent(COMMUNITY_ID)}`,
+    )
+    expect(new URL(url, 'http://localhost').searchParams.getAll('mappingId')).toEqual([])
+  })
+
+  it('GET 只带 mappingId：只发送该参数（不夹带 communityId 默认值）', async () => {
+    stubJson(200, { items: [RULE_VERSION] })
+
+    const versions = await listSettlementRuleVersions({ mappingId: MAPPING_ID })
+
+    const { url } = lastCall()
+    expect(url).toBe(`/api/admin/settlement/rules?mappingId=${encodeURIComponent(MAPPING_ID)}`)
+    expect(new URL(url, 'http://localhost').searchParams.getAll('communityId')).toEqual([])
+    expect(versions).toEqual([RULE_VERSION])
+  })
+
+  it('GET 两个筛选同时给出：两个参数都发送', async () => {
+    stubJson(200, { items: [] })
+
+    await listSettlementRuleVersions({ communityId: COMMUNITY_ID, mappingId: MAPPING_ID })
+
+    const { url } = lastCall()
+    expect(url).toBe(
+      `/api/admin/settlement/rules?communityId=${encodeURIComponent(COMMUNITY_ID)}` +
+        `&mappingId=${encodeURIComponent(MAPPING_ID)}`,
+    )
+  })
+
+  it('真实空态：没有登记过规则时返回空数组', async () => {
+    stubJson(200, { items: [] })
+
+    await expect(listSettlementRuleVersions()).resolves.toEqual([])
+  })
+
+  it('请求失败不得被当成空数组：403 冒泡', async () => {
+    stubJson(403, { error: { code: 'forbidden', message: '无权查看合作分成合同' } })
+
+    const failure = await listSettlementRuleVersions().catch((cause: unknown) => cause)
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).status).toBe(403)
+    expect((failure as LocalApiError).code).toBe('forbidden')
+    expect((failure as LocalApiError).message).toBe('无权查看合作分成合同')
+  })
+
+  it('响应不符合契约：抛 invalid_response，不返回空数组', async () => {
+    stubJson(200, {})
+
+    const failure = await listSettlementRuleVersions().catch((cause: unknown) => cause)
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).code).toBe('invalid_response')
+  })
+})
+
+describe('createSettlementRuleVersion', () => {
+  it('POST：带 CSRF、body 等于契约字段，201 单对象解析且版本号来自响应', async () => {
+    stubJson(201, RULE_VERSION)
+
+    const created = await createSettlementRuleVersion('csrf-token-rule', CREATE_RULE_REQUEST)
+
+    const { url, init, headers } = lastCall()
+    expect(url).toBe('/api/admin/settlement/rules')
+    expect(init.method).toBe('POST')
+    expect(headers['x-csrf-token']).toBe('csrf-token-rule')
+    expect(headers['content-type']).toBe('application/json')
+    expect(JSON.parse(String(init.body))).toEqual(CREATE_RULE_REQUEST)
+    expect(created).toEqual(RULE_VERSION)
+    // Version / approval facts come from the server response only.
+    expect(created.version).toBe(3)
+    expect(created.approvalStatus).toBe('admin_attested')
+    expect(created.approvedByUserId).toBe(USER_ID)
+    // The client cannot submit server-owned fields: the strict contract drops none.
+    expect(JSON.parse(String(init.body))).not.toHaveProperty('version')
+    expect(JSON.parse(String(init.body))).not.toHaveProperty('approvalStatus')
+  })
+
+  it('409 冲突（期限重叠/映射无效）冒泡，不伪造成功', async () => {
+    stubJson(409, {
+      error: { code: 'conflict', message: '合同编号或有效期不匹配已核验销售商户映射' },
+    })
+
+    const failure = await createSettlementRuleVersion('csrf-token-rule', CREATE_RULE_REQUEST).catch(
+      (cause: unknown) => cause,
+    )
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).status).toBe(409)
+    expect((failure as LocalApiError).code).toBe('conflict')
+    expect((failure as LocalApiError).message).toBe('合同编号或有效期不匹配已核验销售商户映射')
+  })
+
+  it('401 未登录冒泡', async () => {
+    stubJson(401, { error: { code: 'unauthorized', message: '请先登录管理后台' } })
+
+    const failure = await createSettlementRuleVersion('csrf-token-rule', CREATE_RULE_REQUEST).catch(
+      (cause: unknown) => cause,
+    )
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).status).toBe(401)
+    expect((failure as LocalApiError).code).toBe('unauthorized')
+  })
+
+  it('403（非管理员或 CSRF 失败）冒泡', async () => {
+    stubJson(403, { error: { code: 'forbidden', message: '仅管理员可登记已核准合同版本' } })
+
+    const failure = await createSettlementRuleVersion('csrf-token-rule', CREATE_RULE_REQUEST).catch(
+      (cause: unknown) => cause,
+    )
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).status).toBe(403)
+    expect((failure as LocalApiError).code).toBe('forbidden')
+    expect((failure as LocalApiError).message).toBe('仅管理员可登记已核准合同版本')
+  })
+
+  it('201 响应缺少 version / approvalStatus：抛 invalid_response，不当作创建成功', async () => {
+    const { version: _version, approvalStatus: _approvalStatus, ...withoutServerFields } =
+      RULE_VERSION
+    expect(_version).toBe(3)
+    expect(_approvalStatus).toBe('admin_attested')
+    stubJson(201, withoutServerFields)
+
+    const failure = await createSettlementRuleVersion('csrf-token-rule', CREATE_RULE_REQUEST).catch(
+      (cause: unknown) => cause,
+    )
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).code).toBe('invalid_response')
+  })
+
+  describe('共享契约在发请求前拒绝非法规则', () => {
+    const invalidCases: Array<{ name: string; request: CreateSettlementRuleRequest }> = [
+      {
+        name: '三方基点合计 ≠ 10000',
+        request: { ...CREATE_RULE_REQUEST, ratesBps: { seller: 6000, sanchuang: 2500, guangdian: 1000 } },
+      },
+      {
+        name: 'effectiveTo 早于 effectiveFrom',
+        request: { ...CREATE_RULE_REQUEST, effectiveFrom: '2026-12-31', effectiveTo: '2026-11-01' },
+      },
+      {
+        name: 'approvalOn 晚于 effectiveFrom',
+        request: { ...CREATE_RULE_REQUEST, approvalOn: '2026-11-02' },
+      },
+      {
+        name: 'processorFeeBps=0 但 owner≠none',
+        request: { ...CREATE_RULE_REQUEST, processorFeeBps: 0, processorFeeOwner: 'seller' },
+      },
+      {
+        name: 'processorFeeBps>0 但 owner=none',
+        request: { ...CREATE_RULE_REQUEST, processorFeeOwner: 'none' },
+      },
+    ]
+
+    it.each(invalidCases)('$name：本地拒绝且不发请求', async ({ request }) => {
+      const failure = await createSettlementRuleVersion('csrf-token-rule', request).catch(
+        (cause: unknown) => cause,
+      )
+
+      expect(failure).not.toBeInstanceOf(LocalApiError)
+      expect(failure).toBeInstanceOf(Error)
+      expect(String((failure as Error).message)).toMatch(/ratesBps|effectiveTo|approvalOn|processorFeeOwner/u)
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
   })
 })
