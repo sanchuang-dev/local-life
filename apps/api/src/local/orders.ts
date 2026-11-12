@@ -1041,7 +1041,7 @@ export function verifyOrder(
           '订单已被其他操作核验，请刷新后重试',
         )
       }
-      if (body.decision === 'rejected') {
+      if (body.decision === 'reject') {
         releaseUnpaidOrderCoupon(tx, orderId, now)
       } else {
         // Invalidated source coupons cannot be turned into a valid order by
