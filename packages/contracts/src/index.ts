@@ -1694,7 +1694,12 @@ export const localOrderSnapshotSchema = z
     productName: z.string().min(1),
     unitPriceCents: z.number().int().nonnegative(),
     quantity: z.number().int().min(1).max(99),
+    /** Historical totalCents is the immutable product gross. */
     totalCents: z.number().int().nonnegative(),
+    /** Exactly one whole coupon or none; never an adjustable client discount. */
+    couponId: z.string().uuid().nullable(),
+    couponDiscountCents: z.number().int().nonnegative(),
+    netPayableCents: z.number().int().nonnegative(),
   })
   .superRefine((snapshot, ctx) => {
     if (snapshot.totalCents !== snapshot.unitPriceCents * snapshot.quantity) {
@@ -1703,6 +1708,11 @@ export const localOrderSnapshotSchema = z
         message: 'totalCents must equal unitPriceCents * quantity',
         path: ['totalCents'],
       })
+    }
+    if (snapshot.netPayableCents !== snapshot.totalCents - snapshot.couponDiscountCents ||
+        snapshot.couponDiscountCents > snapshot.totalCents ||
+        (snapshot.couponId === null) !== (snapshot.couponDiscountCents === 0)) {
+      ctx.addIssue({ code: 'custom', path: ['netPayableCents'], message: 'netPayableCents must equal gross minus one whole coupon' })
     }
   })
 export type LocalOrderSnapshot = z.infer<typeof localOrderSnapshotSchema>
@@ -1816,6 +1826,8 @@ export const createLocalOrderRequestSchema = z.strictObject({
    * that exact activity. A team is never inferred from the activity.
    */
   sourceTeamId: z.string().uuid().optional(),
+  /** Optional single-use owner coupon; its value is always read from SQLite. */
+  couponId: z.string().uuid().optional(),
   /** Client-generated UUID; a replay returns the same order instead of a second one. */
   idempotencyKey: z.string().uuid(),
 })
