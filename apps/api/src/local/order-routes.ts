@@ -6,6 +6,7 @@ import {
   createLocalOrderOnBehalfRequestSchema,
   createLocalOrderRequestSchema,
   localOrderListQuerySchema,
+  localOrderTeamOptionsQuerySchema,
   localOrderVerifyRequestSchema,
   updateLocalOrderStatusRequestSchema,
   type ApiErrorCode,
@@ -17,6 +18,7 @@ import {
   getMyOrder,
   getStaffOrder,
   listMyOrders,
+  listMyTeamOptions,
   listOrderEvents,
   listStaffOrders,
   registerOrderOnBehalf,
@@ -171,6 +173,22 @@ export function registerLocalOrderRoutes(
     try {
       const result = registerResidentOrder(db, guard.actor, body)
       return c.json(result, result.created ? 201 : 200)
+    } catch (error) {
+      return failWithLocalError(c, error)
+    }
+  })
+
+  // Registered before `/local-orders/:localOrderId`, otherwise Hono would treat
+  // `team-options` as an order id and answer 404.
+  app.get(LOCAL_ORDER_ROUTES.myTeamOptions, (c) => {
+    const guard = requireResident(c)
+    if (guard instanceof Response) return guard
+    const query = localOrderTeamOptionsQuerySchema.safeParse(queryObject(c))
+    if (!query.success) {
+      return fail(c, 400, API_ERROR_CODES.invalidRequest, '查询参数不正确')
+    }
+    try {
+      return c.json(listMyTeamOptions(db, guard.actor, query.data.productId))
     } catch (error) {
       return failWithLocalError(c, error)
     }
