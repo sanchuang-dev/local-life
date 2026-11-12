@@ -5,6 +5,7 @@ import {
   buildLocalOrderCouponOptions,
   chooseUsableCoupon,
   couponUnavailableReason,
+  hasUnresolvedCouponSelection,
   localOrderAmountLines,
   shortCouponId,
 } from '../src/components/life/localOrderCoupon.ts'
@@ -166,6 +167,21 @@ test('only one coupon can be selected even when several are usable', () => {
     chooseUsableCoupon(options, '123e4567-e89b-42d3-a456-4266141740ff'),
     null,
   )
+})
+
+test('a previously selected coupon cannot silently become a full-price order when wallet reload fails or becomes empty', () => {
+  const selected = COUPON_ID
+  const emptyWalletSelection = chooseUsableCoupon([], selected)
+  assert.equal(emptyWalletSelection, null)
+  assert.equal(hasUnresolvedCouponSelection(selected, emptyWalletSelection), true)
+  assert.equal(hasUnresolvedCouponSelection(selected, null), true)
+  assert.equal(hasUnresolvedCouponSelection(null, null), false)
+
+  const usable = buildLocalOrderCouponOptions([coupon()], {
+    grossCents: 5_000,
+    communityId: COMMUNITY_ID,
+  })
+  assert.equal(hasUnresolvedCouponSelection(selected, chooseUsableCoupon(usable, selected)), false)
 })
 
 test('the submitted payload carries only the coupon id, never a client amount', () => {
