@@ -7,6 +7,7 @@ import type {
   SettlementMapping,
   SettlementOrderPartySnapshot,
   SettlementParty,
+  SettlementQuoteResponse,
   SettlementRuleVersion,
 } from '@sanchuang-dev/local-life-contracts'
 import { LocalApiError } from './localApi'
@@ -22,6 +23,7 @@ import {
   listSettlementMappings,
   listSettlementParties,
   listSettlementRuleVersions,
+  quoteSettlementOrder,
   readSettlementOrderParty,
   type SettlementOrderPartyResponse,
 } from './settlement'
@@ -880,5 +882,183 @@ describe('createSettlementRuleVersion', () => {
       expect(String((failure as Error).message)).toMatch(/ratesBps|effectiveTo|approvalOn|processorFeeOwner/u)
       expect(fetchMock).not.toHaveBeenCalled()
     })
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* #222 — single-order trial quote (POST + CSRF, simulation only)            */
+/* -------------------------------------------------------------------------- */
+
+const QUOTE_RECEIPT_ENTRY_ID = '123e4567-e89b-42d3-a456-426614174301'
+
+const QUOTE_CALCULATED: SettlementQuoteResponse = {
+  orderId: ORDER_ID,
+  quoteOnly: true,
+  status: 'calculated',
+  rule: RULE_VERSION,
+  allocation: {
+    grossReceivedCents: 12_800,
+    processorFeeCents: 76,
+    sellerNetCents: 7_634,
+    sanchuangNetCents: 3_181,
+    guangdianNetCents: 1_909,
+    totalNetCents: 12_724,
+    conservedTotalCents: 12_800,
+    roundingResidualCents: 1,
+  },
+  payableAmountCents: null,
+  blockingReasons: [],
+  receiptEntryId: QUOTE_RECEIPT_ENTRY_ID,
+  sellerPartyId: SELLER_PARTY_ID,
+  sanchuangPartyId: SANCHUANG_PARTY_ID,
+  guangdianPartyId: GUANGDIAN_PARTY_ID,
+}
+
+const QUOTE_PENDING_RULE: SettlementQuoteResponse = {
+  orderId: ORDER_ID,
+  quoteOnly: true,
+  status: 'pending_rule',
+  rule: null,
+  allocation: null,
+  payableAmountCents: null,
+  blockingReasons: ['missing_approved_rule'],
+  receiptEntryId: QUOTE_RECEIPT_ENTRY_ID,
+  sellerPartyId: SELLER_PARTY_ID,
+  sanchuangPartyId: null,
+  guangdianPartyId: null,
+}
+
+const QUOTE_BLOCKED: SettlementQuoteResponse = {
+  ...QUOTE_PENDING_RULE,
+  status: 'blocked',
+  blockingReasons: ['order_not_verified', 'missing_receipt'],
+}
+
+describe('quoteSettlementOrder', () => {
+  it('成功 calculated：POST /api/admin/settlement/quotes、带 CSRF、body 严格只有 orderId', async () => {
+    stubJson(200, QUOTE_CALCULATED)
+
+    const quote = await quoteSettlementOrder('csrf-token-quote', ORDER_ID)
+
+    const { url, init, headers } = lastCall()
+    expect(url).toBe('/api/admin/settlement/quotes')
+    // Read-only in meaning, but the contract fixes POST + CSRF: never a GET.
+    expect(init.method).toBe('POST')
+    expect(init.credentials).toBe('include')
+    expect(headers['x-csrf-token']).toBe('csrf-token-quote')
+    expect(headers['content-type']).toBe('application/json')
+    const body: unknown = JSON.parse(String(init.body))
+    expect(body).toEqual({ orderId: ORDER_ID })
+    // Strict request object: no extra field may be smuggled in.
+    expect(Object.keys(body as Record<string, unknown>)).toEqual(['orderId'])
+
+    expect(quote).toEqual(QUOTE_CALCULATED)
+    expect(quote.quoteOnly).toBe(true)
+    // The simulation never reports a payable amount.
+    expect(quote.payableAmountCents).toBeNull()
+    expect(quote.status).toBe('calculated')
+  })
+
+  it('pending_rule：rule/allocation 原样为 null，不被误当 0', async () => {
+    stubJson(200, QUOTE_PENDING_RULE)
+
+    const quote = await quoteSettlementOrder('csrf-token-quote', ORDER_ID)
+
+    expect(quote).toEqual(QUOTE_PENDING_RULE)
+    expect(quote.status).toBe('pending_rule')
+    expect(quote.rule).toBeNull()
+    expect(quote.allocation).toBeNull()
+    expect(quote.payableAmountCents).toBeNull()
+  })
+
+  it('blocked：blockingReasons 原样透出', async () => {
+    stubJson(200, QUOTE_BLOCKED)
+
+    const quote = await quoteSettlementOrder('csrf-token-quote', ORDER_ID)
+
+    expect(quote.status).toBe('blocked')
+    expect(quote.allocation).toBeNull()
+    expect(quote.blockingReasons).toEqual(['order_not_verified', 'missing_receipt'])
+  })
+
+  it('响应 quoteOnly=false（非法）：抛 invalid_response，不当作试算成功', async () => {
+    stubJson(200, { ...QUOTE_CALCULATED, quoteOnly: false })
+
+    const failure = await quoteSettlementOrder('csrf-token-quote', ORDER_ID).catch(
+      (cause: unknown) => cause,
+    )
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).code).toBe('invalid_response')
+  })
+
+  it('响应 payableAmountCents 非 null（非法）：抛 invalid_response，绝不透出 payable 数字', async () => {
+    stubJson(200, { ...QUOTE_CALCULATED, payableAmountCents: 12_724 })
+
+    const failure = await quoteSettlementOrder('csrf-token-quote', ORDER_ID).catch(
+      (cause: unknown) => cause,
+    )
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).code).toBe('invalid_response')
+  })
+
+  it('403 冒泡：真实 status/code/message 保留', async () => {
+    stubJson(403, { error: { code: 'forbidden', message: '无权查看合作分成合同' } })
+
+    const failure = await quoteSettlementOrder('csrf-token-quote', ORDER_ID).catch(
+      (cause: unknown) => cause,
+    )
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).status).toBe(403)
+    expect((failure as LocalApiError).code).toBe('forbidden')
+    expect((failure as LocalApiError).message).toBe('无权查看合作分成合同')
+  })
+
+  it('400 与 404 冒泡：订单不存在/参数错误不被吞成未试算', async () => {
+    stubJson(404, { error: { code: 'not_found', message: '本地订单不存在' } })
+
+    const missing = await quoteSettlementOrder('csrf-token-quote', ORDER_ID).catch(
+      (cause: unknown) => cause,
+    )
+    expect(missing).toBeInstanceOf(LocalApiError)
+    expect((missing as LocalApiError).status).toBe(404)
+    expect((missing as LocalApiError).code).toBe('not_found')
+
+    stubJson(400, { error: { code: 'invalid_request', message: '订单 ID 不正确' } })
+
+    const invalid = await quoteSettlementOrder('csrf-token-quote', ORDER_ID).catch(
+      (cause: unknown) => cause,
+    )
+    expect(invalid).toBeInstanceOf(LocalApiError)
+    expect((invalid as LocalApiError).status).toBe(400)
+    expect((invalid as LocalApiError).code).toBe('invalid_request')
+  })
+
+  it('网络失败：LocalApiError status 0、code network_error', async () => {
+    stubRejection(new TypeError('Failed to fetch'))
+
+    const failure = await quoteSettlementOrder('csrf-token-quote', ORDER_ID).catch(
+      (cause: unknown) => cause,
+    )
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).status).toBe(0)
+    expect((failure as LocalApiError).code).toBe('network_error')
+  })
+
+  it.each([
+    { name: '空字符串', orderId: '' },
+    { name: '非 UUID', orderId: 'order-1' },
+    { name: '仅空白', orderId: '   ' },
+  ])('orderId $name：共享契约本地拒绝，不发请求', async ({ orderId }) => {
+    const failure = await quoteSettlementOrder('csrf-token-quote', orderId).catch(
+      (cause: unknown) => cause,
+    )
+
+    expect(failure).not.toBeInstanceOf(LocalApiError)
+    expect(failure).toBeInstanceOf(Error)
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })
