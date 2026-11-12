@@ -293,7 +293,9 @@ export function SettlementCandidatePanel() {
       render: (_value, row) => (
         <Space orientation="vertical" size={2}>
           <span>{formatCents(row.registeredAmountCents)}</span>
-          <Typography.Text type="secondary">订单登记金额，不是收款凭据</Typography.Text>
+          <Typography.Text type="secondary">优惠券抵扣：{formatCents(row.couponDiscountCents)}</Typography.Text>
+          <Typography.Text type="secondary">订单净应付：{formatCents(row.netPayableCents)}</Typography.Text>
+          <Typography.Text type="secondary">订单金额不是实收凭据</Typography.Text>
         </Space>
       ),
     },
@@ -690,6 +692,10 @@ function CandidateDetail({ row }: { row: SettlementCandidate }) {
             <span className="ledger-diff-number-value">
               {formatCents(row.registeredAmountCents)}
             </span>
+            <p className="ledger-diff-hint">
+              优惠券抵扣：{formatCents(row.couponDiscountCents)}；订单净应付：{formatCents(row.netPayableCents)}。
+              净应付由服务端返回，不代表凭据实收。
+            </p>
             <p className="ledger-diff-hint">
               下单时登记的账面金额；不是收款凭据，也不代表业务已办理或款项已经收到。
             </p>
