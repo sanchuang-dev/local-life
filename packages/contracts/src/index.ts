@@ -2125,6 +2125,158 @@ export type LocalOrderTeamOptionListResponse = z.infer<
   typeof localOrderTeamOptionListResponseSchema
 >
 
+/* -------------------------------------------------------------------------- */
+/* Consumption-team effective paid progress (#210 LL-PUR-005)                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One member's contribution to the current consumption team.
+ *
+ * This reuses the participation roster shape (seat, display name, role, self
+ * marker, join time) and adds only the amount that member actually contributed.
+ * Resident ids and order ids stay server-side: the H5 needs a name and an amount,
+ * not an address book or an order directory.
+ */
+export const purchaseRewardMemberContributionSchema = participationTeamMemberSchema
+  .strict()
+  .extend({
+    /**
+     * Net effective paid amount in integer cents. Only verified local orders
+     * created after this member joined, with exactly one linked receipt that is
+     * not fully reversed, may contribute.
+     */
+    contributionCents: z.number().int().nonnegative(),
+  })
+
+export type PurchaseRewardMemberContribution = z.infer<
+  typeof purchaseRewardMemberContributionSchema
+>
+
+/**
+ * The read-only progress of one current team.
+ *
+ * `thresholdCents` is copied from the same public plan returned alongside this
+ * object. `remainingCents` is never negative; it reports how much more effective
+ * paid amount the team needs, independently of whether the team is already full.
+ * `eligible` is therefore true only for a full three-person team whose total has
+ * reached the threshold.
+ */
+export const purchaseRewardTeamProgressSchema = z
+  .strictObject({
+    teamId: z.string().uuid(),
+    teamStatus: participationTeamStatusSchema,
+    seatsFilled: z.number().int().min(0).max(3),
+    teamFull: z.boolean(),
+    membersContributionCents: z.array(purchaseRewardMemberContributionSchema).max(3),
+    totalEffectivePaidCents: z.number().int().nonnegative(),
+    thresholdCents: z.number().int().min(1),
+    remainingCents: z.number().int().nonnegative(),
+    eligible: z.boolean(),
+  })
+  .superRefine((progress, ctx) => {
+    if (progress.seatsFilled !== progress.membersContributionCents.length) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'seatsFilled must equal the number of listed contributions',
+        path: ['seatsFilled'],
+      })
+    }
+    if (progress.teamFull !== (progress.seatsFilled === 3)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'teamFull must mean exactly three filled seats',
+        path: ['teamFull'],
+      })
+    }
+    const sum = progress.membersContributionCents.reduce(
+      (total, member) => total + member.contributionCents,
+      0,
+    )
+    if (sum !== progress.totalEffectivePaidCents) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'totalEffectivePaidCents must equal the sum of member contributions',
+        path: ['totalEffectivePaidCents'],
+      })
+    }
+    if (progress.remainingCents !== Math.max(0, progress.thresholdCents - sum)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'remainingCents must be the non-negative distance to the threshold',
+        path: ['remainingCents'],
+      })
+    }
+    if (progress.eligible !== (progress.teamFull && sum >= progress.thresholdCents)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'eligible requires both a full team and the reached threshold',
+        path: ['eligible'],
+      })
+    }
+  })
+
+export type PurchaseRewardTeamProgress = z.infer<typeof purchaseRewardTeamProgressSchema>
+
+/**
+ * Resident response. `plan: null` means the activity promises no consumption
+ * reward; `progress: null` means the resident has no current team (or there is no
+ * plan to measure against). Neither absence is represented as a zero-value team.
+ */
+export const purchaseRewardProgressResponseSchema = z
+  .strictObject({
+    activityId: z.string().uuid(),
+    activityTitle: z.string().min(1),
+    plan: publicPurchaseRewardSchema.nullable(),
+    progress: purchaseRewardTeamProgressSchema.nullable(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.progress !== null && value.plan === null) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'team progress is impossible without a purchase reward plan',
+        path: ['progress'],
+      })
+    }
+    if (
+      value.progress !== null &&
+      value.plan !== null &&
+      value.progress.thresholdCents !== value.plan.thresholdCents
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'progress.thresholdCents must match the public plan threshold',
+        path: ['progress', 'thresholdCents'],
+      })
+    }
+  })
+
+export type PurchaseRewardProgressResponse = z.infer<
+  typeof purchaseRewardProgressResponseSchema
+>
+
+/** Staff read-only list of every current team of one activity. */
+export const purchaseRewardProgressListResponseSchema = z
+  .strictObject({
+    activityId: z.string().uuid(),
+    activityTitle: z.string().min(1),
+    plan: publicPurchaseRewardSchema.nullable(),
+    items: z.array(purchaseRewardTeamProgressSchema),
+    asOf: isoTimestamp,
+  })
+  .superRefine((value, ctx) => {
+    if (value.plan === null && value.items.length > 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'an activity without a plan cannot expose team progress',
+        path: ['items'],
+      })
+    }
+  })
+
+export type PurchaseRewardProgressListResponse = z.infer<
+  typeof purchaseRewardProgressListResponseSchema
+>
+
 export * from './identity.js'
 export * from './crmeb.js'
 export * from './rewards.js'
