@@ -124,7 +124,7 @@ export function buildPurchaseRewardSummary(
       ...shared,
       kind: 'qualified',
       label: '团队已达标',
-      detail: `团队有效实付 ${formatCents(totalCents)} 已达门槛 ${formatCents(thresholdCents)}，三位团员各获一张 ${formatCents(faceValueCents)} 消费券。`,
+      detail: `团队有效实付 ${formatCents(totalCents)} 已达门槛 ${formatCents(thresholdCents)}，是否成功发券请以下方本人券包记录为准。`,
       tone: 'teal',
     }
   }
