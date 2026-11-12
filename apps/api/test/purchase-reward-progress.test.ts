@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
+import { eq } from 'drizzle-orm'
 import {
   API_ERROR_CODES,
   PURCHASE_REWARD_ROUTES,
@@ -11,6 +12,8 @@ import {
   localProductDetailSchema,
   purchaseRewardProgressListResponseSchema,
   purchaseRewardProgressResponseSchema,
+  couponWalletResponseSchema,
+  couponStockResponseSchema,
   type ActivityStatus,
   type LedgerEntry,
   type LocalOrderDetail,
@@ -23,10 +26,16 @@ import { loadConfig } from '../src/config.js'
 import { createDatabase, type AppDatabase } from '../src/db/client.js'
 import {
   activities,
+  activityRuleVersions,
+  couponIssues,
+  couponTeamGrants,
+  couponIssueEvents,
+  ledgerPaymentOrderLinks,
   staffAccounts,
   users,
 } from '../src/db/schema.js'
 import { hashPassword } from '../src/auth/security.js'
+import { issueEligibleTeamCoupons } from '../src/purchase-reward/coupon-issuance.js'
 import { confirmCommunityOrFail } from './resident-community-fixtures.js'
 
 const migrationsFolder = fileURLToPath(new URL('../db/migrations', import.meta.url))
@@ -240,6 +249,7 @@ interface ActivityOptions {
   status?: ActivityStatus
   thresholdCents?: number | null
   couponFaceValueCents?: number
+  maxRewardedTeams?: number
 }
 
 function addActivity(
@@ -253,6 +263,12 @@ function addActivity(
   const thresholdCents = options.thresholdCents ?? 12_000
   const endsAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
   const id = randomUUID()
+  const startsAt = new Date(now.getTime() - 60 * 60 * 1000)
+  const purchasePlan = options.thresholdCents === null ? null : {
+    thresholdCents,
+    couponFaceValueCents: options.couponFaceValueCents ?? 2_000,
+    maxRewardedTeams: options.maxRewardedTeams ?? 5,
+  }
   db.insert(activities)
     .values({
       id,
@@ -261,19 +277,13 @@ function addActivity(
       summary: '验证团队有效实付累计',
       description: 'LL-PUR-005 测试活动',
       status,
-      startsAt: new Date(now.getTime() - 60 * 60 * 1000),
+      startsAt,
       endsAt,
       location: '幸福社区党群服务中心',
       budgetCapCents: 100_000,
       prizeQuantityCap: 100,
       publicRulesJson: ACTIVITY_RULES_JSON,
-      purchaseRewardPlanJson: options.thresholdCents === null
-        ? null
-        : JSON.stringify({
-            thresholdCents,
-            couponFaceValueCents: options.couponFaceValueCents ?? 2_000,
-            maxRewardedTeams: 5,
-          }),
+      purchaseRewardPlanJson: purchasePlan === null ? null : JSON.stringify(purchasePlan),
       currentRuleVersionId: null,
       createdByUserId,
       createdAt: now,
@@ -283,6 +293,29 @@ function addActivity(
       endedAt: status === 'ended' ? now : null,
     })
     .run()
+  if (status !== 'draft') {
+    // Real publication creates an immutable version. Issuance never trusts the
+    // activity's mutable column when deciding the promise or coupon budget.
+    const versionId = randomUUID()
+    db.insert(activityRuleVersions).values({
+      id: versionId,
+      activityId: id,
+      version: 1,
+      snapshotJson: JSON.stringify({
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+        location: '幸福社区党群服务中心',
+        budgetCapCents: 100_000,
+        prizeQuantityCap: 100,
+        publicRules: JSON.parse(ACTIVITY_RULES_JSON),
+        ...(purchasePlan === null ? {} : { purchaseRewardPlan: purchasePlan }),
+      }),
+      createdByUserId,
+      createdAt: now,
+    }).run()
+    db.update(activities).set({ currentRuleVersionId: versionId })
+      .where(eq(activities.id, id)).run()
+  }
   return id
 }
 
