@@ -154,6 +154,8 @@ test('qualified teams and their equal three-member coupon are described from rea
   const summary = buildPurchaseRewardSummary(data.plan, data.progress)
   assert.equal(summary?.kind, 'qualified')
   assert.equal(summary.eligible, true)
+  assert.match(summary.detail, /券包记录为准/)
+  assert.doesNotMatch(summary.detail, /各获一张/)
 
   const item = coupon()
   const wallet = couponWalletResponseSchema.parse({
