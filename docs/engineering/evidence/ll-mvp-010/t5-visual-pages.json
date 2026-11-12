@@ -1,0 +1,821 @@
+[
+  {
+    "name": "life",
+    "url": "http://localhost:5173/local-life/#/life",
+    "session": "resident",
+    "viewport": "320x720",
+    "scrollWidth": 320,
+    "innerWidth": 320,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "惠生活",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "惠生活",
+        "top": 16
+      },
+      {
+        "label": "cta",
+        "expected": "我的订单",
+        "found": true,
+        "rendered": true,
+        "inViewport": false,
+        "text": "我的订单",
+        "top": 917
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\n惠生活\n\n社区本地商品 · 登记办理意向\n\n本地好物来自社区自己维护的上架商品，登记订单只提交办理意向（平台不收款、不代下单）。 优惠购保留为只读商城渠道，未配置时如实提示，不展示模拟商品。\n\n本地好物\n社区上架商品\n\n本地好物：社区上架的本地商品目录\n\n水果\n阳光社区时令水果箱 r2e2e\n邻社区商品，用于验证跨社区隔离\n¥45.00\n登记后由工作人员办理\n阳光社区\n蔬菜\n社区助农"
+  },
+  {
+    "name": "life",
+    "url": "http://localhost:5173/local-life/#/life",
+    "session": "resident",
+    "viewport": "375x812",
+    "scrollWidth": 375,
+    "innerWidth": 375,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "惠生活",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "惠生活",
+        "top": 16
+      },
+      {
+        "label": "cta",
+        "expected": "我的订单",
+        "found": true,
+        "rendered": true,
+        "inViewport": false,
+        "text": "我的订单",
+        "top": 938
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\n惠生活\n\n社区本地商品 · 登记办理意向\n\n本地好物来自社区自己维护的上架商品，登记订单只提交办理意向（平台不收款、不代下单）。 优惠购保留为只读商城渠道，未配置时如实提示，不展示模拟商品。\n\n本地好物\n社区上架商品\n\n本地好物：社区上架的本地商品目录\n\n水果\n阳光社区时令水果箱 r2e2e\n邻社区商品，用于验证跨社区隔离\n¥45.00\n登记后由工作人员办理\n阳光社区\n蔬菜\n社区助农"
+  },
+  {
+    "name": "life",
+    "url": "http://localhost:5173/local-life/#/life",
+    "session": "resident",
+    "viewport": "1440x900",
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "惠生活",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "惠生活",
+        "top": 16
+      },
+      {
+        "label": "cta",
+        "expected": "我的订单",
+        "found": true,
+        "rendered": true,
+        "inViewport": false,
+        "text": "我的订单",
+        "top": 1059
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\n惠生活\n\n社区本地商品 · 登记办理意向\n\n本地好物来自社区自己维护的上架商品，登记订单只提交办理意向（平台不收款、不代下单）。 优惠购保留为只读商城渠道，未配置时如实提示，不展示模拟商品。\n\n本地好物\n社区上架商品\n\n本地好物：社区上架的本地商品目录\n\n水果\n阳光社区时令水果箱 r2e2e\n邻社区商品，用于验证跨社区隔离\n¥45.00\n登记后由工作人员办理\n阳光社区\n蔬菜\n社区助农"
+  },
+  {
+    "name": "life-product",
+    "url": "http://localhost:5173/local-life/#/life/local-products/3329057e-f199-4ca2-870e-6e101bd4b92d",
+    "session": "resident",
+    "viewport": "320x720",
+    "scrollWidth": 320,
+    "innerWidth": 320,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "社区助农蔬菜包 r2e2e",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "社区助农蔬菜包 r2e2e",
+        "top": 60
+      },
+      {
+        "label": "cta",
+        "expected": "登记订单",
+        "found": true,
+        "rendered": true,
+        "inViewport": false,
+        "text": "登记订单 / 提交办理意向",
+        "top": 1006
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\n返回惠生活\n社区助农蔬菜包 r2e2e\n\n蔬菜 · 幸福社区\n\n蔬菜\n幸福社区\n登记办理意向\n\n社区助农蔬菜包 r2e2e\n\n当日采摘，社区服务点自提\n\n¥19.90\n/ 件 · 参考单价\n\n本页价格由社区维护，登记订单时由服务端冻结商品名称与单价快照。\n\n商品说明\n\n包含 5 种时令蔬菜，约 3 公斤。登记后由社区工作人员电话确认自提时间。\n\n登记订单 / 提交办理意向\n\n只登记办"
+  },
+  {
+    "name": "life-product",
+    "url": "http://localhost:5173/local-life/#/life/local-products/3329057e-f199-4ca2-870e-6e101bd4b92d",
+    "session": "resident",
+    "viewport": "375x812",
+    "scrollWidth": 375,
+    "innerWidth": 375,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "社区助农蔬菜包 r2e2e",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "社区助农蔬菜包 r2e2e",
+        "top": 60
+      },
+      {
+        "label": "cta",
+        "expected": "登记订单",
+        "found": true,
+        "rendered": true,
+        "inViewport": false,
+        "text": "登记订单 / 提交办理意向",
+        "top": 1047
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\n返回惠生活\n社区助农蔬菜包 r2e2e\n\n蔬菜 · 幸福社区\n\n蔬菜\n幸福社区\n登记办理意向\n\n社区助农蔬菜包 r2e2e\n\n当日采摘，社区服务点自提\n\n¥19.90\n/ 件 · 参考单价\n\n本页价格由社区维护，登记订单时由服务端冻结商品名称与单价快照。\n\n商品说明\n\n包含 5 种时令蔬菜，约 3 公斤。登记后由社区工作人员电话确认自提时间。\n\n登记订单 / 提交办理意向\n\n只登记办"
+  },
+  {
+    "name": "life-product",
+    "url": "http://localhost:5173/local-life/#/life/local-products/3329057e-f199-4ca2-870e-6e101bd4b92d",
+    "session": "resident",
+    "viewport": "1440x900",
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "社区助农蔬菜包 r2e2e",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "社区助农蔬菜包 r2e2e",
+        "top": 60
+      },
+      {
+        "label": "cta",
+        "expected": "登记订单",
+        "found": true,
+        "rendered": true,
+        "inViewport": false,
+        "text": "登记订单 / 提交办理意向",
+        "top": 1242
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\n返回惠生活\n社区助农蔬菜包 r2e2e\n\n蔬菜 · 幸福社区\n\n蔬菜\n幸福社区\n登记办理意向\n\n社区助农蔬菜包 r2e2e\n\n当日采摘，社区服务点自提\n\n¥19.90\n/ 件 · 参考单价\n\n本页价格由社区维护，登记订单时由服务端冻结商品名称与单价快照。\n\n商品说明\n\n包含 5 种时令蔬菜，约 3 公斤。登记后由社区工作人员电话确认自提时间。\n\n登记订单 / 提交办理意向\n\n只登记办"
+  },
+  {
+    "name": "life-product-guest",
+    "url": "http://localhost:5173/local-life/#/life/local-products/3329057e-f199-4ca2-870e-6e101bd4b92d",
+    "session": "guest",
+    "viewport": "320x720",
+    "scrollWidth": 320,
+    "innerWidth": 320,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "社区助农蔬菜包 r2e2e",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "社区助农蔬菜包 r2e2e",
+        "top": 60
+      },
+      {
+        "label": "cta",
+        "expected": "去登录",
+        "found": true,
+        "rendered": true,
+        "inViewport": false,
+        "text": "去登录 / 查看登录方式",
+        "top": 1089
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\n返回惠生活\n社区助农蔬菜包 r2e2e\n\n蔬菜 · 幸福社区\n\n蔬菜\n幸福社区\n登记办理意向\n\n社区助农蔬菜包 r2e2e\n\n当日采摘，社区服务点自提\n\n¥19.90\n/ 件 · 参考单价\n\n本页价格由社区维护，登记订单时由服务端冻结商品名称与单价快照。\n\n商品说明\n\n包含 5 种时令蔬菜，约 3 公斤。登记后由社区工作人员电话确认自提时间。\n\n登记订单 / 提交办理意向\n\n只登记办"
+  },
+  {
+    "name": "life-product-guest",
+    "url": "http://localhost:5173/local-life/#/life/local-products/3329057e-f199-4ca2-870e-6e101bd4b92d",
+    "session": "guest",
+    "viewport": "375x812",
+    "scrollWidth": 375,
+    "innerWidth": 375,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "社区助农蔬菜包 r2e2e",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "社区助农蔬菜包 r2e2e",
+        "top": 60
+      },
+      {
+        "label": "cta",
+        "expected": "去登录",
+        "found": true,
+        "rendered": true,
+        "inViewport": false,
+        "text": "去登录 / 查看登录方式",
+        "top": 1130
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\n返回惠生活\n社区助农蔬菜包 r2e2e\n\n蔬菜 · 幸福社区\n\n蔬菜\n幸福社区\n登记办理意向\n\n社区助农蔬菜包 r2e2e\n\n当日采摘，社区服务点自提\n\n¥19.90\n/ 件 · 参考单价\n\n本页价格由社区维护，登记订单时由服务端冻结商品名称与单价快照。\n\n商品说明\n\n包含 5 种时令蔬菜，约 3 公斤。登记后由社区工作人员电话确认自提时间。\n\n登记订单 / 提交办理意向\n\n只登记办"
+  },
+  {
+    "name": "life-product-guest",
+    "url": "http://localhost:5173/local-life/#/life/local-products/3329057e-f199-4ca2-870e-6e101bd4b92d",
+    "session": "guest",
+    "viewport": "1440x900",
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "社区助农蔬菜包 r2e2e",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "社区助农蔬菜包 r2e2e",
+        "top": 60
+      },
+      {
+        "label": "cta",
+        "expected": "去登录",
+        "found": true,
+        "rendered": true,
+        "inViewport": false,
+        "text": "去登录 / 查看登录方式",
+        "top": 1305
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\n返回惠生活\n社区助农蔬菜包 r2e2e\n\n蔬菜 · 幸福社区\n\n蔬菜\n幸福社区\n登记办理意向\n\n社区助农蔬菜包 r2e2e\n\n当日采摘，社区服务点自提\n\n¥19.90\n/ 件 · 参考单价\n\n本页价格由社区维护，登记订单时由服务端冻结商品名称与单价快照。\n\n商品说明\n\n包含 5 种时令蔬菜，约 3 公斤。登记后由社区工作人员电话确认自提时间。\n\n登记订单 / 提交办理意向\n\n只登记办"
+  },
+  {
+    "name": "my-orders",
+    "url": "http://localhost:5173/local-life/#/me/orders",
+    "session": "resident",
+    "viewport": "320x720",
+    "scrollWidth": 320,
+    "innerWidth": 320,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "我的订单",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "我的订单",
+        "top": 60
+      },
+      {
+        "label": "row",
+        "expected": "社区助农蔬菜包 r2e2e",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "社区助农蔬菜包 r2e2e\n\n已登记\n\n幸福社区 · 登记 2026-11-06 16:24\n\n2 件 × ¥19.90合计 ¥39.80\n\n办理意向已登记，等待工作人员处理。本平台不收款。",
+        "top": 384
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\n返回我的\n我的订单\n\n本地商品 · 办理意向登记 · 处理进度\n\n本页只登记办理意向\n\n平台不收款、不代下单。「人工核验通过」是运营人员对订单事实的人工确认，不代表已收款或业务办理已完成。\n\n订单状态\n\n全部 1\n已登记\n处理中\n待人工核验\n人工核验通过\n已取消\n未通过\n\n共 1 条订单\n\n刷新\n\n社区助农蔬菜包 r2e2e\n\n已登记\n\n幸福社区 · 登记 2026-11-06 16"
+  },
+  {
+    "name": "my-orders",
+    "url": "http://localhost:5173/local-life/#/me/orders",
+    "session": "resident",
+    "viewport": "375x812",
+    "scrollWidth": 375,
+    "innerWidth": 375,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "我的订单",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "我的订单",
+        "top": 60
+      },
+      {
+        "label": "row",
+        "expected": "社区助农蔬菜包 r2e2e",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "社区助农蔬菜包 r2e2e\n\n已登记\n\n幸福社区 · 登记 2026-11-06 16:24\n\n2 件 × ¥19.90合计 ¥39.80\n\n办理意向已登记，等待工作人员处理。本平台不收款。",
+        "top": 365
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\n返回我的\n我的订单\n\n本地商品 · 办理意向登记 · 处理进度\n\n本页只登记办理意向\n\n平台不收款、不代下单。「人工核验通过」是运营人员对订单事实的人工确认，不代表已收款或业务办理已完成。\n\n订单状态\n\n全部 1\n已登记\n处理中\n待人工核验\n人工核验通过\n已取消\n未通过\n\n共 1 条订单\n\n刷新\n\n社区助农蔬菜包 r2e2e\n\n已登记\n\n幸福社区 · 登记 2026-11-06 16"
+  },
+  {
+    "name": "my-orders",
+    "url": "http://localhost:5173/local-life/#/me/orders",
+    "session": "resident",
+    "viewport": "1440x900",
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "我的订单",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "我的订单",
+        "top": 60
+      },
+      {
+        "label": "row",
+        "expected": "社区助农蔬菜包 r2e2e",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "社区助农蔬菜包 r2e2e\n\n已登记\n\n幸福社区 · 登记 2026-11-06 16:24\n\n2 件 × ¥19.90合计 ¥39.80\n\n办理意向已登记，等待工作人员处理。本平台不收款。",
+        "top": 346
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\n返回我的\n我的订单\n\n本地商品 · 办理意向登记 · 处理进度\n\n本页只登记办理意向\n\n平台不收款、不代下单。「人工核验通过」是运营人员对订单事实的人工确认，不代表已收款或业务办理已完成。\n\n订单状态\n\n全部 1\n已登记\n处理中\n待人工核验\n人工核验通过\n已取消\n未通过\n\n共 1 条订单\n\n刷新\n\n社区助农蔬菜包 r2e2e\n\n已登记\n\n幸福社区 · 登记 2026-11-06 16"
+  },
+  {
+    "name": "my-order-detail",
+    "url": "http://localhost:5173/local-life/#/me/orders/f77344b3-8f2a-4493-9091-b6d18057b02d",
+    "session": "resident",
+    "viewport": "320x720",
+    "scrollWidth": 320,
+    "innerWidth": 320,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "订单详情",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "订单详情",
+        "top": 60
+      },
+      {
+        "label": "cta",
+        "expected": "返回我的订单",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "返回我的订单",
+        "top": 12
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\n返回我的订单\n订单详情\n\n本地商品登记 · 处理进度\n\n订单状态\n已登记\n\n办理意向已登记，等待工作人员处理。本平台不收款。\n\n订单编号 f77344b3…（完整编号仅用于工作人员核对）\n\n商品快照\n\n快照在登记时冻结，商品后续改价或下架都不会改写这笔订单。\n\n商品\n社区助农蔬菜包 r2e2e\n单价\n¥19.90\n数量\n2 件\n参考合计\n¥39.80\n社区\n幸福社区\n登记时间\n202"
+  },
+  {
+    "name": "my-order-detail",
+    "url": "http://localhost:5173/local-life/#/me/orders/f77344b3-8f2a-4493-9091-b6d18057b02d",
+    "session": "resident",
+    "viewport": "375x812",
+    "scrollWidth": 375,
+    "innerWidth": 375,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "订单详情",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "订单详情",
+        "top": 60
+      },
+      {
+        "label": "cta",
+        "expected": "返回我的订单",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "返回我的订单",
+        "top": 12
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\n返回我的订单\n订单详情\n\n本地商品登记 · 处理进度\n\n订单状态\n已登记\n\n办理意向已登记，等待工作人员处理。本平台不收款。\n\n订单编号 f77344b3…（完整编号仅用于工作人员核对）\n\n商品快照\n\n快照在登记时冻结，商品后续改价或下架都不会改写这笔订单。\n\n商品\n社区助农蔬菜包 r2e2e\n单价\n¥19.90\n数量\n2 件\n参考合计\n¥39.80\n社区\n幸福社区\n登记时间\n202"
+  },
+  {
+    "name": "my-order-detail",
+    "url": "http://localhost:5173/local-life/#/me/orders/f77344b3-8f2a-4493-9091-b6d18057b02d",
+    "session": "resident",
+    "viewport": "1440x900",
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "订单详情",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "订单详情",
+        "top": 60
+      },
+      {
+        "label": "cta",
+        "expected": "返回我的订单",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "返回我的订单",
+        "top": 12
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\n返回我的订单\n订单详情\n\n本地商品登记 · 处理进度\n\n订单状态\n已登记\n\n办理意向已登记，等待工作人员处理。本平台不收款。\n\n订单编号 f77344b3…（完整编号仅用于工作人员核对）\n\n商品快照\n\n快照在登记时冻结，商品后续改价或下架都不会改写这笔订单。\n\n商品\n社区助农蔬菜包 r2e2e\n单价\n¥19.90\n数量\n2 件\n参考合计\n¥39.80\n社区\n幸福社区\n登记时间\n202"
+  },
+  {
+    "name": "me",
+    "url": "http://localhost:5173/local-life/#/me",
+    "session": "resident",
+    "viewport": "320x720",
+    "scrollWidth": 320,
+    "innerWidth": 320,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "我的订单",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "我的订单\n本地商品登记记录 · 处理进度 · 运营人工核验结果",
+        "top": 531
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\nt5 冒烟居民 54248\n\n居民账户 · 已登录\n\n已登录\n平台居民 ID：11e8a2f3…\n退出登录\n\n手机号\n\n短信服务未启用，当前不可绑定。\n\n读取中\n当前活动报名\n暂无已发布活动\n读取中\n三人团\n可在活动页邀请街坊\n0\n我的奖励\n真实奖励条目\n\n以上状态读取自真实服务，展示当前活动的报名与三人团；其他活动的报名记录请在对应活动页查看。 活动暂无发布时不会显示示例报名或虚构"
+  },
+  {
+    "name": "me",
+    "url": "http://localhost:5173/local-life/#/me",
+    "session": "resident",
+    "viewport": "375x812",
+    "scrollWidth": 375,
+    "innerWidth": 375,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "我的订单",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "我的订单\n本地商品登记记录 · 处理进度 · 运营人工核验结果",
+        "top": 496
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\nt5 冒烟居民 54248\n\n居民账户 · 已登录\n\n已登录\n平台居民 ID：11e8a2f3…\n退出登录\n\n手机号\n\n短信服务未启用，当前不可绑定。\n\n读取中\n当前活动报名\n暂无已发布活动\n读取中\n三人团\n可在活动页邀请街坊\n0\n我的奖励\n真实奖励条目\n\n以上状态读取自真实服务，展示当前活动的报名与三人团；其他活动的报名记录请在对应活动页查看。 活动暂无发布时不会显示示例报名或虚构"
+  },
+  {
+    "name": "me",
+    "url": "http://localhost:5173/local-life/#/me",
+    "session": "resident",
+    "viewport": "1440x900",
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "我的订单",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "我的订单\n本地商品登记记录 · 处理进度 · 运营人工核验结果",
+        "top": 480
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\nt5 冒烟居民 54248\n\n居民账户 · 已登录\n\n已登录\n平台居民 ID：11e8a2f3…\n退出登录\n\n手机号\n\n短信服务未启用，当前不可绑定。\n\n读取中\n当前活动报名\n暂无已发布活动\n读取中\n三人团\n可在活动页邀请街坊\n0\n我的奖励\n真实奖励条目\n\n以上状态读取自真实服务，展示当前活动的报名与三人团；其他活动的报名记录请在对应活动页查看。 活动暂无发布时不会显示示例报名或虚构"
+  },
+  {
+    "name": "workbench-local-orders",
+    "url": "http://localhost:5173/local-life/#/workbench/local-orders",
+    "session": "grid_worker",
+    "viewport": "320x720",
+    "scrollWidth": 320,
+    "innerWidth": 320,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "社区订单",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "社区订单",
+        "top": 121
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\n\nR2 网格员\n\n网格员 · r2grid\n\n授权社区：幸福社区\n\n退出\n社区订单\n\n共 15 条\n\n刷新\n\n只显示服务端授权社区内的居民登记订单。人工核验通过由运营后台完成，工作台不能把订单改成「人工核验通过」。\n\n订单状态\n\n全部\n已登记\n处理中\n待人工核验\n人工核验通过\n已取消\n未通过\n\n社区助农蔬菜包 r2e2e\n\n已登记\n\n幸福社区 · t5 冒烟居民 54248 · 登记"
+  },
+  {
+    "name": "workbench-local-orders",
+    "url": "http://localhost:5173/local-life/#/workbench/local-orders",
+    "session": "grid_worker",
+    "viewport": "375x812",
+    "scrollWidth": 375,
+    "innerWidth": 375,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "社区订单",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "社区订单",
+        "top": 121
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\n\nR2 网格员\n\n网格员 · r2grid\n\n授权社区：幸福社区\n\n退出\n社区订单\n\n共 15 条\n\n刷新\n\n只显示服务端授权社区内的居民登记订单。人工核验通过由运营后台完成，工作台不能把订单改成「人工核验通过」。\n\n订单状态\n\n全部\n已登记\n处理中\n待人工核验\n人工核验通过\n已取消\n未通过\n\n社区助农蔬菜包 r2e2e\n\n已登记\n\n幸福社区 · t5 冒烟居民 54248 · 登记"
+  },
+  {
+    "name": "workbench-local-orders",
+    "url": "http://localhost:5173/local-life/#/workbench/local-orders",
+    "session": "grid_worker",
+    "viewport": "1440x900",
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "社区订单",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "社区订单",
+        "top": 121
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\n\nR2 网格员\n\n网格员 · r2grid\n\n授权社区：幸福社区\n\n退出\n社区订单\n\n共 15 条\n\n刷新\n\n只显示服务端授权社区内的居民登记订单。人工核验通过由运营后台完成，工作台不能把订单改成「人工核验通过」。\n\n订单状态\n\n全部\n已登记\n处理中\n待人工核验\n人工核验通过\n已取消\n未通过\n\n社区助农蔬菜包 r2e2e\n\n已登记\n\n幸福社区 · t5 冒烟居民 54248 · 登记"
+  },
+  {
+    "name": "workbench-local-order-detail",
+    "url": "http://localhost:5173/local-life/#/workbench/local-orders/f77344b3-8f2a-4493-9091-b6d18057b02d",
+    "session": "grid_worker",
+    "viewport": "320x720",
+    "scrollWidth": 320,
+    "innerWidth": 320,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "社区助农蔬菜包 r2e2e",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "社区助农蔬菜包 r2e2e",
+        "top": 50
+      },
+      {
+        "label": "cta",
+        "expected": "取消订单",
+        "found": true,
+        "rendered": true,
+        "inViewport": false,
+        "text": "取消订单",
+        "top": 861
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\n\n本地商品订单\n\n社区助农蔬菜包 r2e2e\n\n幸福社区 · 订单 f77344b3…\n\n已登记\n\n办理意向已登记，等待工作人员处理。本平台不收款。\n\n本平台只登记办理意向，不收款、不开通业务。「人工核验通过」只能由运营人员在后台完成，工作台不可直接设置。\n\n登记居民\nt5 冒烟居民 54248\n登记方式\n居民自助登记\n登记时间\n2026-11-06 16:24\n最后更新\n2026-"
+  },
+  {
+    "name": "workbench-local-order-detail",
+    "url": "http://localhost:5173/local-life/#/workbench/local-orders/f77344b3-8f2a-4493-9091-b6d18057b02d",
+    "session": "grid_worker",
+    "viewport": "375x812",
+    "scrollWidth": 375,
+    "innerWidth": 375,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "社区助农蔬菜包 r2e2e",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "社区助农蔬菜包 r2e2e",
+        "top": 50
+      },
+      {
+        "label": "cta",
+        "expected": "取消订单",
+        "found": true,
+        "rendered": true,
+        "inViewport": false,
+        "text": "取消订单",
+        "top": 841
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\n\n本地商品订单\n\n社区助农蔬菜包 r2e2e\n\n幸福社区 · 订单 f77344b3…\n\n已登记\n\n办理意向已登记，等待工作人员处理。本平台不收款。\n\n本平台只登记办理意向，不收款、不开通业务。「人工核验通过」只能由运营人员在后台完成，工作台不可直接设置。\n\n登记居民\nt5 冒烟居民 54248\n登记方式\n居民自助登记\n登记时间\n2026-11-06 16:24\n最后更新\n2026-"
+  },
+  {
+    "name": "workbench-local-order-detail",
+    "url": "http://localhost:5173/local-life/#/workbench/local-orders/f77344b3-8f2a-4493-9091-b6d18057b02d",
+    "session": "grid_worker",
+    "viewport": "1440x900",
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "社区助农蔬菜包 r2e2e",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "社区助农蔬菜包 r2e2e",
+        "top": 50
+      },
+      {
+        "label": "cta",
+        "expected": "取消订单",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "取消订单",
+        "top": 761
+      }
+    ],
+    "forbidden": [],
+    "firstText": "跳到主要内容\n\n本地商品订单\n\n社区助农蔬菜包 r2e2e\n\n幸福社区 · 订单 f77344b3…\n\n已登记\n\n办理意向已登记，等待工作人员处理。本平台不收款。\n\n本平台只登记办理意向，不收款、不开通业务。「人工核验通过」只能由运营人员在后台完成，工作台不可直接设置。\n\n登记居民\nt5 冒烟居民 54248\n登记方式\n居民自助登记\n登记时间\n2026-11-06 16:24\n最后更新\n2026-"
+  },
+  {
+    "name": "admin-products",
+    "url": "http://localhost:5174/products",
+    "session": "operator",
+    "viewport": "320x720",
+    "scrollWidth": 320,
+    "innerWidth": 320,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "商品管理",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "商品管理",
+        "top": 104
+      },
+      {
+        "label": "cta",
+        "expected": "新建商品",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "新建商品",
+        "top": 208
+      }
+    ],
+    "forbidden": [],
+    "firstText": "商品与订单\n/\n商品管理\nR2 运营员\n运营员\n退出登录\n经营工作台\n商品管理\n商品管理\n真实数据\n维护本社区本地商品：创建、编辑、上架与下架。居民 H5「惠生活」读取同一份上架目录，价格以整数分保存并在居民登记订单时冻结快照。\n新建商品\n运营员视图\n仅能查看与操作管理员分配的社区（幸福社区）；服务端同样会校验社区范围。\n关键词\n社区\n幸福社区\n状态\n查询\n重置\n刷 新\n表格\n卡片\n商品名称\t社区"
+  },
+  {
+    "name": "admin-products",
+    "url": "http://localhost:5174/products",
+    "session": "operator",
+    "viewport": "375x812",
+    "scrollWidth": 375,
+    "innerWidth": 375,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "商品管理",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "商品管理",
+        "top": 104
+      },
+      {
+        "label": "cta",
+        "expected": "新建商品",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "新建商品",
+        "top": 208
+      }
+    ],
+    "forbidden": [],
+    "firstText": "商品与订单\n/\n商品管理\nR2 运营员\n运营员\n退出登录\n经营工作台\n商品管理\n商品管理\n真实数据\n维护本社区本地商品：创建、编辑、上架与下架。居民 H5「惠生活」读取同一份上架目录，价格以整数分保存并在居民登记订单时冻结快照。\n新建商品\n运营员视图\n仅能查看与操作管理员分配的社区（幸福社区）；服务端同样会校验社区范围。\n关键词\n社区\n幸福社区\n状态\n查询\n重置\n刷 新\n表格\n卡片\n商品名称\t社区"
+  },
+  {
+    "name": "admin-products",
+    "url": "http://localhost:5174/products",
+    "session": "operator",
+    "viewport": "1440x900",
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "商品管理",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "商品管理",
+        "top": 104
+      },
+      {
+        "label": "cta",
+        "expected": "新建商品",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "新建商品",
+        "top": 104
+      }
+    ],
+    "forbidden": [],
+    "firstText": "生\n本地生活\n管理台\n经营工作台\n活动运营\n活动管理\n报名与核销\n客户与网格\n客户与业务单\n账户与社区\n商品与订单\n商品管理\n订单管理\n业绩与对账\n业绩看板\n对账结算\n系统管理\n管理员与权限\n系统信息\n界面组件\n商品与订单\n/\n商品管理\nR2 运营员\n运营员\n退出登录\n经营工作台\n商品管理\n商品管理\n真实数据\n维护本社区本地商品：创建、编辑、上架与下架。居民 H5「惠生活」读取同一份上架目录，价格"
+  },
+  {
+    "name": "admin-orders",
+    "url": "http://localhost:5174/orders",
+    "session": "operator",
+    "viewport": "320x720",
+    "scrollWidth": 320,
+    "innerWidth": 320,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "订单管理",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "订单管理",
+        "top": 104
+      }
+    ],
+    "forbidden": [],
+    "firstText": "商品与订单\n/\n订单管理\nR2 运营员\n运营员\n退出登录\n经营工作台\n订单管理\n订单管理\n真实数据\n查询居民登记的本地商品订单、处理状态并做运营人工核验。价格与商品名称以登记时冻结的快照为准；「人工核验通过」只是运营员对订单事实的人工确认，不代表收款或业务办理已完成。\n运营员视图\n仅能查看与处理管理员分配的社区（幸福社区）订单；服务端同样会校验社区范围。\n关键词\n社区\n幸福社区\n状态\n全部状态\n查"
+  },
+  {
+    "name": "admin-orders",
+    "url": "http://localhost:5174/orders",
+    "session": "operator",
+    "viewport": "375x812",
+    "scrollWidth": 375,
+    "innerWidth": 375,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "订单管理",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "订单管理",
+        "top": 104
+      }
+    ],
+    "forbidden": [],
+    "firstText": "商品与订单\n/\n订单管理\nR2 运营员\n运营员\n退出登录\n经营工作台\n订单管理\n订单管理\n真实数据\n查询居民登记的本地商品订单、处理状态并做运营人工核验。价格与商品名称以登记时冻结的快照为准；「人工核验通过」只是运营员对订单事实的人工确认，不代表收款或业务办理已完成。\n运营员视图\n仅能查看与处理管理员分配的社区（幸福社区）订单；服务端同样会校验社区范围。\n关键词\n社区\n幸福社区\n状态\n全部状态\n查"
+  },
+  {
+    "name": "admin-orders",
+    "url": "http://localhost:5174/orders",
+    "session": "operator",
+    "viewport": "1440x900",
+    "scrollWidth": 1440,
+    "innerWidth": 1440,
+    "expectations": [
+      {
+        "label": "heading",
+        "expected": "订单管理",
+        "found": true,
+        "rendered": true,
+        "inViewport": true,
+        "text": "订单管理",
+        "top": 104
+      }
+    ],
+    "forbidden": [],
+    "firstText": "生\n本地生活\n管理台\n经营工作台\n活动运营\n活动管理\n报名与核销\n客户与网格\n客户与业务单\n账户与社区\n商品与订单\n商品管理\n订单管理\n业绩与对账\n业绩看板\n对账结算\n系统管理\n管理员与权限\n系统信息\n界面组件\n商品与订单\n/\n订单管理\nR2 运营员\n运营员\n退出登录\n经营工作台\n订单管理\n订单管理\n真实数据\n查询居民登记的本地商品订单、处理状态并做运营人工核验。价格与商品名称以登记时冻结的快照为"
+  }
+]

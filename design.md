@@ -1,7 +1,7 @@
 # 本地生活 · 视觉设计基线（初版）
 
 > 状态：**界面视觉方向与五 Tab 演示信息架构已确认；具体业务功能与品牌细节尚未定稿。**
-> 适用于新仓库 `sanchuang-dev/local-life` 的移动端 H5 原型。参考现行 [开发预览](https://sanchuang-dev.github.io/local-life/) 与 [MiniProgramShell](src/components/MiniProgramShell.tsx)、[HomePage](src/pages/HomePage.tsx) 的实际实现。
+> 适用于新仓库 `sanchuang-dev/local-life` 的移动端 H5 原型。参考现行 [开发预览](https://sanchuang-dev.github.io/local-life/) 与 [MiniProgramShell](apps/web/src/components/MiniProgramShell.tsx)、[HomePage](apps/web/src/pages/HomePage.tsx) 的实际实现。
 > 这里是**设计意图与复用规则**，不覆盖 [AGENTS.md](AGENTS.md) 的工程/派工约束，也不把历史 V0.3 当作新版产品契约。
 
 ## 1. 整体气质
@@ -40,10 +40,10 @@
 
 ## 4. 字体、图标与组件
 
-- 使用系统中文无衬线字体（现有 `src/index.css` 字体栈），避免无必要的外部字体依赖。
+- 使用系统中文无衬线字体（现有 `apps/web/src/index.css` 字体栈），避免无必要的外部字体依赖。
 - 视觉尺度参考：首页大标题 **28px**；板块标题 **16–18px**；卡片标题 **14–15px**；正文与说明 **12–14px**。**不要把 10–11px 提示字用作关键业务正文**。
 - 通用图标统一选 **Lucide React**，线性、简洁；常见入口图标约 **20–24px**。品牌专有图形以后续正式资产为准。
-- 页面先组合已有 `src/components/` 组件，重复出现后再抽象。简单卡片允许就近实现，不为了“统一”降低视觉质量。
+- 页面先组合已有 `apps/web/src/components/` 组件，重复出现后再抽象。简单卡片允许就近实现，不为了“统一”降低视觉质量。
 - 可点击区域宜至少 **44 × 44px**，区分普通、选中、禁用与加载；选中态不能只依赖颜色，必要时配合文字/形状。
 
 ## 5. 内容与交互约束

@@ -1,0 +1,15 @@
+/* LL-USER-002：/users 统一用户目录页局部样式。
+ * Drawer 在窄屏（<768，含 375/320）不横向溢出，长详情在 body 内滚动。 */
+.users-drawer .ant-drawer-content-wrapper {
+  max-width: 100vw;
+}
+
+.users-drawer .ant-drawer-body {
+  overflow-y: auto;
+}
+
+.users-drawer .users-drawer-loading {
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+}

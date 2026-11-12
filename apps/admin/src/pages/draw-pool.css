@@ -1,0 +1,31 @@
+.draw-pool-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.draw-pool-config {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 8px;
+  background: var(--ant-color-fill-quaternary);
+}
+
+.draw-pool-meta {
+  color: var(--ant-color-text-secondary);
+}
+
+.draw-pool-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.draw-pool-loading {
+  padding: 48px 0;
+  text-align: center;
+}

@@ -1,0 +1,113 @@
+{
+  "generatedAt": "2026-11-03T18:30:24.118Z",
+  "chrome": "Chrome/156.0.8078.79",
+  "adminUrl": "http://localhost:5274/#/activities",
+  "emulatedTimezone": "America/New_York",
+  "checks": [
+    {
+      "name": "admin logged in with a real session",
+      "ok": true
+    },
+    {
+      "name": "editing shows a real loading state while the detail request is in flight",
+      "ok": true
+    },
+    {
+      "name": "create drawer opens after closing a loading edit drawer",
+      "ok": true,
+      "detail": "新建活动草稿"
+    },
+    {
+      "name": "create form is immediately usable (title input present)",
+      "ok": true
+    },
+    {
+      "name": "no spinner reappears in the create drawer after the late detail response lands",
+      "ok": true
+    },
+    {
+      "name": "time field label states Asia/Shanghai (UTC+08:00)",
+      "ok": true,
+      "detail": "活动时间（Asia/Shanghai，UTC+08:00）"
+    },
+    {
+      "name": "picker values are Shanghai wall time under TZ=America/New_York",
+      "ok": true,
+      "detail": "[\"2026-10-05 10:00\",\"2026-10-05 18:00\"]"
+    },
+    {
+      "name": "audit drawer renders a real Timeline",
+      "ok": true,
+      "detail": "items=4"
+    },
+    {
+      "name": "console has no Timeline items.children deprecation warning",
+      "ok": true
+    },
+    {
+      "name": "no page errors",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "real detail GETs returned 200",
+      "ok": true,
+      "detail": "[{\"method\":\"GET\",\"path\":\"/api/admin/activities/d8f6c9ef-2b75-43b1-accc-24e2d4c1a05c\",\"status\":200},{\"method\":\"GET\",\"path\":\"/api/admin/activities/d8f6c9ef-2b75-43b1-accc-24e2d4c1a05c\",\"status\":200}]"
+    }
+  ],
+  "failures": 0,
+  "pageErrors": [],
+  "consoleMessages": [
+    {
+      "type": "error",
+      "text": "Warning: [antd: Spin] `tip` is deprecated. Please use `description` instead."
+    }
+  ],
+  "network": [
+    {
+      "method": "GET",
+      "path": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/session",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/csrf",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/communities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/activities",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/activities/d8f6c9ef-2b75-43b1-accc-24e2d4c1a05c",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/activities/d8f6c9ef-2b75-43b1-accc-24e2d4c1a05c",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/activities/d8f6c9ef-2b75-43b1-accc-24e2d4c1a05c/audit",
+      "status": 200
+    }
+  ]
+}

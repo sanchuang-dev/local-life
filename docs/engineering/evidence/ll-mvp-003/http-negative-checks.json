@@ -1,0 +1,304 @@
+{
+  "generatedAt": "2026-11-03T18:28:38.269Z",
+  "api": "http://127.0.0.1:4081",
+  "origin": "http://localhost:5274",
+  "node": "v24.9.0",
+  "fixtures": {
+    "communityA": "144ad937-922e-45a9-aafe-f4d7ced91889",
+    "communityB": "8df6bf55-228b-41a4-b31d-b5142ad7ac59",
+    "publishedId": "d8f6c9ef-2b75-43b1-accc-24e2d4c1a05c",
+    "hiddenDraftId": "70ec363b-4dce-4228-9199-3be98ff28ead",
+    "crossCommunityDraftId": "db886c46-edf7-4eb4-a785-c3e149fc1a5f"
+  },
+  "totalChecks": 37,
+  "failures": 0,
+  "results": [
+    {
+      "name": "operator creates activity in assigned community",
+      "expected": 201,
+      "status": 201,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "operator publishes activity in assigned community",
+      "expected": 200,
+      "status": 200,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "operator creates a second draft in assigned community",
+      "expected": 201,
+      "status": 201,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "admin creates a draft in the other community",
+      "expected": 201,
+      "status": 201,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "unauthenticated GET /admin/activities",
+      "expected": 401,
+      "status": 401,
+      "ok": true,
+      "snippet": "unauthorized",
+      "note": ""
+    },
+    {
+      "name": "unauthenticated POST /admin/activities",
+      "expected": 401,
+      "status": 401,
+      "ok": true,
+      "snippet": "unauthorized",
+      "note": ""
+    },
+    {
+      "name": "unauthenticated PATCH /admin/activities/:id",
+      "expected": 401,
+      "status": 401,
+      "ok": true,
+      "snippet": "unauthorized",
+      "note": ""
+    },
+    {
+      "name": "authenticated create without CSRF header",
+      "expected": 403,
+      "status": 403,
+      "ok": true,
+      "snippet": "forbidden",
+      "note": ""
+    },
+    {
+      "name": "valid CSRF with untrusted Origin",
+      "expected": 403,
+      "status": 403,
+      "ok": true,
+      "snippet": "forbidden",
+      "note": ""
+    },
+    {
+      "name": "grid_worker GET /admin/activities",
+      "expected": 403,
+      "status": 403,
+      "ok": true,
+      "snippet": "forbidden",
+      "note": ""
+    },
+    {
+      "name": "grid_worker GET /admin/activities/:id",
+      "expected": 403,
+      "status": 403,
+      "ok": true,
+      "snippet": "forbidden",
+      "note": ""
+    },
+    {
+      "name": "grid_worker POST /admin/activities",
+      "expected": 403,
+      "status": 403,
+      "ok": true,
+      "snippet": "forbidden",
+      "note": ""
+    },
+    {
+      "name": "grid_worker POST pause",
+      "expected": 403,
+      "status": 403,
+      "ok": true,
+      "snippet": "forbidden",
+      "note": ""
+    },
+    {
+      "name": "grid_worker GET audit",
+      "expected": 403,
+      "status": 403,
+      "ok": true,
+      "snippet": "forbidden",
+      "note": ""
+    },
+    {
+      "name": "grid_worker GET rule-versions",
+      "expected": 403,
+      "status": 403,
+      "ok": true,
+      "snippet": "forbidden",
+      "note": ""
+    },
+    {
+      "name": "operator list contains no other community",
+      "expected": 200,
+      "status": 200,
+      "ok": true,
+      "snippet": "2 rows",
+      "note": ""
+    },
+    {
+      "name": "operator filters by foreign community -> zero rows",
+      "expected": 200,
+      "status": 200,
+      "ok": true,
+      "snippet": "total=0",
+      "note": ""
+    },
+    {
+      "name": "operator reads other community activity",
+      "expected": 403,
+      "status": 403,
+      "ok": true,
+      "snippet": "forbidden",
+      "note": ""
+    },
+    {
+      "name": "operator patches other community activity",
+      "expected": 403,
+      "status": 403,
+      "ok": true,
+      "snippet": "forbidden",
+      "note": ""
+    },
+    {
+      "name": "operator publishes other community activity",
+      "expected": 403,
+      "status": 403,
+      "ok": true,
+      "snippet": "forbidden",
+      "note": ""
+    },
+    {
+      "name": "operator creates in other community",
+      "expected": 403,
+      "status": 403,
+      "ok": true,
+      "snippet": "forbidden",
+      "note": ""
+    },
+    {
+      "name": "admin reads other community activity",
+      "expected": 200,
+      "status": 200,
+      "ok": true,
+      "snippet": "QA 越权社区",
+      "note": ""
+    },
+    {
+      "name": "operator updates published activity with fresh token",
+      "expected": 200,
+      "status": 200,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "stale expectedUpdatedAt replay",
+      "expected": 409,
+      "status": 409,
+      "ok": true,
+      "snippet": "conflict",
+      "note": ""
+    },
+    {
+      "name": "anonymous GET /activities/public",
+      "expected": 200,
+      "status": 200,
+      "ok": true,
+      "snippet": "1 items",
+      "note": ""
+    },
+    {
+      "name": "anonymous GET public detail of published activity",
+      "expected": 200,
+      "status": 200,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "anonymous GET public detail of draft",
+      "expected": 404,
+      "status": 404,
+      "ok": true,
+      "snippet": "not_found",
+      "note": ""
+    },
+    {
+      "name": "anonymous GET public detail of draft in B",
+      "expected": 404,
+      "status": 404,
+      "ok": true,
+      "snippet": "not_found",
+      "note": ""
+    },
+    {
+      "name": "public list hides internal fields",
+      "expected": 200,
+      "status": 200,
+      "ok": true,
+      "snippet": "none leaked",
+      "note": ""
+    },
+    {
+      "name": "public detail hides internal fields",
+      "expected": 200,
+      "status": 200,
+      "ok": true,
+      "snippet": "none leaked",
+      "note": ""
+    },
+    {
+      "name": "public list excludes drafts",
+      "expected": 200,
+      "status": 200,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "public detail key set",
+      "expected": 200,
+      "status": 200,
+      "ok": true,
+      "snippet": "community,description,endsAt,id,location,publicRules,publishedAt,ruleVersion,startsAt,status,summary,title,updatedAt",
+      "note": ""
+    },
+    {
+      "name": "operator reads rule versions",
+      "expected": 200,
+      "status": 200,
+      "ok": true,
+      "snippet": "v1",
+      "note": ""
+    },
+    {
+      "name": "PATCH rule-versions is not routed",
+      "expected": 404,
+      "status": 404,
+      "ok": true,
+      "note": ""
+    },
+    {
+      "name": "operator reads audit trail",
+      "expected": 200,
+      "status": 200,
+      "ok": true,
+      "snippet": "activity.updated,activity.rule_version.created,activity.published,activity.created",
+      "note": ""
+    },
+    {
+      "name": "audit metadata has no budget value",
+      "expected": 200,
+      "status": 200,
+      "ok": true,
+      "snippet": "[{\"status\":\"published\"},{\"version\":\"1\"},{\"status\":\"published\"},{\"status\":\"draft\"}]",
+      "note": ""
+    },
+    {
+      "name": "DELETE /admin/activities/:id is not routed",
+      "expected": 404,
+      "status": 404,
+      "ok": true,
+      "note": ""
+    }
+  ]
+}

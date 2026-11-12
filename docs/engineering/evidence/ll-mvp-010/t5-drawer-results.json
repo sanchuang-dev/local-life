@@ -1,0 +1,109 @@
+{
+  "generatedAt": "2026-11-06T08:25:50.858Z",
+  "question": "antd 6.6.8 deprecates Drawer `width`; does the drawer still lay out correctly at 320/375/1440?",
+  "results": [
+    {
+      "page": "products",
+      "viewport": "320x720",
+      "clicked": true,
+      "drawerOpen": true,
+      "panelWidth": 320,
+      "panelLeft": 0,
+      "panelRight": 320,
+      "innerWidth": 320,
+      "scrollWidth": 320,
+      "overflowsViewport": false,
+      "docOverflows": false,
+      "title": "新建本地商品",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-drawer-products-320.png"
+    },
+    {
+      "page": "orders",
+      "viewport": "320x720",
+      "clicked": true,
+      "drawerOpen": true,
+      "panelWidth": 320,
+      "panelLeft": 0,
+      "panelRight": 320,
+      "innerWidth": 320,
+      "scrollWidth": 320,
+      "overflowsViewport": false,
+      "docOverflows": false,
+      "title": "订单详情 · 社区助农蔬菜包 r2e2e",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-drawer-orders-320.png"
+    },
+    {
+      "page": "products",
+      "viewport": "375x812",
+      "clicked": true,
+      "drawerOpen": true,
+      "panelWidth": 375,
+      "panelLeft": 0,
+      "panelRight": 375,
+      "innerWidth": 375,
+      "scrollWidth": 375,
+      "overflowsViewport": false,
+      "docOverflows": false,
+      "title": "新建本地商品",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-drawer-products-375.png"
+    },
+    {
+      "page": "orders",
+      "viewport": "375x812",
+      "clicked": true,
+      "drawerOpen": true,
+      "panelWidth": 375,
+      "panelLeft": 0,
+      "panelRight": 375,
+      "innerWidth": 375,
+      "scrollWidth": 375,
+      "overflowsViewport": false,
+      "docOverflows": false,
+      "title": "订单详情 · 社区助农蔬菜包 r2e2e",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-drawer-orders-375.png"
+    },
+    {
+      "page": "products",
+      "viewport": "1440x900",
+      "clicked": true,
+      "drawerOpen": true,
+      "panelWidth": 520,
+      "panelLeft": 920,
+      "panelRight": 1440,
+      "innerWidth": 1440,
+      "scrollWidth": 1440,
+      "overflowsViewport": false,
+      "docOverflows": false,
+      "title": "新建本地商品",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-drawer-products-1440.png"
+    },
+    {
+      "page": "orders",
+      "viewport": "1440x900",
+      "clicked": true,
+      "drawerOpen": true,
+      "panelWidth": 600,
+      "panelLeft": 840,
+      "panelRight": 1440,
+      "innerWidth": 1440,
+      "scrollWidth": 1440,
+      "overflowsViewport": false,
+      "docOverflows": false,
+      "title": "订单详情 · 社区助农蔬菜包 r2e2e",
+      "screenshot": "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\t5-drawer-orders-1440.png"
+    }
+  ],
+  "summary": {
+    "allOpen": true,
+    "noneOverflowViewport": true,
+    "noDocOverflow": true,
+    "widths": [
+      "products@320x720=320px",
+      "orders@320x720=320px",
+      "products@375x812=375px",
+      "orders@375x812=375px",
+      "products@1440x900=520px",
+      "orders@1440x900=600px"
+    ]
+  }
+}

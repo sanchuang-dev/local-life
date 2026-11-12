@@ -1,0 +1,80 @@
+{
+  "description": "Real SQLite persistence: API process was stopped and started again against /tmp/ll-mvp-004-verify/verify-r2.sqlite; the same resident session/team is read back.",
+  "primaryActivityId": "db78d9ed-1a26-4115-9c77-d57f2d7a50f7",
+  "expectedTeamId": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+  "responseStatus": 200,
+  "responseBody": {
+    "activityId": "db78d9ed-1a26-4115-9c77-d57f2d7a50f7",
+    "activityStatus": "published",
+    "joinable": false,
+    "unavailableReason": null,
+    "participation": {
+      "id": "d0255450-f677-4955-bad8-bc089d5f39b8",
+      "teamId": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+      "seatNo": 1,
+      "role": "leader",
+      "inviteSource": "self",
+      "invitationId": null,
+      "inviterDisplayName": null,
+      "joinedAt": "2026-11-04T03:51:57.401Z"
+    },
+    "team": {
+      "id": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+      "status": "locked",
+      "seatsTotal": 3,
+      "seatsFilled": 3,
+      "inviteCode": null,
+      "members": [
+        {
+          "seatNo": 1,
+          "displayName": "居民A",
+          "role": "leader",
+          "isSelf": true,
+          "joinedAt": "2026-11-04T03:51:57.401Z"
+        },
+        {
+          "seatNo": 2,
+          "displayName": "居民B",
+          "role": "member",
+          "isSelf": false,
+          "joinedAt": "2026-11-04T03:51:57.407Z"
+        },
+        {
+          "seatNo": 3,
+          "displayName": "居民C",
+          "role": "member",
+          "isSelf": false,
+          "joinedAt": "2026-11-04T03:51:57.411Z"
+        }
+      ]
+    }
+  },
+  "checks": [
+    {
+      "name": "API answered after full restart",
+      "expected": 200,
+      "actual": 200,
+      "pass": true
+    },
+    {
+      "name": "A session cookie (database-backed) still valid",
+      "expected": true,
+      "actual": true,
+      "pass": true
+    },
+    {
+      "name": "same team id after restart",
+      "expected": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+      "actual": "2baa21eb-ef4a-4fb5-9e3e-70df9be7f782",
+      "pass": true
+    },
+    {
+      "name": "team still locked 3/3 after restart",
+      "expected": "locked/3",
+      "actual": "locked/3",
+      "pass": true
+    }
+  ],
+  "passed": 4,
+  "failed": 0
+}

@@ -1,0 +1,144 @@
+{
+  "checks": [
+    {
+      "name": "unauthenticated WeChat share contains real activityId",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "unauthenticated WeChat share never invents invite",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "WeChat shares the existing activity page",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "WeChat uses the existing published activity title and its summary",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "WeChat share cover is an absolute current-site image",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "friend and timeline use the same public URL",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "actual H5 dev resident can log in on browser fixture",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "resident explicitly submits participation",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "updated friend and timeline payloads use same actual team invitation link",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "invitation keeps activityId and valid inviteCode",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "friend card uses activity title, summary, and current-site hero image",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "real invite sheet reachable from current activity home",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "375px: hint + QR visible without horizontal overflow",
+      "ok": true,
+      "detail": "{\"hint\":true,\"qr\":true,\"overflows\":false}"
+    },
+    {
+      "name": "WeChat button can be tapped",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "WeChat button only shows top-right menu hint and never fakes native share",
+      "ok": true,
+      "detail": "{\"text\":true,\"nativeCalls\":0}"
+    },
+    {
+      "name": "copy retains exact invitation link",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "320px: no horizontal overflow, QR and share button retained",
+      "ok": true,
+      "detail": "{\"viewport\":320,\"bodyWidth\":320,\"button\":true,\"qr\":true}"
+    },
+    {
+      "name": "real activity subpage also uses identical invitation URL",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "activity invite sheet remains accessible when SDK config fails",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "signing/SDK failure does not disable copying and QR",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "non-WeChat browser still opens the real invite sheet",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "non-WeChat uses its original system-share button",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "native navigator.share receives the real same invitation URL and WeChat SDK is not called",
+      "ok": true,
+      "detail": "{\"calls\":[{\"title\":\"银发社区欢乐季\",\"text\":\"还差街坊一起组成三人团，来一起参加本场活动。\",\"url\":\"http://127.0.0.1:5184/community/activity/silver-neighborhood?activityId=a0672d73-7a04-4a25-bb37-17c462c964be&invite=4fbf11d5f4f7b953429756d0657ab4ad\"}],\"configured\":0}"
+    },
+    {
+      "name": "no browser runtime exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "no browser error events",
+      "ok": true,
+      "detail": "[]"
+    }
+  ],
+  "payload": {
+    "friend": {
+      "type": "friend",
+      "title": "银发社区欢乐季",
+      "desc": "秋季社区敬老活动",
+      "link": "http://127.0.0.1:5184/community/activity/silver-neighborhood?activityId=a0672d73-7a04-4a25-bb37-17c462c964be&invite=4fbf11d5f4f7b953429756d0657ab4ad",
+      "imgUrl": "http://127.0.0.1:5184/images/silver-neighborhood-hero.webp"
+    },
+    "timeline": {
+      "type": "timeline",
+      "title": "银发社区欢乐季",
+      "link": "http://127.0.0.1:5184/community/activity/silver-neighborhood?activityId=a0672d73-7a04-4a25-bb37-17c462c964be&invite=4fbf11d5f4f7b953429756d0657ab4ad",
+      "imgUrl": "http://127.0.0.1:5184/images/silver-neighborhood-hero.webp"
+    }
+  }
+}

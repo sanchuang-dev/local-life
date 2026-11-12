@@ -1,0 +1,8 @@
+[{"contact_name":"QA浏览器客户-mobile-evidence-1793765509186","status":"converted","event":"lead.created","from_status":null,"to_status":"new","note":null},
+{"contact_name":"QA浏览器客户-mobile-evidence-1793765509186","status":"converted","event":"lead.follow_up_added","from_status":"new","to_status":"new","note":null},
+{"contact_name":"QA浏览器客户-mobile-evidence-1793765509186","status":"converted","event":"lead.status_changed","from_status":"new","to_status":"contacting","note":"系统随订单人工核验进入跟进"},
+{"contact_name":"QA浏览器客户-mobile-evidence-1793765509186","status":"converted","event":"lead.status_changed","from_status":"contacting","to_status":"converted","note":"订单人工核验确认"},
+{"contact_name":"QA浏览器客户-tv-evidence-1793765509186","status":"converted","event":"lead.created","from_status":null,"to_status":"new","note":null},
+{"contact_name":"QA浏览器客户-tv-evidence-1793765509186","status":"converted","event":"lead.follow_up_added","from_status":"new","to_status":"new","note":null},
+{"contact_name":"QA浏览器客户-tv-evidence-1793765509186","status":"converted","event":"lead.status_changed","from_status":"new","to_status":"contacting","note":"系统随订单人工核验进入跟进"},
+{"contact_name":"QA浏览器客户-tv-evidence-1793765509186","status":"converted","event":"lead.status_changed","from_status":"contacting","to_status":"converted","note":"订单人工核验确认"}]

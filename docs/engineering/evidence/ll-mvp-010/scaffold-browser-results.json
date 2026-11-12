@@ -1,0 +1,157 @@
+{
+  "generatedAt": "2026-11-06T06:50:34.829Z",
+  "runTag": "2026-11-06T06-50-29-839Z",
+  "chrome": "C:/Program Files/Google/Chrome/Application/chrome.exe",
+  "pages": [
+    {
+      "label": "life",
+      "url": "http://127.0.0.1:5173/local-life/#/life"
+    }
+  ],
+  "viewports": [
+    {
+      "label": "320",
+      "width": 320,
+      "height": 640
+    },
+    {
+      "label": "375",
+      "width": 375,
+      "height": 812
+    },
+    {
+      "label": "1440",
+      "width": 1440,
+      "height": 900
+    }
+  ],
+  "checks": [
+    {
+      "name": "scaffold-life-life-320 viewport width matches",
+      "ok": true,
+      "detail": "{\"innerWidth\":320,\"expected\":320}"
+    },
+    {
+      "name": "scaffold-life-life-320 scrollWidth === innerWidth",
+      "ok": true,
+      "detail": "{\"scrollWidth\":320,\"innerWidth\":320}"
+    },
+    {
+      "name": "scaffold-life-life-320 body does not overflow",
+      "ok": true,
+      "detail": "{\"bodyScrollWidth\":320}"
+    },
+    {
+      "name": "scaffold-life-life-320 page rendered content",
+      "ok": true,
+      "detail": "{\"textLength\":398,\"firstText\":\"跳到主要内容\\n惠生活\\n\\n真实商城商品 · 居民权益\\n\\n优惠购接入真实 CRMEB 商城商品（只读展示与购买跳转，平台不代下单、不代支付）。 未配置商城时如实提示，不展示模拟商品。\\n\\n优惠购\\n真实商城商品\\n优惠购尚未接入商城\\n\\n未配置 CRMEB_BASE_URL、CRMEB_OUTAPI_APPID、CRMEB_OUT\"}"
+    },
+    {
+      "name": "scaffold-life-life-320 no console errors",
+      "ok": true,
+      "detail": "{\"errors\":[],\"allowedNoise\":[]}"
+    },
+    {
+      "name": "scaffold-life-life-320 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "scaffold-life-life-320 layout",
+      "ok": true,
+      "detail": "{\"href\":\"http://127.0.0.1:5173/local-life/#/life\",\"title\":\"三创 · 本地生活\",\"readyState\":\"complete\",\"innerWidth\":320,\"innerHeight\":640,\"documentScrollWidth\":320,\"documentClientWidth\":320,\"bodyScrollWidth\":320,\"bodyClientWidth\":320,\"horizontalOverflow\":false,\"bodyOverflow\":false,\"widestRight\":320,\"textLength\":398,\"firstText\":\"跳到主要内容\\n惠生活\\n\\n真实商城商品 · 居民权益\\n\\n优惠购接入真实 CRMEB 商城商品（只读展示与购买跳转，平台不代下单、不代支付）。 未配置商城时如实提示，不展示模拟商品。\\n\\n优惠购\\n真实商城商品\\n优惠购尚未接入商城\\n\\n未配置 CRMEB_BASE_URL、CRMEB_OUTAPI_APPID、CRMEB_OUT\"}"
+    },
+    {
+      "name": "scaffold-life-life-320 network",
+      "ok": true,
+      "detail": "{\"failures\":[],\"canceledByPage\":[\"http://127.0.0.1:5173/api/integrations/crmeb/status\"],\"non2xx\":[]}"
+    },
+    {
+      "name": "scaffold-life-life-375 viewport width matches",
+      "ok": true,
+      "detail": "{\"innerWidth\":375,\"expected\":375}"
+    },
+    {
+      "name": "scaffold-life-life-375 scrollWidth === innerWidth",
+      "ok": true,
+      "detail": "{\"scrollWidth\":375,\"innerWidth\":375}"
+    },
+    {
+      "name": "scaffold-life-life-375 body does not overflow",
+      "ok": true,
+      "detail": "{\"bodyScrollWidth\":375}"
+    },
+    {
+      "name": "scaffold-life-life-375 page rendered content",
+      "ok": true,
+      "detail": "{\"textLength\":398,\"firstText\":\"跳到主要内容\\n惠生活\\n\\n真实商城商品 · 居民权益\\n\\n优惠购接入真实 CRMEB 商城商品（只读展示与购买跳转，平台不代下单、不代支付）。 未配置商城时如实提示，不展示模拟商品。\\n\\n优惠购\\n真实商城商品\\n优惠购尚未接入商城\\n\\n未配置 CRMEB_BASE_URL、CRMEB_OUTAPI_APPID、CRMEB_OUT\"}"
+    },
+    {
+      "name": "scaffold-life-life-375 no console errors",
+      "ok": true,
+      "detail": "{\"errors\":[],\"allowedNoise\":[]}"
+    },
+    {
+      "name": "scaffold-life-life-375 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "scaffold-life-life-375 layout",
+      "ok": true,
+      "detail": "{\"href\":\"http://127.0.0.1:5173/local-life/#/life\",\"title\":\"三创 · 本地生活\",\"readyState\":\"complete\",\"innerWidth\":375,\"innerHeight\":812,\"documentScrollWidth\":375,\"documentClientWidth\":375,\"bodyScrollWidth\":375,\"bodyClientWidth\":375,\"horizontalOverflow\":false,\"bodyOverflow\":false,\"widestRight\":375,\"textLength\":398,\"firstText\":\"跳到主要内容\\n惠生活\\n\\n真实商城商品 · 居民权益\\n\\n优惠购接入真实 CRMEB 商城商品（只读展示与购买跳转，平台不代下单、不代支付）。 未配置商城时如实提示，不展示模拟商品。\\n\\n优惠购\\n真实商城商品\\n优惠购尚未接入商城\\n\\n未配置 CRMEB_BASE_URL、CRMEB_OUTAPI_APPID、CRMEB_OUT\"}"
+    },
+    {
+      "name": "scaffold-life-life-375 network",
+      "ok": true,
+      "detail": "{\"failures\":[],\"canceledByPage\":[\"http://127.0.0.1:5173/api/integrations/crmeb/status\"],\"non2xx\":[]}"
+    },
+    {
+      "name": "scaffold-life-life-1440 viewport width matches",
+      "ok": true,
+      "detail": "{\"innerWidth\":1440,\"expected\":1440}"
+    },
+    {
+      "name": "scaffold-life-life-1440 scrollWidth === innerWidth",
+      "ok": true,
+      "detail": "{\"scrollWidth\":1440,\"innerWidth\":1440}"
+    },
+    {
+      "name": "scaffold-life-life-1440 body does not overflow",
+      "ok": true,
+      "detail": "{\"bodyScrollWidth\":1440}"
+    },
+    {
+      "name": "scaffold-life-life-1440 page rendered content",
+      "ok": true,
+      "detail": "{\"textLength\":398,\"firstText\":\"跳到主要内容\\n惠生活\\n\\n真实商城商品 · 居民权益\\n\\n优惠购接入真实 CRMEB 商城商品（只读展示与购买跳转，平台不代下单、不代支付）。 未配置商城时如实提示，不展示模拟商品。\\n\\n优惠购\\n真实商城商品\\n优惠购尚未接入商城\\n\\n未配置 CRMEB_BASE_URL、CRMEB_OUTAPI_APPID、CRMEB_OUT\"}"
+    },
+    {
+      "name": "scaffold-life-life-1440 no console errors",
+      "ok": true,
+      "detail": "{\"errors\":[],\"allowedNoise\":[]}"
+    },
+    {
+      "name": "scaffold-life-life-1440 no uncaught exceptions",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "scaffold-life-life-1440 layout",
+      "ok": true,
+      "detail": "{\"href\":\"http://127.0.0.1:5173/local-life/#/life\",\"title\":\"三创 · 本地生活\",\"readyState\":\"complete\",\"innerWidth\":1440,\"innerHeight\":900,\"documentScrollWidth\":1440,\"documentClientWidth\":1440,\"bodyScrollWidth\":1440,\"bodyClientWidth\":1440,\"horizontalOverflow\":false,\"bodyOverflow\":false,\"widestRight\":1440,\"textLength\":398,\"firstText\":\"跳到主要内容\\n惠生活\\n\\n真实商城商品 · 居民权益\\n\\n优惠购接入真实 CRMEB 商城商品（只读展示与购买跳转，平台不代下单、不代支付）。 未配置商城时如实提示，不展示模拟商品。\\n\\n优惠购\\n真实商城商品\\n优惠购尚未接入商城\\n\\n未配置 CRMEB_BASE_URL、CRMEB_OUTAPI_APPID、CRMEB_OUT\"}"
+    },
+    {
+      "name": "scaffold-life-life-1440 network",
+      "ok": true,
+      "detail": "{\"failures\":[],\"canceledByPage\":[\"http://127.0.0.1:5173/api/integrations/crmeb/status\"],\"non2xx\":[]}"
+    }
+  ],
+  "screenshots": [
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\scaffold-life-life-320.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\scaffold-life-life-375.png",
+    "E:\\tomz\\local-life-wt\\mvp-010\\docs\\engineering\\evidence\\ll-mvp-010\\scaffold-life-life-1440.png"
+  ],
+  "passed": 24,
+  "failed": 0
+}

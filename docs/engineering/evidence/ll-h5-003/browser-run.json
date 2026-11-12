@@ -1,0 +1,423 @@
+{
+  "generatedAt": "2026-11-05T10:33:24.266Z",
+  "chrome": "Chrome/156.0.8078.80",
+  "node": "v22.23.3",
+  "servers": {
+    "pages": "http://127.0.0.1:57153/local-life/",
+    "mvp": "http://127.0.0.1:57154/"
+  },
+  "notes": [],
+  "consoleErrors": [],
+  "screenshots": [
+    "screenshots/mvp-375-activities-home.png",
+    "screenshots/mvp-375-activity-sub-page.png",
+    "screenshots/mvp-320-activities-home.png",
+    "screenshots/mvp-1440-desktop-home.png",
+    "screenshots/mvp-375-life.png",
+    "screenshots/mvp-375-me.png",
+    "screenshots/mvp-375-deep-link-me-rewards.png",
+    "screenshots/mvp-375-workbench.png",
+    "screenshots/mvp-375-keyboard-open.png",
+    "screenshots/mvp-375-safe-area.png",
+    "screenshots/mvp-375-activity-detail.png",
+    "screenshots/pages-hash-375-activities-home.png",
+    "screenshots/pages-hash-375-activity-sub-page.png",
+    "screenshots/pages-hash-375-deep-link-me.png"
+  ],
+  "results": [
+    {
+      "id": "MVP-01",
+      "area": "MVP BrowserRouter build (base /)",
+      "description": "375×812 首页无假状态栏/电池/胶囊/原型文案，底部只有三入口且活动高亮",
+      "status": "passed",
+      "detail": {
+        "forbidden": [],
+        "fakeChromeIcons": 0,
+        "overflowX": 0,
+        "nav": [
+          "活动",
+          "惠生活",
+          "我的"
+        ],
+        "headers": 0
+      }
+    },
+    {
+      "id": "MVP-02",
+      "area": "MVP BrowserRouter build (base /)",
+      "description": "375×812 底部导航固定贴底，正文预留 66px 且导航底部内边距 8px",
+      "status": "passed",
+      "detail": {
+        "navPosition": "fixed",
+        "navBottom": "0px",
+        "navPaddingBottom": "8px",
+        "mainPaddingBottom": "66px"
+      }
+    },
+    {
+      "id": "MVP-03",
+      "area": "MVP BrowserRouter build (base /)",
+      "description": "活动子页 /community/activity/silver-neighborhood 仍高亮活动 Tab",
+      "status": "passed",
+      "detail": {
+        "activeLabel": "活动",
+        "pathname": "/community/activity/silver-neighborhood",
+        "overflowX": 0
+      }
+    },
+    {
+      "id": "MVP-04",
+      "area": "MVP BrowserRouter build (base /)",
+      "description": "活动商品子页 /community/activity/silver-neighborhood/products 仍高亮活动 Tab",
+      "status": "passed",
+      "detail": {
+        "activeLabel": "活动",
+        "pathname": "/community/activity/silver-neighborhood/products",
+        "overflowX": 0
+      }
+    },
+    {
+      "id": "MVP-05",
+      "area": "MVP BrowserRouter build (base /)",
+      "description": "320 宽首页无假状态栏/原型文案、三入口完整、无横向滚动",
+      "status": "passed",
+      "detail": {
+        "forbidden": [],
+        "fakeChromeIcons": 0,
+        "overflowX": 0,
+        "nav": [
+          "活动",
+          "惠生活",
+          "我的"
+        ],
+        "headers": 0
+      }
+    },
+    {
+      "id": "MVP-06",
+      "area": "MVP BrowserRouter build (base /)",
+      "description": "320 宽 /life、/me、活动子页、/workbench 均无横向溢出",
+      "status": "passed",
+      "detail": [
+        {
+          "route": "/life",
+          "overflowX": 0,
+          "bodyOverflowX": 0
+        },
+        {
+          "route": "/me",
+          "overflowX": 0,
+          "bodyOverflowX": 0
+        },
+        {
+          "route": "/community/activity/silver-neighborhood",
+          "overflowX": 0,
+          "bodyOverflowX": 0
+        },
+        {
+          "route": "/workbench",
+          "overflowX": 0,
+          "bodyOverflowX": 0
+        }
+      ]
+    },
+    {
+      "id": "MVP-07",
+      "area": "MVP BrowserRouter build (base /)",
+      "description": "1440×900 桌面正常显示 H5 内容：无手机外框（无圆角/阴影）、列宽 720 居中",
+      "status": "passed",
+      "detail": {
+        "columnWidth": 720,
+        "columnLeft": 353,
+        "columnRight": 353,
+        "columnRadius": "0px",
+        "columnShadow": "none",
+        "overflowX": 0
+      }
+    },
+    {
+      "id": "MVP-08",
+      "area": "MVP BrowserRouter build (base /)",
+      "description": "三入口切换：活动→惠生活→我的→活动，URL 与高亮同步路由",
+      "status": "passed",
+      "detail": {
+        "life": [
+          "/life",
+          "惠生活"
+        ],
+        "me": [
+          "/me",
+          "我的"
+        ],
+        "home": [
+          "/",
+          "活动"
+        ]
+      }
+    },
+    {
+      "id": "MVP-09",
+      "area": "MVP BrowserRouter build (base /)",
+      "description": "浏览器后退/前进：我的→惠生活→活动→惠生活，每次高亮跟随路由",
+      "status": "passed",
+      "detail": {
+        "back1": [
+          "/life",
+          "惠生活"
+        ],
+        "back2": [
+          "/",
+          "活动"
+        ],
+        "forward1": [
+          "/life",
+          "惠生活"
+        ]
+      }
+    },
+    {
+      "id": "MVP-10",
+      "area": "MVP BrowserRouter build (base /)",
+      "description": "新页面从顶部开始（push 归零），浏览器后退恢复原阅读位置",
+      "status": "passed",
+      "detail": {
+        "scrolledBefore": 600,
+        "afterPush": 0,
+        "afterPop": 600
+      }
+    },
+    {
+      "id": "MVP-11",
+      "area": "MVP BrowserRouter build (base /)",
+      "description": "直接深链 /me/rewards 可打开，刷新后路由与高亮保持（我的）",
+      "status": "passed",
+      "detail": {
+        "before": [
+          "/me/rewards",
+          "我的",
+          271
+        ],
+        "afterReload": [
+          "/me/rewards",
+          "我的"
+        ]
+      }
+    },
+    {
+      "id": "MVP-12",
+      "area": "MVP BrowserRouter build (base /)",
+      "description": "旧分享链接 /#/me 升级为 clean URL /me 并高亮我的（PR #87 分流未改动）",
+      "status": "passed",
+      "detail": {
+        "pathname": "/me",
+        "hash": "",
+        "activeLabel": "我的"
+      }
+    },
+    {
+      "id": "MVP-13",
+      "area": "MVP BrowserRouter build (base /)",
+      "description": "/workbench 与 /workbench/leads 仍可达并渲染（工作人员 H5），居民导航高亮我的",
+      "status": "passed",
+      "detail": {
+        "workbench": [
+          "/workbench",
+          71,
+          "我的"
+        ],
+        "leads": [
+          "/workbench/leads",
+          71,
+          "我的"
+        ]
+      }
+    },
+    {
+      "id": "MVP-14",
+      "area": "MVP BrowserRouter build (base /)",
+      "description": "键盘弹出时底部导航让位（data-keyboard=open、导航隐藏、正文不再预留 66px）",
+      "status": "passed",
+      "detail": {
+        "keyboardSupported": true,
+        "inputFocused": false,
+        "keyboard": "open",
+        "navDisplay": "none",
+        "mainPaddingBottom": "0px",
+        "afterRestore": "closed",
+        "simulated": "visualViewport height shrunk by 320px in-page; headless has no real keyboard"
+      }
+    },
+    {
+      "id": "MVP-15",
+      "area": "MVP BrowserRouter build (base /)",
+      "description": "安全区：底部 34px 时正文预留 66+34px、导航底部内边距 34px",
+      "status": "passed",
+      "detail": {
+        "mainPaddingBottom": "100px",
+        "navPaddingBottom": "34px",
+        "insets": {
+          "top": 44,
+          "bottom": 34
+        }
+      }
+    },
+    {
+      "id": "MVP-16",
+      "area": "MVP BrowserRouter build (base /)",
+      "description": "站内返回可用：/life/exchange 页面内「返回惠生活」回到 /life 并高亮惠生活",
+      "status": "passed",
+      "detail": {
+        "backLink": {
+          "label": "返回惠生活",
+          "href": "/life"
+        },
+        "pathname": "/life",
+        "activeLabel": "惠生活"
+      }
+    },
+    {
+      "id": "MVP-17",
+      "area": "MVP BrowserRouter build (base /)",
+      "description": "旧深链 /gd、/health 仍可达（非空白/404），三入口导航保留且无横向溢出",
+      "status": "passed",
+      "detail": [
+        {
+          "route": "/gd",
+          "pathname": "/gd",
+          "mainTextLength": 465,
+          "overflowX": 0,
+          "navCount": 3,
+          "activeLabel": null
+        },
+        {
+          "route": "/health",
+          "pathname": "/health",
+          "mainTextLength": 424,
+          "overflowX": 0,
+          "navCount": 3,
+          "activeLabel": null
+        }
+      ]
+    },
+    {
+      "id": "MVP-18",
+      "area": "MVP BrowserRouter build (base /)",
+      "description": "滚到页面底部时正文末元素不藏在固定导航后面（预留 66px 生效）",
+      "status": "passed",
+      "detail": {
+        "navTop": 745,
+        "lastBottom": 746,
+        "scrollY": 689,
+        "maxScroll": 689
+      }
+    },
+    {
+      "id": "MVP-19",
+      "area": "MVP BrowserRouter build (base /)",
+      "description": "未知路径 404 页仍有完整三入口导航且无横向溢出",
+      "status": "passed",
+      "detail": {
+        "navCount": 3,
+        "activeLabel": null,
+        "mainTextLength": 52,
+        "overflowX": 0
+      }
+    },
+    {
+      "id": "MVP-20",
+      "area": "MVP BrowserRouter build (base /)",
+      "description": "活动详情深链 /community/activity/:activityId 高亮活动 Tab",
+      "status": "passed",
+      "detail": {
+        "pathname": "/community/activity/example-activity-id",
+        "activeLabel": "活动",
+        "overflowX": 0
+      }
+    },
+    {
+      "id": "PAGES-01",
+      "area": "Pages HashRouter build (base /local-life/)",
+      "description": "HashRouter 首页可打开：样式加载、三入口底部导航、活动高亮、无假状态栏",
+      "status": "passed",
+      "detail": {
+        "forbidden": [],
+        "fakeChromeIcons": 0,
+        "overflowX": 0,
+        "nav": [
+          "活动",
+          "惠生活",
+          "我的"
+        ],
+        "headers": 0,
+        "stylesheetCount": 1
+      }
+    },
+    {
+      "id": "PAGES-02",
+      "area": "Pages HashRouter build (base /local-life/)",
+      "description": "HashRouter 活动子页深链可打开且高亮活动",
+      "status": "passed",
+      "detail": {
+        "hash": "#/community/activity/silver-neighborhood",
+        "activeLabel": "活动",
+        "overflowX": 0
+      }
+    },
+    {
+      "id": "PAGES-03",
+      "area": "Pages HashRouter build (base /local-life/)",
+      "description": "HashRouter 深链刷新后仍停留在同一活动子页",
+      "status": "passed",
+      "detail": {
+        "before": "#/community/activity/silver-neighborhood",
+        "afterReload": "#/community/activity/silver-neighborhood"
+      }
+    },
+    {
+      "id": "PAGES-04",
+      "area": "Pages HashRouter build (base /local-life/)",
+      "description": "HashRouter 三入口切换与浏览器后退正常（我的→惠生活→后退回我的）",
+      "status": "passed",
+      "detail": {
+        "me": [
+          "#/me",
+          "我的"
+        ],
+        "life": [
+          "#/life",
+          "惠生活"
+        ],
+        "back": [
+          "#/me",
+          "我的"
+        ]
+      }
+    },
+    {
+      "id": "PAGES-05",
+      "area": "Pages HashRouter build (base /local-life/)",
+      "description": "HashRouter 直接访问 #/me 并刷新仍可选我的（静态预览深链）",
+      "status": "passed",
+      "detail": {
+        "hash": "#/me",
+        "activeLabel": "我的",
+        "mainTextLength": 429
+      }
+    },
+    {
+      "id": "ERRORS",
+      "area": "runtime",
+      "description": "无未捕获异常；console 中的 /api 失败仅因本轮未启动 API 服务",
+      "status": "passed",
+      "detail": {
+        "unexpected": [],
+        "apiRelated": 0
+      }
+    }
+  ],
+  "summary": {
+    "total": 26,
+    "passed": 26,
+    "failed": 0
+  }
+}

@@ -1,0 +1,233 @@
+# Auto-deploy only on protected local-life/mvp push. Package without SSH secrets.
+# Deployment logic remains owned by pinned proto-infra@prod (see docs).
+name: Local Life MVP Auto Publish
+
+on:
+  push:
+    branches: [mvp]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: local-life-mvp-auto-publish
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: sanchuang-dev/proto-infra
+          ref: 6ddaa22c6ab2aa75310e416031cb4a04685c0b7e
+          persist-credentials: false
+      - name: Check installer syntax and bounded paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/install-local-life-mvp-app.sh
+          grep -Fq 'base=/srv/proto/local-life-mvp' scripts/install-local-life-mvp-app.sh
+          grep -Fq -- '-p 127.0.0.1:18081:4080' scripts/install-local-life-mvp-app.sh
+          grep -Fq "AUTH_DEV_ENABLED=false" scripts/install-local-life-mvp-app.sh
+          grep -Fq 'chmod -R a+rX' scripts/install-local-life-mvp-app.sh
+          grep -Fq 'MVP_STATIC_READABLE_BY_CADDY=yes' scripts/install-local-life-mvp-app.sh
+          # Fail the release gate if a pinned installer loses the persistent WeChat secret mount.
+          grep -Fq 'target=/run/local-life-wechat,readonly' scripts/install-local-life-mvp-app.sh
+          grep -Fq 'WECHAT_CONFIG_MASTER_KEY_FILE=/run/local-life-wechat/master-key.b64' scripts/install-local-life-mvp-app.sh
+          grep -Fq "test -z \"\$(read_old)\"" scripts/install-local-life-mvp-app.sh
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          mkdir -p "$tmp/source/assets" "$tmp/out"
+          printf '<html>ok</html>\n' > "$tmp/source/index.html"
+          printf 'asset\n' > "$tmp/source/assets/app.js"
+          chmod 0644 "$tmp/source/index.html" "$tmp/source/assets/app.js"
+          chmod 0755 "$tmp/source" "$tmp/source/assets"
+          tar -C "$tmp/source" -czf "$tmp/site.tar.gz" .
+          (umask 077; tar -xzf "$tmp/site.tar.gz" --no-same-owner --no-same-permissions -C "$tmp/out")
+          test "$(stat -c '%a' "$tmp/out/index.html")" = 600
+          chmod -R a+rX "$tmp/out"
+          test "$(stat -c '%a' "$tmp/out/index.html")" = 644
+          test "$(stat -c '%a' "$tmp/out/assets")" = 755
+          echo 'MVP_STATIC_PERMISSION_NORMALIZATION_TEST=PASS'
+
+  package:
+    needs: validate
+    if: github.event_name == 'push' && github.repository == 'sanchuang-dev/local-life' && github.ref == 'refs/heads/mvp'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    outputs:
+      sha: ${{ steps.pin.outputs.sha }}
+    steps:
+      - name: Check out protected MVP source, never development head
+        uses: actions/checkout@v4
+        with:
+          repository: sanchuang-dev/local-life
+          ref: ${{ github.sha }}
+          path: source
+          persist-credentials: false
+      - name: Pin exact source SHA and ensure this is the protected MVP tip
+        id: pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="$(git -C source rev-parse HEAD)"
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          expected="$(git ls-remote https://github.com/sanchuang-dev/local-life.git refs/heads/mvp | cut -f1)"
+          test "$sha" = "$expected" || { echo "::error::mvp moved during checkout; retry with new source"; exit 1; }
+          test "$sha" = "$GITHUB_SHA" || { echo "::error::Trigger/source SHA mismatch"; exit 1; }
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+          echo "MVP_PINNED_SHA=$sha"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: source/pnpm-lock.yaml
+      - name: Repeat full source checks on pinned MVP commit
+        working-directory: source
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm check
+      - name: Build two independent origin roots and verify
+        working-directory: source
+        run: |
+          set -euo pipefail
+          pnpm --filter @sanchuang-dev/local-life-web build:mvp
+          pnpm --filter @sanchuang-dev/local-life-admin build:mvp
+          node scripts/mvp/verify-build.mjs
+      - name: Build one immutable Linux API image from reviewed source
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="${{ steps.pin.outputs.sha }}"
+          docker build -f source/apps/api/Dockerfile -t "local-life-mvp-api:$sha" source
+          mkdir -p bundles
+          tar -C source/apps/web/dist -czf bundles/web.tar.gz .
+          tar -C source/apps/admin/dist -czf bundles/admin.tar.gz .
+          docker save "local-life-mvp-api:$sha" | gzip -1 > bundles/api-image.tar.gz
+          printf '%s\n' "$sha" > bundles/source-sha.txt
+          for tarball in bundles/web.tar.gz bundles/admin.tar.gz; do
+            tar -tzf "$tarball" | awk '
+              /^\// || /(^|\/)\.\.(\/|$)/ { bad=1 }
+              END { exit bad ? 1 : 0 }
+            '
+          done
+          test -s bundles/api-image.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: local-life-mvp-${{ steps.pin.outputs.sha }}
+          path: bundles/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  publish:
+    needs: package
+    if: github.event_name == 'push' && github.repository == 'sanchuang-dev/local-life' && github.ref == 'refs/heads/mvp'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out vetted infra release executor, not app source
+        uses: actions/checkout@v4
+        with:
+          repository: sanchuang-dev/proto-infra
+          ref: 6ddaa22c6ab2aa75310e416031cb4a04685c0b7e
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: local-life-mvp-${{ needs.package.outputs.sha }}
+          path: bundles
+      - name: Verify immutable source/artifact identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(cat bundles/source-sha.txt)" = "${{ needs.package.outputs.sha }}"
+          for path in web.tar.gz admin.tar.gz api-image.tar.gz; do test -s "bundles/$path"; done
+          bash -n scripts/install-local-life-mvp-app.sh
+          head="$(git ls-remote https://github.com/sanchuang-dev/local-life.git refs/heads/mvp | cut -f1)"
+          test "$head" = "${{ needs.package.outputs.sha }}" || { echo "::error::Newer mvp commit superseded this release"; exit 1; }
+      - name: Install SSH client on disposable runner
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends sshpass >/dev/null
+      - name: Deploy immutable release, verify HTTPS and preserve rollback
+        shell: bash
+        env:
+          TARGET_HOST: ${{ secrets.PROTO_SERVER_A_HOST }}
+          TARGET_USER: ${{ secrets.PROTO_SERVER_A_USER }}
+          TARGET_PORT: ${{ secrets.PROTO_SERVER_A_PORT || '22' }}
+          SSHPASS: ${{ secrets.PROTO_SERVER_A_PASSWORD }}
+          SOURCE_SHA: ${{ needs.package.outputs.sha }}
+        run: |
+          set -Eeuo pipefail
+          for name in TARGET_HOST TARGET_USER TARGET_PORT SSHPASS SOURCE_SHA; do
+            test -n "${!name:-}" || { echo "::error::Missing $name"; exit 1; }
+          done
+          case "$TARGET_HOST" in 8.148.148.135|proto.3cgroup.cn) ;; *) echo "::error::Unapproved host"; exit 1 ;; esac
+          [[ "$TARGET_PORT" =~ ^[0-9]+$ ]] || exit 1
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          install -d -m 0700 "$RUNNER_TEMP/ssh"
+          ssh-keyscan -T 10 -p "$TARGET_PORT" -t ed25519 "$TARGET_HOST" 2>/dev/null > "$RUNNER_TEMP/ssh/known_hosts"
+          test -s "$RUNNER_TEMP/ssh/known_hosts"
+          fingerprint="$(ssh-keygen -lf "$RUNNER_TEMP/ssh/known_hosts" -E sha256 | awk 'NR==1 {print $2}')"
+          test "$fingerprint" = "SHA256:wRPdG4mucUA07fKN1V/Fes+r38VK0zYWXZ4BYm/6Niw" || {
+            echo "::error::SSH identity mismatch"; exit 1;
+          }
+          ssh_opts=(-o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$RUNNER_TEMP/ssh/known_hosts" -o PreferredAuthentications=password -o PubkeyAuthentication=no -o NumberOfPasswordPrompts=1 -o ConnectTimeout=12 -p "$TARGET_PORT")
+          scp_opts=(-o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$RUNNER_TEMP/ssh/known_hosts" -o PreferredAuthentications=password -o PubkeyAuthentication=no -o NumberOfPasswordPrompts=1 -o ConnectTimeout=12 -P "$TARGET_PORT")
+          remote() { sshpass -e ssh -T "${ssh_opts[@]}" "$TARGET_USER@$TARGET_HOST" "$@"; }
+          stage="$(remote 'mktemp -d /tmp/local-life-mvp-release.XXXXXX')"
+          [[ "$stage" =~ ^/tmp/local-life-mvp-release\.[A-Za-z0-9]+$ ]] || exit 1
+          applied=0
+          rollback() {
+            if test "$applied" = 1; then
+              echo "::warning::Release verification failed; requesting bounded rollback"
+              if remote "bash '$stage/install-local-life-mvp-app.sh' rollback '$stage' '$SOURCE_SHA'"; then
+                remote "rm -rf -- '$stage'" || echo "::warning::Temporary staging cleanup failed"
+              else
+                echo "::error::Rollback needs operator review; staging retained at $stage"
+              fi
+            fi
+          }
+          trap rollback EXIT
+          sshpass -e scp -q "${scp_opts[@]}" \
+            bundles/web.tar.gz bundles/admin.tar.gz bundles/api-image.tar.gz \
+            scripts/install-local-life-mvp-app.sh "$TARGET_USER@$TARGET_HOST:$stage/"
+          applied=1
+          remote "bash '$stage/install-local-life-mvp-app.sh' apply '$stage' '$SOURCE_SHA'"
+          for host in local.proto.3cgroup.cn local-admin.proto.3cgroup.cn; do
+            echo "MVP_PUBLIC_HEALTH_CHECK_BEGIN=$host"
+            curl -fsS --connect-timeout 8 --max-time 20 "https://$host/api/healthz" > "$RUNNER_TEMP/health.json"
+            grep -Fq '"service":"local-life-api"' "$RUNNER_TEMP/health.json"
+            echo "MVP_PUBLIC_HEALTH_CHECK_PASS=$host"
+            echo "MVP_PUBLIC_INDEX_CHECK_BEGIN=$host"
+            curl -fsS --connect-timeout 8 --max-time 20 "https://$host/" -o "$RUNNER_TEMP/$host.html"
+            grep -Eq '(src|href)="/assets/' "$RUNNER_TEMP/$host.html"
+            echo "MVP_PUBLIC_INDEX_CHECK_PASS=$host"
+            case "$host" in
+              local.proto.3cgroup.cn) deep_link=/community/activity/silver-neighborhood ;;
+              local-admin.proto.3cgroup.cn) deep_link=/communities ;;
+              *) exit 1 ;;
+            esac
+            curl -fsS --connect-timeout 8 --max-time 20 "https://$host$deep_link" -o "$RUNNER_TEMP/$host.deep.html"
+            cmp -s "$RUNNER_TEMP/$host.html" "$RUNNER_TEMP/$host.deep.html"
+            echo "MVP_BROWSER_ROUTE_FALLBACK_PASS=$host$deep_link"
+            asset="$(grep -oE '(src|href)="/assets/[^"]+' "$RUNNER_TEMP/$host.html" | head -n1 | cut -d'"' -f2)"
+            test -n "$asset"
+            echo "MVP_PUBLIC_ASSET_CHECK_BEGIN=$host"
+            curl -fsS --connect-timeout 8 --max-time 20 "https://$host$asset" -o /dev/null
+            echo "MVP_PUBLIC_ASSET_CHECK_PASS=$host"
+            status="$(curl -s -o /dev/null -w '%{http_code}' "https://$host/api/admin/communities")"
+            test "$status" = 401
+            echo "MVP_HTTPS_HEALTH_ASSETS_AND_AUTH_PASS=$host"
+          done
+          curl -fsSL --connect-timeout 8 --max-time 20 https://local-life.proto.3cgroup.cn/ -o /dev/null
+          curl -fsSL --connect-timeout 8 --max-time 20 https://benefit.proto.3cgroup.cn/healthz -o /dev/null
+          curl -fsSL --connect-timeout 8 --max-time 20 https://proto.3cgroup.cn/ -o /dev/null
+          remote "bash '$stage/install-local-life-mvp-app.sh' finalize '$stage' '$SOURCE_SHA'"
+          applied=0
+          trap - EXIT
+          echo "MVP_DEPLOYMENT_VERIFIED_SHA=$SOURCE_SHA"
