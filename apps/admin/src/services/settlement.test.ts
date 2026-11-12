@@ -1130,6 +1130,8 @@ const BLOCKED_LINE = {
   productName: '幸福社区三日体验卡',
   periodAt: '2026-11-02T03:00:00.000Z',
   registeredAmountCents: 12_800,
+  couponDiscountCents: 0,
+  netPayableCents: 12_800,
   receiptEntryId: QUOTE_RECEIPT_ENTRY_ID,
   receiptEvidenceRef: '收据 2026-11-02',
   receiptReceivedAt: '2026-11-02T04:00:00.000Z',
