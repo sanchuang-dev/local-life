@@ -29,6 +29,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   activityRewardPlanSchema,
   createActivityRequestSchema,
+  PURCHASE_REWARD_MAX_TOTAL_BUDGET_CENTS,
+  PURCHASE_REWARD_TEAM_SIZE,
+  purchaseRewardPlanSchema,
+  purchaseRewardTotalBudgetCents,
   updateActivityRequestSchema,
   type ActivityAuditEntry,
   type ActivityCommunityRef,
@@ -39,6 +43,7 @@ import {
   type ActivityStatus,
   type AdminActivityDetail,
   type AdminActivitySummary,
+  type PurchaseRewardPlan,
   type UpdateActivityRequest,
 } from '@sanchuang-dev/local-life-contracts'
 import { useAdminAuth } from '../app/auth-context'
@@ -108,6 +113,16 @@ interface ActivityFormValues {
    * means "the payload did not tell us" (older API), `null` means "no plan".
    */
   rewardPlanBaseline?: ActivityRewardPlan | null
+  /**
+   * Consumption team reward plan (LL-PUR-002). Same three-state semantics as the
+   * check-in plan: absent key inherits, explicit `null` clears, an object
+   * replaces. The baseline lets an untouched plan survive an unrelated edit.
+   */
+  purchaseRewardEnabled?: boolean
+  purchaseThresholdYuan?: number | null
+  purchaseCouponFaceValueYuan?: number | null
+  purchaseMaxRewardedTeams?: number | null
+  purchaseRewardPlanBaseline?: PurchaseRewardPlan | null
 }
 
 const ACTIVITY_STATUS_META: Record<ActivityStatus, { label: string; color: string }> = {
@@ -263,7 +278,18 @@ function publicRulesFromForm(values: ActivityFormValues): ActivityPublicRules {
 
 type KeyRulesResult = { ok: true; keyRules: ActivityKeyRules } | { ok: false; message: string }
 
-export function keyRulesFromForm(values: ActivityFormValues): KeyRulesResult {
+/** Server-owned state the form cannot always infer from its own fields. */
+interface KeyRulesContext {
+  /** Published/paused purchase rules are frozen; never send a changed plan. */
+  purchaseRewardLocked?: boolean
+  /** The plan currently stored on the activity; used to echo a locked plan. */
+  purchaseRewardPlanBaseline?: PurchaseRewardPlan | null
+}
+
+export function keyRulesFromForm(
+  values: ActivityFormValues,
+  context: KeyRulesContext = {},
+): KeyRulesResult {
   const start = values.range?.[0]
   const end = values.range?.[1]
   if (!start || !end) return { ok: false, message: '请选择完整的活动开始与结束时间。' }
@@ -284,6 +310,8 @@ export function keyRulesFromForm(values: ActivityFormValues): KeyRulesResult {
   }
   const plan = rewardPlanFromForm(values)
   if (!plan.ok) return plan
+  const purchasePlan = purchaseRewardPlanFromForm(values, context)
+  if (!purchasePlan.ok) return purchasePlan
   return {
     ok: true,
     keyRules: {
@@ -293,13 +321,16 @@ export function keyRulesFromForm(values: ActivityFormValues): KeyRulesResult {
       budgetCapCents: yuanToCents(values.budgetYuan),
       prizeQuantityCap: values.prizeQuantityCap,
       publicRules: publicRulesFromForm(values),
-      // Reward plan is *three-state* on the wire:
+      // Both plans are *three-state* on the wire:
       //   key absent  → the server keeps whatever plan it already froze
       //   explicit null → the operator cleared the plan (destructive)
       //   an object   → replace/define the plan
       // The form therefore only emits a key when it has an opinion. Emitting
       // `undefined` here is deliberate: it drops the key from the JSON body.
       ...(plan.rewardPlan === undefined ? {} : { rewardPlan: plan.rewardPlan }),
+      ...(purchasePlan.purchaseRewardPlan === undefined
+        ? {}
+        : { purchaseRewardPlan: purchasePlan.purchaseRewardPlan }),
     },
   }
 }
@@ -377,6 +408,64 @@ function rewardPlanFromForm(values: ActivityFormValues): RewardPlanResult {
   return { ok: true, rewardPlan: parsed.data }
 }
 
+type PurchaseRewardPlanResult =
+  | { ok: true; purchaseRewardPlan: PurchaseRewardPlan | null | undefined }
+  | { ok: false; message: string }
+
+/**
+ * Reads the consumption team reward section of the form.
+ *
+ * Mirrors `rewardPlanFromForm`: `undefined` keeps the stored plan, `null` clears
+ * it, an object replaces it. On published/paused activities the plan is frozen
+ * by the API, so the form echoes the stored baseline instead of submitting a
+ * (possibly unavailable) edit and provoking a 409.
+ */
+function purchaseRewardPlanFromForm(
+  values: ActivityFormValues,
+  context: KeyRulesContext,
+): PurchaseRewardPlanResult {
+  const baseline = Object.hasOwn(context, 'purchaseRewardPlanBaseline')
+    ? (context.purchaseRewardPlanBaseline ?? null)
+    : (values.purchaseRewardPlanBaseline ?? null)
+
+  if (context.purchaseRewardLocked) {
+    // Echoing the baseline keeps `keyRulesEqual` stable, so an ordinary title or
+    // location edit cannot mint a new rule version just because the plan is
+    // locked. A null baseline stays omitted (same equality after `?? null`).
+    return { ok: true, purchaseRewardPlan: baseline ?? undefined }
+  }
+
+  if (!values.purchaseRewardEnabled) {
+    return { ok: true, purchaseRewardPlan: baseline ? null : undefined }
+  }
+
+  const thresholdYuan = values.purchaseThresholdYuan
+  if (typeof thresholdYuan !== 'number' || !Number.isFinite(thresholdYuan)) {
+    return { ok: false, message: '请填写消费奖励中的团队实付门槛（元）。' }
+  }
+  const couponFaceValueYuan = values.purchaseCouponFaceValueYuan
+  if (typeof couponFaceValueYuan !== 'number' || !Number.isFinite(couponFaceValueYuan)) {
+    return { ok: false, message: '请填写消费奖励中的每人券面额（元）。' }
+  }
+  const maxRewardedTeams = values.purchaseMaxRewardedTeams
+  if (typeof maxRewardedTeams !== 'number' || !Number.isInteger(maxRewardedTeams)) {
+    return { ok: false, message: '请填写消费奖励中的奖励团队数量上限（整数）。' }
+  }
+
+  const parsed = purchaseRewardPlanSchema.safeParse({
+    thresholdCents: yuanToCents(thresholdYuan),
+    couponFaceValueCents: yuanToCents(couponFaceValueYuan),
+    maxRewardedTeams,
+  })
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: `消费奖励规则不符合共享契约：${formatIssues(parsed.error.issues)}`,
+    }
+  }
+  return { ok: true, purchaseRewardPlan: parsed.data }
+}
+
 /**
  * Identity used to decide whether a save actually changes the key rules.
  *
@@ -394,6 +483,7 @@ function normalizeKeyRules(rules: ActivityKeyRules) {
     prizeQuantityCap: rules.prizeQuantityCap,
     publicRules: normalizePublicRules(rules.publicRules),
     rewardPlan: rules.rewardPlan ?? null,
+    purchaseRewardPlan: rules.purchaseRewardPlan ?? null,
   }
 }
 
@@ -406,6 +496,7 @@ function keyRulesEqual(detail: AdminActivityDetail, next: ActivityKeyRules): boo
     prizeQuantityCap: detail.prizeQuantityCap,
     publicRules: normalizePublicRules(detail.publicRules),
     rewardPlan: detail.rewardPlan ?? null,
+    purchaseRewardPlan: detail.purchaseRewardPlan ?? null,
   }
   return JSON.stringify(current) === JSON.stringify(normalizeKeyRules(next))
 }
@@ -426,6 +517,7 @@ export function toFormValues(detail: AdminActivityDetail): ActivityFormValues {
     prizeClaim: detail.publicRules.prizeClaim,
     notes: detail.publicRules.notes ?? '',
     ...rewardPlanToForm(detail.rewardPlan ?? null),
+    ...purchaseRewardPlanToForm(detail.purchaseRewardPlan ?? null),
   }
 }
 
@@ -466,6 +558,32 @@ function rewardPlanToForm(plan: ActivityRewardPlan | null): Partial<ActivityForm
     rewardRedemptionHours: plan.redemptionValidHours,
     rewardNotes: plan.notes ?? '',
     rewardPlanBaseline: plan,
+  }
+}
+
+/**
+ * Projects the stored consumption reward plan into the editable fields.
+ * `purchaseRewardPlanBaseline` is the value echoed back by a save that does not
+ * touch the plan, so a title/location edit cannot silently clear it.
+ */
+function purchaseRewardPlanToForm(
+  plan: PurchaseRewardPlan | null,
+): Partial<ActivityFormValues> {
+  if (!plan) {
+    return {
+      purchaseRewardEnabled: false,
+      purchaseThresholdYuan: null,
+      purchaseCouponFaceValueYuan: null,
+      purchaseMaxRewardedTeams: null,
+      purchaseRewardPlanBaseline: null,
+    }
+  }
+  return {
+    purchaseRewardEnabled: true,
+    purchaseThresholdYuan: centsToYuan(plan.thresholdCents),
+    purchaseCouponFaceValueYuan: centsToYuan(plan.couponFaceValueCents),
+    purchaseMaxRewardedTeams: plan.maxRewardedTeams,
+    purchaseRewardPlanBaseline: plan,
   }
 }
 
@@ -665,6 +783,183 @@ function RewardPlanFields() {
   )
 }
 
+/**
+ * Read-only summary of a consumption team reward plan.
+ *
+ * Used in the frozen snapshot (published/paused drawer), the ended-activity
+ * snapshot and the rule-version history, so the same budget meaning is shown
+ * everywhere the plan is not editable.
+ */
+function PurchaseRewardPlanSummary({ plan }: { plan: PurchaseRewardPlan | null }) {
+  if (!plan) {
+    return <Typography.Text type="secondary">未配置（不影响签到奖励）</Typography.Text>
+  }
+  return (
+    <Space orientation="vertical" size={2}>
+      <Typography.Text>
+        团队实付门槛 {formatCents(plan.thresholdCents)} · 每人券面额{' '}
+        {formatCents(plan.couponFaceValueCents)}
+      </Typography.Text>
+      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        奖励团队上限 {plan.maxRewardedTeams} 个 · 团队券总预算{' '}
+        {formatCents(purchaseRewardTotalBudgetCents(plan))}（每人券额 × {PURCHASE_REWARD_TEAM_SIZE}{' '}
+        人 × 团队数）
+      </Typography.Text>
+    </Space>
+  )
+}
+
+/** Read-only budget arithmetic; the API still owns the authoritative limit. */
+function PurchaseRewardBudgetHint({
+  couponFaceValueYuan,
+  maxRewardedTeams,
+}: {
+  couponFaceValueYuan?: number | null
+  maxRewardedTeams?: number | null
+}) {
+  const hasInputs =
+    typeof couponFaceValueYuan === 'number' &&
+    Number.isFinite(couponFaceValueYuan) &&
+    typeof maxRewardedTeams === 'number' &&
+    Number.isInteger(maxRewardedTeams)
+  if (!hasInputs) {
+    return (
+      <Alert
+        type="info"
+        showIcon
+        title="团队券总预算（只读计算）"
+        description="填写每人券面额与奖励团队数量上限后自动计算：每人券额 × 3 人 × 团队数；最终由服务端约束。"
+      />
+    )
+  }
+  const totalCents = purchaseRewardTotalBudgetCents({
+    couponFaceValueCents: yuanToCents(couponFaceValueYuan),
+    maxRewardedTeams,
+  })
+  const overLimit = totalCents > PURCHASE_REWARD_MAX_TOTAL_BUDGET_CENTS
+  return (
+    <Alert
+      type={overLimit ? 'warning' : 'info'}
+      showIcon
+      title="团队券总预算（只读计算）"
+      description={
+        overLimit
+          ? `当前为 ${formatCents(totalCents)}，超过共享契约上限 ${formatCents(PURCHASE_REWARD_MAX_TOTAL_BUDGET_CENTS)}；请降低每人券面额或团队数量上限。`
+          : `当前为 ${formatCents(totalCents)}（每人券额 × 3 人 × 团队数）；服务端保存时会再次校验。`
+      }
+    />
+  )
+}
+
+/**
+ * Consumption team reward editor (LL-PUR-002).
+ *
+ * Deliberately independent from `RewardPlanFields`: an activity can run the
+ * check-in reward, the consumption team reward, both, or neither. Every field
+ * maps 1:1 onto `purchaseRewardPlanSchema`; the only derived value is the
+ * read-only total coupon budget, and even that is re-checked by the server.
+ */
+function PurchaseRewardPlanFields() {
+  return (
+    <>
+      <Row gutter={12}>
+        <Col xs={24} sm={12}>
+          <Form.Item
+            name="purchaseThresholdYuan"
+            label="团队实付门槛（元）"
+            rules={[{ required: true, message: '请填写团队实付门槛' }]}
+            extra="团队三名成员自加入起累计实付达到该金额，整团才算达标。"
+          >
+            <InputNumber
+              min={0.01}
+              max={1000000}
+              precision={2}
+              style={{ width: '100%' }}
+              placeholder="0.00"
+            />
+          </Form.Item>
+        </Col>
+        <Col xs={24} sm={12}>
+          <Form.Item
+            name="purchaseCouponFaceValueYuan"
+            label="每人券面额（元）"
+            rules={[{ required: true, message: '请填写每人券面额' }]}
+            extra="达标团队的三名成员各获得一张同面额平台券。"
+          >
+            <InputNumber
+              min={0.01}
+              max={1000000}
+              precision={2}
+              style={{ width: '100%' }}
+              placeholder="0.00"
+            />
+          </Form.Item>
+        </Col>
+      </Row>
+
+      <Form.Item
+        name="purchaseMaxRewardedTeams"
+        label="奖励团队数量上限"
+        dependencies={['purchaseCouponFaceValueYuan']}
+        rules={[
+          { required: true, message: '请填写奖励团队数量上限' },
+          ({ getFieldValue }) => ({
+            validator: async (_rule, value: number | null | undefined) => {
+              if (typeof value !== 'number' || !Number.isInteger(value)) return
+              const couponYuan = getFieldValue('purchaseCouponFaceValueYuan') as
+                | number
+                | undefined
+              if (typeof couponYuan !== 'number') return
+              const totalCents = purchaseRewardTotalBudgetCents({
+                couponFaceValueCents: yuanToCents(couponYuan),
+                maxRewardedTeams: value,
+              })
+              if (totalCents > PURCHASE_REWARD_MAX_TOTAL_BUDGET_CENTS) {
+                throw new Error(
+                  `团队券总预算 ${formatCents(totalCents)} 超过上限 ${formatCents(
+                    PURCHASE_REWARD_MAX_TOTAL_BUDGET_CENTS,
+                  )}，请降低每人券面额或团队数量上限`,
+                )
+              }
+            },
+          }),
+        ]}
+        extra="达到上限后不再新增奖励团队；该值与每人券面额共同锁定团队券总预算。"
+      >
+        <InputNumber
+          min={1}
+          max={100000}
+          precision={0}
+          style={{ width: '100%' }}
+          placeholder="0"
+        />
+      </Form.Item>
+
+      <Form.Item
+        noStyle
+        shouldUpdate={(prev, next) =>
+          prev.purchaseCouponFaceValueYuan !== next.purchaseCouponFaceValueYuan ||
+          prev.purchaseMaxRewardedTeams !== next.purchaseMaxRewardedTeams
+        }
+      >
+        {({ getFieldValue }) => (
+          <PurchaseRewardBudgetHint
+            couponFaceValueYuan={getFieldValue('purchaseCouponFaceValueYuan') as number | undefined}
+            maxRewardedTeams={getFieldValue('purchaseMaxRewardedTeams') as number | undefined}
+          />
+        )}
+      </Form.Item>
+
+      <Alert
+        type="info"
+        showIcon
+        title="消费奖励口径"
+        description="团队券总预算 = 每人券面额 × 3 人 × 奖励团队数量上限，由服务端校验。未启用消费组团奖励不影响既有签到奖励，也不会削弱已配置的签到奖。"
+      />
+    </>
+  )
+}
+
 function PublicRulesDescriptions({ rules }: { rules: ActivityPublicRules }) {
   return (
     <Descriptions size="small" column={1} colon={false} className="activity-snapshot">
@@ -839,6 +1134,7 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
       // A brand-new activity has no plan: keep the section collapsed but give
       // the fields usable starting values for when the operator turns it on.
       ...rewardPlanToForm(null),
+      ...purchaseRewardPlanToForm(null),
     })
     // Only the create-drawer opening should reset the form; later community
     // refreshes must not wipe what the operator is typing.
@@ -1059,7 +1355,18 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
 
   async function submitEditor(values: ActivityFormValues) {
     setSaveError(null)
-    const keyRulesResult = keyRulesFromForm(values)
+    const purchaseRewardLocked =
+      editorMode === 'edit' &&
+      (detail?.status === 'published' || detail?.status === 'paused')
+    const keyRulesResult = keyRulesFromForm(
+      values,
+      editorMode === 'edit' && detail
+        ? {
+            purchaseRewardLocked,
+            purchaseRewardPlanBaseline: detail.purchaseRewardPlan ?? null,
+          }
+        : {},
+    )
     if (!keyRulesResult.ok) {
       setSaveError(keyRulesResult.message)
       return
@@ -1415,6 +1722,9 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
                   <Typography.Text type="secondary">未配置（居民签到与领奖入口不可用）</Typography.Text>
                 )}
               </Descriptions.Item>
+              <Descriptions.Item label="消费组团奖励">
+                <PurchaseRewardPlanSummary plan={detail.purchaseRewardPlan ?? null} />
+              </Descriptions.Item>
             </Descriptions>
             <PublicRulesDescriptions rules={detail.publicRules} />
             <Button onClick={closeEditor}>关闭</Button>
@@ -1653,6 +1963,66 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
               }
             </Form.Item>
 
+            <Typography.Text type="secondary" className="activity-form-section">
+              消费组团奖励（LL-PUR-002 · 与签到奖励独立，可同时配置）
+            </Typography.Text>
+
+            {editorMode === 'edit' && detail && detail.status !== 'draft' ? (
+              <Alert
+                type="info"
+                showIcon
+                title="消费组团奖励已冻结"
+                description={
+                  <Space orientation="vertical" size={4} style={{ width: '100%' }}>
+                    <PurchaseRewardPlanSummary plan={detail.purchaseRewardPlan ?? null} />
+                    <Typography.Text type="secondary">
+                      发布/暂停期间该规则随规则版本冻结，不可修改；其他活动字段仍可编辑。如需调整请结束活动后新建。
+                    </Typography.Text>
+                  </Space>
+                }
+              />
+            ) : (
+              <>
+                <Form.Item
+                  name="purchaseRewardEnabled"
+                  label="配置消费组团奖励"
+                  valuePropName="checked"
+                  extra="与签到奖励相互独立。关闭表示该活动不设消费组团奖励，不影响已配置的签到奖；发布后该规则随规则版本冻结。"
+                >
+                  <Switch checkedChildren="已配置" unCheckedChildren="未配置" />
+                </Form.Item>
+
+                <Form.Item
+                  noStyle
+                  shouldUpdate={(prev, next) =>
+                    prev.purchaseRewardEnabled !== next.purchaseRewardEnabled ||
+                    prev.purchaseRewardPlanBaseline !== next.purchaseRewardPlanBaseline
+                  }
+                >
+                  {({ getFieldValue }) =>
+                    getFieldValue('purchaseRewardEnabled') ? (
+                      <PurchaseRewardPlanFields />
+                    ) : (
+                      <Alert
+                        type="info"
+                        showIcon
+                        title={
+                          getFieldValue('purchaseRewardPlanBaseline')
+                            ? '保存后该活动的消费组团奖励将被清空'
+                            : '未配置消费组团奖励'
+                        }
+                        description={
+                          getFieldValue('purchaseRewardPlanBaseline')
+                            ? '当前活动已配置过消费组团奖励。关闭开关再保存会显式清空它，并生成新规则版本；已发放奖励与既有签到奖励不受影响。'
+                            : '未启用消费组团奖励不影响既有签到奖励；发布后居民端只展示门槛与每人券面额。'
+                        }
+                      />
+                    )
+                  }
+                </Form.Item>
+              </>
+            )}
+
             {editorMode === 'edit' && detail?.status === 'draft' ? (
               <Alert
                 type="info"
@@ -1757,6 +2127,11 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
                         未配置（该版本下居民签到与领奖入口不可用）
                       </Typography.Text>
                     )}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="消费组团奖励">
+                    <PurchaseRewardPlanSummary
+                      plan={version.snapshot.purchaseRewardPlan ?? null}
+                    />
                   </Descriptions.Item>
                 </Descriptions>
                 <PublicRulesDescriptions rules={version.snapshot.publicRules} />
