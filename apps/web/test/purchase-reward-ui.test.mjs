@@ -33,6 +33,7 @@ const OTHER_ACTIVITY_ID = '123e4567-e89b-42d3-a456-4266141740a2'
 const TEAM_ID = '123e4567-e89b-42d3-a456-4266141740b1'
 const OTHER_TEAM_ID = '123e4567-e89b-42d3-a456-4266141740b2'
 const PRODUCT_ID = '123e4567-e89b-42d3-a456-4266141740c1'
+const COMMUNITY_ID = '123e4567-e89b-42d3-a456-4266141740c2'
 const JOINED_AT = '2026-11-11T03:04:05.678Z'
 const ISSUED_AT = '2026-11-11T05:06:07.000Z'
 const EXPIRES_AT = '2026-12-11T05:06:07.000Z'
@@ -77,6 +78,7 @@ function coupon(overrides = {}) {
     id: '123e4567-e89b-42d3-a456-4266141740d1',
     activityId: ACTIVITY_ID,
     teamId: TEAM_ID,
+    communityId: COMMUNITY_ID,
     faceValueCents: PLAN.couponFaceValueCents,
     status: 'available',
     issuedAt: ISSUED_AT,

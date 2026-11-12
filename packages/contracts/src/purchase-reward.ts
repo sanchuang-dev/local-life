@@ -108,6 +108,8 @@ export const couponWalletItemSchema = z.strictObject({
   id: z.string().uuid(),
   activityId: z.string().uuid(),
   teamId: z.string().uuid(),
+  /** The activity's community, so the H5 can explain a cross-community coupon. */
+  communityId: z.string().uuid(),
   faceValueCents: z.number().int().positive(),
   status: couponEffectiveStatusSchema,
   issuedAt: z.string().datetime({ offset: true }),

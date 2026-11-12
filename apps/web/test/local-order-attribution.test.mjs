@@ -82,26 +82,36 @@ test('a removed selection resolves to no option instead of another team', () => 
   )
 })
 
-test('a retry keeps the first idempotency key and attribution', () => {
+test('a retry keeps the first idempotency key, attribution and coupon', () => {
   let keyCalls = 0
   const createKey = () => {
     keyCalls += 1
     return `key-${keyCalls}`
   }
+  const coupon = { id: '123e4567-e89b-42d3-a456-4266141740f8', faceValueCents: 2_000 }
   const first = resolveSubmissionAttempt(
     null,
-    { sourceActivityId: ACTIVITY_A.id, sourceTeamId: TEAM_A.id },
+    {
+      attribution: { sourceActivityId: ACTIVITY_A.id, sourceTeamId: TEAM_A.id },
+      coupon,
+    },
     createKey,
   )
   assert.deepEqual(first, {
     idempotencyKey: 'key-1',
     attribution: { sourceActivityId: ACTIVITY_A.id, sourceTeamId: TEAM_A.id },
+    couponId: coupon.id,
+    couponFaceValueCents: coupon.faceValueCents,
   })
 
-  // A later UI selection change must not turn the same retry into another team.
+  // A later UI selection change must not turn the same retry into another team
+  // or reserve a different coupon.
   const retry = resolveSubmissionAttempt(
     first,
-    { sourceActivityId: ACTIVITY_B.id, sourceTeamId: TEAM_B.id },
+    {
+      attribution: { sourceActivityId: ACTIVITY_B.id, sourceTeamId: TEAM_B.id },
+      coupon: { id: '123e4567-e89b-42d3-a456-4266141740f9', faceValueCents: 1_000 },
+    },
     createKey,
   )
   assert.equal(retry.idempotencyKey, 'key-1')
@@ -109,6 +119,8 @@ test('a retry keeps the first idempotency key and attribution', () => {
     sourceActivityId: ACTIVITY_A.id,
     sourceTeamId: TEAM_A.id,
   })
+  assert.equal(retry.couponId, coupon.id)
+  assert.equal(retry.couponFaceValueCents, coupon.faceValueCents)
   assert.equal(keyCalls, 1)
 })
 
@@ -118,6 +130,7 @@ test('the submitted payload carries the selected activity/team and a trimmed opt
     quantity: 2,
     note: '  周末自提  ',
     attribution: { sourceActivityId: ACTIVITY_A.id, sourceTeamId: TEAM_A.id },
+    couponId: null,
     idempotencyKey: '123e4567-e89b-42d3-a456-4266141740f6',
   })
   assert.deepEqual(payload, {
@@ -134,11 +147,13 @@ test('the submitted payload carries the selected activity/team and a trimmed opt
     quantity: 1,
     note: '   ',
     attribution: {},
+    couponId: null,
     idempotencyKey: '123e4567-e89b-42d3-a456-4266141740f7',
   })
   assert.equal('note' in withoutNoteOrTeam, false)
   assert.equal('sourceActivityId' in withoutNoteOrTeam, false)
   assert.equal('sourceTeamId' in withoutNoteOrTeam, false)
+  assert.equal('couponId' in withoutNoteOrTeam, false)
 })
 
 test('the frozen attribution is described without inventing a team or a name', () => {
