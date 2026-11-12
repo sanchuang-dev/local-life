@@ -1458,8 +1458,11 @@ describe('SettlementStatementPanel · 付款凭据（#225）', () => {
     // A 403 must not masquerade as "no payment records": no KPI/list is rendered.
     expect(screen.queryByText('受款人（真实登记主体）')).toBeNull()
     expect(screen.queryByText('已登记付款凭据')).toBeNull()
-    expect(screen.queryAllByText('¥0.00')).toHaveLength(0)
-    expect(screen.queryByText(/暂无付款事件|尚未登记付款凭据/)).toBeNull()
+    // The statement summary can legitimately contain zero-valued amounts;
+    // a payment 403 must hide PAYMENT amounts, not unrelated statement data.
+    const paymentPanel = screen.getByRole('tabpanel', { name: /付款凭据/ })
+    expect(within(paymentPanel).queryAllByText('¥0.00')).toHaveLength(0)
+    expect(within(paymentPanel).queryByText(/暂无付款事件|尚未登记付款凭据/)).toBeNull()
   })
 
   it('never claims payment/verification and offers no transfer entry', async () => {
