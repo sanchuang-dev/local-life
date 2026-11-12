@@ -1035,6 +1035,12 @@ export function verifyOrder(
           '订单已被其他操作核验，请刷新后重试',
         )
       }
+      // Fully subsidised orders have net cash 0: no fake payment receipt.
+      // Actual business verification consumes the reserved coupon atomically.
+      if (body.decision === 'verify' && row.couponId &&
+          row.totalCents === row.couponDiscountCents) {
+        redeemCouponForOrder(tx, orderId, now)
+      }
       insertOrderEvent(tx, {
         orderId,
         actorUserId: actor.userId,
@@ -1053,7 +1059,7 @@ export function verifyOrder(
         now,
         { fromStatus: 'pending_review', toStatus: target, decision: body.decision },
       )
-    })
+    }, { behavior: 'immediate' })
   } catch (error) {
     mapConstraintError(error)
   }
