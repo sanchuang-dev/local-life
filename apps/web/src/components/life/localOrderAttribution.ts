@@ -1,3 +1,4 @@
+import { API_ERROR_CODES } from '@sanchuang-dev/local-life-contracts'
 import type {
   CreateLocalOrderRequest,
   LocalOrderSummary,
@@ -96,6 +97,20 @@ export function resolveSubmissionAttempt(
   createKey: () => string,
 ): LocalOrderSubmissionAttempt {
   return previous ?? { idempotencyKey: createKey(), attribution }
+}
+
+/**
+ * A missing response (network timeout, 5xx, malformed success) may mean the
+ * server committed the order but the acknowledgement was lost. In that case
+ * the original idempotency key MUST survive; starting over may duplicate an
+ * order. Only definitive business rejections may unlock editing.
+ */
+export function mayDiscardRejectedOrderAttempt(failure: { status: number; code: string | null }): boolean {
+  return (
+    failure.status === 400 ||
+    failure.status === 404 ||
+    (failure.status === 409 && failure.code !== API_ERROR_CODES.orderIdempotencyConflict)
+  )
 }
 
 export function buildLocalOrderRegistration(input: {
