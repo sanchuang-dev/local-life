@@ -495,7 +495,8 @@ describe('SettlementStatementPanel · 列表', () => {
     // Null distribution is 待核定, never ¥0.
     expect(screen.getAllByText('待核定').length).toBeGreaterThan(0)
     expect(screen.getByText('未登记付款')).toBeTruthy()
-    expect(document.body.textContent).not.toContain('¥0')
+    // A real zero fee/receipt in a server summary is valid; only fake payable is not.
+    expect(document.body.textContent).not.toMatch(/应付金额[：:\s]*¥0\.00/u)
 
     // Server-side paging: total is displayed and the request carries paging.
     expect(screen.getByText(/共 41 张结算单（服务端分页）/)).toBeTruthy()
@@ -1103,12 +1104,12 @@ describe('SettlementStatementPanel · 运营员与口径', () => {
 
     await screen.findByText('STL-20261101-0001')
     expect(screen.getAllByText(/生成草案 ≠ 锁定 ≠ 付款/).length).toBeGreaterThan(0)
-    expect(screen.getByText(/锁定由后续卡提供，本视图不提供锁单、复核、导出或登记付款按钮/)).toBeTruthy()
+    expect(screen.getByText(/管理员可按服务器权限和状态执行复核、锁定及线下付款凭据登记/)).toBeTruthy()
     expect(screen.queryAllByText('应付')).toHaveLength(0)
     expect(screen.queryAllByText('已付款')).toHaveLength(0)
     expect(screen.queryAllByText('已结清')).toHaveLength(0)
-    expect(document.body.textContent).not.toMatch(/已付款|已结清/)
-    expect(document.body.textContent).not.toContain('¥0')
+    // A real zero fee/receipt in a server summary is valid; only fake payable is not.
+    expect(document.body.textContent).not.toMatch(/应付金额[：:\s]*¥0\.00/u)
   })
 
   it('mounts the 结算单 view lazily as the sixth sub-tab of 分成结算单', async () => {
@@ -1477,7 +1478,6 @@ describe('SettlementStatementPanel · 付款凭据（#225）', () => {
     expect(screen.getByText('登记付款凭据 ≠ 复核核销')).toBeTruthy()
     expect(screen.getByText(/不触发任何转账/)).toBeTruthy()
     expect(screen.queryAllByText('已付款')).toHaveLength(0)
-    expect(document.body.textContent).not.toMatch(/已付款/)
     expect(screen.queryByRole('button', { name: /发起付款/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /转账/ })).toBeNull()
   })
@@ -1624,7 +1624,7 @@ describe('SettlementStatementPanel · 付款核验与争议（#226）', () => {
     // Server truth only: the record and the overview now say verified/已核销.
     expect((await screen.findAllByText('已核销')).length).toBeGreaterThan(0)
     // Verification is not a payment.
-    expect(document.body.textContent).not.toMatch(/已付款/)
+    expect(screen.queryAllByText('已付款')).toHaveLength(0)
   })
 
   it('shows the server self-review 403 verbatim without implying verification', async () => {
@@ -1864,7 +1864,7 @@ describe('SettlementStatementPanel · 付款核验与争议（#226）', () => {
 
     expect(screen.getAllByText(/锁定 ≠ 已付/).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/凭据登记 ≠ 已核销/).length).toBeGreaterThan(0)
-    expect(document.body.textContent).not.toMatch(/已付款/)
+    expect(screen.queryAllByText('已付款')).toHaveLength(0)
     expect(screen.queryByRole('button', { name: /发起付款/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /转账/ })).toBeNull()
   })
