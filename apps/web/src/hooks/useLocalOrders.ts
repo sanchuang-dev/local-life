@@ -4,11 +4,86 @@ import type {
   LocalOrderDetail,
   LocalOrderStatus,
   LocalOrderSummary,
+  LocalOrderTeamOption,
 } from '@sanchuang-dev/local-life-contracts'
-import { getMyLocalOrder, listMyLocalOrders } from '../services/localOrders'
+import {
+  getMyLocalOrder,
+  listMyLocalOrderTeamOptions,
+  listMyLocalOrders,
+} from '../services/localOrders'
 import { describeLocalError, isLocalApiError } from '../services/localApi'
 
 const PAGE_SIZE = 20
+
+export type LocalOrderTeamOptionsState =
+  /** Signed out, or no product to read options for. */
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'error'; message: string }
+  | { status: 'ready'; items: LocalOrderTeamOption[] }
+
+export interface LocalOrderTeamOptions {
+  state: LocalOrderTeamOptionsState
+  reload: () => void
+}
+
+/**
+ * Reads the signed-in resident's eligible consumption teams for this product.
+ *
+ * A 401 invalidates the shared resident session; it never degrades into an empty
+ * option list, because "no team" and "could not read teams" are different facts
+ * and only the former may produce an order without attribution.
+ */
+export function useLocalOrderTeamOptions({
+  productId,
+  sessionKey,
+  authLoading,
+}: {
+  productId: string | null
+  sessionKey: string | null
+  authLoading: boolean
+}): LocalOrderTeamOptions {
+  const [state, setState] = useState<LocalOrderTeamOptionsState>({ status: 'idle' })
+  const [reloadToken, setReloadToken] = useState(0)
+
+  const reload = useCallback(() => setReloadToken((token) => token + 1), [])
+
+  useEffect(() => {
+    if (authLoading) {
+      setState({ status: 'loading' })
+      return
+    }
+    if (!sessionKey || !productId) {
+      setState({ status: 'idle' })
+      return
+    }
+
+    const controller = new AbortController()
+    setState({ status: 'loading' })
+
+    listMyLocalOrderTeamOptions(productId, controller.signal)
+      .then((response) => {
+        if (controller.signal.aborted) return
+        setState({ status: 'ready', items: response.items })
+      })
+      .catch((cause: unknown) => {
+        if (controller.signal.aborted) return
+        if (isLocalApiError(cause) && cause.status === 401) {
+          reportResidentSessionExpired()
+          setState({ status: 'idle' })
+          return
+        }
+        setState({
+          status: 'error',
+          message: describeLocalError(cause, '暂时无法读取可参与的消费团'),
+        })
+      })
+
+    return () => controller.abort()
+  }, [productId, sessionKey, authLoading, reloadToken])
+
+  return { state, reload }
+}
 
 export type MyOrdersState =
   | { status: 'loading' }
