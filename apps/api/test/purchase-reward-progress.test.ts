@@ -1201,3 +1201,315 @@ test('expired coupon is rejected by the same SQLite reservation guard, not a bro
   assert.equal((await myCouponWallet(w.app, w.a)).items[0]?.status, 'available',
     'a failed future-quote cannot accidentally reserve the real coupon now')
 })
+
+
+/* -------------------------------------------------------------------------- */
+/* #213: cancel, full reversal, immutable coupon/dispute recovery             */
+/* -------------------------------------------------------------------------- */
+
+async function registerWithCoupon(
+  app: App, resident: ResidentSession, productId: string, couponId: string,
+  idempotencyKey = randomUUID(),
+) {
+  const response = await api(app, 'POST', '/local-orders', {
+    session: resident, origin: RESIDENT_ORIGIN,
+    body: { productId, quantity: 1, couponId, idempotencyKey },
+  })
+  const text = await response.text()
+  assert.equal(response.status, 201, `coupon registration: ${text}`)
+  return { order: localOrderDetailSchema.parse((JSON.parse(text) as { order: unknown }).order), idempotencyKey }
+}
+
+async function readStaffCouponDisputes(app: App, staff: Session, activityId: string) {
+  const response = await api(app, 'GET', route(PURCHASE_REWARD_ROUTES.staffRewardDisputes, activityId), {
+    session: staff,
+  })
+  assert.equal(response.status, 200)
+  return couponRewardDisputeListSchema.parse(await response.json())
+}
+
+test('unpaid cancellation releases exactly once, preserves old snapshot, permits one NEW active order', async () => {
+  const w = await couponEarnedWorld()
+  const { app, db, sqlite, a, b, operator, product, couponId } = w
+  const registered = await registerWithCoupon(app, a, product.id, couponId)
+  const { order, idempotencyKey } = registered
+  const wrongActor = await api(app, 'PATCH', `/staff/local-orders/${order.id}/status`, {
+    session: b, origin: RESIDENT_ORIGIN,
+    body: { expectedUpdatedAt: order.updatedAt, status: 'cancelled' },
+  })
+  assert.equal(wrongActor.status, 401, 'resident cannot cancel through staff API')
+
+  // SQL must reject returning an actively held coupon, even for a direct writer.
+  assert.throws(
+    () => sqlite.prepare(`UPDATE coupon_issues SET status='available',
+      reserved_order_id=NULL, reserved_at=NULL WHERE id=?`).run(couponId),
+    /coupon release requires unpaid terminal order/u,
+  )
+  const eventsBefore = db.select().from(couponIssueEvents).all().length
+  const cancelled = await api(app, 'PATCH', `/staff/local-orders/${order.id}/status`, {
+    session: operator, body: { expectedUpdatedAt: order.updatedAt, status: 'cancelled' },
+  })
+  assert.equal(cancelled.status, 200)
+  const cancelledDetail = localOrderDetailSchema.parse(await cancelled.json())
+  assert.equal(cancelledDetail.status, 'cancelled')
+  assert.equal(cancelledDetail.snapshot.couponId, couponId)
+  assert.equal(cancelledDetail.snapshot.couponDiscountCents, 2_000)
+  assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'available')
+  assert.equal((await myCouponWallet(app, a)).items[0]?.reservedOrderId, null)
+  assert.equal(db.select().from(couponIssueEvents).all().length, eventsBefore + 1)
+
+  const duplicateCancel = await api(app, 'PATCH', `/staff/local-orders/${order.id}/status`, {
+    session: operator, body: { expectedUpdatedAt: order.updatedAt, status: 'cancelled' },
+  })
+  assert.equal(duplicateCancel.status, 409)
+  const wrongOwner = await api(app, 'POST', '/local-orders', {
+    session: b, origin: RESIDENT_ORIGIN,
+    body: { productId: product.id, couponId, quantity: 1, idempotencyKey: randomUUID() },
+  })
+  assert.equal(wrongOwner.status, 409)
+
+  // An idempotent replay is the original CANCELLED order, never a new order.
+  const replay = await api(app, 'POST', '/local-orders', {
+    session: a, origin: RESIDENT_ORIGIN,
+    body: { productId: product.id, couponId, quantity: 1, idempotencyKey },
+  })
+  assert.equal(replay.status, 200)
+  assert.equal(localOrderDetailSchema.parse(((await replay.json()) as { order: unknown }).order).id, order.id)
+
+  // The old permanent unique coupon index would wrongly reject both attempts.
+  // With the partial unique index, exactly one active claimant wins.
+  const attempts = await Promise.all([0, 1].map(() =>
+    api(app, 'POST', '/local-orders', {
+      session: a, origin: RESIDENT_ORIGIN,
+      body: { productId: product.id, couponId, quantity: 1, idempotencyKey: randomUUID() },
+    }),
+  ))
+  assert.deepEqual(attempts.map(r => r.status).sort(), [201, 409])
+  assert.equal(db.select().from(localOrders).all().filter(o =>
+    o.couponId === couponId && !['cancelled', 'rejected'].includes(o.status)).length, 1)
+  assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'reserved')
+})
+
+test('rejection also releases coupon; release-event failure rolls back the whole cancellation', async () => {
+  const w = await couponEarnedWorld()
+  const { app, db, sqlite, a, operator, product, couponId } = w
+  const { order } = await registerWithCoupon(app, a, product.id, couponId)
+  const before = db.select().from(couponIssueEvents).all().length
+  sqlite.exec(`CREATE TRIGGER test_refuse_coupon_release_event
+    BEFORE INSERT ON coupon_issue_events WHEN NEW.kind='released'
+    BEGIN SELECT RAISE(ABORT,'test release audit write refused'); END`)
+  try {
+    const failed = await api(app, 'PATCH', `/staff/local-orders/${order.id}/status`, {
+      session: operator, body: { expectedUpdatedAt: order.updatedAt, status: 'cancelled' },
+    })
+    assert.ok(failed.status >= 500)
+    assert.equal(db.select().from(localOrders).where(eq(localOrders.id, order.id)).get()?.status, 'registered',
+      'status must roll back with the coupon event')
+    assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'reserved')
+    assert.equal(db.select().from(couponIssueEvents).all().length, before)
+  } finally {
+    sqlite.exec('DROP TRIGGER test_refuse_coupon_release_event')
+  }
+  const processing = await api(app, 'PATCH', `/staff/local-orders/${order.id}/status`, {
+    session: operator, body: { expectedUpdatedAt: order.updatedAt, status: 'processing' },
+  })
+  assert.equal(processing.status, 200)
+  const p = localOrderDetailSchema.parse(await processing.json())
+  const review = await api(app, 'PATCH', `/staff/local-orders/${order.id}/status`, {
+    session: operator, body: { expectedUpdatedAt: p.updatedAt, status: 'pending_review' },
+  })
+  assert.equal(review.status, 200)
+  const pending = localOrderDetailSchema.parse(await review.json())
+  const rejected = await api(app, 'POST', `/admin/local-orders/${order.id}/verify`, {
+    session: operator, body: {
+      expectedUpdatedAt: pending.updatedAt,
+      decision: 'reject', note: '来源资料核对失败',
+    },
+  })
+  assert.equal(rejected.status, 200)
+  assert.equal(localOrderDetailSchema.parse(await rejected.json()).status, 'rejected')
+  assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'available')
+  assert.equal(db.select().from(couponIssueEvents).all().length, before + 1)
+  const expiredProjection = getMyCoupons(db, a.userId, new Date(Date.now() + 31 * 24 * 60 * 60 * 1000))
+  assert.equal(expiredProjection.items[0]?.status, 'expired',
+    'releasing after expiry does not extend or recreate coupon validity')
+  assert.throws(() => db.transaction(tx => readCouponForOrder(tx, {
+    couponId, buyerUserId: a.userId, communityId: w.communityId,
+    grossCents: 10_000, now: new Date(Date.now() + 31 * 24 * 60 * 60 * 1000),
+  }), { behavior: 'immediate' }), /消费券无效|已过期/u)
+})
+
+test('full reversal removes paid progress, voids all unused reward coupons, keeps grant budget and evidence', async () => {
+  const w = await couponEarnedWorld()
+  const { app, db, admin, operator, a, b, c, activityId, seedReceipt } = w
+  assert.equal((await myProgress(app, a, activityId)).progress?.eligible, true)
+  const reversal = await reversePayment(app, operator, seedReceipt.id)
+  assert.equal(reversal.factKind, 'payment_reversed')
+  assert.equal((await myProgress(app, a, activityId)).progress?.totalEffectivePaidCents, 0)
+  for (const member of [a, b, c]) {
+    assert.equal((await myCouponWallet(app, member)).items[0]?.status, 'void')
+  }
+  const dispute = await readStaffCouponDisputes(app, operator, activityId)
+  assert.equal(dispute.items.length, 1)
+  assert.equal(dispute.items[0]?.kind, 'reward_eligibility_lost')
+  assert.equal(dispute.items[0]?.resolution, 'auto_void')
+  assert.equal(dispute.items[0]?.reversalEntryId, reversal.id)
+  assert.equal(db.select().from(couponTeamGrants).all().length, 1, 'budget reservation remains immutable')
+  assert.equal((await couponStock(app, operator, activityId)).issuedTeams, 1)
+  assert.equal(db.select().from(ledgerEntries).where(eq(ledgerEntries.id, seedReceipt.id)).get()?.factKind,
+    'payment_received', 'original receipt is never modified')
+  const before = db.select().from(couponIssueEvents).all().length
+  const repeat = await api(app, 'POST', `/admin/ledger/payments/${seedReceipt.id}/reverse`, {
+    session: operator, body: { reason: 'repeat' },
+  })
+  assert.equal(repeat.status, 409)
+  assert.equal(db.select().from(couponIssueEvents).all().length, before)
+  assert.equal(db.select().from(couponRewardDisputes).all().length, 1)
+  const unusable = await api(app, 'POST', '/local-orders', {
+    session: a, origin: RESIDENT_ORIGIN,
+    body: { productId: w.product.id, quantity: 1, couponId: w.couponId, idempotencyKey: randomUUID() },
+  })
+  assert.equal(unusable.status, 409)
+  assert.equal(issueEligibleTeamCoupons(db, activityId, w.teamId), 'already_issued',
+    'voiding a grant does not create a second budget liability')
+
+  const otherCommunity = await createCommunity(app, admin, '受限社区')
+  await createOperator(app, admin, {
+    username: 'other-operator', displayName: '外区运营',
+    password: OPERATOR_PASSWORD, communityIds: [otherCommunity],
+  })
+  const outsider = await staffSession(app, 'other-operator', OPERATOR_PASSWORD)
+  const wrongScope = await api(app, 'GET',
+    route(PURCHASE_REWARD_ROUTES.staffRewardDisputes, activityId), { session: outsider })
+  assert.equal(wrongScope.status, 403)
+  const noStaff = await api(app, 'GET',
+    route(PURCHASE_REWARD_ROUTES.staffRewardDisputes, activityId), { session: a })
+  assert.equal(noStaff.status, 401)
+  const unauthorizedReversal = await api(app, 'POST',
+    `/admin/ledger/payments/${seedReceipt.id}/reverse`, {
+      session: outsider, body: { reason: 'unauthorized' },
+    })
+  assert.equal(unauthorizedReversal.status, 403)
+})
+
+test('source reversal after coupon redemption preserves spent history, voids remaining rewards and creates manual dispute', async () => {
+  const w = await couponEarnedWorld()
+  const { app, db, a, b, c, operator, operatorId, communityId, activityId, couponId, seedReceipt } = w
+  const { order } = await registerWithCoupon(app, a, w.product.id, couponId)
+  const verified = await markVerified(app, operator, order)
+  const laterCash = await recordPayment(app, operator, {
+    communityId, staffId: operatorId, orderId: verified.id,
+    amountCents: 8_000, evidenceRef: 'REVERSAL-DOWNSTREAM-NET',
+  })
+  assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'redeemed')
+  const sourceReverse = await reversePayment(app, operator, seedReceipt.id)
+  assert.equal((await myProgress(app, a, activityId)).progress?.totalEffectivePaidCents, 0)
+  assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'redeemed',
+    'already redeemed coupon must NOT be restored or rewritten')
+  assert.equal((await myCouponWallet(app, b)).items[0]?.status, 'void')
+  assert.equal((await myCouponWallet(app, c)).items[0]?.status, 'void')
+  const disputes = await readStaffCouponDisputes(app, operator, activityId)
+  assert.equal(disputes.items.length, 1)
+  assert.equal(disputes.items[0]?.kind, 'reward_eligibility_lost')
+  assert.equal(disputes.items[0]?.resolution, 'pending_manual')
+  assert.equal(disputes.items[0]?.reversalEntryId, sourceReverse.id)
+  const snapshot = db.select().from(localOrders).where(eq(localOrders.id, order.id)).get()
+  assert.equal(snapshot?.status, 'verified')
+  assert.equal(snapshot?.totalCents, 10_000)
+  assert.equal(snapshot?.couponDiscountCents, 2_000)
+  assert.equal(snapshot?.couponId, couponId)
+
+  // Reversing the payment of the coupon-backed order creates a DIFFERENT
+  // manual exception; no wallet re-credit or history rewrite is permitted.
+  const downstreamReverse = await reversePayment(app, operator, laterCash.id)
+  assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'redeemed')
+  const all = await readStaffCouponDisputes(app, operator, activityId)
+  assert.equal(all.items.length, 2)
+  const downstreamDispute = all.items.find(x => x.kind === 'redeemed_payment_reversed')
+  assert.equal(downstreamDispute?.resolution, 'pending_manual')
+  assert.equal(downstreamDispute?.reversalEntryId, downstreamReverse.id)
+  assert.equal(db.select().from(couponRewardDisputes).all().length, 2)
+  assert.equal(db.select().from(couponTeamGrants).all().length, 1)
+})
+
+test('reserved downstream coupon becomes unusable on source reversal; pending order cannot falsely verify', async () => {
+  const w = await couponEarnedWorld()
+  const { app, a, operator, activityId, couponId, seedReceipt } = w
+  const { order } = await registerWithCoupon(app, a, w.product.id, couponId)
+  await reversePayment(app, operator, seedReceipt.id)
+  assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'void')
+  const disputes = await readStaffCouponDisputes(app, operator, activityId)
+  assert.equal(disputes.items[0]?.resolution, 'pending_manual')
+  const processing = await api(app, 'PATCH', `/staff/local-orders/${order.id}/status`, {
+    session: operator, body: { expectedUpdatedAt: order.updatedAt, status: 'processing' },
+  })
+  assert.equal(processing.status, 200)
+  const p = localOrderDetailSchema.parse(await processing.json())
+  const review = await api(app, 'PATCH', `/staff/local-orders/${order.id}/status`, {
+    session: operator, body: { expectedUpdatedAt: p.updatedAt, status: 'pending_review' },
+  })
+  assert.equal(review.status, 200)
+  const pending = localOrderDetailSchema.parse(await review.json())
+  const badVerify = await api(app, 'POST', `/admin/local-orders/${order.id}/verify`, {
+    session: operator, body: {
+      expectedUpdatedAt: pending.updatedAt, decision: 'verify', note: '尝试错误核验',
+    },
+  })
+  assert.equal(badVerify.status, 409)
+  const rejected = await api(app, 'POST', `/admin/local-orders/${order.id}/verify`, {
+    session: operator, body: {
+      expectedUpdatedAt: pending.updatedAt, decision: 'reject', note: '失效消费券，人工终止订单',
+    },
+  })
+  assert.equal(rejected.status, 200)
+  assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'void',
+    'ending a disputed order cannot restore a void coupon')
+})
+
+test('failure writing a reversal dispute or void event rolls back the reversal fact itself', async () => {
+  const w = await couponEarnedWorld()
+  const { app, db, sqlite, a, operator, seedReceipt } = w
+  const initialEvents = db.select().from(couponIssueEvents).all().length
+  sqlite.exec(`CREATE TRIGGER test_reject_coupon_void_event
+    BEFORE INSERT ON coupon_issue_events WHEN NEW.kind='voided'
+    BEGIN SELECT RAISE(ABORT, 'test coupon void event write refused'); END`)
+  try {
+    const failed = await api(app, 'POST', `/admin/ledger/payments/${seedReceipt.id}/reverse`, {
+      session: operator, body: { reason: 'simulate event failure' },
+    })
+    assert.ok(failed.status >= 500)
+    assert.equal(db.select().from(ledgerEntries).all().filter(x =>
+      x.factKind === 'payment_reversed' && x.counterEntryId === seedReceipt.id).length, 0)
+    assert.equal(db.select().from(couponRewardDisputes).all().length, 0)
+    assert.equal(db.select().from(couponIssueEvents).all().length, initialEvents)
+    assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'available')
+  } finally {
+    sqlite.exec('DROP TRIGGER test_reject_coupon_void_event')
+  }
+  await reversePayment(app, operator, seedReceipt.id)
+  assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'void')
+})
+
+test('partial refund payload is explicitly rejected; legacy no-coupon receipts stay immutable', async () => {
+  const w = await couponEarnedWorld()
+  const { app, db, operator, seedReceipt, admin, communityId } = w
+  const invalid = await api(app, 'POST', `/admin/ledger/payments/${seedReceipt.id}/reverse`, {
+    session: operator, body: { amountCents: 500, reason: 'partial refund unsupported' },
+  })
+  assert.equal(invalid.status, 400)
+  assert.equal(db.select().from(ledgerEntries).all().filter(x =>
+    x.factKind === 'payment_reversed' && x.counterEntryId === seedReceipt.id).length, 0)
+  const standaloneProduct = await createOnShelfProduct(app, admin, communityId, 900)
+  const other = await w.resident('无券居民')
+  const order = await registerOrder(app, other, { productId: standaloneProduct.id })
+  const verified = await markVerified(app, operator, order)
+  const receipt = await recordPayment(app, operator, {
+    communityId, staffId: w.operatorId, orderId: verified.id,
+    amountCents: 900, evidenceRef: 'NO-COUPON-LEGACY-REVERSAL',
+  })
+  const reversed = await reversePayment(app, operator, receipt.id)
+  assert.equal(reversed.factKind, 'payment_reversed')
+  assert.equal(db.select().from(couponRewardDisputes).all().length, 0)
+  assert.equal(db.select().from(ledgerEntries).where(eq(ledgerEntries.id, receipt.id)).get()?.factKind,
+    'payment_received')
+})
