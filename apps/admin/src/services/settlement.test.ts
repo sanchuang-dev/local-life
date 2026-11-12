@@ -4,25 +4,34 @@ import type {
   CreateSettlementMappingRequest,
   CreateSettlementPartyRequest,
   CreateSettlementRuleRequest,
+  CreateSettlementStatementRequest,
   SettlementMapping,
   SettlementOrderPartySnapshot,
   SettlementParty,
   SettlementQuoteResponse,
   SettlementRuleVersion,
+  SettlementStatement,
+  SettlementStatementDetail,
+  SettlementStatementListResponse,
 } from '@sanchuang-dev/local-life-contracts'
 import { LocalApiError } from './localApi'
 import {
   SETTLEMENT_PARTY_ROLE_LABELS,
+  SETTLEMENT_PAYMENT_STATE_LABELS,
   SETTLEMENT_PROCESSOR_FEE_OWNER_LABELS,
   SETTLEMENT_RULE_FIXED_POLICY_LABELS,
   SETTLEMENT_RULE_PARTY_KEY_LABELS,
+  SETTLEMENT_STATEMENT_STATUS_LABELS,
   confirmSettlementOrderParty,
   createSettlementMapping,
   createSettlementParty,
   createSettlementRuleVersion,
+  createSettlementStatement,
+  getSettlementStatement,
   listSettlementMappings,
   listSettlementParties,
   listSettlementRuleVersions,
+  listSettlementStatements,
   quoteSettlementOrder,
   readSettlementOrderParty,
   type SettlementOrderPartyResponse,
@@ -1060,5 +1069,383 @@ describe('quoteSettlementOrder', () => {
     expect(failure).not.toBeInstanceOf(LocalApiError)
     expect(failure).toBeInstanceOf(Error)
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* #223 — settlement statements: list / draft / detail                       */
+/* -------------------------------------------------------------------------- */
+
+const DIGEST = 'a'.repeat(64)
+const STATEMENT_ID = '123e4567-e89b-42d3-a456-426614174701'
+const STATEMENT_LINE_ID = '123e4567-e89b-42d3-a456-426614174702'
+const STATEMENT_PERF_ID = '123e4567-e89b-42d3-a456-426614174703'
+const STATEMENT_EVENT_ID = '123e4567-e89b-42d3-a456-426614174704'
+const STATEMENT_STAFF_ID = '123e4567-e89b-42d3-a456-426614174705'
+const STATEMENT_PERF_ENTRY_ID = '123e4567-e89b-42d3-a456-426614174706'
+const STATEMENT_PERF_SOURCE_ID = '123e4567-e89b-42d3-a456-426614174707'
+
+const STATEMENT: SettlementStatement = {
+  id: STATEMENT_ID,
+  communityId: COMMUNITY_ID,
+  statementNo: 'ST-20261101-0001',
+  periodFrom: '2026-11-01',
+  periodTo: '2026-11-15',
+  generation: 1,
+  revision: 2,
+  status: 'reviewed',
+  snapshotDigest: DIGEST,
+  asOf: '2026-11-16T02:00:00.000Z',
+  createdByUserId: USER_ID,
+  createdAt: '2026-11-16T02:00:00.000Z',
+  updatedAt: '2026-11-16T03:00:00.000Z',
+  reviewedByUserId: USER_ID,
+  reviewEvidenceRef: '复核单 2026-11-16',
+  reviewedAt: '2026-11-16T03:00:00.000Z',
+  lockedByUserId: null,
+  lockEvidenceRef: null,
+  lockedAt: null,
+  summary: {
+    lineCount: 2,
+    calculatedCount: 1,
+    blockedCount: 1,
+    eligibleGrossCents: 12_800,
+    feeCents: 76,
+    sellerNetCents: 7_634,
+    sanchuangNetCents: 3_181,
+    guangdianNetCents: 1_909,
+    eligibleDistributionCents: 12_724,
+  },
+  // Locking is not payment: this statement is reviewed, not even locked yet.
+  paymentState: 'awaiting_payment',
+}
+
+const BLOCKED_LINE = {
+  id: STATEMENT_LINE_ID,
+  statementId: STATEMENT_ID,
+  orderId: ORDER_ID,
+  orderDisplayNo: 'LL-20261101-0001',
+  communityId: COMMUNITY_ID,
+  productId: PRODUCT_ID,
+  productName: '幸福社区三日体验卡',
+  periodAt: '2026-11-02T03:00:00.000Z',
+  registeredAmountCents: 12_800,
+  receiptEntryId: QUOTE_RECEIPT_ENTRY_ID,
+  receiptEvidenceRef: '收据 2026-11-02',
+  receiptReceivedAt: '2026-11-02T04:00:00.000Z',
+  receiptAmountCents: 12_800,
+  operatingBatchId: null,
+  gridStaffId: null,
+  gridReviewerUserId: null,
+  mappingId: null,
+  sellerPartyId: null,
+  sanchuangPartyId: null,
+  guangdianPartyId: null,
+  agreementRef: null,
+  ruleId: null,
+  ruleVersion: null,
+  state: 'blocked' as const,
+  blockingReasons: ['missing_seller'],
+  // A blocked line has no allocation; the client must not fill in zero.
+  allocation: null,
+  sourceDigest: DIGEST,
+}
+
+const STATEMENT_DETAIL: SettlementStatementDetail = {
+  statement: STATEMENT,
+  lines: [BLOCKED_LINE],
+  performance: [
+    {
+      id: STATEMENT_PERF_ID,
+      statementId: STATEMENT_ID,
+      entryId: STATEMENT_PERF_ENTRY_ID,
+      sourceId: STATEMENT_PERF_SOURCE_ID,
+      sourceDisplayNo: 'CRM-20261101-0001',
+      communityId: COMMUNITY_ID,
+      staffId: STATEMENT_STAFF_ID,
+      confirmedByUserId: USER_ID,
+      confirmedAt: '2026-11-02T05:00:00.000Z',
+      evidenceRef: 'CRM 服务确认单',
+      sourceDigest: DIGEST,
+    },
+  ],
+  events: [
+    {
+      id: STATEMENT_EVENT_ID,
+      statementId: STATEMENT_ID,
+      kind: 'reviewed',
+      revision: 2,
+      actorUserId: USER_ID,
+      evidenceRef: '复核单 2026-11-16',
+      snapshotDigest: DIGEST,
+      createdAt: '2026-11-16T03:00:00.000Z',
+    },
+  ],
+  // Post-lock disputes are separate entries, never rewritten lines.
+  postLockDisputes: [{ orderId: ORDER_ID, reasons: ['receipt_reversed'] }],
+}
+
+const CREATE_STATEMENT_REQUEST: CreateSettlementStatementRequest = {
+  communityId: COMMUNITY_ID,
+  periodFrom: '2026-11-01',
+  periodTo: '2026-11-15',
+}
+
+const STATEMENT_LIST_RESPONSE: SettlementStatementListResponse = {
+  items: [STATEMENT],
+  total: 1,
+  page: 2,
+  pageSize: 20,
+}
+
+describe('settlement statement labels', () => {
+  it('状态标签只描述快照生命周期，锁定不暗示已付款', () => {
+    expect(SETTLEMENT_STATEMENT_STATUS_LABELS).toEqual({
+      draft: '草案未复核',
+      reviewed: '已复核未锁定',
+      locked: '已锁定',
+      superseded: '已被替代',
+    })
+    expect(SETTLEMENT_STATEMENT_STATUS_LABELS.locked).not.toMatch(/付|结清|核销/u)
+  })
+
+  it('付款状态标签是独立的付款口径', () => {
+    expect(SETTLEMENT_PAYMENT_STATE_LABELS).toEqual({
+      not_recorded: '未登记付款',
+      awaiting_payment: '待付款',
+      pending_review: '已登记待复核',
+      partial: '部分支付',
+      verified: '已核销',
+      disputed: '争议',
+    })
+  })
+})
+
+describe('listSettlementStatements', () => {
+  it('page/pageSize 必带、communityId 缺省不发，返回服务端分页响应', async () => {
+    stubJson(200, STATEMENT_LIST_RESPONSE)
+
+    const result = await listSettlementStatements({ page: 2, pageSize: 20 })
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const { url, init, headers } = lastCall()
+    expect(url).toBe('/api/admin/settlement/statements?page=2&pageSize=20')
+    expect(init.method).toBe('GET')
+    expect(init.credentials).toBe('include')
+    expect(headers['x-csrf-token']).toBeUndefined()
+    expect(init.body).toBeUndefined()
+    // The whole paged object is returned: total/page/pageSize are server facts.
+    expect(result).toEqual(STATEMENT_LIST_RESPONSE)
+    expect(result.total).toBe(1)
+    expect(result.page).toBe(2)
+    expect(result.pageSize).toBe(20)
+    expect(result.items).toEqual([STATEMENT])
+  })
+
+  it('显式 communityId 时三个参数都发送（社区在前）', async () => {
+    stubJson(200, { items: [], total: 0, page: 1, pageSize: 20 })
+
+    await listSettlementStatements({ communityId: COMMUNITY_ID, page: 1, pageSize: 20 })
+
+    expect(lastCall().url).toBe(
+      `/api/admin/settlement/statements?communityId=${encodeURIComponent(COMMUNITY_ID)}` +
+        '&page=1&pageSize=20',
+    )
+  })
+
+  it('空 items 是真实空态（total=0），不是失败', async () => {
+    stubJson(200, { items: [], total: 0, page: 1, pageSize: 20 })
+
+    const result = await listSettlementStatements({ page: 1, pageSize: 20 })
+
+    expect(result.items).toEqual([])
+    expect(result.total).toBe(0)
+  })
+
+  it('请求失败不得被当成空列表：403 冒泡', async () => {
+    stubJson(403, { error: { code: 'forbidden', message: '仅管理员或授权运营人员可查看结算单' } })
+
+    const failure = await listSettlementStatements({ page: 1, pageSize: 20 }).catch(
+      (cause: unknown) => cause,
+    )
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).status).toBe(403)
+    expect((failure as LocalApiError).code).toBe('forbidden')
+  })
+
+  it('响应不符合契约：抛 invalid_response，不返回空列表', async () => {
+    stubJson(200, { items: [] })
+
+    const failure = await listSettlementStatements({ page: 1, pageSize: 20 }).catch(
+      (cause: unknown) => cause,
+    )
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).code).toBe('invalid_response')
+  })
+})
+
+describe('createSettlementStatement', () => {
+  it('POST 带 CSRF、body 严格等于契约字段；真实 201 detail 响应返回其 statement', async () => {
+    stubJson(201, STATEMENT_DETAIL)
+
+    // The real API's 201 body is a detail object; the helper returns its statement.
+    const created = await createSettlementStatement('csrf-token-statement', CREATE_STATEMENT_REQUEST)
+
+    const { url, init, headers } = lastCall()
+    expect(url).toBe('/api/admin/settlement/statements')
+    expect(init.method).toBe('POST')
+    expect(headers['x-csrf-token']).toBe('csrf-token-statement')
+    expect(headers['content-type']).toBe('application/json')
+    const body: unknown = JSON.parse(String(init.body))
+    expect(body).toEqual(CREATE_STATEMENT_REQUEST)
+    expect(Object.keys(body as Record<string, unknown>).sort()).toEqual([
+      'communityId',
+      'periodFrom',
+      'periodTo',
+    ])
+    expect(created).toEqual(STATEMENT)
+    // The returned value is the statement, not a wrapper.
+    expect(created).not.toHaveProperty('lines')
+    expect(created).not.toHaveProperty('statement')
+  })
+
+  it('重建草案：replaceStatementId 与 expectedRevision 同时出现在 body', async () => {
+    stubJson(201, STATEMENT_DETAIL)
+    const request: CreateSettlementStatementRequest = {
+      ...CREATE_STATEMENT_REQUEST,
+      replaceStatementId: STATEMENT_ID,
+      expectedRevision: 2,
+    }
+
+    await createSettlementStatement('csrf-token-statement', request)
+
+    expect(JSON.parse(String(lastCall().init.body))).toEqual(request)
+  })
+
+  it('201 响应是裸 statement（真实服务端不会这样返回）：抛 invalid_response', async () => {
+    stubJson(201, STATEMENT)
+
+    const failure = await createSettlementStatement(
+      'csrf-token-statement',
+      CREATE_STATEMENT_REQUEST,
+    ).catch((cause: unknown) => cause)
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).code).toBe('invalid_response')
+  })
+
+  it('409 冲突（期间已有草案）冒泡，不伪造成功', async () => {
+    stubJson(409, {
+      error: { code: 'conflict', message: '期间已有草案；如需更新凭据，请提供旧草案ID和预期版本以重新生成' },
+    })
+
+    const failure = await createSettlementStatement(
+      'csrf-token-statement',
+      CREATE_STATEMENT_REQUEST,
+    ).catch((cause: unknown) => cause)
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).status).toBe(409)
+    expect((failure as LocalApiError).code).toBe('conflict')
+  })
+
+  it('periodFrom > periodTo：共享契约本地拒绝，不发请求', async () => {
+    const failure = await createSettlementStatement('csrf-token-statement', {
+      ...CREATE_STATEMENT_REQUEST,
+      periodFrom: '2026-11-15',
+      periodTo: '2026-11-01',
+    }).catch((cause: unknown) => cause)
+
+    expect(failure).not.toBeInstanceOf(LocalApiError)
+    expect(failure).toBeInstanceOf(Error)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('只给 replaceStatementId 不给 expectedRevision：共享契约本地拒绝，不发请求', async () => {
+    const failure = await createSettlementStatement('csrf-token-statement', {
+      ...CREATE_STATEMENT_REQUEST,
+      replaceStatementId: STATEMENT_ID,
+    }).catch((cause: unknown) => cause)
+
+    expect(failure).not.toBeInstanceOf(LocalApiError)
+    expect(failure).toBeInstanceOf(Error)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('只给 expectedRevision 不给 replaceStatementId：同样本地拒绝，不发请求', async () => {
+    const failure = await createSettlementStatement('csrf-token-statement', {
+      ...CREATE_STATEMENT_REQUEST,
+      expectedRevision: 2,
+    }).catch((cause: unknown) => cause)
+
+    expect(failure).not.toBeInstanceOf(LocalApiError)
+    expect(failure).toBeInstanceOf(Error)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('getSettlementStatement', () => {
+  it('详情解析 statement/lines/performance/events/postLockDisputes，blocked 行 allocation 保持 null', async () => {
+    stubJson(200, STATEMENT_DETAIL)
+
+    const detail = await getSettlementStatement(STATEMENT_ID)
+
+    expect(lastCall().url).toBe(`/api/admin/settlement/statements/${STATEMENT_ID}`)
+    expect(lastCall().init.method).toBe('GET')
+    expect(detail).toEqual(STATEMENT_DETAIL)
+    expect(detail.statement).toEqual(STATEMENT)
+    expect(detail.lines).toHaveLength(1)
+    const [line] = detail.lines
+    expect(line?.state).toBe('blocked')
+    // Null allocation is a fact, not a zero split.
+    expect(line?.allocation).toBeNull()
+    expect(line?.blockingReasons).toEqual(['missing_seller'])
+    expect(detail.performance[0]?.sourceDisplayNo).toBe('CRM-20261101-0001')
+    expect(detail.events.map((event) => event.kind)).toEqual(['reviewed'])
+    expect(detail.postLockDisputes).toEqual([{ orderId: ORDER_ID, reasons: ['receipt_reversed'] }])
+  })
+
+  it('statementId 在路径中正确编码，不拼出额外 query', async () => {
+    stubJson(200, STATEMENT_DETAIL)
+
+    await getSettlementStatement('stm 1/2?x=1')
+
+    const { url } = lastCall()
+    expect(url).toBe('/api/admin/settlement/statements/stm%201%2F2%3Fx%3D1')
+    expect(url).not.toContain('?x=1')
+  })
+
+  it('404（结算单不存在）与 403 冒泡', async () => {
+    stubJson(404, { error: { code: 'not_found', message: '结算单不存在' } })
+    const missing = await getSettlementStatement(STATEMENT_ID).catch((cause: unknown) => cause)
+    expect(missing).toBeInstanceOf(LocalApiError)
+    expect((missing as LocalApiError).status).toBe(404)
+    expect((missing as LocalApiError).code).toBe('not_found')
+
+    stubJson(403, { error: { code: 'forbidden', message: '仅管理员或授权运营人员可查看结算单' } })
+    const denied = await getSettlementStatement(STATEMENT_ID).catch((cause: unknown) => cause)
+    expect(denied).toBeInstanceOf(LocalApiError)
+    expect((denied as LocalApiError).status).toBe(403)
+    expect((denied as LocalApiError).code).toBe('forbidden')
+  })
+
+  it('响应不符合契约：抛 invalid_response，不返回空详情', async () => {
+    stubJson(200, { statement: STATEMENT })
+
+    const failure = await getSettlementStatement(STATEMENT_ID).catch((cause: unknown) => cause)
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).code).toBe('invalid_response')
+  })
+
+  it('响应 lines 被伪造为 null：同样 invalid_response，不当作空行集', async () => {
+    stubJson(200, { ...STATEMENT_DETAIL, lines: null })
+
+    const failure = await getSettlementStatement(STATEMENT_ID).catch((cause: unknown) => cause)
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).code).toBe('invalid_response')
   })
 })

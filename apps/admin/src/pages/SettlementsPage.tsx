@@ -50,6 +50,7 @@ import { SettlementMappingPanel } from './SettlementMappingPanel'
 import { SettlementPartyPanel } from './SettlementPartyPanel'
 import { SettlementQuotePanel } from './SettlementQuotePanel'
 import { SettlementRulesPanel } from './SettlementRulesPanel'
+import { SettlementStatementPanel } from './SettlementStatementPanel'
 import './ledger.css'
 
 /**
@@ -153,29 +154,35 @@ function SettlementConsole({ session }: { session: AuthenticatedSession }) {
   }
 
   /**
-   * 分成结算单 has its own views (#219–#222): the read-only candidate board, the
+   * 分成结算单 has its own views (#219–#223): the read-only candidate board, the
    * real-party directory, the versioned merchant mappings with per-order party
-   * confirmation, the approved contract-rule history and the server-side quote.
-   * Each is mounted only after a human selects it, so opening 分成结算单 never
-   * issues a request nobody asked for.
+   * confirmation, the approved contract-rule history, the server-side quote and
+   * the statement snapshots. Each is mounted only after a human selects it, so
+   * opening 分成结算单 never issues a request nobody asked for.
    */
   const [settlementView, setSettlementView] = useState<
-    'candidates' | 'parties' | 'mappings' | 'rules' | 'quote'
+    'candidates' | 'parties' | 'mappings' | 'rules' | 'quote' | 'statements'
   >('candidates')
   const [partiesMounted, setPartiesMounted] = useState(false)
   const [mappingsMounted, setMappingsMounted] = useState(false)
   const [rulesMounted, setRulesMounted] = useState(false)
   const [quoteMounted, setQuoteMounted] = useState(false)
+  const [statementsMounted, setStatementsMounted] = useState(false)
 
   const switchSettlementView = (key: string) => {
     const next =
-      key === 'parties' || key === 'mappings' || key === 'rules' || key === 'quote'
+      key === 'parties' ||
+      key === 'mappings' ||
+      key === 'rules' ||
+      key === 'quote' ||
+      key === 'statements'
         ? key
         : 'candidates'
     if (next === 'parties') setPartiesMounted(true)
     if (next === 'mappings') setMappingsMounted(true)
     if (next === 'rules') setRulesMounted(true)
     if (next === 'quote') setQuoteMounted(true)
+    if (next === 'statements') setStatementsMounted(true)
     setSettlementView(next)
   }
 
@@ -806,6 +813,11 @@ function SettlementConsole({ session }: { session: AuthenticatedSession }) {
                   key: 'quote',
                   label: '服务端试算',
                   children: quoteMounted ? <SettlementQuotePanel /> : null,
+                },
+                {
+                  key: 'statements',
+                  label: '结算单',
+                  children: statementsMounted ? <SettlementStatementPanel /> : null,
                 },
               ]}
             />
