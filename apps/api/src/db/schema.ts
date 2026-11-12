@@ -932,6 +932,84 @@ export const activityParticipations = sqliteTable(
 )
 
 /* -------------------------------------------------------------------------- */
+/* Consumption team coupons (LL-PUR-006, #211)                                 */
+/* -------------------------------------------------------------------------- */
+
+/** One immutable budget reservation per rewarded three-person team. */
+export const couponTeamGrants = sqliteTable(
+  'coupon_team_grants',
+  {
+    id: text('id').primaryKey(),
+    activityId: text('activity_id').notNull().references(() => activities.id, { onDelete: 'restrict' }),
+    teamId: text('team_id').notNull().references(() => activityTeams.id, { onDelete: 'restrict' }),
+    ruleVersionId: text('rule_version_id').notNull().references(() => activityRuleVersions.id, { onDelete: 'restrict' }),
+    faceValueCents: integer('face_value_cents').notNull(),
+    totalValueCents: integer('total_value_cents').notNull(),
+    grantedAt: integer('granted_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('coupon_team_grants_activity_team_uq').on(table.activityId, table.teamId),
+    uniqueIndex('coupon_team_grants_team_uq').on(table.teamId),
+    index('coupon_team_grants_activity_idx').on(table.activityId),
+    check('coupon_team_grants_face_positive', sql`${table.faceValueCents} > 0`),
+    check('coupon_team_grants_three_equal', sql`${table.totalValueCents} = ${table.faceValueCents} * 3`),
+  ],
+)
+
+/** A single-use, non-transferable whole coupon; the later #212 owns reservation/redemption. */
+export const couponIssues = sqliteTable(
+  'coupon_issues',
+  {
+    id: text('id').primaryKey(),
+    grantId: text('grant_id').notNull().references(() => couponTeamGrants.id, { onDelete: 'restrict' }),
+    activityId: text('activity_id').notNull().references(() => activities.id, { onDelete: 'restrict' }),
+    teamId: text('team_id').notNull().references(() => activityTeams.id, { onDelete: 'restrict' }),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+    seatNo: integer('seat_no').notNull(),
+    faceValueCents: integer('face_value_cents').notNull(),
+    status: text('status').$type<'available' | 'reserved' | 'redeemed' | 'void'>().notNull(),
+    issuedAt: integer('issued_at', { mode: 'timestamp_ms' }).notNull(),
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+    reservedOrderId: text('reserved_order_id').references(() => localOrders.id, { onDelete: 'restrict' }),
+    reservedAt: integer('reserved_at', { mode: 'timestamp_ms' }),
+    redeemedAt: integer('redeemed_at', { mode: 'timestamp_ms' }),
+    voidedAt: integer('voided_at', { mode: 'timestamp_ms' }),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('coupon_issues_grant_user_uq').on(table.grantId, table.userId),
+    uniqueIndex('coupon_issues_grant_seat_uq').on(table.grantId, table.seatNo),
+    uniqueIndex('coupon_issues_order_uq').on(table.reservedOrderId),
+    index('coupon_issues_user_issued_idx').on(table.userId, table.issuedAt),
+    index('coupon_issues_activity_status_idx').on(table.activityId, table.status),
+    check('coupon_issues_positive', sql`${table.faceValueCents} > 0`),
+    check('coupon_issues_seat', sql`${table.seatNo} BETWEEN 1 AND 3`),
+    check('coupon_issues_expiry', sql`${table.expiresAt} > ${table.issuedAt}`),
+    check('coupon_issues_status', sql`${table.status} IN ('available', 'reserved', 'redeemed', 'void')`),
+    check('coupon_issues_reserved_fields', sql`(${table.status} = 'available' AND ${table.reservedOrderId} IS NULL AND ${table.reservedAt} IS NULL AND ${table.redeemedAt} IS NULL)
+      OR (${table.status} = 'reserved' AND ${table.reservedOrderId} IS NOT NULL AND ${table.reservedAt} IS NOT NULL AND ${table.redeemedAt} IS NULL)
+      OR (${table.status} = 'redeemed' AND ${table.reservedOrderId} IS NOT NULL AND ${table.reservedAt} IS NOT NULL AND ${table.redeemedAt} IS NOT NULL)
+      OR (${table.status} = 'void' AND ${table.voidedAt} IS NOT NULL)`),
+  ],
+)
+
+/** Append-only coupon history; voucher lifecycle never overwrites its issuance trail. */
+export const couponIssueEvents = sqliteTable(
+  'coupon_issue_events',
+  {
+    id: text('id').primaryKey(),
+    couponId: text('coupon_id').notNull().references(() => couponIssues.id, { onDelete: 'restrict' }),
+    kind: text('kind').$type<'issued' | 'reserved' | 'redeemed' | 'released' | 'voided'>().notNull(),
+    orderId: text('order_id').references(() => localOrders.id, { onDelete: 'restrict' }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    index('coupon_issue_events_coupon_created_idx').on(table.couponId, table.createdAt),
+    check('coupon_issue_events_kind', sql`${table.kind} IN ('issued', 'reserved', 'redeemed', 'released', 'voided')`),
+  ],
+)
+
+/* -------------------------------------------------------------------------- */
 /* CRMEB adapter domain (LL-MVP-007, Issue #63)                               */
 /* -------------------------------------------------------------------------- */
 
