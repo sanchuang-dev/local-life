@@ -48,6 +48,7 @@ import {
 import {
   buildLocalOrderCouponOptions,
   chooseUsableCoupon,
+  hasUnresolvedCouponSelection,
   localOrderAmountLines,
   shortCouponId,
 } from '../components/life/localOrderCoupon'
@@ -178,14 +179,11 @@ export function LocalProductPage() {
   // selected coupon. Resolve to null and require an explicit new choice; never
   // silently fall back to another coupon or to a discount.
   const selectedCoupon = chooseUsableCoupon(couponOptions, selectedCouponId)
-  // Only a readable, non-empty wallet can offer a way to clear a stale choice.
-  // While the wallet is loading/failed, a stale id is never submitted as a coupon.
+  // A selected coupon must not silently turn into a full-price order if the
+  // wallet refresh is pending, failed, or returns an empty list. A frozen retry
+  // keeps its original coupon regardless of the refreshed wallet state.
   const couponChoiceMissing =
-    !attempt &&
-    couponWallet.state.status === 'ready' &&
-    couponItems.length > 0 &&
-    selectedCouponId !== null &&
-    selectedCoupon === null
+    !attempt && hasUnresolvedCouponSelection(selectedCouponId, selectedCoupon)
   const previewDiscountCents = attempt
     ? attempt.couponFaceValueCents
     : selectedCoupon?.coupon.faceValueCents ?? 0
