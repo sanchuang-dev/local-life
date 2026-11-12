@@ -14,6 +14,7 @@ import {
   purchaseRewardProgressResponseSchema,
   couponWalletResponseSchema,
   couponStockResponseSchema,
+  couponRewardDisputeListSchema,
   type ActivityStatus,
   type LedgerEntry,
   type LocalOrderDetail,
@@ -30,12 +31,15 @@ import {
   couponIssues,
   couponTeamGrants,
   couponIssueEvents,
+  couponRewardDisputes,
+  ledgerEntries,
+  localOrders,
   ledgerPaymentOrderLinks,
   staffAccounts,
   users,
 } from '../src/db/schema.js'
 import { hashPassword } from '../src/auth/security.js'
-import { issueEligibleTeamCoupons } from '../src/purchase-reward/coupon-issuance.js'
+import { getMyCoupons, issueEligibleTeamCoupons } from '../src/purchase-reward/coupon-issuance.js'
 import { readOrderPaymentEvidence } from '../src/ledger/payment-evidence.js'
 import { readSettlementCandidate } from '../src/ledger/settlement-candidates.js'
 import { readCouponForOrder } from '../src/purchase-reward/coupon-usage.js'
@@ -1064,14 +1068,14 @@ async function couponEarnedWorld() {
   await confirmParticipation(app, c, activityId, inviteCode)
   const purchase = await registerOrder(app, a, { productId: starter.id, activityId, teamId })
   const verified = await markVerified(app, operator, purchase)
-  await recordPayment(app, operator, {
+  const seedReceipt = await recordPayment(app, operator, {
     communityId, staffId: operatorId, orderId: verified.id,
     amountCents: 1_000, evidenceRef: 'COUPON-NET-STARTER',
   })
   const couponId = (await myCouponWallet(app, a)).items[0]?.id
   assert.ok(couponId, 'verified receipt must have issued a resident coupon')
   return { ...w, starter, product, exactFaceProduct, tooCheapProduct,
-    a, b, c, activityId, teamId, couponId }
+    a, b, c, activityId, teamId, couponId, seedReceipt }
 }
 
 test('100 yuan gross - 20 yuan coupon = 80 yuan cash; replay is safe and only real net earns team progress', async () => {
