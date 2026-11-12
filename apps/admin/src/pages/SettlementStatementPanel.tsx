@@ -18,6 +18,7 @@ import {
   Typography,
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
+import type { Rule } from 'antd/es/form'
 import { useEffect, useState } from 'react'
 import type {
   SettlementStatement,
@@ -35,8 +36,11 @@ import {
   SETTLEMENT_PAYMENT_STATE_LABELS,
   SETTLEMENT_STATEMENT_STATUS_LABELS,
   createSettlementStatement,
+  downloadSettlementCsv,
   getSettlementStatement,
   listSettlementStatements,
+  lockSettlementStatement,
+  reviewSettlementStatement,
 } from '../services/settlement'
 import './ledger.css'
 
@@ -61,6 +65,27 @@ interface DraftFormValues {
   communityId?: string
   periodFrom?: string
   periodTo?: string
+}
+
+interface ActionFormValues {
+  evidenceRef?: string
+}
+
+/** Contract-trimmed evidence reference: required, 2-200 characters. */
+function evidenceRule(label: string): Rule[] {
+  return [
+    { required: true, whitespace: true, message: `请填写${label}` },
+    {
+      validator: (_rule: unknown, value: unknown): Promise<void> => {
+        const text = typeof value === 'string' ? value.trim() : ''
+        if (text === '') return Promise.resolve()
+        if (text.length < 2 || text.length > 200) {
+          return Promise.reject(new Error(`${label}需 2-200 个字符`))
+        }
+        return Promise.resolve()
+      },
+    },
+  ]
 }
 
 /** Contracts export the event schema but not its inferred type. */
@@ -92,6 +117,11 @@ export function SettlementStatementPanel() {
   const { message } = AntdApp.useApp()
   const authorizedCommunities = session.staff.communities
   const isAdmin = session.staff.role === 'admin'
+  // The server allows entity CSV for admin/operator and performance CSV for
+  // admin/operator/grid_worker; this panel is not a grid-worker surface, so both
+  // CSV entries are shown to every role that can reach it. Only review/lock are
+  // admin-only.
+  const canExport = session.staff.role !== 'grid_worker'
   const hasAuthorizedScope = isAdmin || authorizedCommunities.length > 0
 
   /* --------------------------------- list ---------------------------------- */
@@ -240,6 +270,92 @@ export function SettlementStatementPanel() {
     setDetailRow(null)
     setDetail(null)
     setDetailError(null)
+    setActionKind(null)
+    setActionStatement(null)
+    setActionError(null)
+    setExportError(null)
+  }
+
+  /* ---------------------- independent review / one-way lock ---------------- */
+
+  const [actionKind, setActionKind] = useState<'review' | 'lock' | null>(null)
+  const [actionStatement, setActionStatement] = useState<SettlementStatement | null>(null)
+  const [actionSubmitting, setActionSubmitting] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [actionForm] = Form.useForm<ActionFormValues>()
+
+  const openAction = (kind: 'review' | 'lock', statement: SettlementStatement) => {
+    setActionKind(kind)
+    setActionStatement(statement)
+    setActionError(null)
+    actionForm.resetFields()
+  }
+
+  const closeAction = () => {
+    if (actionSubmitting) return
+    setActionKind(null)
+    setActionStatement(null)
+    setActionError(null)
+    actionForm.resetFields()
+  }
+
+  const submitAction = async (values: ActionFormValues) => {
+    if (!actionKind || !actionStatement || actionSubmitting) return
+    const evidenceRef = (values.evidenceRef ?? '').trim()
+    if (evidenceRef.length < 2 || evidenceRef.length > 200) return
+    setActionSubmitting(true)
+    setActionError(null)
+    try {
+      const updated =
+        actionKind === 'review'
+          ? await reviewSettlementStatement(session.csrfToken, actionStatement.id, {
+              expectedRevision: actionStatement.revision,
+              evidenceRef,
+            })
+          : await lockSettlementStatement(session.csrfToken, actionStatement.id, {
+              expectedRevision: actionStatement.revision,
+              evidenceRef,
+            })
+      // Re-render from the server's detail: the page never flips draft → reviewed
+      // or reviewed → locked locally.
+      setDetail(updated)
+      setDetailRow(updated.statement)
+      setActionKind(null)
+      setActionStatement(null)
+      actionForm.resetFields()
+      message.success(
+        actionKind === 'review'
+          ? '复核已提交：快照未被锁定，也不代表已付款。'
+          : '结算单已锁定：快照已冻结，锁定不等于已付款。',
+      )
+      setReloadToken((value) => value + 1)
+    } catch (cause: unknown) {
+      setActionError(
+        describeLocalError(cause, actionKind === 'review' ? '复核未完成' : '锁单未完成'),
+      )
+    } finally {
+      setActionSubmitting(false)
+    }
+  }
+
+  /* ------------------------------ CSV export ------------------------------- */
+
+  const [exporting, setExporting] = useState<'entity' | 'performance' | null>(null)
+  const [exportError, setExportError] = useState<string | null>(null)
+
+  const exportCsv = async (kind: 'entity' | 'performance') => {
+    if (!detail || exporting !== null) return
+    setExporting(kind)
+    setExportError(null)
+    try {
+      const result = await downloadSettlementCsv(detail.statement.id, kind)
+      message.success(`已导出 ${result.filename}（${result.byteLength} 字节）`)
+    } catch (cause: unknown) {
+      // A failed download is never reported as a success/filename.
+      setExportError(describeLocalError(cause, '结算单 CSV 导出失败'))
+    } finally {
+      setExporting(null)
+    }
   }
 
   /* -------------------------------- columns -------------------------------- */
@@ -607,9 +723,209 @@ export function SettlementStatementPanel() {
             <Typography.Text type="secondary">正在读取结算单明细…</Typography.Text>
           </div>
         ) : (
-          <StatementDetail detail={detail} tab={detailTab} onTabChange={setDetailTab} />
+          <Space orientation="vertical" size={16} style={{ width: '100%' }}>
+            {isAdmin ? (
+              <StatementActionBar
+                statement={detail.statement}
+                onReview={() => openAction('review', detail.statement)}
+                onLock={() => openAction('lock', detail.statement)}
+              />
+            ) : null}
+            {canExport ? (
+              <StatementExportBar
+                statement={detail.statement}
+                exporting={exporting}
+                error={exportError}
+                onExport={(kind) => void exportCsv(kind)}
+              />
+            ) : null}
+            <StatementDetail detail={detail} tab={detailTab} onTabChange={setDetailTab} />
+          </Space>
         )}
       </Drawer>
+
+      {/* --------------------- review / lock confirmation ------------------------ */}
+      {isAdmin ? (
+        <Modal
+          title={actionKind === 'review' ? '复核结算单（人工确认快照）' : '锁单（不可逆）'}
+          open={actionKind !== null}
+          onCancel={closeAction}
+          onOk={() => actionForm.submit()}
+          okText={actionKind === 'review' ? '提交复核' : '确认锁单'}
+          cancelText="取消"
+          confirmLoading={actionSubmitting}
+          destroyOnHidden
+        >
+          {actionStatement ? (
+            <Descriptions size="small" column={1} bordered style={{ marginBottom: 12 }}>
+              <Descriptions.Item label="单据号">
+                <Typography.Text className="ledger-cell-mono">
+                  {actionStatement.statementNo}
+                </Typography.Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="当前修订">第 {actionStatement.revision} 次</Descriptions.Item>
+              <Descriptions.Item label="当前状态">
+                {SETTLEMENT_STATEMENT_STATUS_LABELS[actionStatement.status]}
+              </Descriptions.Item>
+              <Descriptions.Item label="付款状态">
+                {SETTLEMENT_PAYMENT_STATE_LABELS[actionStatement.paymentState]}（锁定后仍以服务端为准）
+              </Descriptions.Item>
+            </Descriptions>
+          ) : null}
+
+          {actionKind === 'review' ? (
+            <Alert
+              type="info"
+              showIcon
+              title="复核只是人工确认快照内容，不锁定、不代表已付款"
+              description="复核由服务端强制独立：制单人不能复核自己的草案，管理员之间也必须满足服务端规则。复核依据必须人工填写，页面不预填。"
+              style={{ marginBottom: 12 }}
+            />
+          ) : (
+            <Alert
+              type="warning"
+              showIcon
+              title="锁定不可逆"
+              description={
+                <>
+                  <p style={{ marginBottom: 4 }}>
+                    确认后该结算单快照立即冻结，锁定不可逆，不能撤销或回到 reviewed。
+                  </p>
+                  <p style={{ marginBottom: 4 }}>锁定 ≠ 已付款：锁定只冻结快照，不登记任何付款。</p>
+                  <p style={{ marginBottom: 0 }}>
+                    后续付款必须由线下凭据单独登记与复核；页面不会把锁单当作已结清。
+                  </p>
+                </>
+              }
+              style={{ marginBottom: 12 }}
+            />
+          )}
+
+          {actionError ? (
+            <Alert
+              type="error"
+              showIcon
+              title={actionKind === 'review' ? '复核未完成' : '锁单未完成'}
+              description={actionError}
+              style={{ marginBottom: 12 }}
+            />
+          ) : null}
+
+          <Form<ActionFormValues>
+            form={actionForm}
+            layout="vertical"
+            onFinish={(values) => void submitAction(values)}
+          >
+            <Form.Item
+              name="evidenceRef"
+              label={actionKind === 'review' ? '复核依据' : '锁单依据'}
+              rules={evidenceRule(actionKind === 'review' ? '复核依据' : '锁单依据')}
+              tooltip="人工填写的可核对依据（2-200 字），页面不预填。"
+            >
+              <Input maxLength={200} placeholder="人工填写依据，不预填" />
+            </Form.Item>
+          </Form>
+        </Modal>
+      ) : null}
+    </section>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Drawer action bar: independent review + one-way lock (#224, admin only)     */
+/* -------------------------------------------------------------------------- */
+
+function StatementActionBar({
+  statement,
+  onReview,
+  onLock,
+}: {
+  statement: SettlementStatement
+  onReview: () => void
+  onLock: () => void
+}) {
+  return (
+    <section className="local-section" aria-label="复核与锁单">
+      <Space wrap size={8}>
+        <Typography.Text strong>动作</Typography.Text>
+        {statement.status === 'draft' ? (
+          <Button type="primary" onClick={onReview}>
+            复核
+          </Button>
+        ) : null}
+        {statement.status === 'reviewed' ? (
+          <Button type="primary" danger onClick={onLock}>
+            锁单
+          </Button>
+        ) : null}
+        {statement.status !== 'draft' && statement.status !== 'reviewed' ? (
+          <Typography.Text type="secondary">
+            该状态没有可用的复核或锁单入口；锁定后的快照不能再被写回。
+          </Typography.Text>
+        ) : null}
+      </Space>
+      <p className="ledger-diff-hint">
+        复核与锁单都是人工动作，都不等于付款；状态与付款信息始终以服务端返回为准。
+      </p>
+    </section>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* CSV export: entity statement + grid-worker performance appendix             */
+/* -------------------------------------------------------------------------- */
+
+function StatementExportBar({
+  statement,
+  exporting,
+  error,
+  onExport,
+}: {
+  statement: SettlementStatement
+  exporting: 'entity' | 'performance' | null
+  error: string | null
+  onExport: (kind: 'entity' | 'performance') => void
+}) {
+  return (
+    <section className="local-section" aria-label="导出 CSV">
+      <Space wrap size={8}>
+        <Typography.Text strong>导出</Typography.Text>
+        <Button
+          onClick={() => onExport('entity')}
+          loading={exporting === 'entity'}
+          disabled={exporting !== null}
+        >
+          导出机构结算明细（CSV）
+        </Button>
+        <Button
+          onClick={() => onExport('performance')}
+          loading={exporting === 'performance'}
+          disabled={exporting !== null}
+        >
+          导出网格员业绩附表（CSV）
+        </Button>
+      </Space>
+      {statement.status === 'draft' ? (
+        <Alert
+          style={{ marginTop: 8 }}
+          type="warning"
+          showIcon
+          title="草案/未复核：导出仅供核对，不是已结清单据"
+          description="该结算单尚未复核，导出的文件只用于核对快照内容，不能作为已结清或已付款凭证。"
+        />
+      ) : null}
+      <p className="ledger-diff-hint">
+        业绩附表是广电网格员的工作量，不是应付给个人的佣金。导出的两个 CSV 都只是快照明细，不代表付款或结清。
+      </p>
+      {error ? (
+        <Alert
+          style={{ marginTop: 8 }}
+          type="error"
+          showIcon
+          title="CSV 导出失败"
+          description={error}
+        />
+      ) : null}
     </section>
   )
 }

@@ -624,6 +624,385 @@ describe('SettlementStatementPanel · 明细 Drawer', () => {
   })
 })
 
+describe('SettlementStatementPanel · 复核与锁单动作区', () => {
+  function detailWith(overrides: Partial<SettlementStatement>): SettlementStatementDetail {
+    return { ...detail(), statement: statement(overrides) }
+  }
+
+  function reviewedStatement(): SettlementStatement {
+    return statement({
+      status: 'reviewed',
+      revision: 2,
+      reviewedByUserId: USER_ID,
+      reviewEvidenceRef: '复核单 2026-11-08',
+      reviewedAt: '2026-11-08T03:00:00.000Z',
+    })
+  }
+
+  function lockedStatement(): SettlementStatement {
+    return statement({
+      status: 'locked',
+      revision: 3,
+      reviewedByUserId: USER_ID,
+      reviewEvidenceRef: '复核单 2026-11-08',
+      reviewedAt: '2026-11-08T03:00:00.000Z',
+      lockedByUserId: USER_ID,
+      lockEvidenceRef: '锁单依据 2026-11-09',
+      lockedAt: '2026-11-09T03:00:00.000Z',
+    })
+  }
+
+  function stateRoutes(current: SettlementStatement): readonly [string, Handler] {
+    return [
+      STATEMENTS_ROUTE,
+      (url, init) => {
+        const path = new URL(url, 'http://localhost').pathname
+        if (path === STATEMENTS_ROUTE) {
+          return init?.method === 'POST'
+            ? json(detailWith(current), 201)
+            : json({ items: [current], total: 1, page: 1, pageSize: 20 })
+        }
+        return json(detailWith(current))
+      },
+    ]
+  }
+
+  it('shows 复核 only for draft, 锁单 only for reviewed, and neither once locked', async () => {
+    const first = stubApi([stateRoutes(statement())])
+    const draftRender = renderPanel(ADMIN_SESSION)
+    await screen.findByText('STL-20261101-0001')
+    await openDetailDrawer()
+    expect(await screen.findByRole('button', { name: /复\s*核/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /锁\s*单/ })).toBeNull()
+    draftRender.unmount()
+    vi.unstubAllGlobals()
+    expect(first.length).toBeGreaterThan(0)
+
+    stubApi([stateRoutes(reviewedStatement())])
+    const reviewedRender = renderPanel(ADMIN_SESSION)
+    await screen.findByText('STL-20261101-0001')
+    await openDetailDrawer()
+    expect(await screen.findByRole('button', { name: /锁\s*单/ })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /复\s*核/ })).toBeNull()
+    reviewedRender.unmount()
+    vi.unstubAllGlobals()
+
+    stubApi([stateRoutes(lockedStatement())])
+    renderPanel(ADMIN_SESSION)
+    await screen.findByText('STL-20261101-0001')
+    await openDetailDrawer()
+    expect(await screen.findByText('该状态没有可用的复核或锁单入口；锁定后的快照不能再被写回。')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /复\s*核/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /锁\s*单/ })).toBeNull()
+  })
+
+  it('reviews with the current revision and re-renders from the server detail', async () => {
+    const reviewCalls: FetchCall[] = []
+    const calls = stubApi([
+      [
+        STATEMENTS_ROUTE,
+        (url, init) => {
+          const path = new URL(url, 'http://localhost').pathname
+          if (path === STATEMENTS_ROUTE) {
+            return json({ items: [statement()], total: 1, page: 1, pageSize: 20 })
+          }
+          if (path.endsWith('/review')) {
+            reviewCalls.push({ url, init })
+            return json(
+              detailWith(
+                statement({
+                  status: 'reviewed',
+                  revision: 2,
+                  reviewedByUserId: USER_ID,
+                  reviewEvidenceRef: '复核单 2026-11-09',
+                  reviewedAt: '2026-11-09T02:00:00.000Z',
+                }),
+              ),
+            )
+          }
+          return json(detail())
+        },
+      ],
+    ])
+    renderPanel(ADMIN_SESSION)
+
+    await screen.findByText('STL-20261101-0001')
+    await openDetailDrawer()
+    fireEvent.click(await screen.findByRole('button', { name: /复\s*核/ }))
+
+    expect(await screen.findByText('复核结算单（人工确认快照）')).toBeTruthy()
+    expect(screen.getByText('复核只是人工确认快照内容，不锁定、不代表已付款')).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText('复核依据'), {
+      target: { value: '复核单 2026-11-09' },
+    })
+    fireEvent.click(within(modalElement()).getByRole('button', { name: '提交复核' }))
+
+    await waitFor(() => expect(reviewCalls).toHaveLength(1))
+    const post = reviewCalls[0]!
+    expect(urlOf(post).pathname).toBe(`${STATEMENTS_ROUTE}/${STATEMENT_ID}/review`)
+    expect(post.init?.method).toBe('POST')
+    expect(headersOf(post)['x-csrf-token']).toBe(CSRF_TOKEN)
+    expect(JSON.parse(String(post.init?.body))).toEqual({
+      expectedRevision: 1,
+      evidenceRef: '复核单 2026-11-09',
+    })
+
+    expect(await screen.findByText(/复核已提交/)).toBeTruthy()
+    // The Drawer status comes from the server-returned detail, not a local flip.
+    expect((await screen.findAllByText('已复核未锁定')).length).toBeGreaterThan(0)
+    const detailReads = calls.filter(
+      (call) => urlOf(call).pathname === `${STATEMENTS_ROUTE}/${STATEMENT_ID}`,
+    )
+    expect(detailReads).toHaveLength(1)
+  })
+
+  it('locks only after confirmation, and re-renders from the server detail', async () => {
+    const lockCalls: FetchCall[] = []
+    stubApi([
+      [
+        STATEMENTS_ROUTE,
+        (url, init) => {
+          const path = new URL(url, 'http://localhost').pathname
+          if (path === STATEMENTS_ROUTE) {
+            return json({ items: [reviewedStatement()], total: 1, page: 1, pageSize: 20 })
+          }
+          if (path.endsWith('/lock')) {
+            lockCalls.push({ url, init })
+            return json(detailWith(lockedStatement()))
+          }
+          return json(detailWith(reviewedStatement()))
+        },
+      ],
+    ])
+    renderPanel(ADMIN_SESSION)
+
+    await screen.findByText('STL-20261101-0001')
+    await openDetailDrawer()
+    fireEvent.click(await screen.findByRole('button', { name: /锁\s*单/ }))
+
+    expect(await screen.findByText('锁单（不可逆）')).toBeTruthy()
+    // The confirmation must say the lock is irreversible and not a payment.
+    expect(screen.getByText('锁定不可逆')).toBeTruthy()
+    expect(screen.getByText(/锁定 ≠ 已付款/)).toBeTruthy()
+    expect(screen.getByText(/后续付款必须由线下凭据单独登记与复核/)).toBeTruthy()
+
+    fireEvent.click(within(modalElement()).getByRole('button', { name: /取\s*消/ }))
+    await waitFor(() => expect(screen.queryByText('锁单（不可逆）')).toBeNull())
+    expect(lockCalls).toHaveLength(0)
+
+    fireEvent.click(screen.getByRole('button', { name: /锁\s*单/ }))
+    expect(await screen.findByText('锁单（不可逆）')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('锁单依据'), {
+      target: { value: '锁单依据 2026-11-09' },
+    })
+    fireEvent.click(within(modalElement()).getByRole('button', { name: '确认锁单' }))
+
+    await waitFor(() => expect(lockCalls).toHaveLength(1))
+    const post = lockCalls[0]!
+    expect(urlOf(post).pathname).toBe(`${STATEMENTS_ROUTE}/${STATEMENT_ID}/lock`)
+    expect(post.init?.method).toBe('POST')
+    expect(headersOf(post)['x-csrf-token']).toBe(CSRF_TOKEN)
+    expect(JSON.parse(String(post.init?.body))).toEqual({
+      expectedRevision: 2,
+      evidenceRef: '锁单依据 2026-11-09',
+    })
+
+    expect(await screen.findByText(/结算单已锁定/)).toBeTruthy()
+    expect((await screen.findAllByText('已锁定')).length).toBeGreaterThan(0)
+    // Locking is not payment: payment state stays whatever the server says.
+    expect(screen.getAllByText('未登记付款').length).toBeGreaterThan(0)
+  })
+
+  it('keeps the modal open and the draft status on a stale-revision 409', async () => {
+    stubApi([
+      [
+        STATEMENTS_ROUTE,
+        (url) => {
+          const path = new URL(url, 'http://localhost').pathname
+          if (path === STATEMENTS_ROUTE) {
+            return json({ items: [statement()], total: 1, page: 1, pageSize: 20 })
+          }
+          if (path.endsWith('/review')) {
+            return json(
+              {
+                error: {
+                  code: 'settlement_statement_conflict',
+                  message: '结算单已被其他管理员复核，revision 已过期',
+                },
+              },
+              409,
+            )
+          }
+          return json(detail())
+        },
+      ],
+    ])
+    renderPanel(ADMIN_SESSION)
+
+    await screen.findByText('STL-20261101-0001')
+    await openDetailDrawer()
+    fireEvent.click(await screen.findByRole('button', { name: /复\s*核/ }))
+    await screen.findByText('复核结算单（人工确认快照）')
+    fireEvent.change(screen.getByLabelText('复核依据'), {
+      target: { value: '复核单 2026-11-09' },
+    })
+    fireEvent.click(within(modalElement()).getByRole('button', { name: '提交复核' }))
+
+    expect(
+      await screen.findByText(/数据已被更新：结算单已被其他管理员复核，revision 已过期/),
+    ).toBeTruthy()
+    expect(screen.getByLabelText('复核依据')).toBeTruthy()
+    expect(screen.queryByText(/复核已提交/)).toBeNull()
+    // No local status rewrite: the drawer still shows the draft status.
+    expect(screen.getAllByText('草案未复核').length).toBeGreaterThan(0)
+  })
+
+  it('does not send a review without the required evidence', async () => {
+    const reviewCalls: FetchCall[] = []
+    stubApi([
+      [
+        STATEMENTS_ROUTE,
+        (url, init) => {
+          const path = new URL(url, 'http://localhost').pathname
+          if (path === STATEMENTS_ROUTE) {
+            return json({ items: [statement()], total: 1, page: 1, pageSize: 20 })
+          }
+          if (path.endsWith('/review')) {
+            reviewCalls.push({ url, init })
+            return json(detail())
+          }
+          return json(detail())
+        },
+      ],
+    ])
+    renderPanel(ADMIN_SESSION)
+
+    await screen.findByText('STL-20261101-0001')
+    await openDetailDrawer()
+    fireEvent.click(await screen.findByRole('button', { name: /复\s*核/ }))
+    await screen.findByText('复核结算单（人工确认快照）')
+
+    fireEvent.click(within(modalElement()).getByRole('button', { name: '提交复核' }))
+
+    expect(await screen.findByText('请填写复核依据')).toBeTruthy()
+    expect(reviewCalls).toHaveLength(0)
+  })
+})
+
+describe('SettlementStatementPanel · 双 CSV 导出', () => {
+  function csvResponse(filename: string): Response {
+    return new Response('a,b\r\n1,2\r\n', {
+      status: 200,
+      headers: {
+        'content-type': 'text/csv; charset=utf-8',
+        'content-disposition': `attachment; filename="${filename}"`,
+      },
+    })
+  }
+
+  function csvRoutes(handler: (path: string) => Response): readonly [string, Handler] {
+    return [
+      STATEMENTS_ROUTE,
+      (url) => {
+        const path = new URL(url, 'http://localhost').pathname
+        if (path === STATEMENTS_ROUTE) {
+          return json({ items: [statement()], total: 1, page: 1, pageSize: 20 })
+        }
+        if (path.endsWith('.csv')) return handler(path)
+        return json(detail())
+      },
+    ]
+  }
+
+  it('downloads both entity and performance CSVs with their real filenames', async () => {
+    const csvCalls: FetchCall[] = []
+    stubApi([
+      [
+        STATEMENTS_ROUTE,
+        (url, init) => {
+          const path = new URL(url, 'http://localhost').pathname
+          if (path === STATEMENTS_ROUTE) {
+            return json({ items: [statement()], total: 1, page: 1, pageSize: 20 })
+          }
+          if (path.endsWith('/entity.csv')) {
+            csvCalls.push({ url, init })
+            return csvResponse('settlement-0001-entity.csv')
+          }
+          if (path.endsWith('/performance.csv')) {
+            csvCalls.push({ url, init })
+            return csvResponse('settlement-0001-grid-performance.csv')
+          }
+          return json(detail())
+        },
+      ],
+    ])
+    renderPanel(ADMIN_SESSION)
+
+    await screen.findByText('STL-20261101-0001')
+    await openDetailDrawer()
+
+    fireEvent.click(await screen.findByRole('button', { name: '导出机构结算明细（CSV）' }))
+    expect(await screen.findByText(/已导出 settlement-0001-entity\.csv/)).toBeTruthy()
+    expect(urlOf(csvCalls[0]!).pathname).toBe(
+      `${STATEMENTS_ROUTE}/${STATEMENT_ID}/entity.csv`,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '导出网格员业绩附表（CSV）' }))
+    expect(
+      await screen.findByText(/已导出 settlement-0001-grid-performance\.csv/),
+    ).toBeTruthy()
+    expect(urlOf(csvCalls[1]!).pathname).toBe(
+      `${STATEMENTS_ROUTE}/${STATEMENT_ID}/performance.csv`,
+    )
+  })
+
+  it('shows the real export failure without claiming a success', async () => {
+    stubApi([
+      csvRoutes(() => json({ error: { code: 'forbidden', message: '没有导出权限' } }, 403)),
+    ])
+    renderPanel(ADMIN_SESSION)
+
+    await screen.findByText('STL-20261101-0001')
+    await openDetailDrawer()
+    fireEvent.click(await screen.findByRole('button', { name: '导出机构结算明细（CSV）' }))
+
+    expect((await screen.findAllByText(/没有权限/)).length).toBeGreaterThan(0)
+    expect(screen.getByText('CSV 导出失败')).toBeTruthy()
+    expect(screen.queryByText(/已导出/)).toBeNull()
+  })
+
+  it('states the draft-export warning and the performance appendix boundary', async () => {
+    stubApi([csvRoutes(() => csvResponse('x.csv'))])
+    renderPanel(ADMIN_SESSION)
+
+    await screen.findByText('STL-20261101-0001')
+    await openDetailDrawer()
+
+    expect(await screen.findByText('草案/未复核：导出仅供核对，不是已结清单据')).toBeTruthy()
+    expect(
+      screen.getByText(/业绩附表是广电网格员的工作量，不是应付给个人的佣金/),
+    ).toBeTruthy()
+  })
+
+  it('lets an operator export both CSVs but hides review/lock', async () => {
+    stubApi([csvRoutes(() => csvResponse('x.csv'))])
+    renderPanel(OPERATOR_SESSION)
+
+    await screen.findByText('STL-20261101-0001')
+    await openDetailDrawer()
+
+    expect((await screen.findAllByText('ORD-20261101-0001')).length).toBeGreaterThan(0)
+    // Review/lock stay admin-only; the server rejects any other role.
+    expect(screen.queryByRole('button', { name: /复\s*核/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /锁\s*单/ })).toBeNull()
+    // CSV export is allowed by the real API for admin AND operator.
+    expect(screen.getByRole('button', { name: '导出机构结算明细（CSV）' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '导出网格员业绩附表（CSV）' })).toBeTruthy()
+    expect(screen.getByText(/草案\/未复核：导出仅供核对，不是已结清单据/)).toBeTruthy()
+  })
+})
+
 describe('SettlementStatementPanel · 运营员与口径', () => {
   it('passes communityId and exposes only the draft entry this card owns', async () => {
     const calls = stubApi([statementRoutes()])

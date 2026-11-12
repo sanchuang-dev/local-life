@@ -1,5 +1,6 @@
 import {
   LEDGER_ROUTES,
+  apiErrorSchema,
   confirmSettlementOrderPartyRequestSchema,
   createSettlementMappingRequestSchema,
   createSettlementPartyRequestSchema,
@@ -15,6 +16,7 @@ import {
   settlementQuoteResponseSchema,
   settlementRuleListResponseSchema,
   settlementRuleVersionSchema,
+  settlementStatementActionRequestSchema,
   settlementStatementDetailSchema,
   settlementStatementListResponseSchema,
   settlementStatementSchema,
@@ -31,7 +33,8 @@ import {
   type SettlementStatementDetail,
   type SettlementStatementListResponse,
 } from '@sanchuang-dev/local-life-contracts'
-import { fillRoute, parsePayload, requestLocalJson, withQuery } from './localApi'
+import { filenameFromDisposition, saveBlob } from './ledger'
+import { LocalApiError, fillRoute, parsePayload, requestLocalJson, withQuery } from './localApi'
 
 /**
  * Back-office transport for real settlement parties (LL-SET-009A / #219, API #183).
@@ -64,6 +67,12 @@ import { fillRoute, parsePayload, requestLocalJson, withQuery } from './localApi
  * `status='locked'` 只说明快照不可再改，付款状态必须另看 `paymentState`。页面只能
  * 原样展示服务端给出的状态与金额；`allocation: null` 的 blocked 行不得补 0，汇总
  * 金额也不得被当成应付或已付。
+ *
+ * 「复核 / 锁单 / 双 CSV」（LL-SET-011B / #224）：**独立复核是服务端强制的规则** ——
+ * 制单人不得复核自己的草案、锁单还要求另一位管理员的复核签认，前端既不计算也不
+ * 猜测这些条件，只把服务端 403/409 的 message 原样展示。两个 CSV 通道（主体结算表 /
+ * 网格业绩附表）只下载服务端生成的文本：**任何错误响应（非 2xx，或 200 但
+ * content-type 是 JSON）都必须抛 `LocalApiError`，绝不能把错误 JSON 存成 `.csv`**。
  *
  * 硬规则：
  *
@@ -539,4 +548,194 @@ export async function getSettlementStatement(
     { signal },
   )
   return parsePayload(settlementStatementDetailSchema, payload, '结算单详情')
+}
+
+/* -------------------------------------------------------------------------- */
+/* Review / lock (#224) — server-enforced independence, never guessed         */
+/* -------------------------------------------------------------------------- */
+
+/** Both fields are mandatory: the revision is the optimistic-concurrency token. */
+export type SettlementStatementActionRequest = {
+  expectedRevision: number
+  evidenceRef: string
+}
+
+/**
+ * Shared POST for review/lock. Real API (verified in `apps/api`, #186):
+ *
+ * - `POST /admin/settlement/statements/:statementId/review` and `/lock`;
+ * - admin-only (`guard('admin')`) and CSRF-protected → 403 without a valid token;
+ * - success is **HTTP 200** (not 201) with a `SettlementStatementDetail` body;
+ * - 404 for an unknown/invalid statement id, 400 for a body that fails the strict
+ *   action contract, 403 for「制单人不能复核自己的结算草案」, and 409 for stale
+ *   revision / status / missing independent review / non-calculated lines.
+ *
+ * Independence is a *server* rule: this client never decides who may review and
+ * never rewrites a 403/409 — the page shows the server's message verbatim.
+ */
+async function postSettlementStatementAction(
+  csrfToken: string,
+  routeTemplate: string,
+  statementId: string,
+  request: SettlementStatementActionRequest,
+  label: string,
+): Promise<SettlementStatementDetail> {
+  const body = settlementStatementActionRequestSchema.parse(request)
+  const payload = await requestLocalJson(
+    `/api${fillRoute(routeTemplate, ':statementId', statementId)}`,
+    { method: 'POST', csrfToken, body },
+  )
+  return parsePayload(settlementStatementDetailSchema, payload, label)
+}
+
+/** POST /admin/settlement/statements/:statementId/review — draft → reviewed. */
+export async function reviewSettlementStatement(
+  csrfToken: string,
+  statementId: string,
+  request: SettlementStatementActionRequest,
+): Promise<SettlementStatementDetail> {
+  return postSettlementStatementAction(
+    csrfToken,
+    LEDGER_ROUTES.adminSettlementReview,
+    statementId,
+    request,
+    '结算单复核结果',
+  )
+}
+
+/**
+ * POST /admin/settlement/statements/:statementId/lock — reviewed → locked.
+ *
+ * Locking freezes the snapshot; it is **not** payment. The returned detail's
+ * `statement.paymentState` remains the only payment truth.
+ */
+export async function lockSettlementStatement(
+  csrfToken: string,
+  statementId: string,
+  request: SettlementStatementActionRequest,
+): Promise<SettlementStatementDetail> {
+  return postSettlementStatementAction(
+    csrfToken,
+    LEDGER_ROUTES.adminSettlementLock,
+    statementId,
+    request,
+    '结算单锁定结果',
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* CSV downloads (#224) — the admin app's audited, redacted text channel      */
+/* -------------------------------------------------------------------------- */
+
+/** Test seam: capture the blob instead of touching the DOM/OS download. */
+export interface SettlementCsvDownloadOptions {
+  save?: (blob: Blob, filename: string) => void
+  signal?: AbortSignal
+}
+
+/** What the server said about the file it produced (no row counts on this API). */
+export interface SettlementCsvDownloadResult {
+  filename: string
+  byteLength: number
+  contentType: string | null
+}
+
+const SETTLEMENT_CSV_ROUTE_BY_KIND = {
+  entity: LEDGER_ROUTES.adminSettlementEntityCsv,
+  performance: LEDGER_ROUTES.adminSettlementPerformanceCsv,
+} as const
+
+/** Deterministic ASCII fallback name when the server sends no usable filename. */
+function settlementCsvFilename(
+  kind: 'entity' | 'performance',
+  statementId: string,
+): string {
+  const stem = statementId.replace(/[^A-Za-z0-9]/gu, '').slice(0, 8)
+  return `settlement-${kind}-${stem || 'unknown'}.csv`
+}
+
+/**
+ * Turns a non-file response back into the shared `{ error: { code, message } }`
+ * envelope. A 2xx whose body is JSON is treated the same way: saving an error
+ * document as `.csv` would hand the operator an unreadable "success".
+ */
+async function settlementCsvFailure(response: Response): Promise<LocalApiError> {
+  const text = await response.text().catch(() => '')
+  let payload: unknown = null
+  try {
+    payload = text ? JSON.parse(text) : null
+  } catch {
+    payload = null
+  }
+  const parsed = apiErrorSchema.safeParse(payload)
+  if (parsed.success) {
+    return new LocalApiError(response.status, parsed.data.error.code, parsed.data.error.message)
+  }
+  const trimmed = text.trim()
+  return new LocalApiError(
+    response.status,
+    'http_error',
+    trimmed.length > 0 && trimmed.length <= 200 && !/^\s*</u.test(trimmed)
+      ? trimmed
+      : `导出失败（HTTP ${response.status}）`,
+  )
+}
+
+/**
+ * GET the audited CSV for one statement — `entity` (主体结算表, admin/operator) or
+ * `performance` (网格业绩附表, also readable by grid workers).
+ *
+ * Reuses `requestLocalJson`? No: that helper ends with `response.json()`, which
+ * would throw on a perfectly good `text/csv` attachment. This function therefore
+ * owns the only `response.blob()` call on the settlement surface and keeps the
+ * same guarantees as the ledger CSV channel:
+ *
+ * 1. `fetch` with `credentials: 'include'` and `accept: text/csv`;
+ * 2. non-2xx **or** a 2xx carrying `content-type: *json*` → parse the shared error
+ *    envelope and throw a real `LocalApiError` (401/403/404/409 keep their code);
+ *    `save` is never called for an error;
+ * 3. filename from `Content-Disposition` (`filename*=UTF-8''…` first, then
+ *    `filename="…"`), else `settlement-<kind>-<statementId 前8位>.csv`;
+ * 4. hands the file to `options.save ?? saveBlob` and returns the real file name,
+ *    byte length and content type.
+ */
+export async function downloadSettlementCsv(
+  statementId: string,
+  kind: 'entity' | 'performance',
+  options: SettlementCsvDownloadOptions = {},
+): Promise<SettlementCsvDownloadResult> {
+  const path = `/api${fillRoute(
+    SETTLEMENT_CSV_ROUTE_BY_KIND[kind],
+    ':statementId',
+    statementId,
+  )}`
+
+  let response: Response
+  try {
+    response = await fetch(path, {
+      method: 'GET',
+      credentials: 'include',
+      signal: options.signal,
+      headers: { accept: 'text/csv' },
+    })
+  } catch (cause) {
+    if (options.signal?.aborted) throw cause
+    throw new LocalApiError(0, 'network_error', '无法连接管理后台 API，结算单导出未开始。')
+  }
+
+  if (!response.ok) throw await settlementCsvFailure(response)
+
+  const contentType = response.headers.get('content-type')
+  // A 200 carrying JSON is the error envelope, not a file.
+  if (contentType !== null && /json/iu.test(contentType)) {
+    throw await settlementCsvFailure(response)
+  }
+
+  const blob = await response.blob()
+  const filename =
+    filenameFromDisposition(response.headers.get('content-disposition')) ??
+    settlementCsvFilename(kind, statementId)
+  const save = options.save ?? saveBlob
+  save(blob, filename)
+  return { filename, byteLength: blob.size, contentType }
 }
