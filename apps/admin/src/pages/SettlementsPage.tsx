@@ -46,6 +46,7 @@ import {
   lockReconciliationBatch,
 } from '../services/ledger'
 import { SettlementCandidatePanel } from './SettlementCandidatePanel'
+import { SettlementPartyPanel } from './SettlementPartyPanel'
 import './ledger.css'
 
 /**
@@ -146,6 +147,20 @@ function SettlementConsole({ session }: { session: AuthenticatedSession }) {
     const next = key === 'candidates' ? 'candidates' : 'reconciliation'
     if (next === 'candidates') setCandidatesMounted(true)
     setTab(next)
+  }
+
+  /**
+   * 分成结算单 has its own two views (#219): the read-only candidate board and the
+   * real-party directory. `parties` is mounted only after a human selects it, so
+   * opening 分成结算单 never issues a party request nobody asked for.
+   */
+  const [settlementView, setSettlementView] = useState<'candidates' | 'parties'>('candidates')
+  const [partiesMounted, setPartiesMounted] = useState(false)
+
+  const switchSettlementView = (key: string) => {
+    const next = key === 'parties' ? 'parties' : 'candidates'
+    if (next === 'parties') setPartiesMounted(true)
+    setSettlementView(next)
   }
 
   /* ------------------------------- batch list ------------------------------ */
@@ -746,7 +761,23 @@ function SettlementConsole({ session }: { session: AuthenticatedSession }) {
             aria-label="分成结算单"
             hidden={tab !== 'candidates'}
           >
-            <SettlementCandidatePanel />
+            <Tabs
+              size="small"
+              activeKey={settlementView}
+              onChange={switchSettlementView}
+              items={[
+                {
+                  key: 'candidates',
+                  label: '候选看板',
+                  children: <SettlementCandidatePanel />,
+                },
+                {
+                  key: 'parties',
+                  label: '主体目录',
+                  children: partiesMounted ? <SettlementPartyPanel /> : null,
+                },
+              ]}
+            />
           </div>
         ) : null}
       </div>
