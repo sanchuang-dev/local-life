@@ -30,6 +30,7 @@ export const PURCHASE_REWARD_ROUTES = {
   staffProgress: '/staff/activities/:activityId/purchase-reward/progress',
   myCoupons: '/purchase-reward/coupons',
   staffCouponStock: '/staff/activities/:activityId/purchase-reward/stock',
+  staffRewardDisputes: '/staff/activities/:activityId/purchase-reward/disputes',
 } as const
 
 /** A rewarded team is always the three-person team from LL-MVP-004. */
@@ -139,3 +140,22 @@ export const couponStockResponseSchema = z.strictObject({
   }
 })
 export type CouponStockResponse = z.infer<typeof couponStockResponseSchema>
+
+
+/** Durable, staff-scoped record of a financial exception, not an auto-refund. */
+export const couponRewardDisputeSchema = z.strictObject({
+  id: z.string().uuid(),
+  kind: z.enum(['reward_eligibility_lost', 'redeemed_payment_reversed']),
+  grantId: z.string().uuid(),
+  couponId: z.string().uuid().nullable(),
+  sourceOrderId: z.string().uuid(),
+  reversalEntryId: z.string().uuid(),
+  resolution: z.enum(['auto_void', 'pending_manual']),
+  createdAt: z.string().datetime({ offset: true }),
+})
+export type CouponRewardDispute = z.infer<typeof couponRewardDisputeSchema>
+export const couponRewardDisputeListSchema = z.strictObject({
+  items: z.array(couponRewardDisputeSchema),
+  asOf: z.string().datetime({ offset: true }),
+})
+export type CouponRewardDisputeList = z.infer<typeof couponRewardDisputeListSchema>
