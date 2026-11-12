@@ -6,12 +6,14 @@ import {
   createSettlementPartyRequestSchema,
   createSettlementRuleRequestSchema,
   createSettlementStatementRequestSchema,
+  recordSettlementPaymentRequestSchema,
   settlementMappingListResponseSchema,
   settlementMappingSchema,
   settlementOrderPartyResponseSchema,
   settlementOrderPartySnapshotSchema,
   settlementPartyListResponseSchema,
   settlementPartySchema,
+  settlementPaymentOverviewSchema,
   settlementQuoteRequestSchema,
   settlementQuoteResponseSchema,
   settlementRuleListResponseSchema,
@@ -24,9 +26,11 @@ import {
   type CreateSettlementPartyRequest,
   type CreateSettlementRuleRequest,
   type CreateSettlementStatementRequest,
+  type RecordSettlementPaymentRequest,
   type SettlementMapping,
   type SettlementOrderPartySnapshot,
   type SettlementParty,
+  type SettlementPaymentOverview,
   type SettlementQuoteResponse,
   type SettlementRuleVersion,
   type SettlementStatement,
@@ -73,6 +77,11 @@ import { LocalApiError, fillRoute, parsePayload, requestLocalJson, withQuery } f
  * 猜测这些条件，只把服务端 403/409 的 message 原样展示。两个 CSV 通道（主体结算表 /
  * 网格业绩附表）只下载服务端生成的文本：**任何错误响应（非 2xx，或 200 但
  * content-type 是 JSON）都必须抛 `LocalApiError`，绝不能把错误 JSON 存成 `.csv`**。
+ *
+ * 「付款凭据登记」（LL-SET-012A / #225）：登记凭据 **≠ 复核核销**。运营人员只登记
+ * 脱敏的线下付款凭据，`state` 完全由服务端决定；前端不得把 `pending_review` 显示成
+ * `verified`，也不得自行推断「已付款」。本模块**不调用任何银行 / 微信 / 支付 SDK**，
+ * 不发起转账。`idempotencyKey` 只被原样传递：service 不生成、不替换、不重试。
  *
  * 硬规则：
  *
@@ -738,4 +747,84 @@ export async function downloadSettlementCsv(
   const save = options.save ?? saveBlob
   save(blob, filename)
   return { filename, byteLength: blob.size, contentType }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Payment proof registration (#225) — register ≠ verify                      */
+/* -------------------------------------------------------------------------- */
+
+/** Record lifecycle wording. `pending_review` is NOT a payment confirmation. */
+export const SETTLEMENT_PAYMENT_RECORD_STATE_LABELS: Record<
+  'pending_review' | 'verified' | 'disputed',
+  string
+> = {
+  pending_review: '待复核',
+  verified: '已核销',
+  disputed: '争议',
+}
+
+/** Per-beneficiary payment progress. Only `verified` means the money was checked. */
+export const SETTLEMENT_BENEFICIARY_STATE_LABELS: Record<
+  'awaiting_payment' | 'pending_review' | 'partial' | 'verified' | 'disputed',
+  string
+> = {
+  awaiting_payment: '待付款',
+  pending_review: '已登记待复核',
+  partial: '部分支付',
+  verified: '已核销',
+  disputed: '争议',
+}
+
+/**
+ * GET /admin/settlement/statements/:statementId/payments — the payment overview.
+ *
+ * Measured against `apps/api` (#187): the route guard is `'read'`, but
+ * `getSettlementPaymentOverview` itself calls `requireAdmin`, so the effective
+ * caller is an **admin** — an operator receives a real `403`
+ * (「只有管理员可登记或复核线下付款凭据」). The whole overview is returned:
+ * `state`, the three totals, `beneficiaries`, `records` and `events`. Empty
+ * arrays are a real 「尚未登记」 state; a failed request throws instead.
+ */
+export async function getSettlementPaymentOverview(
+  statementId: string,
+  signal?: AbortSignal,
+): Promise<SettlementPaymentOverview> {
+  const payload = await requestLocalJson(
+    `/api${fillRoute(LEDGER_ROUTES.adminSettlementPayments, ':statementId', statementId)}`,
+    { signal },
+  )
+  return parsePayload(settlementPaymentOverviewSchema, payload, '结算单付款概览')
+}
+
+/**
+ * POST /admin/settlement/statements/:statementId/payments — register one masked
+ * offline payment proof.
+ *
+ * Measured against `apps/api` (#187): admin-only + CSRF, success is **HTTP 201**
+ * and the body is the whole `SettlementPaymentOverview` (not a single record), so
+ * the page can refresh everything from the resolved value.
+ *
+ * `idempotencyKey` is **passed through verbatim**: this service never generates,
+ * replaces, mutates or retries it. Callers own one key per logical submission and
+ * reuse the same key when retrying the identical payload; the server's replay
+ * rule returns the current overview for an identical replay and a `409` for a
+ * key reused with different content.
+ *
+ * The body is parsed locally first, so a weak proof reference (12+ consecutive
+ * digits), a non-positive/non-integer amount, a malformed timestamp or a non-UUID
+ * key never leave the browser. Registering is not verifying: the server keeps the
+ * record `pending_review` until an independent admin verifies it.
+ */
+export async function recordSettlementPayment(
+  csrfToken: string,
+  statementId: string,
+  request: RecordSettlementPaymentRequest,
+): Promise<SettlementPaymentOverview> {
+  // Verbatim idempotency key: `parse` only validates/normalises the proof text.
+  const body = recordSettlementPaymentRequestSchema.parse(request)
+  const payload = await requestLocalJson(
+    `/api${fillRoute(LEDGER_ROUTES.adminSettlementPayments, ':statementId', statementId)}`,
+    { method: 'POST', csrfToken, body },
+  )
+  return parsePayload(settlementPaymentOverviewSchema, payload, '付款凭据登记结果')
 }
