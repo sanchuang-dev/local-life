@@ -1343,7 +1343,7 @@ test('full reversal removes paid progress, voids all unused reward coupons, keep
   const w = await couponEarnedWorld()
   const { app, db, admin, operator, a, b, c, activityId, seedReceipt } = w
   assert.equal((await myProgress(app, a, activityId)).progress?.eligible, true)
-  const reversal = await reversePayment(app, operator, seedReceipt.id)
+  const reversal = await reversePayment(app, operator, seedReceipt.entryId)
   assert.equal(reversal.factKind, 'payment_reversed')
   assert.equal((await myProgress(app, a, activityId)).progress?.totalEffectivePaidCents, 0)
   for (const member of [a, b, c]) {
@@ -1353,13 +1353,13 @@ test('full reversal removes paid progress, voids all unused reward coupons, keep
   assert.equal(dispute.items.length, 1)
   assert.equal(dispute.items[0]?.kind, 'reward_eligibility_lost')
   assert.equal(dispute.items[0]?.resolution, 'auto_void')
-  assert.equal(dispute.items[0]?.reversalEntryId, reversal.id)
+  assert.equal(dispute.items[0]?.reversalEntryId, reversal.entryId)
   assert.equal(db.select().from(couponTeamGrants).all().length, 1, 'budget reservation remains immutable')
   assert.equal((await couponStock(app, operator, activityId)).issuedTeams, 1)
-  assert.equal(db.select().from(ledgerEntries).where(eq(ledgerEntries.id, seedReceipt.id)).get()?.factKind,
+  assert.equal(db.select().from(ledgerEntries).where(eq(ledgerEntries.id, seedReceipt.entryId)).get()?.factKind,
     'payment_received', 'original receipt is never modified')
   const before = db.select().from(couponIssueEvents).all().length
-  const repeat = await api(app, 'POST', `/admin/ledger/payments/${seedReceipt.id}/reverse`, {
+  const repeat = await api(app, 'POST', `/admin/ledger/payments/${seedReceipt.entryId}/reverse`, {
     session: operator, body: { reason: 'repeat' },
   })
   assert.equal(repeat.status, 409)
@@ -1386,7 +1386,7 @@ test('full reversal removes paid progress, voids all unused reward coupons, keep
     route(PURCHASE_REWARD_ROUTES.staffRewardDisputes, activityId), { session: a })
   assert.equal(noStaff.status, 401)
   const unauthorizedReversal = await api(app, 'POST',
-    `/admin/ledger/payments/${seedReceipt.id}/reverse`, {
+    `/admin/ledger/payments/${seedReceipt.entryId}/reverse`, {
       session: outsider, body: { reason: 'unauthorized' },
     })
   assert.equal(unauthorizedReversal.status, 403)
@@ -1402,7 +1402,7 @@ test('source reversal after coupon redemption preserves spent history, voids rem
     amountCents: 8_000, evidenceRef: 'REVERSAL-DOWNSTREAM-NET',
   })
   assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'redeemed')
-  const sourceReverse = await reversePayment(app, operator, seedReceipt.id)
+  const sourceReverse = await reversePayment(app, operator, seedReceipt.entryId)
   assert.equal((await myProgress(app, a, activityId)).progress?.totalEffectivePaidCents, 0)
   assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'redeemed',
     'already redeemed coupon must NOT be restored or rewritten')
@@ -1412,7 +1412,7 @@ test('source reversal after coupon redemption preserves spent history, voids rem
   assert.equal(disputes.items.length, 1)
   assert.equal(disputes.items[0]?.kind, 'reward_eligibility_lost')
   assert.equal(disputes.items[0]?.resolution, 'pending_manual')
-  assert.equal(disputes.items[0]?.reversalEntryId, sourceReverse.id)
+  assert.equal(disputes.items[0]?.reversalEntryId, sourceReverse.entryId)
   const snapshot = db.select().from(localOrders).where(eq(localOrders.id, order.id)).get()
   assert.equal(snapshot?.status, 'verified')
   assert.equal(snapshot?.totalCents, 10_000)
@@ -1421,13 +1421,13 @@ test('source reversal after coupon redemption preserves spent history, voids rem
 
   // Reversing the payment of the coupon-backed order creates a DIFFERENT
   // manual exception; no wallet re-credit or history rewrite is permitted.
-  const downstreamReverse = await reversePayment(app, operator, laterCash.id)
+  const downstreamReverse = await reversePayment(app, operator, laterCash.entryId)
   assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'redeemed')
   const all = await readStaffCouponDisputes(app, operator, activityId)
   assert.equal(all.items.length, 2)
   const downstreamDispute = all.items.find(x => x.kind === 'redeemed_payment_reversed')
   assert.equal(downstreamDispute?.resolution, 'pending_manual')
-  assert.equal(downstreamDispute?.reversalEntryId, downstreamReverse.id)
+  assert.equal(downstreamDispute?.reversalEntryId, downstreamReverse.entryId)
   assert.equal(db.select().from(couponRewardDisputes).all().length, 2)
   assert.equal(db.select().from(couponTeamGrants).all().length, 1)
 })
@@ -1436,7 +1436,7 @@ test('reserved downstream coupon becomes unusable on source reversal; pending or
   const w = await couponEarnedWorld()
   const { app, a, operator, activityId, couponId, seedReceipt } = w
   const { order } = await registerWithCoupon(app, a, w.product.id, couponId)
-  await reversePayment(app, operator, seedReceipt.id)
+  await reversePayment(app, operator, seedReceipt.entryId)
   assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'void')
   const disputes = await readStaffCouponDisputes(app, operator, activityId)
   assert.equal(disputes.items[0]?.resolution, 'pending_manual')
@@ -1474,31 +1474,31 @@ test('failure writing a reversal dispute or void event rolls back the reversal f
     BEFORE INSERT ON coupon_issue_events WHEN NEW.kind='voided'
     BEGIN SELECT RAISE(ABORT, 'test coupon void event write refused'); END`)
   try {
-    const failed = await api(app, 'POST', `/admin/ledger/payments/${seedReceipt.id}/reverse`, {
+    const failed = await api(app, 'POST', `/admin/ledger/payments/${seedReceipt.entryId}/reverse`, {
       session: operator, body: { reason: 'simulate event failure' },
     })
     assert.ok(failed.status >= 500)
     assert.equal(db.select().from(ledgerEntries).all().filter(x =>
-      x.factKind === 'payment_reversed' && x.counterEntryId === seedReceipt.id).length, 0)
+      x.factKind === 'payment_reversed' && x.counterEntryId === seedReceipt.entryId).length, 0)
     assert.equal(db.select().from(couponRewardDisputes).all().length, 0)
     assert.equal(db.select().from(couponIssueEvents).all().length, initialEvents)
     assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'available')
   } finally {
     sqlite.exec('DROP TRIGGER test_reject_coupon_void_event')
   }
-  await reversePayment(app, operator, seedReceipt.id)
+  await reversePayment(app, operator, seedReceipt.entryId)
   assert.equal((await myCouponWallet(app, a)).items[0]?.status, 'void')
 })
 
 test('partial refund payload is explicitly rejected; legacy no-coupon receipts stay immutable', async () => {
   const w = await couponEarnedWorld()
   const { app, db, operator, seedReceipt, admin, communityId } = w
-  const invalid = await api(app, 'POST', `/admin/ledger/payments/${seedReceipt.id}/reverse`, {
+  const invalid = await api(app, 'POST', `/admin/ledger/payments/${seedReceipt.entryId}/reverse`, {
     session: operator, body: { amountCents: 500, reason: 'partial refund unsupported' },
   })
   assert.equal(invalid.status, 400)
   assert.equal(db.select().from(ledgerEntries).all().filter(x =>
-    x.factKind === 'payment_reversed' && x.counterEntryId === seedReceipt.id).length, 0)
+    x.factKind === 'payment_reversed' && x.counterEntryId === seedReceipt.entryId).length, 0)
   const standaloneProduct = await createOnShelfProduct(app, admin, communityId, 900)
   const other = await w.resident('无券居民')
   const order = await registerOrder(app, other, { productId: standaloneProduct.id })
@@ -1507,9 +1507,9 @@ test('partial refund payload is explicitly rejected; legacy no-coupon receipts s
     communityId, staffId: w.operatorId, orderId: verified.id,
     amountCents: 900, evidenceRef: 'NO-COUPON-LEGACY-REVERSAL',
   })
-  const reversed = await reversePayment(app, operator, receipt.id)
+  const reversed = await reversePayment(app, operator, receipt.entryId)
   assert.equal(reversed.factKind, 'payment_reversed')
   assert.equal(db.select().from(couponRewardDisputes).all().length, 0)
-  assert.equal(db.select().from(ledgerEntries).where(eq(ledgerEntries.id, receipt.id)).get()?.factKind,
+  assert.equal(db.select().from(ledgerEntries).where(eq(ledgerEntries.id, receipt.entryId)).get()?.factKind,
     'payment_received')
 })
