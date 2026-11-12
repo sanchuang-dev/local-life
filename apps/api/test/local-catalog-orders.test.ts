@@ -417,7 +417,7 @@ function addActivity(
   db: AppDatabase,
   communityId: string,
   createdByUserId: string,
-  options: { status?: ActivityStatus; endsAt?: Date } = {},
+  options: { status?: ActivityStatus; endsAt?: Date; withPurchaseReward?: boolean } = {},
 ): string {
   const status = options.status ?? 'published'
   const endsAt = options.endsAt ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
@@ -437,6 +437,9 @@ function addActivity(
       budgetCapCents: 100_000,
       prizeQuantityCap: 100,
       publicRulesJson: ACTIVITY_RULES_JSON,
+      purchaseRewardPlanJson: options.withPurchaseReward === false
+        ? null
+        : JSON.stringify({ thresholdCents: 20_000, couponFaceValueCents: 2_000, maxRewardedTeams: 5 }),
       currentRuleVersionId: null,
       createdByUserId,
       createdAt: now,
@@ -1842,6 +1845,18 @@ test('an order may bind only the caller own team in a live activity of the produ
     )
     assert.deepEqual(bound.sourceTeam, { id: ownTeam.teamId, activityId })
 
+    // A check-in-only activity may have a real team but must NOT be treated
+    // as a consumption reward activity, either by order registration or options.
+    const checkinOnly = addActivity(db, communityId, resident.userId, { withPurchaseReward: false })
+    const checkinTeam = await joinTeam(app, resident, checkinOnly)
+    const invalidConsumption = await register(app, resident, {
+      productId: product.id,
+      sourceActivityId: checkinOnly,
+      sourceTeamId: checkinTeam.teamId,
+    })
+    assert.equal(invalidConsumption.status, 409)
+    assert.equal(await errorCode(invalidConsumption), API_ERROR_CODES.activityUnavailable)
+
     // Somebody else's team is refused (same message as a team from the wrong
     // activity, so neither relation is enumerable).
     const foreignTeam = await register(app, resident, {
@@ -2091,6 +2106,14 @@ test('order team attribution is permanent: replay cannot switch teams and SQL ca
       () => insertOrder.run(...baseParams(null, firstTeam.teamId)),
       /requires source_activity_id/u,
     )
+    // A direct SQL writer must not attribute consumption to a check-in-only team.
+    const checkinOnly = addActivity(db, communityId, resident.userId, { withPurchaseReward: false })
+    const checkinTeam = await joinTeam(app, resident, checkinOnly)
+    assert.throws(
+      () => insertOrder.run(...baseParams(checkinOnly, checkinTeam.teamId)),
+      /requires a purchase reward plan/u,
+    )
+
     // And no rejected insert left a row behind.
     const leaked = db
       .select({ id: localOrders.id })
