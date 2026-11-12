@@ -21,6 +21,7 @@ import {
   secondaryButtonClassName,
   type TimelineEntry,
 } from '../../components/crm/WorkbenchUi'
+import { describeOrderAttribution } from '../../components/life/localOrderAttribution'
 import {
   formatLocalDateTime,
   formatLocalPriceCents,
@@ -152,6 +153,7 @@ function OrderContent({ order, onUpdated }: { order: LocalOrderDetail; onUpdated
           {order.sourceActivity ? (
             <InfoRow label="来源活动" value={order.sourceActivity.title} />
           ) : null}
+          <InfoRow label="消费团归属" value={describeOrderAttribution(order)} />
           <InfoRow label="登记时间" value={formatLocalDateTime(order.createdAt)} />
           <InfoRow label="最后更新" value={formatLocalDateTime(order.updatedAt)} />
         </dl>

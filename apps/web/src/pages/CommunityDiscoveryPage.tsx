@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import './CommunityDiscoveryPage.css'
 import { Link, useLocation } from 'react-router'
 import {
   ACTIVITY_ROUTES,
@@ -11,8 +12,8 @@ import {
   type PublicCommunity,
 } from '@sanchuang-dev/local-life-contracts'
 import {
-  ArrowRight, CalendarDays, CalendarX, ChevronDown, ChevronRight,
-  CircleAlert, Clock3, LocateFixed, MapPin, Search, X,
+  CalendarDays, CalendarX, ChevronRight,
+  CircleAlert, LocateFixed, MapPin, Search, X,
 } from 'lucide-react'
 import { CommunityLocationError, createCommunityLocationRequester } from '../lib/communityGeolocation'
 import { communityLocationSheetCopy, type CommunityLocationStatus } from '../lib/communityLocationCopy'
@@ -20,7 +21,6 @@ import type { Gcj02Point } from '../lib/communityCoordinates'
 import { activityDetailHref, SELECTED_COMMUNITY_KEY } from '../lib/communityHomeRoute'
 import {
   BROWSE_ONLY_NOTICE,
-  LOCATION_NOT_PROOF_NOTICE,
   residentCommunityConfirmHrefWithContext,
 } from '../lib/residentCommunity'
 import { ResidentCommunityCard } from '../components/community/ResidentCommunityCard'
@@ -297,98 +297,137 @@ export function CommunityDiscoveryPage() {
     : null
 
   return (
-    <div className="mx-auto min-h-[70vh] w-full max-w-[480px] bg-[#f5f7f7] text-[#172d28]">
-      <header className="flex items-start justify-between gap-3 px-5 pb-2 pt-5 max-[359px]:px-4">
-        <div>
-          <h1 className="text-[24px] font-bold tracking-tight text-[#0b4a42]">本地生活</h1>
-          <p className="mt-0.5 text-[14px] text-[#5b6c67]">社区活动与便民服务</p>
+    <div className="community-home">
+      <header className="community-home__banner">
+        <img
+          className="community-home__art"
+          src={import.meta.env.BASE_URL + 'images/community-home-park.webp'}
+          alt=""
+          aria-hidden="true"
+        />
+        <div className="community-home__banner-title">
+          <h1>本地生活</h1>
+          <p>社区活动与便民服务</p>
         </div>
-        <button type="button" onClick={startLocation}
-          disabled={locationStatus === 'locating'}
-          className="flex min-h-11 shrink-0 items-center gap-1 rounded-full border border-[#dce6e2] bg-white px-3 text-[13px] font-semibold text-[#116d63]">
-          <MapPin size={17} aria-hidden="true" />
-          {locationStatus === 'success' ? '已定位 · 重新定位' :
-            locationStatus === 'locating' ? '定位中…' : locationStatus === 'error' ? '定位失败 · 重试' : '定位附近'}
+        <button type="button" className="community-home__locate-pill"
+          onClick={startLocation} disabled={locationStatus === 'locating'}>
+          <MapPin size={16} aria-hidden="true" />
+          {locationStatus === 'success' ? '重新定位'
+            : locationStatus === 'locating' ? '定位中…'
+              : locationStatus === 'error' ? '定位重试' : '定位附近'}
         </button>
       </header>
 
-      <div className="px-5 pb-7 pt-5 max-[359px]:px-4">
-        <section aria-labelledby="home-community-title">
+      <div className="community-home__body">
+        <section className="community-home__chooser" aria-labelledby="home-community-title">
+          <h2 id="home-community-title" className="sr-only">选择社区</h2>
+          <div className="community-home__actions">
+            <button type="button" className={primary} disabled={locationStatus === 'locating'}
+              onClick={startLocation}>
+              <LocateFixed size={18} aria-hidden="true" />
+              {locationStatus === 'locating' ? '定位中…'
+                : locationStatus === 'success' ? '重新定位' : '定位附近社区'}
+            </button>
+            <button type="button" className={secondary}
+              onClick={(e) => openSheet(null, e.currentTarget)}>
+              选择社区
+            </button>
+          </div>
+
+          {locationStatus === 'error' && locationError && (
+            <p className="community-home__notice" role="status">{locationError}</p>
+          )}
+          {directory.status === 'error' && (
+            <div className="community-home__notice community-home__notice--error" role="alert">
+              {directory.message}
+              <button type="button" onClick={() => refreshDirectory((n) => n + 1)}>重试</button>
+            </div>
+          )}
+
           {community ? (
-            <>
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-[14px] font-semibold text-[#116d63]">当前浏览社区</p>
-                <button type="button" data-switch-community
-                  className="min-h-11 text-[14px] font-semibold text-[#116d63]"
-                  onClick={(e) => openSheet(null, e.currentTarget)}>切换浏览社区 <ChevronDown size={15} className="inline" /></button>
+            <div className="community-home__current">
+              <span className="community-home__current-icon" aria-hidden="true"><MapPin size={20} /></span>
+              <div>
+                <span>当前浏览社区</span>
+                <strong>{community.name}</strong>
+                <small>{community.address || '社区服务点地址暂未录入'}</small>
               </div>
-              <div className="mt-2 flex items-center gap-3">
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e8f6f0] text-[#116d63]">
-                  <MapPin size={21}/></span>
-                <div className="min-w-0">
-                  <h2 id="home-community-title" className="text-[23px] font-bold leading-8">{community.name}</h2>
-                  <p className="text-[14px] text-[#5b6c67]">{community.address || '社区服务点地址暂未录入'}</p>
-                </div>
+            </div>
+          ) : locationStatus === 'success' && nearby.length > 0 ? (
+            <div className="community-home__nearby" aria-label="附近社区推荐">
+              {nearby.slice(0, 2).map((item) => (
+                <button key={item.id} type="button"
+                  onClick={(e) => openSheet(item.id, e.currentTarget)}>
+                  <MapPin size={18} aria-hidden="true" />
+                  <span><strong>{item.name}</strong><small>{distanceText(item.distanceMeters)}</small></span>
+                  <ChevronRight size={18} aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </section>
+
+        <section className="community-home__activities" aria-labelledby="community-activities-title">
+          <div className="community-home__section-heading">
+            <h2 id="community-activities-title">社区活动</h2>
+            <p>{community ? community.name + ' · 已公开发布的活动' : '选择社区后查看活动'}</p>
+          </div>
+
+          {!community ? (
+            <div className="community-home__activity-empty">
+              <span className="community-home__empty-icon" aria-hidden="true"><CalendarDays size={27}/></span>
+              <div>
+                <h3>选择社区后查看活动</h3>
+                <p>选择想浏览的社区，看看那里正在发生什么。</p>
               </div>
-              <p className="mt-2 text-[12px] leading-5 text-[#5b6c67]">{BROWSE_ONLY_NOTICE}</p>
-            </>
+            </div>
+          ) : activities.status === 'loading' ? (
+            <p className="community-home__status" role="status">正在读取已发布活动…</p>
+          ) : activities.status === 'error' ? (
+            <div className="community-home__status community-home__status--error" role="alert">
+              <p>{activities.message}</p>
+              <button type="button" onClick={() => refreshActivities((n) => n + 1)}>重新读取活动</button>
+            </div>
+          ) : activities.items.length === 0 ? (
+            <div className="community-home__activity-empty">
+              <span className="community-home__empty-icon" aria-hidden="true"><CalendarX size={27}/></span>
+              <div>
+                <h3>这个社区暂无已发布活动</h3>
+                <p>可以稍后再来，或者看看其他社区。</p>
+                <button type="button" onClick={(e) => openSheet(null, e.currentTarget)}>选择其他社区</button>
+              </div>
+            </div>
           ) : (
-            <>
-              <p className="text-[14px] font-semibold text-[#116d63]">
-                {locationStatus === 'success' ? '已定位' : locationStatus === 'locating' ? '正在定位' : '附近社区'}
-              </p>
-              <h2 id="home-community-title" className="mt-2 text-[24px] font-bold leading-8">
-                {locationStatus === 'success' && nearby.length === 0 && directory.status === 'ready' ? '附近暂未找到社区' :
-                  locationStatus === 'success' && nearby.length ? '选择要浏览的社区' :
-                  locationStatus === 'locating' ? '正在获取你的位置' : locationStatus === 'error' ? '暂时无法获取位置' :
-                  '先选一个要浏览的社区'}
-              </h2>
-              <p className="mt-2 text-[15px] leading-7 text-[#5b6c67]">
-                {locationStatus === 'success' ? '我们按照社区服务点的位置推荐附近社区，你可以自行选择要浏览的社区。' :
-                  '定位后可以查看附近社区，也可以直接搜索社区名称。'}
-              </p>
-              {locationStatus === 'error' && locationError && (
-                <p className="mt-2 text-[13px] text-[#a15c38]" role="status">{locationError}</p>
-              )}
-              {directory.status === 'error' && (
-                <div className="mt-3 rounded-xl border border-[#edd1c9] bg-[#fff7f0] p-3 text-[14px] text-[#934a35]" role="alert">
-                  {directory.message}
-                  <button className="ml-2 underline" onClick={() => refreshDirectory((n)=>n+1)}>重试</button>
-                </div>
-              )}
-              {locationStatus === 'success' && nearby.length > 0 && (
-                <div className="mt-4 divide-y divide-[#dce6e2] border-y border-[#dce6e2]">
-                  {nearby.slice(0, 2).map((item) => (
-                    <button type="button" key={item.id}
-                      className="flex min-h-[70px] w-full items-center gap-3 py-3 text-left"
-                      onClick={(event) => openSheet(item.id, event.currentTarget)}>
-                      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e8f6f0] text-[#116d63]"><MapPin size={19}/></span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[16px] font-semibold">{item.name}</span>
-                        <span className="block text-[13px] text-[#5b6c67]">{distanceText(item.distanceMeters)}</span>
-                      </span>
-                      <ChevronRight size={18} className="text-[#138b79]"/>
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="mt-5 grid grid-cols-2 gap-2 max-[359px]:grid-cols-1">
-                <button type="button" className={primary} disabled={locationStatus === 'locating'}
-                  onClick={startLocation}>
-                  <LocateFixed size={18}/> {locationStatus === 'locating' ? '定位中…' : locationStatus === 'success' ? '重新定位' : '定位附近社区'}
-                </button>
-                <button type="button" className={secondary}
-                  onClick={(e) => openSheet(null, e.currentTarget)}>
-                  手动选择社区
-                </button>
-              </div>
-              <p className="mt-2 text-[12px] leading-5 text-[#5b6c67]">{LOCATION_NOT_PROOF_NOTICE}</p>
-            </>
+            <div className="community-home__activity-list">
+              {activities.items.map((activity) => (
+                <Link key={activity.id} to={activityDetailHref(activity.id)} className="community-home__activity-card">
+                  <span className="community-home__thumbnail" aria-hidden="true">
+                    <CalendarDays size={38} strokeWidth={1.35} />
+                  </span>
+                  <span className="community-home__activity-info">
+                    <span className="community-home__activity-top">
+                      <span className="community-home__status-tag">{activityStatus(activity)}</span>
+                      <ChevronRight size={17} aria-hidden="true" />
+                    </span>
+                    <strong>{activity.title}</strong>
+                    {activity.summary && <span className="community-home__summary">{activity.summary}</span>}
+                    <span className="community-home__meta">
+                      <CalendarDays size={14} aria-hidden="true" />
+                      {formatTime(activity.startsAt)} 至 {formatTime(activity.endsAt)}
+                    </span>
+                    <span className="community-home__meta">
+                      <MapPin size={14} aria-hidden="true" />
+                      {activity.location}
+                    </span>
+                  </span>
+                </Link>
+              ))}
+            </div>
           )}
         </section>
 
-        {community ? (
-          <div className="mt-5">
+        {community && (
+          <div className="community-home__residence">
             <ResidentCommunityCard
               state={residentCommunity.state}
               onReload={residentCommunity.reload}
@@ -398,57 +437,9 @@ export function CommunityDiscoveryPage() {
               chooseCommunityHref="/"
             />
           </div>
-        ) : null}
+        )}
 
-        <section className="mt-9" aria-labelledby="community-activities-title">
-          <h2 id="community-activities-title" className="text-[21px] font-bold">社区活动</h2>
-          <p className="mt-1 text-[14px] leading-6 text-[#5b6c67]">
-            {community ? `${community.name} · 已公开发布的活动` : '选择社区后查看活动'}
-          </p>
-          {!community ? (
-            <div className="mt-3 flex items-start gap-3 rounded-2xl border border-[#dce6e2] bg-white p-4">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e8f6f0] text-[#116d63]"><CalendarDays size={21}/></span>
-              <div>
-                <h3 className="text-[16px] font-semibold">选择社区后查看活动</h3>
-                <p className="mt-1 text-[14px] leading-6 text-[#5b6c67]">不会混入其他社区的活动，也无需提前登录。</p>
-              </div>
-            </div>
-          ) : activities.status === 'loading' ? (
-            <p className="mt-3 rounded-2xl bg-white p-5 text-[14px] text-[#5b6c67]" role="status">正在读取已发布活动…</p>
-          ) : activities.status === 'error' ? (
-            <div className="mt-3 rounded-2xl border border-[#edd1c9] bg-[#fff7f0] p-4" role="alert">
-              <p className="text-[14px] text-[#934a35]">{activities.message}</p>
-              <button className="mt-2 min-h-11 text-[14px] font-semibold text-[#116d63]" onClick={() => refreshActivities(n=>n+1)}>重新读取活动</button>
-            </div>
-          ) : activities.items.length === 0 ? (
-            <div className="mt-3 flex flex-col items-center rounded-2xl border border-[#dce6e2] bg-white p-6 text-center">
-              <CalendarX size={28} className="text-[#138b79]"/>
-              <h3 className="mt-2 text-[16px] font-semibold">这个社区暂无已发布活动</h3>
-              <p className="mt-1 text-[14px] text-[#5b6c67]">可以切换其他社区看看，或稍后再来。</p>
-              <button type="button" className={`${secondary} mt-4`} onClick={(e)=>openSheet(null,e.currentTarget)}>切换浏览社区</button>
-            </div>
-          ) : (
-            <div className="mt-3 grid gap-3">
-              {activities.items.map((activity) => (
-                <article key={activity.id} className="rounded-2xl border border-[#dce6e2] bg-white p-5 shadow-[0_2px_16px_rgba(17,109,99,.05)] max-[359px]:p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#e8f6f0] text-[#116d63]"><CalendarDays size={20}/></span>
-                    <span className="rounded-full bg-[#e8f6f0] px-3 py-1 text-[13px] font-semibold text-[#116d63]">{activityStatus(activity)}</span>
-                  </div>
-                  <h3 className="mt-3 text-[18px] font-bold">{activity.title}</h3>
-                  <p className="mt-2 flex items-center gap-1.5 text-[14px] text-[#5b6c67]"><Clock3 size={15}/>{formatTime(activity.startsAt)} 至 {formatTime(activity.endsAt)}</p>
-                  <p className="mt-1 flex items-center gap-1.5 text-[14px] text-[#5b6c67]"><MapPin size={15}/>{activity.location}</p>
-                  {activity.summary && <p className="mt-2 line-clamp-2 text-[15px] leading-6 text-[#3b4f49]">{activity.summary}</p>}
-                  <div className="mt-3 flex justify-end border-t border-[#edf2f0] pt-2">
-                    <Link to={activityDetailHref(activity.id)} className="flex min-h-11 items-center gap-1 text-[15px] font-semibold text-[#116d63]">
-                      查看活动 <ArrowRight size={17}/></Link>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
-        <p className="mt-8 text-center text-[13px] leading-5 text-[#5b6c67]">社区与活动信息以实际发布为准</p>
+        <p className="community-home__footnote">社区与活动信息以实际发布为准</p>
       </div>
 
       {sheetOpen && createPortal(

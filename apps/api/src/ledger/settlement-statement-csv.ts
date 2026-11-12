@@ -37,7 +37,7 @@ export function entitySettlementCsv(detail: SettlementStatementDetail): string {
   const disputes = new Map(detail.postLockDisputes.map(x=>[x.orderId,x.reasons.join('；')]))
   const rows: Array<Array<string | number | null>> = [[
     '结算单号','版本','业务起始日','业务结束日','快照截至UTC','结算状态','付款状态',
-    '社区ID','订单ID','订单编号','商品','订单登记分','收款流水ID','收款凭据引用',
+    '社区ID','订单ID','订单编号','商品','商品毛额分','消费券补贴分','净应付分','收款流水ID','收款凭据引用',
     '实收日期UTC','实收金额分','经营对账批次ID','归属网格员ID','归属审核人ID',
     '实际销售商户主体ID','三创法律主体ID','广电法律主体ID','合同协议引用',
     '合同规则ID','规则版本','计价状态','阻塞原因','通道手续费分',
@@ -49,6 +49,7 @@ export function entitySettlementCsv(detail: SettlementStatementDetail): string {
       s.statementNo, s.generation, s.periodFrom, s.periodTo, s.asOf,
       stateLabel(s.status), paymentStateLabel(s.paymentState), l.communityId, l.orderId,
       l.orderDisplayNo, l.productName, l.registeredAmountCents,
+      l.couponDiscountCents, l.netPayableCents,
       l.receiptEntryId, l.receiptEvidenceRef, l.receiptReceivedAt,
       l.receiptAmountCents === null ? '未收款' : l.receiptAmountCents,
       l.operatingBatchId, l.gridStaffId, l.gridReviewerUserId,

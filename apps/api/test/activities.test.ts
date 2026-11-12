@@ -908,6 +908,7 @@ test('public payloads never leak budgets, caps, creator identity or audit data',
       'currentRuleVersionId',
       'audit',
       'metadata',
+      'maxRewardedTeams',
       '987654',
       '4321',
     ]) {
@@ -923,6 +924,7 @@ test('public payloads never leak budgets, caps, creator identity or audit data',
       'location',
       'publicRules',
       'publishedAt',
+      'purchaseReward',
       'ruleVersion',
       'startsAt',
       'status',
@@ -930,6 +932,7 @@ test('public payloads never leak budgets, caps, creator identity or audit data',
       'title',
       'updatedAt',
     ])
+    assert.equal(detail.purchaseReward, null, 'no plan must be exposed as null, not a fake tier')
     assert.deepEqual(Object.keys(list.items[0]!).sort(), [
       'community',
       'endsAt',

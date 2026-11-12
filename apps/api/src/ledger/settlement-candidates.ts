@@ -149,8 +149,8 @@ function projectSettlementCandidate(
       if (evidence.payment.reversedEntryId) {
         block('receipt_reversed', '原人工收款已全额冲正，不得产生应付')
       }
-      if (evidence.payment.amountCents !== order.totalCents) {
-        block('amount_mismatch', '登记价与凭据实收不符；部分退款/合并收款未支持自动拆分')
+      if (evidence.payment.amountCents !== order.totalCents - order.couponDiscountCents) {
+        block('amount_mismatch', '净应付与凭据实收不符；券抵扣不等于现金收款')
       }
       if (evidence.payment.attribution.state !== 'attributed' ||
         !evidence.payment.confirmation ||
@@ -201,6 +201,8 @@ function projectSettlementCandidate(
       communityId: order.communityId, productId: order.productId,
       productName: order.productName, orderStatus: order.status,
       registeredAmountCents: order.totalCents,
+      couponDiscountCents: order.couponDiscountCents,
+      netPayableCents: order.totalCents - order.couponDiscountCents,
       periodAt: evidence.payment?.receivedAt ?? iso(order.createdAt),
       periodSource: evidence.payment ? 'linked_receipt' : 'order_registration',
       sellerStatus: parties.sellerStatus,

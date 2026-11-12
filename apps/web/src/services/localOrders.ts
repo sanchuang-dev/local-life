@@ -3,11 +3,13 @@ import {
   createLocalOrderRequestSchema,
   localOrderDetailSchema,
   localOrderListResponseSchema,
+  localOrderTeamOptionListResponseSchema,
   updateLocalOrderStatusRequestSchema,
   type CreateLocalOrderRequest,
   type LocalOrderDetail,
   type LocalOrderListQuery,
   type LocalOrderListResponse,
+  type LocalOrderTeamOptionListResponse,
   type LocalOrderTransitionStatus,
 } from '@sanchuang-dev/local-life-contracts'
 import { API_PREFIX, fillRoute, requestLocal, withQuery, type SafelyParsable } from './localApi'
@@ -45,6 +47,26 @@ export function registerLocalOrder(
     createdOrderSchema,
     '订单登记结果',
     { method: 'POST', csrfToken, body: createLocalOrderRequestSchema.parse(request) },
+  )
+}
+
+/**
+ * GET /local-orders/team-options — the signed-in resident's own eligible
+ * consumption teams for one product's community (#209).
+ *
+ * Only the session identifies the resident; no resident id, roster or community
+ * is sent. The list is advisory for the form: the create endpoint re-validates
+ * the exact activity/team membership before freezing the order.
+ */
+export function listMyLocalOrderTeamOptions(
+  productId: string,
+  signal?: AbortSignal,
+): Promise<LocalOrderTeamOptionListResponse> {
+  return requestLocal(
+    `${API_PREFIX}${withQuery(LOCAL_ORDER_ROUTES.myTeamOptions, { productId })}`,
+    localOrderTeamOptionListResponseSchema,
+    '消费团选项',
+    { signal },
   )
 }
 

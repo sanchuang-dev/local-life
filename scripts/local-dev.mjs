@@ -198,6 +198,8 @@ async function main() {
   if (action === 'start') await assertPortsFree(ports)
   console.log('本地数据库：' + dbPath + '（重复启动不会清空）')
   if (action !== 'admin') runChecked(['install', '--frozen-lockfile'], localEnv)
+  // Database setup imports contracts at runtime; never use stale dist after changing branches.
+  runChecked(['--filter', '@sanchuang-dev/local-life-contracts', 'build'], localEnv)
   runChecked(['--filter', '@sanchuang-dev/local-life-api', 'db:prepare'], localEnv)
 
   if (action === 'admin') {

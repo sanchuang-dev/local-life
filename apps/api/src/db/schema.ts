@@ -575,6 +575,13 @@ export const activities = sqliteTable(
      * every activity that has no plan.
      */
     rewardPlanJson: text('reward_plan_json'),
+    /**
+     * Mutable current copy of the consumption team reward rule (LL-PUR-001).
+     * As with `reward_plan_json`, only the frozen rule-version snapshot may be
+     * authoritative after publication; this column lets a draft be edited
+     * before any version exists and is NULL when no purchase plan is set.
+     */
+    purchaseRewardPlanJson: text('purchase_reward_plan_json'),
     currentRuleVersionId: text('current_rule_version_id').references(
       () => activityRuleVersions.id,
       { onDelete: 'set null' },
@@ -921,6 +928,112 @@ export const activityParticipations = sqliteTable(
       sql`(${table.role} = 'leader' AND ${table.seatNo} = 1 AND ${table.inviteSource} = 'self' AND ${table.invitationId} IS NULL)
         OR (${table.role} = 'member' AND ${table.seatNo} BETWEEN 2 AND 3 AND ${table.inviteSource} = 'invite' AND ${table.invitationId} IS NOT NULL)`,
     ),
+  ],
+)
+
+/* -------------------------------------------------------------------------- */
+/* Consumption team coupons (LL-PUR-006, #211)                                 */
+/* -------------------------------------------------------------------------- */
+
+/** One immutable budget reservation per rewarded three-person team. */
+export const couponTeamGrants = sqliteTable(
+  'coupon_team_grants',
+  {
+    id: text('id').primaryKey(),
+    activityId: text('activity_id').notNull().references(() => activities.id, { onDelete: 'restrict' }),
+    teamId: text('team_id').notNull().references(() => activityTeams.id, { onDelete: 'restrict' }),
+    ruleVersionId: text('rule_version_id').notNull().references(() => activityRuleVersions.id, { onDelete: 'restrict' }),
+    faceValueCents: integer('face_value_cents').notNull(),
+    totalValueCents: integer('total_value_cents').notNull(),
+    grantedAt: integer('granted_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('coupon_team_grants_activity_team_uq').on(table.activityId, table.teamId),
+    uniqueIndex('coupon_team_grants_team_uq').on(table.teamId),
+    index('coupon_team_grants_activity_idx').on(table.activityId),
+    check('coupon_team_grants_face_positive', sql`${table.faceValueCents} > 0`),
+    check('coupon_team_grants_three_equal', sql`${table.totalValueCents} = ${table.faceValueCents} * 3`),
+  ],
+)
+
+/** A single-use, non-transferable whole coupon; the later #212 owns reservation/redemption. */
+export const couponIssues = sqliteTable(
+  'coupon_issues',
+  {
+    id: text('id').primaryKey(),
+    grantId: text('grant_id').notNull().references(() => couponTeamGrants.id, { onDelete: 'restrict' }),
+    activityId: text('activity_id').notNull().references(() => activities.id, { onDelete: 'restrict' }),
+    teamId: text('team_id').notNull().references(() => activityTeams.id, { onDelete: 'restrict' }),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+    seatNo: integer('seat_no').notNull(),
+    faceValueCents: integer('face_value_cents').notNull(),
+    status: text('status').$type<'available' | 'reserved' | 'redeemed' | 'void'>().notNull(),
+    issuedAt: integer('issued_at', { mode: 'timestamp_ms' }).notNull(),
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+    reservedOrderId: text('reserved_order_id').references((): AnySQLiteColumn => localOrders.id, { onDelete: 'restrict' }),
+    reservedAt: integer('reserved_at', { mode: 'timestamp_ms' }),
+    redeemedAt: integer('redeemed_at', { mode: 'timestamp_ms' }),
+    voidedAt: integer('voided_at', { mode: 'timestamp_ms' }),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('coupon_issues_grant_user_uq').on(table.grantId, table.userId),
+    uniqueIndex('coupon_issues_grant_seat_uq').on(table.grantId, table.seatNo),
+    uniqueIndex('coupon_issues_order_uq').on(table.reservedOrderId),
+    index('coupon_issues_user_issued_idx').on(table.userId, table.issuedAt),
+    index('coupon_issues_activity_status_idx').on(table.activityId, table.status),
+    check('coupon_issues_positive', sql`${table.faceValueCents} > 0`),
+    check('coupon_issues_seat', sql`${table.seatNo} BETWEEN 1 AND 3`),
+    check('coupon_issues_expiry', sql`${table.expiresAt} > ${table.issuedAt}`),
+    check('coupon_issues_status', sql`${table.status} IN ('available', 'reserved', 'redeemed', 'void')`),
+    check('coupon_issues_reserved_fields', sql`(${table.status} = 'available' AND ${table.reservedOrderId} IS NULL AND ${table.reservedAt} IS NULL AND ${table.redeemedAt} IS NULL)
+      OR (${table.status} = 'reserved' AND ${table.reservedOrderId} IS NOT NULL AND ${table.reservedAt} IS NOT NULL AND ${table.redeemedAt} IS NULL)
+      OR (${table.status} = 'redeemed' AND ${table.reservedOrderId} IS NOT NULL AND ${table.reservedAt} IS NOT NULL AND ${table.redeemedAt} IS NOT NULL)
+      OR (${table.status} = 'void' AND ${table.voidedAt} IS NOT NULL)`),
+  ],
+)
+
+/** Append-only coupon history; voucher lifecycle never overwrites its issuance trail. */
+export const couponIssueEvents = sqliteTable(
+  'coupon_issue_events',
+  {
+    id: text('id').primaryKey(),
+    couponId: text('coupon_id').notNull().references(() => couponIssues.id, { onDelete: 'restrict' }),
+    kind: text('kind').$type<'issued' | 'reserved' | 'redeemed' | 'released' | 'voided'>().notNull(),
+    orderId: text('order_id').references(() => localOrders.id, { onDelete: 'restrict' }),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    index('coupon_issue_events_coupon_created_idx').on(table.couponId, table.createdAt),
+    check('coupon_issue_events_kind', sql`${table.kind} IN ('issued', 'reserved', 'redeemed', 'released', 'voided')`),
+  ],
+)
+
+/**
+ * Immutable recovery/exception record. A disputed grant retains its original
+ * three-coupon budget reservation; no automatic re-award or cash refund is
+ * implied. A source reversal can auto-void unspent coupons, but an already
+ * redeemed or outstanding order always requires a human decision.
+ */
+export const couponRewardDisputes = sqliteTable(
+  'coupon_reward_disputes',
+  {
+    id: text('id').primaryKey(),
+    disputeKey: text('dispute_key').notNull(),
+    kind: text('kind').$type<'reward_eligibility_lost' | 'redeemed_payment_reversed'>().notNull(),
+    grantId: text('grant_id').notNull().references(() => couponTeamGrants.id, { onDelete: 'restrict' }),
+    couponId: text('coupon_id').references(() => couponIssues.id, { onDelete: 'restrict' }),
+    sourceOrderId: text('source_order_id').notNull().references((): AnySQLiteColumn => localOrders.id, { onDelete: 'restrict' }),
+    reversalEntryId: text('reversal_entry_id').notNull().references((): AnySQLiteColumn => ledgerEntries.id, { onDelete: 'restrict' }),
+    resolution: text('resolution').$type<'auto_void' | 'pending_manual'>().notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('coupon_reward_disputes_key_uq').on(table.disputeKey),
+    index('coupon_reward_disputes_grant_idx').on(table.grantId),
+    index('coupon_reward_disputes_reversal_idx').on(table.reversalEntryId),
+    check('coupon_reward_disputes_kind_check', sql`${table.kind} IN ('reward_eligibility_lost', 'redeemed_payment_reversed')`),
+    check('coupon_reward_disputes_resolution_check', sql`${table.resolution} IN ('auto_void', 'pending_manual')`),
   ],
 )
 
@@ -1619,6 +1732,9 @@ export const localOrders = sqliteTable(
     unitPriceCents: integer('unit_price_cents').notNull(),
     quantity: integer('quantity').notNull(),
     totalCents: integer('total_cents').notNull(),
+    /** Gross = historical total_cents; subsidy is frozen in cents separately. */
+    couponDiscountCents: integer('coupon_discount_cents').notNull().default(0),
+    couponId: text('coupon_id').references((): AnySQLiteColumn => couponIssues.id, { onDelete: 'restrict' }),
     note: text('note'),
     /** Staff member who recorded the order on behalf of the resident; null for self-service. */
     createdByStaffId: text('created_by_staff_id').references(() => staffAccounts.id, {
@@ -1629,6 +1745,19 @@ export const localOrders = sqliteTable(
       onDelete: 'set null',
     }),
     sourceActivityId: text('source_activity_id').references(() => activities.id, {
+      onDelete: 'restrict',
+    }),
+    /**
+     * The one consumption team this order is attributed to (#207 LL-PUR-003).
+     *
+     * A single nullable column is the whole "one order, at most one team" rule:
+     * there is no join table, so a second attribution has nowhere to live. The
+     * migration adds triggers that (a) accept the team only when the resident
+     * really joined that team of `source_activity_id` no later than the order's
+     * `created_at`, and (b) reject any later change to either attribution column.
+     * Existing orders stay NULL: #207 never guesses a team from a bare activity.
+     */
+    sourceTeamId: text('source_team_id').references(() => activityTeams.id, {
       onDelete: 'restrict',
     }),
     verifiedByUserId: text('verified_by_user_id').references(() => users.id, {
@@ -1649,6 +1778,14 @@ export const localOrders = sqliteTable(
     index('local_orders_resident_created_idx').on(table.residentUserId, table.createdAt),
     index('local_orders_product_idx').on(table.productId),
     index('local_orders_created_by_staff_idx').on(table.createdByStaffId),
+    index('local_orders_source_team_idx').on(table.sourceTeamId),
+    // A cancelled/rejected order keeps its immutable coupon snapshot, but no
+    // longer occupies the coupon for a future order. SQLite enforces one
+    // concurrent ACTIVE order per coupon across all writers.
+    uniqueIndex('local_orders_active_coupon_uq').on(table.couponId)
+      .where(sql`${table.couponId} IS NOT NULL AND ${table.status} NOT IN ('cancelled', 'rejected')`),
+    check('local_orders_coupon_amount_check', sql`${table.couponDiscountCents} >= 0 AND ${table.couponDiscountCents} <= ${table.totalCents}`),
+    check('local_orders_coupon_presence_check', sql`(${table.couponId} IS NULL AND ${table.couponDiscountCents} = 0) OR (${table.couponId} IS NOT NULL AND ${table.couponDiscountCents} > 0)`),
     check('local_orders_quantity_check', sql`${table.quantity} >= 1 AND ${table.quantity} <= 99`),
     check(
       'local_orders_total_check',
@@ -1867,6 +2004,9 @@ export const settlementStatementLines = sqliteTable('settlement_statement_lines'
   productName: text('product_name').notNull(),
   periodAt: integer('period_at', { mode: 'timestamp_ms' }).notNull(),
   registeredAmountCents: integer('registered_amount_cents').notNull(),
+  /** NULL on historic immutable statement snapshots; no backfill. */
+  couponDiscountCents: integer('coupon_discount_cents'),
+  netPayableCents: integer('net_payable_cents'),
   receiptEntryId: text('receipt_entry_id')
     .references(() => ledgerEntries.id, { onDelete: 'restrict' }),
   receiptEvidenceRef: text('receipt_evidence_ref'),

@@ -14,6 +14,7 @@ import type {
   ActivityRuleVersion,
   AdminActivityDetail,
   AdminActivitySummary,
+  PurchaseRewardPlan,
 } from '@sanchuang-dev/local-life-contracts'
 import {
   ActivitiesPage,
@@ -80,6 +81,7 @@ function detail(overrides: Partial<AdminActivityDetail> = {}): AdminActivityDeta
     publicRules: PUBLIC_RULES,
     currentRuleVersionId: VERSION_ID,
     rewardPlan: null,
+    purchaseRewardPlan: null,
     ...overrides,
   }
 }
@@ -670,5 +672,285 @@ describe('ActivitiesPage reward plan form (LL-MVP-006)', () => {
 
     expect(await screen.findByText('未配置奖励计划')).toBeTruthy()
     expect(screen.getByText(/409 reward_unavailable/)).toBeTruthy()
+  })
+})
+
+describe('ActivitiesPage purchase reward plan form (LL-PUR-002)', () => {
+  const PURCHASE_PLAN: PurchaseRewardPlan = {
+    thresholdCents: 20_000,
+    couponFaceValueCents: 2_000,
+    maxRewardedTeams: 50,
+  }
+
+  it('round-trips a stored plan through the form without changing it', () => {
+    const values = toFormValues(detail({ purchaseRewardPlan: PURCHASE_PLAN }))
+    expect(values.purchaseRewardEnabled).toBe(true)
+    expect(values.purchaseThresholdYuan).toBe(200)
+    expect(values.purchaseCouponFaceValueYuan).toBe(20)
+    expect(values.purchaseMaxRewardedTeams).toBe(50)
+
+    const result = keyRulesFromForm(values)
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.keyRules.purchaseRewardPlan).toEqual(PURCHASE_PLAN)
+    }
+  })
+
+  it('keeps the key out when the activity has no consumption plan', () => {
+    const values = toFormValues(detail({ purchaseRewardPlan: null }))
+    expect(values.purchaseRewardEnabled).toBe(false)
+
+    const result = keyRulesFromForm(values)
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      // Absent key: the server keeps whatever plan it holds (nothing here), so
+      // an ordinary edit cannot invent a zero-value plan.
+      expect('purchaseRewardPlan' in result.keyRules).toBe(false)
+    }
+  })
+
+  it('clears the plan only when the operator turns a stored plan off', () => {
+    const values = toFormValues(detail({ purchaseRewardPlan: PURCHASE_PLAN }))
+    values.purchaseRewardEnabled = false
+
+    const result = keyRulesFromForm(values)
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.keyRules.purchaseRewardPlan).toBeNull()
+    }
+  })
+
+  it('preserves the plan on an unrelated edit', () => {
+    const values = toFormValues(detail({ purchaseRewardPlan: PURCHASE_PLAN }))
+    values.location = '幸福社区文化广场'
+
+    const result = keyRulesFromForm(values)
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.keyRules.location).toBe('幸福社区文化广场')
+      expect(result.keyRules.purchaseRewardPlan).toEqual(PURCHASE_PLAN)
+    }
+  })
+
+  it('rejects a total coupon budget above the shared contract cap', () => {
+    const values = toFormValues(detail({ purchaseRewardPlan: PURCHASE_PLAN }))
+    // ¥1000 × 3 people × 400 teams = ¥1,200,000, above the ¥1,000,000 cap.
+    values.purchaseCouponFaceValueYuan = 1000
+    values.purchaseMaxRewardedTeams = 400
+
+    const result = keyRulesFromForm(values)
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.message).toMatch(/消费奖励规则不符合共享契约|maxRewardedTeams/)
+    }
+  })
+
+  it('rejects non-integer team counts and missing threshold amounts', () => {
+    const values = toFormValues(detail({ purchaseRewardPlan: PURCHASE_PLAN }))
+    values.purchaseMaxRewardedTeams = 2.5
+
+    let result = keyRulesFromForm(values)
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.message).toMatch(/奖励团队数量上限/)
+    }
+
+    values.purchaseMaxRewardedTeams = 50
+    values.purchaseThresholdYuan = null
+    result = keyRulesFromForm(values)
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.message).toMatch(/团队实付门槛/)
+    }
+  })
+
+  it('echoes the stored plan instead of editing a frozen published plan', () => {
+    const values = toFormValues(
+      detail({ status: 'published', purchaseRewardPlan: PURCHASE_PLAN }),
+    )
+    // The fields are not editable in this state; even a stale/rogue value must
+    // not submit a plan change that the API would reject with 409.
+    values.purchaseCouponFaceValueYuan = 999
+
+    const result = keyRulesFromForm(values, {
+      purchaseRewardLocked: true,
+      purchaseRewardPlanBaseline: PURCHASE_PLAN,
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect(result.keyRules.purchaseRewardPlan).toEqual(PURCHASE_PLAN)
+    }
+  })
+
+  it('omits a frozen plan that does not exist', () => {
+    const values = toFormValues(detail({ status: 'paused', purchaseRewardPlan: null }))
+
+    const result = keyRulesFromForm(values, {
+      purchaseRewardLocked: true,
+      purchaseRewardPlanBaseline: null,
+    })
+    expect(result.ok).toBe(true)
+    if (result.ok) {
+      expect('purchaseRewardPlan' in result.keyRules).toBe(false)
+    }
+  })
+
+  it('shows the frozen snapshot instead of editable fields after publication', async () => {
+    stubApi((url) => {
+      if (url.startsWith('/api/admin/communities')) return json({ items: [COMMUNITY_A] })
+      if (url.startsWith('/api/admin/activities?')) {
+        return json({ items: [summary()], total: 1, page: 1, pageSize: 20 })
+      }
+      if (url === `/api/admin/activities/${ACTIVITY_ID}`) {
+        return json(detail({ purchaseRewardPlan: PURCHASE_PLAN }))
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+
+    renderPage(ADMIN_SESSION)
+    expect(await screen.findByText('银发社区欢乐季')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '编辑' }))
+
+    expect(await screen.findByText('消费组团奖励已冻结')).toBeTruthy()
+    expect(screen.getByText(/团队实付门槛 ¥200\.00 · 每人券面额 ¥20\.00/)).toBeTruthy()
+    expect(screen.getByText(/团队券总预算 ¥3000\.00/)).toBeTruthy()
+    expect(screen.queryByText('配置消费组团奖励')).toBeNull()
+  })
+
+  it('keeps the consumption fields editable for a draft', async () => {
+    stubApi((url) => {
+      if (url.startsWith('/api/admin/communities')) return json({ items: [COMMUNITY_A] })
+      if (url.startsWith('/api/admin/activities?')) {
+        return json({
+          items: [summary({ status: 'draft', ruleVersion: null, publishedAt: null })],
+          total: 1,
+          page: 1,
+          pageSize: 20,
+        })
+      }
+      if (url === `/api/admin/activities/${ACTIVITY_ID}`) {
+        return json(
+          detail({
+            status: 'draft',
+            ruleVersion: null,
+            publishedAt: null,
+            purchaseRewardPlan: PURCHASE_PLAN,
+          }),
+        )
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+
+    renderPage(ADMIN_SESSION)
+    expect(await screen.findByText('银发社区欢乐季')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '编辑' }))
+
+    expect(await screen.findByText('配置消费组团奖励')).toBeTruthy()
+    expect(screen.queryByText('消费组团奖励已冻结')).toBeNull()
+    expect(screen.getByText(/当前为 ¥3000\.00（每人券额 × 3 人 × 团队数）/)).toBeTruthy()
+  })
+
+  it('saves a draft plan through the real PATCH payload', async () => {
+    let patchBody: unknown
+    stubApi((url, init) => {
+      if (url.startsWith('/api/admin/communities')) return json({ items: [COMMUNITY_A] })
+      if (url.startsWith('/api/admin/activities?')) {
+        return json({
+          items: [summary({ status: 'draft', ruleVersion: null, publishedAt: null })],
+          total: 1,
+          page: 1,
+          pageSize: 20,
+        })
+      }
+      if (url === `/api/admin/activities/${ACTIVITY_ID}` && init?.method === 'PATCH') {
+        patchBody = JSON.parse(String(init.body))
+        return json(
+          detail({
+            status: 'draft',
+            ruleVersion: null,
+            publishedAt: null,
+            purchaseRewardPlan: {
+              thresholdCents: 30_000,
+              couponFaceValueCents: 5_000,
+              maxRewardedTeams: 10,
+            },
+          }),
+        )
+      }
+      if (url === `/api/admin/activities/${ACTIVITY_ID}`) {
+        return json(
+          detail({
+            status: 'draft',
+            ruleVersion: null,
+            publishedAt: null,
+            purchaseRewardPlan: null,
+          }),
+        )
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+
+    renderPage(ADMIN_SESSION)
+    expect(await screen.findByText('银发社区欢乐季')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '编辑' }))
+
+    fireEvent.click(await screen.findByRole('switch', { name: '配置消费组团奖励' }))
+    fireEvent.change(await screen.findByLabelText('团队实付门槛（元）'), {
+      target: { value: '300' },
+    })
+    fireEvent.change(screen.getByLabelText('每人券面额（元）'), {
+      target: { value: '50' },
+    })
+    fireEvent.change(screen.getByLabelText('奖励团队数量上限'), {
+      target: { value: '10' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '保存修改' }))
+
+    await waitFor(() => expect(patchBody).toBeTruthy())
+    expect(patchBody).toMatchObject({
+      keyRules: {
+        purchaseRewardPlan: {
+          thresholdCents: 30_000,
+          couponFaceValueCents: 5_000,
+          maxRewardedTeams: 10,
+        },
+      },
+    })
+  })
+
+  it('shows the plan in the frozen rule-version drawer', async () => {
+    const version: ActivityRuleVersion = {
+      id: VERSION_ID,
+      activityId: ACTIVITY_ID,
+      version: 1,
+      snapshot: {
+        startsAt: '2026-12-01T02:00:00.000Z',
+        endsAt: '2026-12-01T10:00:00.000Z',
+        location: '幸福社区党群服务中心',
+        budgetCapCents: 987_654,
+        prizeQuantityCap: 4_321,
+        publicRules: PUBLIC_RULES,
+        purchaseRewardPlan: PURCHASE_PLAN,
+      },
+      createdByUserId: USER_ID,
+      createdAt: '2026-11-02T02:00:00.000Z',
+    }
+    stubApi((url) => {
+      if (url.startsWith('/api/admin/communities')) return json({ items: [COMMUNITY_A] })
+      if (url.startsWith('/api/admin/activities?')) {
+        return json({ items: [summary()], total: 1, page: 1, pageSize: 20 })
+      }
+      if (url === `/api/admin/activities/${ACTIVITY_ID}/rule-versions`) {
+        return json({ items: [version] })
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+
+    renderPage(ADMIN_SESSION)
+    expect(await screen.findByText('银发社区欢乐季')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '规则版本' }))
+
+    expect(await screen.findByText('只读快照，不可编辑或删除')).toBeTruthy()
+    expect(screen.getByText(/团队实付门槛 ¥200\.00 · 每人券面额 ¥20\.00/)).toBeTruthy()
   })
 })

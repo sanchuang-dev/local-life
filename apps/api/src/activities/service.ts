@@ -13,6 +13,7 @@ import {
   adminActivityListResponseSchema,
   publicActivityDetailSchema,
   publicActivityListResponseSchema,
+  purchaseRewardPlanSchema,
   type ActivityAuditEntryListResponse,
   type ActivityKeyRules,
   type ActivityPublicRules,
@@ -25,6 +26,8 @@ import {
   type CreateActivityRequest,
   type PublicActivityDetail,
   type PublicActivityListResponse,
+  type PublicPurchaseReward,
+  type PurchaseRewardPlan,
   type UpdateActivityRequest,
 } from '@sanchuang-dev/local-life-contracts'
 import type { AppDatabase } from '../db/client.js'
@@ -78,6 +81,7 @@ const adminSelection = {
   prizeQuantityCap: activities.prizeQuantityCap,
   publicRulesJson: activities.publicRulesJson,
   rewardPlanJson: activities.rewardPlanJson,
+  purchaseRewardPlanJson: activities.purchaseRewardPlanJson,
   currentRuleVersionId: activities.currentRuleVersionId,
   ruleVersion: activityRuleVersions.version,
   createdAt: activities.createdAt,
@@ -102,6 +106,7 @@ interface ActivityRow {
   prizeQuantityCap: number
   publicRulesJson: string
   rewardPlanJson: string | null
+  purchaseRewardPlanJson: string | null
   currentRuleVersionId: string | null
   ruleVersion: number | null
   createdAt: Date
@@ -183,13 +188,32 @@ function parseRewardPlan(rewardPlanJson: string | null): ActivityRewardPlan | nu
   return activityRewardPlanSchema.parse(parsed)
 }
 
+function parsePurchaseRewardPlan(
+  purchaseRewardPlanJson: string | null,
+): PurchaseRewardPlan | null {
+  if (purchaseRewardPlanJson === null) return null
+  const parsed: unknown = JSON.parse(purchaseRewardPlanJson)
+  return purchaseRewardPlanSchema.parse(parsed)
+}
+
+function toPublicPurchaseReward(json: string | null): PublicPurchaseReward | null {
+  const plan = parsePurchaseRewardPlan(json)
+  if (plan === null) return null
+  // Only the resident-readable half; `maxRewardedTeams` stays internal.
+  return {
+    thresholdCents: plan.thresholdCents,
+    couponFaceValueCents: plan.couponFaceValueCents,
+  }
+}
+
 /**
- * Rebuilds the current key rules from the activity row. The reward plan is
- * spread in only when one is configured, so an activity without a plan produces
- * exactly the pre-#62 shape (and therefore a byte-identical frozen snapshot).
+ * Rebuilds the current key rules from the activity row. Both optional plans are
+ * spread in only when configured, so an activity without them produces exactly
+ * the pre-#62 / pre-#206 shape (and therefore a byte-identical frozen snapshot).
  */
 function currentKeyRules(row: ActivityRow): ActivityKeyRules {
   const rewardPlan = parseRewardPlan(row.rewardPlanJson)
+  const purchaseRewardPlan = parsePurchaseRewardPlan(row.purchaseRewardPlanJson)
   return activityKeyRulesSchema.parse({
     startsAt: iso(row.startsAt),
     endsAt: iso(row.endsAt),
@@ -198,49 +222,55 @@ function currentKeyRules(row: ActivityRow): ActivityKeyRules {
     prizeQuantityCap: row.prizeQuantityCap,
     publicRules: parsePublicRules(row.publicRulesJson),
     ...(rewardPlan === null ? {} : { rewardPlan }),
+    ...(purchaseRewardPlan === null ? {} : { purchaseRewardPlan }),
   })
 }
 
 /**
- * Merges an incoming key-rules payload with the activity's stored reward plan.
+ * Merges an incoming key-rules payload with the activity's stored optional
+ * plans (`rewardPlan` and `purchaseRewardPlan`).
  *
- * Three cases, and they must stay distinct:
- *   - `rewardPlan` key ABSENT  -> inherit the stored plan (an ordinary edit that
- *     only touches, say, `location` must not drop the plan)
- *   - `rewardPlan: null`       -> clear it, deliberately
- *   - `rewardPlan: {...}`      -> replace it
+ * For each plan, three cases must stay distinct:
+ *   - key ABSENT    -> inherit the stored plan (an ordinary edit that only
+ *     touches, say, `location` must not drop the plan)
+ *   - key `null`    -> clear it, deliberately
+ *   - key `{...}`   -> replace it
  *
  * The result is what gets written to the activity row AND to the frozen rule
  * version snapshot. The snapshot half is the one that matters: fulfilment reads
  * only `activity_rule_versions.snapshot_json`, so preserving the column alone
- * would still lose the reward.
+ * would still lose the plan.
  */
-function withEffectiveRewardPlan(
+function withEffectivePlans(
   incoming: ActivityKeyRules,
   current: ActivityRow,
 ): ActivityKeyRules {
-  if ('rewardPlan' in incoming) {
-    // Explicit null or a concrete plan: the caller decided, so this is new input
-    // and the window cross-check applies in full.
-    return activityKeyRulesWriteSchema.parse(incoming)
-  }
-  // The plan is inherited, not supplied. Parse with the lenient read schema and
-  // then apply one narrow rule: an edit must not *introduce* an out-of-bounds
-  // window. An activity whose stored plan was already out of bounds (any row
-  // written before t13) stays editable, because otherwise the window can never
-  // be repaired - the operator would be locked out of the very edit that fixes
-  // it, and a published activity's plan cannot be changed at all.
   const storedPlan = parseRewardPlan(current.rewardPlanJson)
+  const storedPurchasePlan = parsePurchaseRewardPlan(current.purchaseRewardPlanJson)
+  // Parse with the lenient read schema first, then apply the write-only window
+  // cross-check below. The read schema must stay lenient so a row frozen before
+  // t13 remains readable and repairable.
   const merged = activityKeyRulesSchema.parse({
     ...incoming,
-    ...(storedPlan === null ? {} : { rewardPlan: storedPlan }),
+    ...(!('rewardPlan' in incoming) && storedPlan !== null ? { rewardPlan: storedPlan } : {}),
+    ...(!('purchaseRewardPlan' in incoming) && storedPurchasePlan !== null
+      ? { purchaseRewardPlan: storedPurchasePlan }
+      : {}),
   })
   if (merged.rewardPlan !== undefined && merged.rewardPlan !== null) {
+    // A supplied plan is new input, so the window check applies in full. An
+    // inherited plan is checked only when it was already inside the window: an
+    // activity whose stored plan was out of bounds (any row written before t13)
+    // stays editable, because otherwise the window can never be repaired - the
+    // operator would be locked out of the very edit that fixes it, and a
+    // published activity's plan cannot be changed at all.
+    const suppliedNow = 'rewardPlan' in incoming
     const wasOutOfBounds =
+      !suppliedNow &&
       storedPlan !== null &&
       (Date.parse(storedPlan.checkinWindow.opensAt) < current.startsAt.getTime() ||
         Date.parse(storedPlan.checkinWindow.closesAt) > current.endsAt.getTime())
-    if (!wasOutOfBounds) {
+    if (suppliedNow || !wasOutOfBounds) {
       // Throw a domain error, not a ZodError: zod 4's ZodError is not an
       // `instanceof Error`, so Hono's error handling refuses to route it through
       // `onError` and the real server returns an empty-body 500 (no log, no
@@ -256,16 +286,19 @@ function withEffectiveRewardPlan(
 }
 
 /**
- * Deep equality for reward plans. Both sides are normalised through the schema
- * first, so an omitted optional key and an explicit default compare equal.
+ * Deep equality for optional plans. Both sides are normalised through their
+ * schema first, so an omitted optional key and an explicit default compare equal.
  */
-function rewardPlansEqual(left: ActivityRewardPlan | null, right: ActivityRewardPlan | null): boolean {
+function plansEqual(
+  left: ActivityRewardPlan | PurchaseRewardPlan | null,
+  right: ActivityRewardPlan | PurchaseRewardPlan | null,
+): boolean {
   if (left === null || right === null) return left === right
   return JSON.stringify(left) === JSON.stringify(right)
 }
 
-/** Statuses in which the reward plan is frozen. */
-const REWARD_PLAN_FROZEN_STATUSES: ReadonlySet<ActivityStatus> = new Set(['published', 'paused'])
+/** Statuses in which the reward and purchase plans are frozen. */
+const PLAN_FROZEN_STATUSES: ReadonlySet<ActivityStatus> = new Set(['published', 'paused'])
 
 /**
  * Rejects a reward-plan change on an activity whose plan is already frozen.
@@ -276,23 +309,46 @@ const REWARD_PLAN_FROZEN_STATUSES: ReadonlySet<ActivityStatus> = new Set(['publi
  * resets the activity-wide quota and budget accounting — a silent quota refresh
  * and prize swap. Freezing the plan after publication closes that path.
  *
- * Only `rewardPlan` is locked. Every other rule field (location, dates, caps)
+ * Only the plans are locked. Every other rule field (location, dates, caps)
  * stays editable on a published activity and still creates a rule version.
  */
 function assertRewardPlanUnchanged(
   current: ActivityRow,
   incoming: ActivityKeyRules,
 ): void {
-  if (!REWARD_PLAN_FROZEN_STATUSES.has(current.status)) return
+  if (!PLAN_FROZEN_STATUSES.has(current.status)) return
   // A missing key means "leave the plan alone", which is always allowed.
   if (!('rewardPlan' in incoming)) return
   const incomingPlan = incoming.rewardPlan ?? null
   const storedPlan = parseRewardPlan(current.rewardPlanJson)
-  if (rewardPlansEqual(incomingPlan, storedPlan)) return
+  if (plansEqual(incomingPlan, storedPlan)) return
   throw new ActivityError(
     409,
     API_ERROR_CODES.rewardPlanLocked,
     '奖励计划发布后不可修改，如需调整请结束活动后新建',
+  )
+}
+
+/**
+ * Rejects a consumption-reward change on a published/paused activity
+ * (LL-PUR-001). The plan carries the team quota and the coupon liability, so
+ * accepting an edit after publication would silently refresh the activity's
+ * promised budget. Like the check-in plan, only the plan field is locked;
+ * ordinary rule edits stay allowed.
+ */
+function assertPurchaseRewardPlanUnchanged(
+  current: ActivityRow,
+  incoming: ActivityKeyRules,
+): void {
+  if (!PLAN_FROZEN_STATUSES.has(current.status)) return
+  if (!('purchaseRewardPlan' in incoming)) return
+  const incomingPlan = incoming.purchaseRewardPlan ?? null
+  const storedPlan = parsePurchaseRewardPlan(current.purchaseRewardPlanJson)
+  if (plansEqual(incomingPlan, storedPlan)) return
+  throw new ActivityError(
+    409,
+    API_ERROR_CODES.purchaseRewardPlanLocked,
+    '消费奖励规则发布后不可修改，如需调整请结束活动后新建',
   )
 }
 
@@ -326,6 +382,7 @@ function toAdminDetail(row: ActivityRow): AdminActivityDetail {
     publicRules: parsePublicRules(row.publicRulesJson),
     currentRuleVersionId: row.currentRuleVersionId,
     rewardPlan: parseRewardPlan(row.rewardPlanJson),
+    purchaseRewardPlan: parsePurchaseRewardPlan(row.purchaseRewardPlanJson),
   })
 }
 
@@ -349,6 +406,7 @@ function toPublicDetail(row: ActivityRow): PublicActivityDetail {
     ...toPublicSummary(row),
     description: row.description,
     publicRules: parsePublicRules(row.publicRulesJson),
+    purchaseReward: toPublicPurchaseReward(row.purchaseRewardPlanJson),
     publishedAt: isoOrNull(row.publishedAt),
   })
 }
@@ -600,6 +658,11 @@ export function createActivity(
             keyRules.rewardPlan === undefined || keyRules.rewardPlan === null
               ? null
               : JSON.stringify(keyRules.rewardPlan),
+          purchaseRewardPlanJson:
+            keyRules.purchaseRewardPlan === undefined ||
+            keyRules.purchaseRewardPlan === null
+              ? null
+              : JSON.stringify(keyRules.purchaseRewardPlan),
           currentRuleVersionId: null,
           createdByUserId: actor.userId,
           createdAt: now,
@@ -672,9 +735,10 @@ export function updateActivity(
         // problem, which is the one the operator can actually act on.
         const incoming = activityKeyRulesWriteSchema.parse(body.keyRules)
         assertRewardPlanUnchanged(current, incoming)
+        assertPurchaseRewardPlanUnchanged(current, incoming)
       }
       const effectiveKeyRules =
-        body.keyRules === undefined ? undefined : withEffectiveRewardPlan(body.keyRules, current)
+        body.keyRules === undefined ? undefined : withEffectivePlans(body.keyRules, current)
       const keyRulesChanged =
         effectiveKeyRules !== undefined &&
         !keyRulesEqual(effectiveKeyRules, currentKeyRules(current))
@@ -690,6 +754,11 @@ export function updateActivity(
           keyRules.rewardPlan === undefined || keyRules.rewardPlan === null
             ? null
             : JSON.stringify(keyRules.rewardPlan)
+        set.purchaseRewardPlanJson =
+          keyRules.purchaseRewardPlan === undefined ||
+          keyRules.purchaseRewardPlan === null
+            ? null
+            : JSON.stringify(keyRules.purchaseRewardPlan)
         if (current.status !== 'draft') {
           const version = nextRuleVersion(tx, activityId)
           const versionId = randomUUID()

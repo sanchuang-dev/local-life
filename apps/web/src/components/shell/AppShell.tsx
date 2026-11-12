@@ -1,6 +1,7 @@
 import { type ReactNode, useCallback, useEffect } from 'react'
 import { useLocation, useNavigationType } from 'react-router'
 import { BottomTabBar } from './BottomTabBar'
+import { isWeChatBrowser } from '../auth/wechatEnvironment'
 import { useKeyboardVisible } from './useKeyboardVisible'
 
 /**
@@ -30,6 +31,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const focusMain = useCallback(() => {
     document.getElementById('main-content')?.focus()
   }, [])
+
+  // External browser login is a complete viewport, not an app-shell page.
+  if (isAuthRoute && !isWeChatBrowser(navigator.userAgent)) return <>{children}</>
 
   return (
     <div className="app-shell" data-keyboard={keyboardVisible ? 'open' : 'closed'}>

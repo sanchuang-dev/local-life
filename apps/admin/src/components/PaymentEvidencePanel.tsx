@@ -38,6 +38,7 @@ function localDatetimeNow(): string {
 function statusLabel(state: LedgerOrderEvidence['status']): string {
   switch (state) {
     case 'no_evidence': return '尚无实收证明'
+    case 'coupon_only_verified': return '消费券全额抵扣（无现金收款）'
     case 'pending_order_review': return '订单已登记，待业务核验'
     case 'locked_period': return '已锁定，不可补记'
     case 'amount_mismatch': return '金额不一致，待核对'
@@ -125,7 +126,7 @@ export function PaymentEvidencePanel({
       .then((result) => {
         if (!active) return
         setEvidence(result)
-        setAmountYuan(result.registeredAmountCents / 100)
+        setAmountYuan(result.netPayableCents / 100)
         setConfirmationStaffId(result.payment?.attribution.staffId ?? undefined)
       })
       .catch((cause: unknown) => {
@@ -250,7 +251,9 @@ export function PaymentEvidencePanel({
               <Descriptions size="small" bordered column={{ xs: 1, md: 2 }}>
                 <Descriptions.Item label="业务单号">{evidence.orderDisplayNo}</Descriptions.Item>
                 <Descriptions.Item label="商品">{evidence.productName}</Descriptions.Item>
-                <Descriptions.Item label="订单登记金额">{formatCents(evidence.registeredAmountCents)}（非实收）</Descriptions.Item>
+                <Descriptions.Item label="商品毛额">{formatCents(evidence.registeredAmountCents)}（非实收）</Descriptions.Item>
+                <Descriptions.Item label="消费券补贴">{formatCents(evidence.couponDiscountCents)}</Descriptions.Item>
+                <Descriptions.Item label="净应付现金">{formatCents(evidence.netPayableCents)}</Descriptions.Item>
                 <Descriptions.Item label="业务核验">{evidence.orderStatus === 'verified' ? '已人工核验（不代表收钱）' : '待核验'}</Descriptions.Item>
                 <Descriptions.Item label="收款证据状态" span={2}>
                   <Tag color={evidence.status === 'evidence_recorded' ? 'green' : 'orange'}>
@@ -289,7 +292,7 @@ export function PaymentEvidencePanel({
                     </Typography.Text>
                   </Descriptions.Item>
                 </Descriptions>
-              ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="该订单没有关联的实收凭据，不能视为已付款" />}
+              ) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={evidence.status === 'coupon_only_verified' ? '本单全额用券、实收现金0元，已通过业务核验' : '该订单没有关联的实收凭据，不能视为已付款'} />}
 
               {evidence.canRecord ? (
                 <section aria-label="登记真实收款凭据">

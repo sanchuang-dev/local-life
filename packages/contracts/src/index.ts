@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { activityRewardPlanSchema } from './rewards.js'
+import { publicPurchaseRewardSchema, purchaseRewardPlanSchema } from './purchase-reward.js'
 import { activityStatusSchema, authCommunitySchema, staffRoleSchema } from './identity.js'
 
 /** Route identifiers shared by the API and every client that calls it. */
@@ -51,6 +52,13 @@ export const API_ERROR_CODES = {
    * budget accounting.
    */
   rewardPlanLocked: 'reward_plan_locked',
+  /**
+   * A published/paused activity may not have its consumption reward plan
+   * changed (LL-PUR-001). Its coupon liability and team quota are part of the
+   * frozen rule snapshot, so editing them after publication would silently
+   * reset the activity's promised budget.
+   */
+  purchaseRewardPlanLocked: 'purchase_reward_plan_locked',
   /**
    * Phone (SMS one-time code) identity, Issue #93. This card ships the server
    * state machine only: no SMS provider is bundled, so a production deployment
@@ -589,6 +597,17 @@ export const activityKeyRulesSchema = z
      * and must never fall back to the mutable `activities` columns.
      */
     rewardPlan: activityRewardPlanSchema.nullable().optional(),
+    /**
+     * Consumption team reward plan (LL-PUR-001). Same three-way optionality as
+     * `rewardPlan`: an absent key means a snapshot frozen before this rule or an
+     * edit that must inherit the stored plan, `null` means "deliberately not
+     * configured", and an object is the single tier of this activity.
+     *
+     * The plan only fixes the rule. Spend aggregation, coupon issuance and
+     * redemption belong to later LL-PUR cards and must never be inferred from
+     * this field alone.
+     */
+    purchaseRewardPlan: purchaseRewardPlanSchema.nullable().optional(),
   })
   .superRefine((value, ctx) => {
     if (Date.parse(value.endsAt) <= Date.parse(value.startsAt)) {
@@ -767,6 +786,11 @@ export type PublicActivitySummary = z.infer<typeof publicActivitySummarySchema>
 export const publicActivityDetailSchema = publicActivitySummarySchema.extend({
   description: z.string().nullable(),
   publicRules: activityPublicRulesSchema,
+  /**
+   * Residents may see the spend threshold and the per-member coupon face value.
+   * The internal `maxRewardedTeams` budget control is deliberately not exposed.
+   */
+  purchaseReward: publicPurchaseRewardSchema.nullable(),
   publishedAt: isoTimestamp.nullable(),
 })
 
@@ -810,6 +834,11 @@ export const adminActivityDetailSchema = adminActivitySummarySchema.extend({
    * every edit would silently drop it.
    */
   rewardPlan: activityRewardPlanSchema.nullable(),
+  /**
+   * Consumption reward tier stored on the activity (LL-PUR-001), exposed so an
+   * admin form can read a draft back and round-trip it on the next save.
+   */
+  purchaseRewardPlan: purchaseRewardPlanSchema.nullable(),
 })
 
 export type AdminActivityDetail = z.infer<typeof adminActivityDetailSchema>
@@ -1458,6 +1487,12 @@ export const LOCAL_ORDER_ROUTES = {
   myOrders: '/local-orders',
   myOrderDetail: '/local-orders/:localOrderId',
   /**
+   * Resident: the consumption teams this resident may attribute a new order to
+   * (#207). Only the caller's own participation rows are read; no roster, no
+   * other resident, no invite code. Must be registered before `myOrderDetail`.
+   */
+  myTeamOptions: '/local-orders/team-options',
+  /**
    * Staff surface (all three roles, community-scoped). It exists separately from
    * `/admin/*` because `/admin/*` rejects grid workers by convention, while the
    * grid worker must be able to process orders for their assigned communities.
@@ -1659,7 +1694,12 @@ export const localOrderSnapshotSchema = z
     productName: z.string().min(1),
     unitPriceCents: z.number().int().nonnegative(),
     quantity: z.number().int().min(1).max(99),
+    /** Historical totalCents is the immutable product gross. */
     totalCents: z.number().int().nonnegative(),
+    /** Exactly one whole coupon or none; never an adjustable client discount. */
+    couponId: z.string().uuid().nullable(),
+    couponDiscountCents: z.number().int().nonnegative(),
+    netPayableCents: z.number().int().nonnegative(),
   })
   .superRefine((snapshot, ctx) => {
     if (snapshot.totalCents !== snapshot.unitPriceCents * snapshot.quantity) {
@@ -1669,8 +1709,24 @@ export const localOrderSnapshotSchema = z
         path: ['totalCents'],
       })
     }
+    if (snapshot.netPayableCents !== snapshot.totalCents - snapshot.couponDiscountCents ||
+        snapshot.couponDiscountCents > snapshot.totalCents ||
+        (snapshot.couponId === null) !== (snapshot.couponDiscountCents === 0)) {
+      ctx.addIssue({ code: 'custom', path: ['netPayableCents'], message: 'netPayableCents must equal gross minus one whole coupon' })
+    }
   })
 export type LocalOrderSnapshot = z.infer<typeof localOrderSnapshotSchema>
+
+/**
+ * The consumption team an order is permanently attributed to (#207 LL-PUR-003).
+ * `activityId` repeats the order's `sourceActivityId` so readers never have to
+ * assume the two agree; the database rejects a team that belongs elsewhere.
+ */
+export const localOrderTeamRefSchema = z.object({
+  id: z.string().uuid(),
+  activityId: z.string().uuid(),
+})
+export type LocalOrderTeamRef = z.infer<typeof localOrderTeamRefSchema>
 
 export const localOrderSummarySchema = z.object({
   id: z.string().uuid(),
@@ -1684,6 +1740,11 @@ export const localOrderSummarySchema = z.object({
   /** Optional grid-worker attribution / activity source frozen at registration. */
   attributedStaff: crmStaffRefSchema.nullable(),
   sourceActivity: crmActivityRefSchema.nullable(),
+  /**
+   * Frozen consumption-team attribution. `null` means the order contributes to
+   * no team; there is no "default team", and it can never be filled in later.
+   */
+  sourceTeam: localOrderTeamRefSchema.nullable(),
   note: z.string().nullable(),
   createdAt: isoTimestamp,
   updatedAt: isoTimestamp,
@@ -1759,6 +1820,14 @@ export const createLocalOrderRequestSchema = z.strictObject({
   note: z.string().trim().max(200).optional(),
   /** Optional activity attribution; the activity must belong to the product's community. */
   sourceActivityId: z.string().uuid().optional(),
+  /**
+   * Optional consumption-team attribution (#207). Requires `sourceActivityId`,
+   * and the resident (never the caller) must already be in that exact team of
+   * that exact activity. A team is never inferred from the activity.
+   */
+  sourceTeamId: z.string().uuid().optional(),
+  /** Optional single-use owner coupon; its value is always read from SQLite. */
+  couponId: z.string().uuid().optional(),
   /** Client-generated UUID; a replay returns the same order instead of a second one. */
   idempotencyKey: z.string().uuid(),
 })
@@ -2033,9 +2102,197 @@ export type ActivityParticipationConfirmResponse = z.infer<
   typeof activityParticipationConfirmResponseSchema
 >
 
+/* -------------------------------------------------------------------------- */
+/* Resident consumption-team options for local orders (#207 LL-PUR-003)      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Read-only options for `GET /local-orders/team-options?productId=...`.
+ *
+ * Lives after the participation contract so `participationTeamStatusSchema` stays
+ * the single source of truth for team state. Only the caller's own participation
+ * is described: the activity id/title, the team id/state and when the resident
+ * joined. The roster, invite code and other residents are deliberately absent —
+ * team selection must never become a directory of somebody else's team.
+ */
+export const localOrderTeamOptionsQuerySchema = z.object({
+  productId: z.string().uuid(),
+})
+export type LocalOrderTeamOptionsQuery = z.infer<typeof localOrderTeamOptionsQuerySchema>
+
+export const localOrderTeamOptionSchema = z.object({
+  activity: crmActivityRefSchema,
+  team: z.object({
+    id: z.string().uuid(),
+    status: participationTeamStatusSchema,
+  }),
+  joinedAt: isoTimestamp,
+})
+export type LocalOrderTeamOption = z.infer<typeof localOrderTeamOptionSchema>
+
+export const localOrderTeamOptionListResponseSchema = z.object({
+  items: z.array(localOrderTeamOptionSchema),
+})
+export type LocalOrderTeamOptionListResponse = z.infer<
+  typeof localOrderTeamOptionListResponseSchema
+>
+
+/* -------------------------------------------------------------------------- */
+/* Consumption-team effective paid progress (#210 LL-PUR-005)                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One member's contribution to the current consumption team.
+ *
+ * This reuses the participation roster shape (seat, display name, role, self
+ * marker, join time) and adds only the amount that member actually contributed.
+ * Resident ids and order ids stay server-side: the H5 needs a name and an amount,
+ * not an address book or an order directory.
+ */
+export const purchaseRewardMemberContributionSchema = participationTeamMemberSchema
+  .strict()
+  .extend({
+    /**
+     * Net effective paid amount in integer cents. Only verified local orders
+     * created after this member joined, with exactly one linked receipt that is
+     * not fully reversed, may contribute.
+     */
+    contributionCents: z.number().int().nonnegative(),
+  })
+
+export type PurchaseRewardMemberContribution = z.infer<
+  typeof purchaseRewardMemberContributionSchema
+>
+
+/**
+ * The read-only progress of one current team.
+ *
+ * `thresholdCents` is copied from the same public plan returned alongside this
+ * object. `remainingCents` is never negative; it reports how much more effective
+ * paid amount the team needs, independently of whether the team is already full.
+ * `eligible` is therefore true only for a full three-person team whose total has
+ * reached the threshold.
+ */
+export const purchaseRewardTeamProgressSchema = z
+  .strictObject({
+    teamId: z.string().uuid(),
+    teamStatus: participationTeamStatusSchema,
+    seatsFilled: z.number().int().min(0).max(3),
+    teamFull: z.boolean(),
+    membersContributionCents: z.array(purchaseRewardMemberContributionSchema).max(3),
+    totalEffectivePaidCents: z.number().int().nonnegative(),
+    thresholdCents: z.number().int().min(1),
+    remainingCents: z.number().int().nonnegative(),
+    eligible: z.boolean(),
+  })
+  .superRefine((progress, ctx) => {
+    if (progress.seatsFilled !== progress.membersContributionCents.length) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'seatsFilled must equal the number of listed contributions',
+        path: ['seatsFilled'],
+      })
+    }
+    if (progress.teamFull !== (progress.seatsFilled === 3)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'teamFull must mean exactly three filled seats',
+        path: ['teamFull'],
+      })
+    }
+    const sum = progress.membersContributionCents.reduce(
+      (total, member) => total + member.contributionCents,
+      0,
+    )
+    if (sum !== progress.totalEffectivePaidCents) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'totalEffectivePaidCents must equal the sum of member contributions',
+        path: ['totalEffectivePaidCents'],
+      })
+    }
+    if (progress.remainingCents !== Math.max(0, progress.thresholdCents - sum)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'remainingCents must be the non-negative distance to the threshold',
+        path: ['remainingCents'],
+      })
+    }
+    if (progress.eligible !== (progress.teamFull && sum >= progress.thresholdCents)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'eligible requires both a full team and the reached threshold',
+        path: ['eligible'],
+      })
+    }
+  })
+
+export type PurchaseRewardTeamProgress = z.infer<typeof purchaseRewardTeamProgressSchema>
+
+/**
+ * Resident response. `plan: null` means the activity promises no consumption
+ * reward; `progress: null` means the resident has no current team (or there is no
+ * plan to measure against). Neither absence is represented as a zero-value team.
+ */
+export const purchaseRewardProgressResponseSchema = z
+  .strictObject({
+    activityId: z.string().uuid(),
+    activityTitle: z.string().min(1),
+    plan: publicPurchaseRewardSchema.nullable(),
+    progress: purchaseRewardTeamProgressSchema.nullable(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.progress !== null && value.plan === null) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'team progress is impossible without a purchase reward plan',
+        path: ['progress'],
+      })
+    }
+    if (
+      value.progress !== null &&
+      value.plan !== null &&
+      value.progress.thresholdCents !== value.plan.thresholdCents
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'progress.thresholdCents must match the public plan threshold',
+        path: ['progress', 'thresholdCents'],
+      })
+    }
+  })
+
+export type PurchaseRewardProgressResponse = z.infer<
+  typeof purchaseRewardProgressResponseSchema
+>
+
+/** Staff read-only list of every current team of one activity. */
+export const purchaseRewardProgressListResponseSchema = z
+  .strictObject({
+    activityId: z.string().uuid(),
+    activityTitle: z.string().min(1),
+    plan: publicPurchaseRewardSchema.nullable(),
+    items: z.array(purchaseRewardTeamProgressSchema),
+    asOf: isoTimestamp,
+  })
+  .superRefine((value, ctx) => {
+    if (value.plan === null && value.items.length > 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'an activity without a plan cannot expose team progress',
+        path: ['items'],
+      })
+    }
+  })
+
+export type PurchaseRewardProgressListResponse = z.infer<
+  typeof purchaseRewardProgressListResponseSchema
+>
+
 export * from './identity.js'
 export * from './crmeb.js'
 export * from './rewards.js'
+export * from './purchase-reward.js'
 export * from './ledger.js'
 export * from './user-directory.js'
 export * from './resident-community.js'

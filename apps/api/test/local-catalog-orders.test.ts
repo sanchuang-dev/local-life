@@ -18,19 +18,25 @@ import {
   API_ERROR_CODES,
   LEDGER_ROUTES,
   LOCAL_ORDER_STATUS_TRANSITIONS,
+  activityParticipationConfirmResponseSchema,
+  activityParticipationStateSchema,
   ledgerOverviewSchema,
   localOrderDetailSchema,
   localOrderEventListResponseSchema,
   localOrderListResponseSchema,
+  localOrderTeamOptionListResponseSchema,
   localProductDetailSchema,
   localProductListResponseSchema,
+  type ActivityStatus,
   type LocalOrderDetail,
+  type LocalOrderTeamOptionListResponse,
   type LocalProductDetail,
 } from '@sanchuang-dev/local-life-contracts'
 import { createApp } from '../src/app.js'
 import { loadConfig } from '../src/config.js'
 import { createDatabase, type AppDatabase } from '../src/db/client.js'
 import {
+  activities,
   auditLogs,
   communities,
   localOrderEvents,
@@ -295,6 +301,7 @@ async function register(
     idempotencyKey?: string
     note?: string
     sourceActivityId?: string
+    sourceTeamId?: string
   },
 ) {
   return api(app, 'POST', '/local-orders', {
@@ -308,6 +315,7 @@ async function register(
       ...(input.sourceActivityId === undefined
         ? {}
         : { sourceActivityId: input.sourceActivityId }),
+      ...(input.sourceTeamId === undefined ? {} : { sourceTeamId: input.sourceTeamId }),
     },
   })
 }
@@ -396,6 +404,107 @@ async function localWorld() {
   }
 }
 
+const ACTIVITY_RULES_JSON = JSON.stringify({
+  eligibility: '本社区 60 岁以上居民',
+  checkin: '到社区服务中心签到并领取参与卡',
+  purchase: '现场购买指定套餐一份',
+  prizeClaim: '凭核销码领取，每人限一次',
+  notes: '活动最终解释权归社区所有',
+})
+
+/** Minimal real activity row, same shape the participation suite writes. */
+function addActivity(
+  db: AppDatabase,
+  communityId: string,
+  createdByUserId: string,
+  options: { status?: ActivityStatus; endsAt?: Date; withPurchaseReward?: boolean } = {},
+): string {
+  const status = options.status ?? 'published'
+  const endsAt = options.endsAt ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  const now = new Date()
+  const id = randomUUID()
+  db.insert(activities)
+    .values({
+      id,
+      communityId,
+      title: '社区好物欢乐季',
+      summary: '本社区消费团活动',
+      description: '面向本社区居民的线下活动',
+      status,
+      startsAt: new Date(endsAt.getTime() - 2 * 60 * 60 * 1000),
+      endsAt,
+      location: '幸福社区党群服务中心',
+      budgetCapCents: 100_000,
+      prizeQuantityCap: 100,
+      publicRulesJson: ACTIVITY_RULES_JSON,
+      purchaseRewardPlanJson: options.withPurchaseReward === false
+        ? null
+        : JSON.stringify({ thresholdCents: 20_000, couponFaceValueCents: 2_000, maxRewardedTeams: 5 }),
+      currentRuleVersionId: null,
+      createdByUserId,
+      createdAt: now,
+      updatedAt: now,
+      publishedAt: status === 'draft' ? null : now,
+      pausedAt: status === 'paused' ? now : null,
+      endedAt: status === 'ended' ? now : null,
+    })
+    .run()
+  return id
+}
+
+/** Confirms the resident's own participation and returns the resulting team id. */
+async function joinTeam(
+  app: App,
+  resident: ResidentSession,
+  activityId: string,
+): Promise<{ teamId: string; joinedAt: string }> {
+  const response = await api(app, 'POST', `/activities/${activityId}/participation`, {
+    session: resident,
+    origin: RESIDENT_ORIGIN,
+    body: {},
+  })
+  assert.equal(response.status, 200, 'confirming a real participation must succeed')
+  const body = activityParticipationConfirmResponseSchema.parse(await response.json())
+  const state = activityParticipationStateSchema.parse(body.state)
+  const teamId = state.team?.id
+  const joinedAt = state.participation?.joinedAt
+  assert.ok(teamId, 'a confirmed participation always has a team')
+  assert.ok(joinedAt)
+  return { teamId, joinedAt }
+}
+
+function setActivityStatus(
+  db: AppDatabase,
+  activityId: string,
+  status: ActivityStatus,
+): void {
+  const now = new Date()
+  db.update(activities)
+    .set({
+      status,
+      updatedAt: now,
+      endedAt: status === 'ended' ? now : null,
+      pausedAt: status === 'paused' ? now : null,
+    })
+    .where(eq(activities.id, activityId))
+    .run()
+}
+
+async function teamOptions(
+  app: App,
+  resident: ResidentSession,
+  productId: string,
+): Promise<LocalOrderTeamOptionListResponse> {
+  const response = await api(
+    app,
+    'GET',
+    `/local-orders/team-options?productId=${productId}`,
+    { session: resident },
+  )
+  assert.equal(response.status, 200, 'GET team options must succeed')
+  return localOrderTeamOptionListResponseSchema.parse(await response.json())
+}
+
 function withTempDir(prefix: string) {
   const dir = mkdtempSync(join(tmpdir(), prefix))
   return {
@@ -467,6 +576,9 @@ test('catalogue -> registration -> staff handling -> operations verification end
       unitPriceCents: 450,
       quantity: 3,
       totalCents: 1350,
+      couponId: null,
+      couponDiscountCents: 0,
+      netPayableCents: 1350,
     })
     assert.equal(registered.verification, null, 'nothing is verified yet')
     assert.equal(registered.events.length, 1)
@@ -1689,6 +1801,406 @@ test('the public catalogue only exposes on-shelf products and never leaks admin 
       await (await api(app, 'GET', '/catalog/products?keyword=%25')).json(),
     )
     assert.equal(search.total, 0)
+  } finally {
+    world.sqlite.close()
+  }
+})
+
+/* -------------------------------------------------------------------------- */
+/* #207 LL-PUR-003: one permanent consumption-team attribution per order       */
+/* -------------------------------------------------------------------------- */
+
+test('an order may bind only the caller own team in a live activity of the product community', async () => {
+  const world = await localWorld()
+  try {
+    const { app, db, admin, resident, communityId } = world
+    const product = await createOnShelfProduct(app, admin, {
+      communityId,
+      priceCents: 500,
+    })
+    const otherResident = await residentSession(app, '居民乙', communityId)
+    const activityId = addActivity(db, communityId, resident.userId)
+    const ownTeam = await joinTeam(app, resident, activityId)
+    const otherTeam = await joinTeam(app, otherResident, activityId)
+
+    // A plain order is still legal and contributes to no team.
+    const plain = await orderFromRegister(
+      await register(app, resident, { productId: product.id }),
+    )
+    assert.equal(plain.sourceActivity, null)
+    assert.equal(plain.sourceTeam, null)
+
+    // An activity without an explicit team is an explicit non-team order; the
+    // server never picks "the only team" on the resident's behalf.
+    const activityOnly = await orderFromRegister(
+      await register(app, resident, { productId: product.id, sourceActivityId: activityId }),
+    )
+    assert.equal(activityOnly.sourceActivity?.id, activityId)
+    assert.equal(activityOnly.sourceTeam, null)
+
+    // The resident's own team binds and is echoed back.
+    const bound = await orderFromRegister(
+      await register(app, resident, {
+        productId: product.id,
+        sourceActivityId: activityId,
+        sourceTeamId: ownTeam.teamId,
+      }),
+    )
+    assert.deepEqual(bound.sourceTeam, { id: ownTeam.teamId, activityId })
+
+    // A check-in-only activity may have a real team but must NOT be treated
+    // as a consumption reward activity, either by order registration or options.
+    const checkinOnly = addActivity(db, communityId, resident.userId, { withPurchaseReward: false })
+    const checkinTeam = await joinTeam(app, resident, checkinOnly)
+    const invalidConsumption = await register(app, resident, {
+      productId: product.id,
+      sourceActivityId: checkinOnly,
+      sourceTeamId: checkinTeam.teamId,
+    })
+    assert.equal(invalidConsumption.status, 409)
+    assert.equal(await errorCode(invalidConsumption), API_ERROR_CODES.activityUnavailable)
+
+    // Somebody else's team is refused (same message as a team from the wrong
+    // activity, so neither relation is enumerable).
+    const foreignTeam = await register(app, resident, {
+      productId: product.id,
+      sourceActivityId: activityId,
+      sourceTeamId: otherTeam.teamId,
+    })
+    assert.equal(foreignTeam.status, 400)
+    assert.equal(await errorCode(foreignTeam), API_ERROR_CODES.invalidRequest)
+
+    // A team id without its activity is a client error, not a default.
+    const teamWithoutActivity = await register(app, resident, {
+      productId: product.id,
+      sourceTeamId: ownTeam.teamId,
+    })
+    assert.equal(teamWithoutActivity.status, 400)
+    assert.equal(await errorCode(teamWithoutActivity), API_ERROR_CODES.invalidRequest)
+
+    // The team must belong to the activity that is claimed.
+    const secondActivity = addActivity(db, communityId, resident.userId)
+    const secondTeam = await joinTeam(app, resident, secondActivity)
+    const mismatched = await register(app, resident, {
+      productId: product.id,
+      sourceActivityId: activityId,
+      sourceTeamId: secondTeam.teamId,
+    })
+    assert.equal(mismatched.status, 400)
+    assert.equal(await errorCode(mismatched), API_ERROR_CODES.invalidRequest)
+
+    // Cross-community activity/team from the same product's order is refused.
+    const otherCommunity = await createCommunity(app, admin, '另一社区')
+    const outsider = await residentSession(app, '居民丙', otherCommunity)
+    const outsideActivity = addActivity(db, otherCommunity, outsider.userId)
+    const outsideTeam = await joinTeam(app, outsider, outsideActivity)
+    const crossCommunity = await register(app, resident, {
+      productId: product.id,
+      sourceActivityId: outsideActivity,
+      sourceTeamId: outsideTeam.teamId,
+    })
+    assert.equal(crossCommunity.status, 400)
+    assert.equal(await errorCode(crossCommunity), API_ERROR_CODES.invalidRequest)
+
+    // Draft is invisible; paused/ended/past-ends_at are unavailable.
+    const draftActivity = addActivity(db, communityId, resident.userId, { status: 'draft' })
+    const draftResponse = await register(app, resident, {
+      productId: product.id,
+      sourceActivityId: draftActivity,
+    })
+    assert.equal(draftResponse.status, 404)
+
+    const pausedActivity = addActivity(db, communityId, resident.userId)
+    const pausedTeam = await joinTeam(app, resident, pausedActivity)
+    setActivityStatus(db, pausedActivity, 'paused')
+    const pausedResponse = await register(app, resident, {
+      productId: product.id,
+      sourceActivityId: pausedActivity,
+      sourceTeamId: pausedTeam.teamId,
+    })
+    assert.equal(pausedResponse.status, 409)
+    assert.equal(await errorCode(pausedResponse), API_ERROR_CODES.activityUnavailable)
+
+    const endedActivity = addActivity(db, communityId, resident.userId)
+    const endedTeam = await joinTeam(app, resident, endedActivity)
+    setActivityStatus(db, endedActivity, 'ended')
+    const endedResponse = await register(app, resident, {
+      productId: product.id,
+      sourceActivityId: endedActivity,
+      sourceTeamId: endedTeam.teamId,
+    })
+    assert.equal(endedResponse.status, 409)
+    assert.equal(await errorCode(endedResponse), API_ERROR_CODES.activityUnavailable)
+
+    const pastActivity = addActivity(db, communityId, resident.userId, {
+      endsAt: new Date(Date.now() - 60_000),
+    })
+    const pastResponse = await register(app, resident, {
+      productId: product.id,
+      sourceActivityId: pastActivity,
+    })
+    assert.equal(pastResponse.status, 409)
+    assert.equal(await errorCode(pastResponse), API_ERROR_CODES.activityUnavailable)
+
+    // Options: only the caller's own teams in live activities of this product's
+    // community, and no roster / invite code / other-resident data.
+    const options = await teamOptions(app, resident, product.id)
+    assert.deepEqual(
+      options.items.map((item) => item.team.id).sort(),
+      [ownTeam.teamId, secondTeam.teamId].sort(),
+    )
+    for (const item of options.items) {
+      assert.deepEqual(Object.keys(item).sort(), ['activity', 'joinedAt', 'team'])
+      assert.deepEqual(Object.keys(item.activity).sort(), ['id', 'title'])
+      assert.deepEqual(Object.keys(item.team).sort(), ['id', 'status'])
+      assert.equal('members' in item.team, false)
+      assert.equal('inviteCode' in item.team, false)
+    }
+    const otherOptions = await teamOptions(app, otherResident, product.id)
+    assert.deepEqual(
+      otherOptions.items.map((item) => item.team.id),
+      [otherTeam.teamId],
+    )
+
+    const missingProduct = await api(app, 'GET', '/local-orders/team-options', {
+      session: resident,
+    })
+    assert.equal(missingProduct.status, 400)
+    const anonymousOptions = await api(
+      app,
+      'GET',
+      `/local-orders/team-options?productId=${product.id}`,
+    )
+    assert.equal(anonymousOptions.status, 401)
+  } finally {
+    world.sqlite.close()
+  }
+})
+
+test('order team attribution is permanent: replay cannot switch teams and SQL cannot rewrite it', async () => {
+  const world = await localWorld()
+  try {
+    const { app, db, sqlite, admin, resident, communityId } = world
+    const product = await createOnShelfProduct(app, admin, {
+      communityId,
+      name: '社区直供鸡蛋',
+      priceCents: 900,
+    })
+    const firstActivity = addActivity(db, communityId, resident.userId)
+    const firstTeam = await joinTeam(app, resident, firstActivity)
+    const secondActivity = addActivity(db, communityId, resident.userId)
+    const secondTeam = await joinTeam(app, resident, secondActivity)
+
+    const idempotencyKey = randomUUID()
+    const unbindable = await orderFromRegister(
+      await register(app, resident, { productId: product.id }),
+    )
+    assert.equal(unbindable.sourceTeam, null)
+
+    const firstResponse = await register(app, resident, {
+      productId: product.id,
+      idempotencyKey,
+      sourceActivityId: firstActivity,
+      sourceTeamId: firstTeam.teamId,
+    })
+    assert.equal(firstResponse.status, 201)
+    const first = await orderFromRegister(firstResponse)
+    assert.deepEqual(first.sourceTeam, { id: firstTeam.teamId, activityId: firstActivity })
+
+    // Same key + same intent: one order, one attribution, no second row.
+    const replayResponse = await register(app, resident, {
+      productId: product.id,
+      idempotencyKey,
+      sourceActivityId: firstActivity,
+      sourceTeamId: firstTeam.teamId,
+    })
+    assert.equal(replayResponse.status, 200)
+    const replay = await orderFromRegister(replayResponse)
+    assert.equal(replay.id, first.id)
+    assert.deepEqual(replay.sourceTeam, { id: firstTeam.teamId, activityId: firstActivity })
+
+    // Same key + another team: an explicit conflict, never a silent team switch.
+    const switched = await register(app, resident, {
+      productId: product.id,
+      idempotencyKey,
+      sourceActivityId: secondActivity,
+      sourceTeamId: secondTeam.teamId,
+    })
+    assert.equal(switched.status, 409)
+    assert.equal(await errorCode(switched), API_ERROR_CODES.orderIdempotencyConflict)
+
+    const rows = db
+      .select({ id: localOrders.id, teamId: localOrders.sourceTeamId })
+      .from(localOrders)
+      .all()
+      .filter((row) => row.id === first.id)
+    assert.deepEqual(rows, [{ id: first.id, teamId: firstTeam.teamId }])
+
+    // The database itself refuses to move or back-fill the anchor.
+    for (const statement of [
+      'UPDATE local_orders SET source_team_id = ? WHERE id = ?',
+      'UPDATE local_orders SET source_team_id = NULL WHERE id = ?',
+      'UPDATE local_orders SET source_activity_id = ? WHERE id = ?',
+    ]) {
+      const params =
+        statement.includes('= NULL')
+          ? [first.id]
+          : statement.includes('source_team_id')
+            ? [secondTeam.teamId, first.id]
+            : [secondActivity, first.id]
+      assert.throws(
+        () => sqlite.prepare(statement).run(...params),
+        /attribution is immutable/u,
+        `${statement} must be rejected by the immutability trigger`,
+      )
+    }
+
+    // An order created before joining (or without a team) can never be
+    // retro-filled with an attribution later.
+    assert.throws(
+      () =>
+        sqlite
+          .prepare(
+            'UPDATE local_orders SET source_activity_id = ?, source_team_id = ? WHERE id = ?',
+          )
+          .run(firstActivity, firstTeam.teamId, unbindable.id),
+      /attribution is immutable/u,
+    )
+
+    const insertOrder = sqlite.prepare(
+      `INSERT INTO local_orders (
+        id, community_id, product_id, resident_user_id, idempotency_key, status,
+        record_source, product_name, unit_price_cents, quantity, total_cents, note,
+        created_by_staff_id, attributed_staff_id, source_activity_id, source_team_id,
+        verified_by_user_id, verified_at, verification_note, created_at, updated_at
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    )
+    const baseParams = (activityId: string | null, teamId: string | null) => [
+      randomUUID(),
+      communityId,
+      product.id,
+      resident.userId,
+      randomUUID(),
+      'registered',
+      'resident',
+      product.name,
+      product.priceCents,
+      1,
+      product.priceCents,
+      null,
+      null,
+      null,
+      activityId,
+      teamId,
+      null,
+      null,
+      null,
+      Date.now(),
+      Date.now(),
+    ]
+
+    // A team the resident never joined cannot be written even by raw SQL.
+    assert.throws(
+      () => insertOrder.run(...baseParams(firstActivity, secondTeam.teamId)),
+      /must be a team the resident joined/u,
+    )
+    // Half-filled attribution is rejected as well.
+    assert.throws(
+      () => insertOrder.run(...baseParams(null, firstTeam.teamId)),
+      /requires source_activity_id/u,
+    )
+    // A direct SQL writer must not attribute consumption to a check-in-only team.
+    const checkinOnly = addActivity(db, communityId, resident.userId, { withPurchaseReward: false })
+    const checkinTeam = await joinTeam(app, resident, checkinOnly)
+    assert.throws(
+      () => insertOrder.run(...baseParams(checkinOnly, checkinTeam.teamId)),
+      /requires a purchase reward plan/u,
+    )
+
+    // And no rejected insert left a row behind.
+    const leaked = db
+      .select({ id: localOrders.id })
+      .from(localOrders)
+      .all()
+      .filter((row) => row.id !== first.id && row.id !== unbindable.id)
+    assert.deepEqual(leaked, [])
+  } finally {
+    world.sqlite.close()
+  }
+})
+
+test('staff recording on behalf can only attribute a team the target resident joined', async () => {
+  const world = await localWorld()
+  try {
+    const { app, db, admin, operator, resident, communityId } = world
+    const product = await createOnShelfProduct(app, admin, {
+      communityId,
+      priceCents: 700,
+    })
+    const otherResident = await residentSession(app, '居民乙', communityId)
+    const activityId = addActivity(db, communityId, resident.userId)
+    const ownTeam = await joinTeam(app, resident, activityId)
+    const otherTeam = await joinTeam(app, otherResident, activityId)
+
+    const recordOnBehalf = (body: Record<string, unknown>) =>
+      api(app, 'POST', '/staff/local-orders', { session: operator, body })
+
+    const recorded = await recordOnBehalf({
+      productId: product.id,
+      quantity: 1,
+      idempotencyKey: randomUUID(),
+      residentUserId: resident.userId,
+      sourceActivityId: activityId,
+      sourceTeamId: ownTeam.teamId,
+    })
+    assert.equal(recorded.status, 201)
+    const order = await orderFromRegister(recorded)
+    assert.equal(order.recordSource, 'staff_on_behalf')
+    assert.notEqual(order.createdByStaff, null)
+    assert.deepEqual(order.sourceTeam, { id: ownTeam.teamId, activityId })
+
+    // A staff member cannot fabricate a relation the target resident lacks.
+    const foreignTeam = await recordOnBehalf({
+      productId: product.id,
+      quantity: 1,
+      idempotencyKey: randomUUID(),
+      residentUserId: resident.userId,
+      sourceActivityId: activityId,
+      sourceTeamId: otherTeam.teamId,
+    })
+    assert.equal(foreignTeam.status, 400)
+    assert.equal(await errorCode(foreignTeam), API_ERROR_CODES.invalidRequest)
+
+    const wrongResident = await recordOnBehalf({
+      productId: product.id,
+      quantity: 1,
+      idempotencyKey: randomUUID(),
+      residentUserId: otherResident.userId,
+      sourceActivityId: activityId,
+      sourceTeamId: ownTeam.teamId,
+    })
+    assert.equal(wrongResident.status, 400)
+    assert.equal(await errorCode(wrongResident), API_ERROR_CODES.invalidRequest)
+
+    // The target resident's own team is the only accepted option.
+    const recordedForOther = await recordOnBehalf({
+      productId: product.id,
+      quantity: 1,
+      idempotencyKey: randomUUID(),
+      residentUserId: otherResident.userId,
+      sourceActivityId: activityId,
+      sourceTeamId: otherTeam.teamId,
+    })
+    assert.equal(recordedForOther.status, 201)
+    const otherOrder = await orderFromRegister(recordedForOther)
+    assert.deepEqual(otherOrder.sourceTeam, { id: otherTeam.teamId, activityId })
+
+    // Failed attempts wrote nothing.
+    const count = db
+      .select({ id: localOrders.id })
+      .from(localOrders)
+      .all().length
+    assert.equal(count, 2)
   } finally {
     world.sqlite.close()
   }

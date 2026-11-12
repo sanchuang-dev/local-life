@@ -69,13 +69,9 @@ import { registerCrmRoutes } from './crm/routes.js'
 import { registerLocalCatalogRoutes } from './local/routes.js'
 import { registerExternalOfferRoutes } from './external-offers/routes.js'
 import { registerLocalOrderRoutes } from './local/order-routes.js'
-import { registerLedgerRoutes } from './ledger/routes.js'
-import { registerSettlementPartyRoutes } from './ledger/settlement-party-routes.js'
-import { registerSettlementCandidateRoutes } from './ledger/settlement-candidate-routes.js'
-import { registerSettlementRuleRoutes } from './ledger/settlement-rule-routes.js'
-import { registerSettlementStatementRoutes } from './ledger/settlement-statement-routes.js'
-import { registerReconciliationRoutes } from './ledger/reconciliation-routes.js'
+import { registerLedgerRouteGroup } from './routes/ledger-route-group.js'
 import { registerParticipationRoutes } from './participation/routes.js'
+import { registerPurchaseRewardRoutes } from './purchase-reward/routes.js'
 import { registerRewardRoutes } from './rewards/routes.js'
 import { registerDrawRoutes } from './draw/routes.js'
 import { registerUserDirectoryRoutes } from './users/routes.js'
@@ -1639,6 +1635,15 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     bodySchemaError,
   })
 
+  // Read-only consumption-team effective-paid progress (#210 LL-PUR-005).
+  // No writes, no coupon state: both surfaces recompute from verified orders and
+  // their linked manual receipts.
+  registerPurchaseRewardRoutes(app, {
+    db,
+    fail,
+    ...(options.now === undefined ? {} : { now: options.now }),
+  })
+
   // Resident permanent community (#171 LL-IDENTITY-001): the one read behind
   // 未绑定/已确认/待核查/冲突 plus the resident's explicit first confirmation.
   // No rebind/unbind route exists; see `resident-community` contract docs.
@@ -1674,11 +1679,12 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     bodySchemaError,
   })
 
-  // Reconciliation and export (LL-MVP-008, R3b-1b) is registered **before** the
-  // ledger skeleton on purpose: Hono matches in registration order, and the
-  // skeleton owns read-only GETs of some of the same paths. Registering the
-  // concrete module first means its derivation wins instead of being shadowed.
-  registerReconciliationRoutes(app, {
+  // Ledger + settlement (LL-MVP-008, Issue #64 and follow-ups) is mounted after
+  // the local order routes, since its facts are derived from them. The group
+  // additionally registers reconciliation **before** the read-only ledger
+  // skeleton because Hono matches in registration order and the skeleton owns
+  // read-only GETs of some of the same paths; see `routes/ledger-route-group.ts`.
+  registerLedgerRouteGroup(app, {
     db,
     config,
     fail,
@@ -1686,22 +1692,6 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     bodySchemaError,
     now: options.now,
   })
-
-  // Ledger (LL-MVP-008, Issue #64): read-only skeleton registered after the
-  // local order routes, since its facts are derived from them.
-  registerLedgerRoutes(app, {
-    db,
-    config,
-    fail,
-    validCsrf,
-    bodySchemaError,
-    now: options.now,
-  })
-
-  registerSettlementPartyRoutes(app, { db, config, fail, validCsrf, now: options.now })
-  registerSettlementCandidateRoutes(app, { db, fail, now: options.now })
-  registerSettlementRuleRoutes(app, { db, config, fail, validCsrf, now: options.now })
-  registerSettlementStatementRoutes(app, { db, config, fail, validCsrf, now: options.now })
 
   registerRewardRoutes(app, {
     db,
