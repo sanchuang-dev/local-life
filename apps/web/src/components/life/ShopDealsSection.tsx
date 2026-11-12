@@ -40,7 +40,10 @@ export function ShopDealsSection({ activityId }: { activityId: string | null }) 
           <div className="life-shelf-card__body">
             <span className="life-shelf-card__illustration" aria-hidden="true"><Store size={46} strokeWidth={1.45} /></span>
             <p className="life-shelf-card__status">优惠购暂未开放</p>
-            <p className="life-shelf-card__detail">商城尚未接入</p>
+            <p className="life-shelf-card__detail">{state.message}</p>
+            <button type="button" className="life-shelf-card__action" onClick={retry}>
+              <RefreshCcw size={15} aria-hidden="true" /> 重新加载
+            </button>
           </div>
         )}
         {state.status === 'empty' && (
@@ -48,6 +51,9 @@ export function ShopDealsSection({ activityId }: { activityId: string | null }) 
             <span className="life-shelf-card__illustration" aria-hidden="true"><ShoppingBag size={46} strokeWidth={1.45} /></span>
             <p className="life-shelf-card__status">商城暂无商品</p>
             <p className="life-shelf-card__detail">暂未查询到上架商品</p>
+            <button type="button" className="life-shelf-card__action" onClick={retry}>
+              <RefreshCcw size={15} aria-hidden="true" /> 重新读取
+            </button>
           </div>
         )}
         {state.status === 'error' && (
