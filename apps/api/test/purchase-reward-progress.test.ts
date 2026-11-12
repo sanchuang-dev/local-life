@@ -1190,11 +1190,10 @@ test('full-face coupon allows zero net payable, redeems at staff verification wi
 test('expired coupon is rejected by the same SQLite reservation guard, not a browser clock', async () => {
   const w = await couponEarnedWorld()
   const expiredAt = new Date(Date.now() + 31 * 24 * 3600 * 1000)
-  const failure = assert.throws(() => w.db.transaction((tx) => readCouponForOrder(tx, {
+  assert.throws(() => w.db.transaction((tx) => readCouponForOrder(tx, {
     couponId: w.couponId, buyerUserId: w.a.userId, communityId: w.communityId,
     grossCents: 10_000, now: expiredAt,
-  }), { behavior: 'immediate' }))
-  assert.ok(failure)
+  }), { behavior: 'immediate' }), /消费券无效|已过期/)
   assert.equal((await myCouponWallet(w.app, w.a)).items[0]?.status, 'available',
     'a failed future-quote cannot accidentally reserve the real coupon now')
 })
