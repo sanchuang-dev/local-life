@@ -146,6 +146,8 @@ function candidateWithoutReceipt(
     productName: '社区家政体验券',
     orderStatus: 'registered',
     registeredAmountCents: 2990,
+    couponDiscountCents: 0,
+    netPayableCents: 2990,
     periodAt: '2026-11-04T06:00:00.000Z',
     periodSource: 'order_registration',
     sellerStatus: 'missing_seller',
