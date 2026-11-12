@@ -1704,6 +1704,9 @@ export const localOrders = sqliteTable(
     unitPriceCents: integer('unit_price_cents').notNull(),
     quantity: integer('quantity').notNull(),
     totalCents: integer('total_cents').notNull(),
+    /** Gross = historical total_cents; subsidy is frozen in cents separately. */
+    couponDiscountCents: integer('coupon_discount_cents').notNull().default(0),
+    couponId: text('coupon_id').references(() => couponIssues.id, { onDelete: 'restrict' }),
     note: text('note'),
     /** Staff member who recorded the order on behalf of the resident; null for self-service. */
     createdByStaffId: text('created_by_staff_id').references(() => staffAccounts.id, {
@@ -1748,6 +1751,9 @@ export const localOrders = sqliteTable(
     index('local_orders_product_idx').on(table.productId),
     index('local_orders_created_by_staff_idx').on(table.createdByStaffId),
     index('local_orders_source_team_idx').on(table.sourceTeamId),
+    uniqueIndex('local_orders_coupon_uq').on(table.couponId),
+    check('local_orders_coupon_amount_check', sql`${table.couponDiscountCents} >= 0 AND ${table.couponDiscountCents} <= ${table.totalCents}`),
+    check('local_orders_coupon_presence_check', sql`(${table.couponId} IS NULL AND ${table.couponDiscountCents} = 0) OR (${table.couponId} IS NOT NULL AND ${table.couponDiscountCents} > 0)`),
     check('local_orders_quantity_check', sql`${table.quantity} >= 1 AND ${table.quantity} <= 99`),
     check(
       'local_orders_total_check',
@@ -1966,6 +1972,9 @@ export const settlementStatementLines = sqliteTable('settlement_statement_lines'
   productName: text('product_name').notNull(),
   periodAt: integer('period_at', { mode: 'timestamp_ms' }).notNull(),
   registeredAmountCents: integer('registered_amount_cents').notNull(),
+  /** NULL on historic immutable statement snapshots; no backfill. */
+  couponDiscountCents: integer('coupon_discount_cents'),
+  netPayableCents: integer('net_payable_cents'),
   receiptEntryId: text('receipt_entry_id')
     .references(() => ledgerEntries.id, { onDelete: 'restrict' }),
   receiptEvidenceRef: text('receipt_evidence_ref'),
