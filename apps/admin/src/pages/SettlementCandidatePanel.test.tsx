@@ -84,6 +84,8 @@ function candidate(overrides: Partial<SettlementCandidate> = {}): SettlementCand
     productName: '社区宽带体验套餐',
     orderStatus: 'verified',
     registeredAmountCents: 3980,
+    couponDiscountCents: 0,
+    netPayableCents: 3980,
     periodAt: '2026-11-02T03:04:05.000Z',
     periodSource: 'linked_receipt',
     sellerStatus: 'verified',
