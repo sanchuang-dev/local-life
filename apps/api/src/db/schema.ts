@@ -970,7 +970,7 @@ export const couponIssues = sqliteTable(
     status: text('status').$type<'available' | 'reserved' | 'redeemed' | 'void'>().notNull(),
     issuedAt: integer('issued_at', { mode: 'timestamp_ms' }).notNull(),
     expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
-    reservedOrderId: text('reserved_order_id').references(() => localOrders.id, { onDelete: 'restrict' }),
+    reservedOrderId: text('reserved_order_id').references((): AnySQLiteColumn => localOrders.id, { onDelete: 'restrict' }),
     reservedAt: integer('reserved_at', { mode: 'timestamp_ms' }),
     redeemedAt: integer('redeemed_at', { mode: 'timestamp_ms' }),
     voidedAt: integer('voided_at', { mode: 'timestamp_ms' }),
@@ -1706,7 +1706,7 @@ export const localOrders = sqliteTable(
     totalCents: integer('total_cents').notNull(),
     /** Gross = historical total_cents; subsidy is frozen in cents separately. */
     couponDiscountCents: integer('coupon_discount_cents').notNull().default(0),
-    couponId: text('coupon_id').references(() => couponIssues.id, { onDelete: 'restrict' }),
+    couponId: text('coupon_id').references((): AnySQLiteColumn => couponIssues.id, { onDelete: 'restrict' }),
     note: text('note'),
     /** Staff member who recorded the order on behalf of the resident; null for self-service. */
     createdByStaffId: text('created_by_staff_id').references(() => staffAccounts.id, {
