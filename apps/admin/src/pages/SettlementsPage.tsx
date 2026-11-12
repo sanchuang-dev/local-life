@@ -48,6 +48,7 @@ import {
 import { SettlementCandidatePanel } from './SettlementCandidatePanel'
 import { SettlementMappingPanel } from './SettlementMappingPanel'
 import { SettlementPartyPanel } from './SettlementPartyPanel'
+import { SettlementRulesPanel } from './SettlementRulesPanel'
 import './ledger.css'
 
 /**
@@ -151,22 +152,25 @@ function SettlementConsole({ session }: { session: AuthenticatedSession }) {
   }
 
   /**
-   * 分成结算单 has its own views (#219, #220): the read-only candidate board, the
-   * real-party directory and the versioned merchant mappings + per-order party
-   * confirmation. Each is mounted only after a human selects it, so opening
-   * 分成结算单 never issues a request nobody asked for.
+   * 分成结算单 has its own views (#219, #220, #221): the read-only candidate board,
+   * the real-party directory, the versioned merchant mappings with per-order party
+   * confirmation, and the approved contract-rule history. Each is mounted only
+   * after a human selects it, so opening 分成结算单 never issues a request nobody
+   * asked for.
    */
-  const [settlementView, setSettlementView] = useState<'candidates' | 'parties' | 'mappings'>(
-    'candidates',
-  )
+  const [settlementView, setSettlementView] = useState<
+    'candidates' | 'parties' | 'mappings' | 'rules'
+  >('candidates')
   const [partiesMounted, setPartiesMounted] = useState(false)
   const [mappingsMounted, setMappingsMounted] = useState(false)
+  const [rulesMounted, setRulesMounted] = useState(false)
 
   const switchSettlementView = (key: string) => {
     const next =
-      key === 'parties' || key === 'mappings' ? key : 'candidates'
+      key === 'parties' || key === 'mappings' || key === 'rules' ? key : 'candidates'
     if (next === 'parties') setPartiesMounted(true)
     if (next === 'mappings') setMappingsMounted(true)
+    if (next === 'rules') setRulesMounted(true)
     setSettlementView(next)
   }
 
@@ -787,6 +791,11 @@ function SettlementConsole({ session }: { session: AuthenticatedSession }) {
                   key: 'mappings',
                   label: '商户映射',
                   children: mappingsMounted ? <SettlementMappingPanel /> : null,
+                },
+                {
+                  key: 'rules',
+                  label: '合同规则',
+                  children: rulesMounted ? <SettlementRulesPanel /> : null,
                 },
               ]}
             />

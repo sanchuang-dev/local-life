@@ -3,17 +3,22 @@ import {
   confirmSettlementOrderPartyRequestSchema,
   createSettlementMappingRequestSchema,
   createSettlementPartyRequestSchema,
+  createSettlementRuleRequestSchema,
   settlementMappingListResponseSchema,
   settlementMappingSchema,
   settlementOrderPartyResponseSchema,
   settlementOrderPartySnapshotSchema,
   settlementPartyListResponseSchema,
   settlementPartySchema,
+  settlementRuleListResponseSchema,
+  settlementRuleVersionSchema,
   type CreateSettlementMappingRequest,
   type CreateSettlementPartyRequest,
+  type CreateSettlementRuleRequest,
   type SettlementMapping,
   type SettlementOrderPartySnapshot,
   type SettlementParty,
+  type SettlementRuleVersion,
 } from '@sanchuang-dev/local-life-contracts'
 import { fillRoute, parsePayload, requestLocalJson, withQuery } from './localApi'
 
@@ -31,6 +36,12 @@ import { fillRoute, parsePayload, requestLocalJson, withQuery } from './localApi
  * 关键边界：**保存映射不会自动确认任何历史订单。** 订单的销售商户归属必须是运营
  * 人员对具体订单的显式确认（`confirmSettlementOrderParty`），并在服务端留下不可变
  * 的 `settlementOrderPartySnapshot`；映射更新不能回溯补写历史订单的归属。
+ *
+ * 「合同规则版本」（LL-SET-010A / #221）是**已核准合同的人工确认事实**：运营人员
+ * 依据线下已签合同登记费率与期限，`approvalStatus` 恒为 `admin_attested`，
+ * `version` / `approvedByUserId` / `approvedAt` 均由服务端生成并以响应为准。前端
+ * 不得推断审批结果、不得自行递增版本号、更不得填充任何默认费率——没有登记就没有
+ * 规则，没有规则就没有应付金额。
  *
  * 硬规则：
  *
@@ -237,4 +248,112 @@ export async function confirmSettlementOrderParty(
     { method: 'POST', csrfToken, body },
   )
   return parsePayload(settlementOrderPartySnapshotSchema, payload, '订单销售商户确认结果')
+}
+
+/* -------------------------------------------------------------------------- */
+/* Contract rule versions (#221) — human-attested facts, never auto-derived   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The only scope the rules endpoint accepts. Both fields are sent **only when the
+ * caller actually provided them**: the strict `settlementRuleListQuerySchema`
+ * would reject anything else, and the client must not invent a default community.
+ */
+export interface SettlementRuleListQuery {
+  communityId?: string
+  mappingId?: string
+}
+
+/** Party keys inside a rule's `ratesBps`; wording matches the party registry. */
+export const SETTLEMENT_RULE_PARTY_KEY_LABELS: Record<
+  'seller' | 'sanchuang' | 'guangdian',
+  string
+> = {
+  seller: '商品销售商户',
+  sanchuang: '三创主体',
+  guangdian: '广电主体',
+}
+
+/** Who bears the payment-processor fee. `none` means a zero-fee contract. */
+export const SETTLEMENT_PROCESSOR_FEE_OWNER_LABELS: Record<
+  'none' | 'seller' | 'sanchuang' | 'guangdian',
+  string
+> = {
+  none: '无',
+  seller: '由销售商户承担',
+  sanchuang: '由三创承担',
+  guangdian: '由广电承担',
+}
+
+/**
+ * Read-only explanation of the policies the contract *fixes* (each is a zod
+ * literal). These are not editable options, so they are shown as descriptive
+ * sentences instead of controls. `feeBase` is the #166 receipt amount, never the
+ * order's registered value.
+ */
+export const SETTLEMENT_RULE_FIXED_POLICY_LABELS: {
+  feeBase: string
+  roundingPolicy: string
+  processorFeeRounding: string
+  reversalPolicy: string
+  partialRefundPolicy: string
+} = {
+  feeBase: '按实际到账金额计算（#166 收款凭据），不是订单金额',
+  roundingPolicy: '先向下取整分摊，剩余分币归指定主体',
+  processorFeeRounding: '手续费向下取整',
+  reversalPolicy: '整单冲正即阻断结算',
+  partialRefundPolicy: '不支持部分退款，一经出现即阻断',
+}
+
+/**
+ * GET /admin/settlement/rules — the approved rule versions, newest first as the
+ * server returns them.
+ *
+ * A version list is history, not a single "current rate": the page must not pick
+ * one row and present it as the applicable rule for every order. An empty list is
+ * a real 「尚未登记」 answer and is returned as `[]`; a failed request throws, so a
+ * transport error can never look like an empty rule set.
+ */
+export async function listSettlementRuleVersions(
+  query: SettlementRuleListQuery = {},
+  signal?: AbortSignal,
+): Promise<SettlementRuleVersion[]> {
+  const communityId = query.communityId?.trim()
+  const mappingId = query.mappingId?.trim()
+  const payload = await requestLocalJson(
+    withQuery(`/api${LEDGER_ROUTES.adminSettlementRules}`, {
+      communityId: communityId ? communityId : undefined,
+      mappingId: mappingId ? mappingId : undefined,
+    }),
+    { signal },
+  )
+  const parsed = parsePayload(settlementRuleListResponseSchema, payload, '合同规则版本列表')
+  return parsed.items
+}
+
+/**
+ * POST /admin/settlement/rules — append one approved contract version.
+ *
+ * The shared `createSettlementRuleRequestSchema` is parsed first, so these are
+ * rejected **before any request leaves the browser**: rates that do not sum to
+ * exactly 10,000 bps, `effectiveTo < effectiveFrom`, `approvalOn > effectiveFrom`,
+ * and a processor fee that disagrees with its owner (`0` ⇔ `none`).
+ *
+ * The client never fills a default rate and never sets `version` /
+ * `approvalStatus` / `approvedByUserId` / `approvedAt`: the request contract has
+ * no such fields, and the server's `201` is the single source of truth. Overlapping
+ * periods or an invalid mapping surface as a real `409` that keeps its code and
+ * message.
+ */
+export async function createSettlementRuleVersion(
+  csrfToken: string,
+  request: CreateSettlementRuleRequest,
+): Promise<SettlementRuleVersion> {
+  const body = createSettlementRuleRequestSchema.parse(request)
+  const payload = await requestLocalJson(`/api${LEDGER_ROUTES.adminSettlementRules}`, {
+    method: 'POST',
+    csrfToken,
+    body,
+  })
+  return parsePayload(settlementRuleVersionSchema, payload, '合同规则版本创建结果')
 }
