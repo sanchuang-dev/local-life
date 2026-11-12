@@ -1,12 +1,21 @@
 import {
   LEDGER_ROUTES,
+  confirmSettlementOrderPartyRequestSchema,
+  createSettlementMappingRequestSchema,
   createSettlementPartyRequestSchema,
+  settlementMappingListResponseSchema,
+  settlementMappingSchema,
+  settlementOrderPartyResponseSchema,
+  settlementOrderPartySnapshotSchema,
   settlementPartyListResponseSchema,
   settlementPartySchema,
+  type CreateSettlementMappingRequest,
   type CreateSettlementPartyRequest,
+  type SettlementMapping,
+  type SettlementOrderPartySnapshot,
   type SettlementParty,
 } from '@sanchuang-dev/local-life-contracts'
-import { parsePayload, requestLocalJson, withQuery } from './localApi'
+import { fillRoute, parsePayload, requestLocalJson, withQuery } from './localApi'
 
 /**
  * Back-office transport for real settlement parties (LL-SET-009A / #219, API #183).
@@ -14,6 +23,14 @@ import { parsePayload, requestLocalJson, withQuery } from './localApi'
  * 「结算主体」是**真实存在的法人主体**（销售商户 / 三创主体 / 广电主体）的登记，
  * 不是结算规则，也不是应付金额：本模块只做传输与共享契约解析，不做页面，也不
  * 计算任何分账、应付或费率。
+ *
+ * 「商户映射」（LL-SET-009B / #220）是「商品 → 三方主体」的**版本化记录**：
+ * 新增一条即产生一个新版本，过去已写入的映射与其 `effectiveFrom`/`effectiveTo`
+ * 期间原样保留，本客户端从不回写或覆盖历史版本。
+ *
+ * 关键边界：**保存映射不会自动确认任何历史订单。** 订单的销售商户归属必须是运营
+ * 人员对具体订单的显式确认（`confirmSettlementOrderParty`），并在服务端留下不可变
+ * 的 `settlementOrderPartySnapshot`；映射更新不能回溯补写历史订单的归属。
  *
  * 硬规则：
  *
@@ -96,4 +113,128 @@ export async function createSettlementParty(
   })
   // The success body is one party (HTTP 201), not a list.
   return parsePayload(settlementPartySchema, payload, '结算主体创建结果')
+}
+
+/* -------------------------------------------------------------------------- */
+/* Merchant mappings (#220) — versioned product → party records               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * GET /admin/settlement/mappings — every mapping, optionally for one community.
+ *
+ * The same scope rule as the party list applies: omitting `communityId` is the
+ * admin 「全部」 query, and an operator's own scope is applied server-side. The
+ * list is a history: several rows may exist for the same product with different
+ * periods, so the caller must not collapse them into one "current" row.
+ */
+export async function listSettlementMappings(
+  filters: SettlementPartyListFilters = {},
+  signal?: AbortSignal,
+): Promise<SettlementMapping[]> {
+  const communityId = filters.communityId?.trim()
+  const payload = await requestLocalJson(
+    withQuery(`/api${LEDGER_ROUTES.adminSettlementMappings}`, {
+      communityId: communityId ? communityId : undefined,
+    }),
+    { signal },
+  )
+  const parsed = parsePayload(settlementMappingListResponseSchema, payload, '商户映射列表')
+  return parsed.items
+}
+
+/**
+ * POST /admin/settlement/mappings — append one mapping version.
+ *
+ * This never updates or deletes an existing version: a correction is a new row
+ * with its own period. The shared contract rejects `effectiveTo < effectiveFrom`
+ * before the request leaves the browser, and the server rejects unverified or
+ * role-mismatched parties with a real `409` that keeps its code/message.
+ *
+ * Saving a mapping does **not** confirm any existing order's seller; that only
+ * happens through {@link confirmSettlementOrderParty}.
+ */
+export async function createSettlementMapping(
+  csrfToken: string,
+  request: CreateSettlementMappingRequest,
+): Promise<SettlementMapping> {
+  const body = createSettlementMappingRequestSchema.parse(request)
+  const payload = await requestLocalJson(`/api${LEDGER_ROUTES.adminSettlementMappings}`, {
+    method: 'POST',
+    csrfToken,
+    body,
+  })
+  return parsePayload(settlementMappingSchema, payload, '商户映射创建结果')
+}
+
+/* -------------------------------------------------------------------------- */
+/* Per-order seller confirmation — an explicit, append-only human fact        */
+/* -------------------------------------------------------------------------- */
+
+/** The three server-computed order seller states; never derived on the client. */
+export type SettlementOrderPartySellerStatus =
+  | 'missing_seller'
+  | 'incomplete_parties'
+  | 'verified'
+
+/**
+ * The order-party read model.
+ *
+ * Declared structurally here because `@sanchuang-dev/local-life-contracts`
+ * exports `settlementOrderPartyResponseSchema` but **not** an inferred
+ * `SettlementOrderPartyResponse` type. The shape mirrors
+ * `settlementOrderPartyResponseSchema` exactly, and every response is still
+ * parsed by that shared schema in {@link readSettlementOrderParty}, so this
+ * declaration cannot drift into a second source of truth.
+ */
+export interface SettlementOrderPartyResponse {
+  orderId: string
+  sellerStatus: SettlementOrderPartySellerStatus
+  snapshot: SettlementOrderPartySnapshot | null
+}
+
+/**
+ * GET /admin/settlement/orders/:orderId/party — the confirmed seller fact, if any.
+ *
+ * `snapshot: null` is the server's 「尚无归属确认」 answer and always comes with
+ * `missing_seller`; it must be rendered as-is. The client never fabricates an
+ * empty snapshot, never backfills one from the product's current mapping, and
+ * never treats a failed parse as 「未确认」.
+ */
+export async function readSettlementOrderParty(
+  orderId: string,
+  signal?: AbortSignal,
+): Promise<SettlementOrderPartyResponse> {
+  const payload = await requestLocalJson(
+    `/api${fillRoute(LEDGER_ROUTES.adminSettlementOrderParty, ':orderId', orderId)}`,
+    { signal },
+  )
+  return parsePayload(settlementOrderPartyResponseSchema, payload, '订单销售商户归属')
+}
+
+/** The human must name the source document they checked; no implicit default. */
+export type ConfirmSettlementOrderPartyRequest = {
+  mappingId: string
+  confirmationRef: string
+}
+
+/**
+ * POST /admin/settlement/orders/:orderId/party — freeze the seller identity.
+ *
+ * CSRF is mandatory even though the path template is shared with the GET: the
+ * server rejects a write without `x-csrf-token`. The `201` body is the snapshot
+ * object alone (no `sellerStatus`); a `409` (order not verified, or the mapping
+ * does not match the order/business date) bubbles up unchanged and is never
+ * retried as a success.
+ */
+export async function confirmSettlementOrderParty(
+  csrfToken: string,
+  orderId: string,
+  request: ConfirmSettlementOrderPartyRequest,
+): Promise<SettlementOrderPartySnapshot> {
+  const body = confirmSettlementOrderPartyRequestSchema.parse(request)
+  const payload = await requestLocalJson(
+    `/api${fillRoute(LEDGER_ROUTES.adminSettlementOrderParty, ':orderId', orderId)}`,
+    { method: 'POST', csrfToken, body },
+  )
+  return parsePayload(settlementOrderPartySnapshotSchema, payload, '订单销售商户确认结果')
 }

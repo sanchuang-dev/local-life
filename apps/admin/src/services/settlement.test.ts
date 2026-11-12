@@ -1,14 +1,22 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
+  CreateSettlementMappingRequest,
   CreateSettlementPartyRequest,
+  SettlementMapping,
+  SettlementOrderPartySnapshot,
   SettlementParty,
 } from '@sanchuang-dev/local-life-contracts'
 import { LocalApiError } from './localApi'
 import {
   SETTLEMENT_PARTY_ROLE_LABELS,
+  confirmSettlementOrderParty,
+  createSettlementMapping,
   createSettlementParty,
+  listSettlementMappings,
   listSettlementParties,
+  readSettlementOrderParty,
+  type SettlementOrderPartyResponse,
 } from './settlement'
 
 /**
@@ -281,5 +289,316 @@ describe('createSettlementParty', () => {
     expect(failure).toBeInstanceOf(LocalApiError)
     expect((failure as LocalApiError).status).toBe(0)
     expect((failure as LocalApiError).code).toBe('network_error')
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* #220 — merchant mappings and per-order seller confirmation                 */
+/* -------------------------------------------------------------------------- */
+
+const PRODUCT_ID = '123e4567-e89b-42d3-a456-426614174201'
+const MAPPING_ID = '123e4567-e89b-42d3-a456-426614174401'
+const SELLER_PARTY_ID = '123e4567-e89b-42d3-a456-426614174501'
+const SANCHUANG_PARTY_ID = '123e4567-e89b-42d3-a456-426614174502'
+const GUANGDIAN_PARTY_ID = '123e4567-e89b-42d3-a456-426614174503'
+const ORDER_ID = '123e4567-e89b-42d3-a456-426614174101'
+
+const MAPPING: SettlementMapping = {
+  id: MAPPING_ID,
+  communityId: COMMUNITY_ID,
+  productId: PRODUCT_ID,
+  sellerPartyId: SELLER_PARTY_ID,
+  sanchuangPartyId: SANCHUANG_PARTY_ID,
+  guangdianPartyId: GUANGDIAN_PARTY_ID,
+  agreementRef: '合作协议 2026-001',
+  effectiveFrom: '2026-11-01',
+  effectiveTo: '2026-12-31',
+  createdByUserId: USER_ID,
+  createdAt: '2026-11-01T01:30:00.000Z',
+}
+
+const CREATE_MAPPING_REQUEST: CreateSettlementMappingRequest = {
+  communityId: COMMUNITY_ID,
+  productId: PRODUCT_ID,
+  sellerPartyId: SELLER_PARTY_ID,
+  sanchuangPartyId: SANCHUANG_PARTY_ID,
+  guangdianPartyId: GUANGDIAN_PARTY_ID,
+  agreementRef: '合作协议 2026-001',
+  effectiveFrom: '2026-11-01',
+  effectiveTo: '2026-12-31',
+}
+
+const CONFIRMED_SNAPSHOT: SettlementOrderPartySnapshot = {
+  orderId: ORDER_ID,
+  mappingId: MAPPING_ID,
+  sellerPartyId: SELLER_PARTY_ID,
+  sanchuangPartyId: SANCHUANG_PARTY_ID,
+  guangdianPartyId: GUANGDIAN_PARTY_ID,
+  agreementRef: '合作协议 2026-001',
+  confirmationRef: '订单截图与人工核对 2026-11-05',
+  confirmedByUserId: USER_ID,
+  confirmedAt: '2026-11-05T03:00:00.000Z',
+}
+
+describe('listSettlementMappings', () => {
+  it('GET 无筛选：只请求 /api/admin/settlement/mappings，不带 query，返回解析后的 items', async () => {
+    stubJson(200, { items: [MAPPING] })
+
+    const mappings = await listSettlementMappings()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const { url, init, headers } = lastCall()
+    expect(url).toBe('/api/admin/settlement/mappings')
+    expect(init.method).toBe('GET')
+    expect(init.credentials).toBe('include')
+    expect(headers['x-csrf-token']).toBeUndefined()
+    expect(init.body).toBeUndefined()
+    expect(mappings).toEqual([MAPPING])
+  })
+
+  it('GET 带 communityId：query 正确编码，且只有一个参数', async () => {
+    stubJson(200, { items: [MAPPING] })
+
+    const mappings = await listSettlementMappings({ communityId: COMMUNITY_ID })
+
+    const { url } = lastCall()
+    expect(url).toBe(
+      `/api/admin/settlement/mappings?communityId=${encodeURIComponent(COMMUNITY_ID)}`,
+    )
+    expect(new URL(url, 'http://localhost').searchParams.getAll('communityId')).toEqual([
+      COMMUNITY_ID,
+    ])
+    expect(mappings).toEqual([MAPPING])
+  })
+
+  it('映射是版本化历史：同一商品的多条记录原样返回，不合并成「当前版本」', async () => {
+    const older: SettlementMapping = {
+      ...MAPPING,
+      id: '123e4567-e89b-42d3-a456-426614174402',
+      agreementRef: '合作协议 2025-009',
+      effectiveFrom: '2025-01-01',
+      effectiveTo: '2025-12-31',
+    }
+    stubJson(200, { items: [older, MAPPING] })
+
+    const mappings = await listSettlementMappings()
+
+    expect(mappings.map((row) => row.id)).toEqual([older.id, MAPPING.id])
+  })
+
+  it('响应不符合契约：抛 invalid_response，不返回空列表', async () => {
+    stubJson(200, {})
+
+    const failure = await listSettlementMappings().catch((cause: unknown) => cause)
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).code).toBe('invalid_response')
+  })
+})
+
+describe('createSettlementMapping', () => {
+  it('POST：带 CSRF、body 等于契约字段，201 单对象解析成功', async () => {
+    stubJson(201, MAPPING)
+
+    const created = await createSettlementMapping('csrf-token-mapping', CREATE_MAPPING_REQUEST)
+
+    const { url, init, headers } = lastCall()
+    expect(url).toBe('/api/admin/settlement/mappings')
+    expect(init.method).toBe('POST')
+    expect(headers['x-csrf-token']).toBe('csrf-token-mapping')
+    expect(headers['content-type']).toBe('application/json')
+    expect(JSON.parse(String(init.body))).toEqual(CREATE_MAPPING_REQUEST)
+    expect(created).toEqual(MAPPING)
+  })
+
+  it('409 冲突 envelope：status/code/message 冒泡，不伪造成功', async () => {
+    stubJson(409, {
+      error: { code: 'conflict', message: '指定主体尚未凭资料完成核验或类型不匹配' },
+    })
+
+    const failure = await createSettlementMapping('csrf-token-mapping', CREATE_MAPPING_REQUEST).catch(
+      (cause: unknown) => cause,
+    )
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).status).toBe(409)
+    expect((failure as LocalApiError).code).toBe('conflict')
+    expect((failure as LocalApiError).message).toBe('指定主体尚未凭资料完成核验或类型不匹配')
+  })
+
+  it('effectiveTo < effectiveFrom：共享契约本地拒绝，且不发请求', async () => {
+    const invalid: CreateSettlementMappingRequest = {
+      ...CREATE_MAPPING_REQUEST,
+      effectiveFrom: '2026-12-31',
+      effectiveTo: '2026-11-01',
+    }
+
+    const failure = await createSettlementMapping('csrf-token-mapping', invalid).catch(
+      (cause: unknown) => cause,
+    )
+
+    expect(failure).not.toBeInstanceOf(LocalApiError)
+    expect(failure).toBeInstanceOf(Error)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('201 返回列表形状：抛 invalid_response，不当作创建成功', async () => {
+    stubJson(201, { items: [MAPPING] })
+
+    const failure = await createSettlementMapping('csrf-token-mapping', CREATE_MAPPING_REQUEST).catch(
+      (cause: unknown) => cause,
+    )
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).code).toBe('invalid_response')
+  })
+})
+
+describe('readSettlementOrderParty', () => {
+  it('missing_seller：snapshot 原样为 null，不补默认快照', async () => {
+    const response: SettlementOrderPartyResponse = {
+      orderId: ORDER_ID,
+      sellerStatus: 'missing_seller',
+      snapshot: null,
+    }
+    stubJson(200, response)
+
+    const party = await readSettlementOrderParty(ORDER_ID)
+
+    expect(lastCall().url).toBe(`/api/admin/settlement/orders/${ORDER_ID}/party`)
+    expect(lastCall().init.method).toBe('GET')
+    expect(party).toEqual(response)
+    expect(party.snapshot).toBeNull()
+  })
+
+  it('incomplete_parties：snapshot 存在但承运主体缺失，原样透出（不补全）', async () => {
+    const incomplete: SettlementOrderPartyResponse = {
+      orderId: ORDER_ID,
+      sellerStatus: 'incomplete_parties',
+      snapshot: { ...CONFIRMED_SNAPSHOT, guangdianPartyId: null },
+    }
+    stubJson(200, incomplete)
+
+    const party = await readSettlementOrderParty(ORDER_ID)
+
+    expect(party.sellerStatus).toBe('incomplete_parties')
+    expect(party.snapshot?.guangdianPartyId).toBeNull()
+    expect(party.snapshot).toEqual(incomplete.snapshot)
+  })
+
+  it('verified：透出完整 snapshot 字段', async () => {
+    const verified: SettlementOrderPartyResponse = {
+      orderId: ORDER_ID,
+      sellerStatus: 'verified',
+      snapshot: CONFIRMED_SNAPSHOT,
+    }
+    stubJson(200, verified)
+
+    const party = await readSettlementOrderParty(ORDER_ID)
+
+    expect(party).toEqual(verified)
+    expect(party.snapshot).toEqual(CONFIRMED_SNAPSHOT)
+  })
+
+  it('orderId 在路径中正确编码（fillRoute + encodeURIComponent）', async () => {
+    stubJson(200, { orderId: ORDER_ID, sellerStatus: 'missing_seller', snapshot: null })
+
+    await readSettlementOrderParty('order 1/2?x=1')
+
+    expect(lastCall().url).toBe('/api/admin/settlement/orders/order%201%2F2%3Fx%3D1/party')
+    // The encoded id must not leak into a query string.
+    expect(lastCall().url).not.toContain('?x=1')
+  })
+
+  it('契约不符（未知 sellerStatus）：抛 invalid_response，不当作 missing_seller', async () => {
+    stubJson(200, { orderId: ORDER_ID, sellerStatus: 'pending', snapshot: null })
+
+    const failure = await readSettlementOrderParty(ORDER_ID).catch((cause: unknown) => cause)
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).code).toBe('invalid_response')
+  })
+
+  it('404 envelope：status 404 与 code 冒泡，不返回空归属', async () => {
+    stubJson(404, { error: { code: 'not_found', message: '本地订单不存在' } })
+
+    const failure = await readSettlementOrderParty(ORDER_ID).catch((cause: unknown) => cause)
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).status).toBe(404)
+    expect((failure as LocalApiError).code).toBe('not_found')
+    expect((failure as LocalApiError).message).toBe('本地订单不存在')
+  })
+})
+
+describe('confirmSettlementOrderParty', () => {
+  const CONFIRM_REQUEST = {
+    mappingId: MAPPING_ID,
+    confirmationRef: '订单截图与人工核对 2026-11-05',
+  }
+
+  it('POST：路由填充 orderId、带 CSRF、body 为契约字段，201 snapshot 解析成功', async () => {
+    stubJson(201, CONFIRMED_SNAPSHOT)
+
+    const snapshot = await confirmSettlementOrderParty('csrf-token-confirm', ORDER_ID, CONFIRM_REQUEST)
+
+    const { url, init, headers } = lastCall()
+    expect(url).toBe(`/api/admin/settlement/orders/${ORDER_ID}/party`)
+    expect(init.method).toBe('POST')
+    expect(headers['x-csrf-token']).toBe('csrf-token-confirm')
+    expect(headers['content-type']).toBe('application/json')
+    expect(JSON.parse(String(init.body))).toEqual(CONFIRM_REQUEST)
+    expect(snapshot).toEqual(CONFIRMED_SNAPSHOT)
+    // The 201 body is the snapshot, not the { sellerStatus, snapshot } read model.
+    expect(snapshot).not.toHaveProperty('sellerStatus')
+  })
+
+  it('orderId 在 POST 路径中同样被编码，不会拼出额外 query', async () => {
+    stubJson(201, { ...CONFIRMED_SNAPSHOT, orderId: ORDER_ID })
+
+    await confirmSettlementOrderParty('csrf-token-confirm', 'order 3/4', CONFIRM_REQUEST)
+
+    expect(lastCall().url).toBe('/api/admin/settlement/orders/order%203%2F4/party')
+  })
+
+  it('409 冲突 envelope（订单未核验/映射不匹配）：status/code/message 冒泡', async () => {
+    stubJson(409, {
+      error: { code: 'conflict', message: '订单尚未业务核验，不允许确认商户归属' },
+    })
+
+    const failure = await confirmSettlementOrderParty(
+      'csrf-token-confirm',
+      ORDER_ID,
+      CONFIRM_REQUEST,
+    ).catch((cause: unknown) => cause)
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).status).toBe(409)
+    expect((failure as LocalApiError).code).toBe('conflict')
+    expect((failure as LocalApiError).message).toBe('订单尚未业务核验，不允许确认商户归属')
+  })
+
+  it('契约不符（缺少 snapshot 字段）：抛 invalid_response，不伪造成功', async () => {
+    stubJson(201, { orderId: ORDER_ID, mappingId: MAPPING_ID })
+
+    const failure = await confirmSettlementOrderParty(
+      'csrf-token-confirm',
+      ORDER_ID,
+      CONFIRM_REQUEST,
+    ).catch((cause: unknown) => cause)
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).code).toBe('invalid_response')
+  })
+
+  it('confirmationRef 少于 2 个字符：共享契约本地拒绝，且不发请求', async () => {
+    const failure = await confirmSettlementOrderParty('csrf-token-confirm', ORDER_ID, {
+      mappingId: MAPPING_ID,
+      confirmationRef: 'x',
+    }).catch((cause: unknown) => cause)
+
+    expect(failure).not.toBeInstanceOf(LocalApiError)
+    expect(failure).toBeInstanceOf(Error)
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })
