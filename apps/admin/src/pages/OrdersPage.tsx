@@ -108,6 +108,17 @@ function formatDateTime(iso: string | null | undefined): string {
   return DATE_TIME_FORMATTER.format(date).replace(/\//g, '-')
 }
 
+/** The attribution is frozen at registration; the console can only display it. */
+function describeSourceTeam(order: LocalOrderDetail): string {
+  if (!order.sourceTeam) return '不参与消费团'
+  const activityTitle = order.sourceActivity?.title ?? '来源活动'
+  const shortId =
+    order.sourceTeam.id.length > 8
+      ? `${order.sourceTeam.id.slice(0, 8)}…`
+      : order.sourceTeam.id
+  return `${activityTitle} · 团号 ${shortId}（已锁定）`
+}
+
 function formatPrice(cents: number): string {
   return `¥${(Math.round(cents) / 100).toFixed(2)}`
 }
@@ -666,6 +677,9 @@ function OrderConsole({ session }: { session: AuthenticatedSession }) {
                 </Descriptions.Item>
                 <Descriptions.Item label="来源活动">
                   {detail.sourceActivity ? detail.sourceActivity.title : '—'}
+                </Descriptions.Item>
+                <Descriptions.Item label="消费团归属">
+                  {describeSourceTeam(detail)}
                 </Descriptions.Item>
                 <Descriptions.Item label="居民备注">{detail.note ?? '—'}</Descriptions.Item>
                 <Descriptions.Item label="最近处理备注">

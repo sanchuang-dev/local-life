@@ -9,6 +9,7 @@ import {
   localOrderStatusLabels,
   localOrderStatusTone,
 } from '../components/life/localOrderLabels'
+import { describeOrderAttribution } from '../components/life/localOrderAttribution'
 import { useBackTarget } from '../hooks/useBackTarget'
 import { useMyLocalOrder } from '../hooks/useLocalOrders'
 import { useResidentAuth } from '../hooks/useResidentAuth'
@@ -53,6 +54,8 @@ function OrderDetailBody({ order }: { order: LocalOrderDetail }) {
       label: '登记方式',
       value: order.recordSource === 'resident' ? '居民自助登记' : '工作人员代录',
     },
+    { label: '来源活动', value: order.sourceActivity?.title ?? '—' },
+    { label: '消费团归属', value: describeOrderAttribution(order) },
   ]
 
   return (
