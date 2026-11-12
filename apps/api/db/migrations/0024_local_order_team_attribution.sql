@@ -39,6 +39,14 @@ BEGIN
 	-- attributed to?" ambiguous, so reject the half-filled pair outright.
 	SELECT RAISE(ABORT, 'local_orders source_team_id requires source_activity_id')
 	WHERE NEW.`source_activity_id` IS NULL;
+	-- A plain check-in activity is not a consumption reward campaign. Legacy
+	-- source-only orders remain permitted, but no team may be attributed here.
+	SELECT RAISE(ABORT, 'local_orders source_team_id requires a purchase reward plan')
+	WHERE NOT EXISTS (
+		SELECT 1 FROM `activities`
+		WHERE `activities`.`id` = NEW.`source_activity_id`
+			AND `activities`.`purchase_reward_plan_json` IS NOT NULL
+	);
 	-- The attribution must be a relation the resident already has, in the same
 	-- activity, joined no later than this order was created. Another resident's
 	-- team and another activity's team both fail here.
