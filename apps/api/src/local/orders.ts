@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, count, desc, eq, gte, inArray, or, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, or, sql, type SQL } from 'drizzle-orm'
 import {
   API_ERROR_CODES,
   LOCAL_ORDER_EVENT_SOURCE_TYPE,
@@ -426,6 +426,7 @@ function resolveSourceAttribution(
       communityId: activities.communityId,
       status: activities.status,
       endsAt: activities.endsAt,
+      purchaseRewardPlanJson: activities.purchaseRewardPlanJson,
     })
     .from(activities)
     .where(eq(activities.id, input.sourceActivityId))
@@ -446,6 +447,16 @@ function resolveSourceAttribution(
   }
 
   if (!input.sourceTeamId) return { activityId: activity.id, teamId: null }
+
+  // Source-only orders remain compatible; a *consumption team* must belong
+  // to an activity that actually promises a consumption reward.
+  if (activity.purchaseRewardPlanJson === null) {
+    throw new LocalError(
+      409,
+      API_ERROR_CODES.activityUnavailable,
+      '来源活动未配置消费组团奖励，不能绑定消费团',
+    )
+  }
 
   const team = db
     .select({ id: activityTeams.id, activityId: activityTeams.activityId })
@@ -743,6 +754,7 @@ export function listMyTeamOptions(
         eq(activityParticipations.userId, actor.userId),
         eq(activities.communityId, product.communityId),
         eq(activities.status, 'published'),
+        isNotNull(activities.purchaseRewardPlanJson),
         gte(activities.endsAt, now),
       ),
     )
