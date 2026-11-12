@@ -8,6 +8,7 @@ import {
   Empty,
   Form,
   Input,
+  InputNumber,
   Modal,
   Select,
   Space,
@@ -21,6 +22,7 @@ import type { ColumnsType } from 'antd/es/table'
 import type { Rule } from 'antd/es/form'
 import { useEffect, useState } from 'react'
 import type {
+  SettlementPaymentOverview,
   SettlementStatement,
   SettlementStatementDetail,
   SettlementStatementLine,
@@ -33,13 +35,18 @@ import { useAdminAuth } from '../app/auth-context'
 import { formatCents, formatDateTime } from '../services/ledger'
 import { describeLocalError, isLocalApiError } from '../services/localApi'
 import {
+  SETTLEMENT_BENEFICIARY_STATE_LABELS,
+  SETTLEMENT_PARTY_ROLE_LABELS,
+  SETTLEMENT_PAYMENT_RECORD_STATE_LABELS,
   SETTLEMENT_PAYMENT_STATE_LABELS,
   SETTLEMENT_STATEMENT_STATUS_LABELS,
   createSettlementStatement,
   downloadSettlementCsv,
+  getSettlementPaymentOverview,
   getSettlementStatement,
   listSettlementStatements,
   lockSettlementStatement,
+  recordSettlementPayment,
   reviewSettlementStatement,
 } from '../services/settlement'
 import './ledger.css'
@@ -69,6 +76,28 @@ interface DraftFormValues {
 
 interface ActionFormValues {
   evidenceRef?: string
+}
+
+interface PaymentFormValues {
+  beneficiaryPartyId?: string
+  amountCents?: number
+  paidAt?: string
+  proofRefMasked?: string
+}
+
+/** A stable UUID for one registration intent; regenerated only on success or reset. */
+function newIdempotencyKey(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  const hex = () => Math.floor(Math.random() * 0x10000).toString(16).padStart(4, '0')
+  return `${hex()}${hex()}-${hex()}-4${hex().slice(1)}-8${hex().slice(1)}-${hex()}${hex()}${hex()}`
+}
+
+/** The contract refuses 12+ consecutive digits; the page mirrors that message. */
+const LONG_DIGIT_MESSAGE = '不得填写完整银行卡号、账号或其他长数字凭据'
+function hasLongDigitRun(value: string): boolean {
+  return /\d{12,}/u.test(value.normalize('NFKC'))
 }
 
 /** Contract-trimmed evidence reference: required, 2-200 characters. */
@@ -259,10 +288,48 @@ export function SettlementStatementPanel() {
     }
   }, [detailId, detailToken])
 
+  /* ------------------------- offline payment overview ---------------------- */
+
+  const [paymentOverview, setPaymentOverview] = useState<SettlementPaymentOverview | null>(null)
+  const [paymentLoading, setPaymentLoading] = useState(false)
+  const [paymentError, setPaymentError] = useState<Error | null>(null)
+  const [paymentToken, setPaymentToken] = useState(0)
+
+  useEffect(() => {
+    if (detailId === null) return
+    // Locked statements pre-load the payment overview as soon as the Drawer opens;
+    // for any other status it is read when the 付款凭据 tab is first opened. This
+    // keeps a detail-only read from issuing a payment request nobody asked for.
+    const statementLocked = detail?.statement.status === 'locked'
+    if (detailTab !== 'payments' && !statementLocked) return
+    let active = true
+    const controller = new AbortController()
+    setPaymentLoading(true)
+    setPaymentError(null)
+    setPaymentOverview(null)
+    getSettlementPaymentOverview(detailId, controller.signal)
+      .then((result) => {
+        if (active) setPaymentOverview(result)
+      })
+      .catch((cause: unknown) => {
+        if (!active || controller.signal.aborted) return
+        setPaymentOverview(null)
+        setPaymentError(cause instanceof Error ? cause : new Error('付款凭据总览加载失败'))
+      })
+      .finally(() => {
+        if (active) setPaymentLoading(false)
+      })
+    return () => {
+      active = false
+      controller.abort()
+    }
+  }, [detailId, paymentToken, detailTab, detail?.statement.status])
+
   const openDetail = (row: SettlementStatement) => {
     setDetailRow(row)
     setDetailId(row.id)
     setDetailTab('lines')
+    setPaymentError(null)
   }
 
   const closeDetail = () => {
@@ -274,6 +341,8 @@ export function SettlementStatementPanel() {
     setActionStatement(null)
     setActionError(null)
     setExportError(null)
+    setPaymentOverview(null)
+    setPaymentError(null)
   }
 
   /* ---------------------- independent review / one-way lock ---------------- */
@@ -328,6 +397,9 @@ export function SettlementStatementPanel() {
           ? '复核已提交：快照未被锁定，也不代表已付款。'
           : '结算单已锁定：快照已冻结，锁定不等于已付款。',
       )
+      // A lock changes whether payment evidence may be registered, so the
+      // payment overview is re-read from the server as well.
+      setPaymentToken((value) => value + 1)
       setReloadToken((value) => value + 1)
     } catch (cause: unknown) {
       setActionError(
@@ -739,7 +811,21 @@ export function SettlementStatementPanel() {
                 onExport={(kind) => void exportCsv(kind)}
               />
             ) : null}
-            <StatementDetail detail={detail} tab={detailTab} onTabChange={setDetailTab} />
+            <StatementDetail
+              detail={detail}
+              tab={detailTab}
+              onTabChange={setDetailTab}
+              paymentOverview={paymentOverview}
+              paymentLoading={paymentLoading}
+              paymentError={paymentError}
+              onPaymentRetry={() => setPaymentToken((value) => value + 1)}
+              isAdmin={isAdmin}
+              csrfToken={session.csrfToken}
+              onPaymentRecorded={(updated) => {
+                setPaymentOverview(updated)
+                setReloadToken((value) => value + 1)
+              }}
+            />
           </Space>
         )}
       </Drawer>
@@ -938,10 +1024,24 @@ function StatementDetail({
   detail,
   tab,
   onTabChange,
+  paymentOverview,
+  paymentLoading,
+  paymentError,
+  onPaymentRetry,
+  isAdmin,
+  csrfToken,
+  onPaymentRecorded,
 }: {
   detail: SettlementStatementDetail
   tab: string
   onTabChange: (key: string) => void
+  paymentOverview: SettlementPaymentOverview | null
+  paymentLoading: boolean
+  paymentError: Error | null
+  onPaymentRetry: () => void
+  isAdmin: boolean
+  csrfToken: string
+  onPaymentRecorded: (overview: SettlementPaymentOverview) => void
 }) {
   const { statement } = detail
   return (
@@ -1005,6 +1105,22 @@ function StatementDetail({
             key: 'disputes',
             label: `锁后争议（${detail.postLockDisputes.length}）`,
             children: <DisputeList disputes={detail.postLockDisputes} />,
+          },
+          {
+            key: 'payments',
+            label: `付款凭据（${paymentOverview?.records.length ?? 0}）`,
+            children: (
+              <PaymentTab
+                statement={statement}
+                overview={paymentOverview}
+                loading={paymentLoading}
+                error={paymentError}
+                onRetry={onPaymentRetry}
+                isAdmin={isAdmin}
+                csrfToken={csrfToken}
+                onRecorded={onPaymentRecorded}
+              />
+            ),
           },
         ]}
       />
@@ -1241,6 +1357,411 @@ function DisputeList({
           </ul>
         </section>
       ))}
+    </Space>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/* Payment evidence: overview + offline proof registration (#225)              */
+/* -------------------------------------------------------------------------- */
+
+const PAYMENT_EVENT_KIND_LABELS = {
+  recorded: '登记',
+  verified: '核验',
+  disputed: '争议',
+} as const
+
+const beneficiaryColumns: ColumnsType<SettlementPaymentOverview['beneficiaries'][number]> = [
+  {
+    title: '受款人',
+    key: 'legalName',
+    render: (_value, row) => <Typography.Text strong>{row.legalName}</Typography.Text>,
+  },
+  {
+    title: '角色',
+    key: 'role',
+    render: (_value, row) => SETTLEMENT_PARTY_ROLE_LABELS[row.role],
+  },
+  {
+    title: '登记号',
+    key: 'registryRef',
+    render: (_value, row) => (
+      <Typography.Text className="ledger-cell-mono">{row.registryRef}</Typography.Text>
+    ),
+  },
+  {
+    title: '核验依据',
+    key: 'verificationRef',
+    render: (_value, row) => row.verificationRef ?? '未提供',
+  },
+  {
+    title: '应付（服务端）',
+    key: 'payableCents',
+    render: (_value, row) => formatCents(row.payableCents),
+  },
+  {
+    title: '已登记（服务端）',
+    key: 'recordedCents',
+    render: (_value, row) => formatCents(row.recordedCents),
+  },
+  {
+    title: '核销（服务端）',
+    key: 'verifiedCents',
+    render: (_value, row) => formatCents(row.verifiedCents),
+  },
+  {
+    title: '状态',
+    key: 'state',
+    render: (_value, row) => SETTLEMENT_BENEFICIARY_STATE_LABELS[row.state],
+  },
+]
+
+const paymentRecordColumns: ColumnsType<SettlementPaymentOverview['records'][number]> = [
+  {
+    title: '金额',
+    key: 'amountCents',
+    render: (_value, row) => formatCents(row.amountCents),
+  },
+  {
+    title: '付款时间',
+    key: 'paidAt',
+    render: (_value, row) => formatDateTime(row.paidAt),
+  },
+  {
+    title: '脱敏凭据引用',
+    key: 'proofRefMasked',
+    render: (_value, row) => (
+      <Typography.Text className="ledger-cell-mono">{row.proofRefMasked}</Typography.Text>
+    ),
+  },
+  {
+    title: '状态',
+    key: 'state',
+    render: (_value, row) => SETTLEMENT_PAYMENT_RECORD_STATE_LABELS[row.state],
+  },
+  {
+    title: '登记人',
+    key: 'recorderUserId',
+    render: (_value, row) => (
+      <Typography.Text className="ledger-cell-mono" style={{ fontSize: 12 }}>
+        {row.recorderUserId}
+      </Typography.Text>
+    ),
+  },
+  {
+    title: '登记时间',
+    key: 'recordedAt',
+    render: (_value, row) => formatDateTime(row.recordedAt),
+  },
+]
+
+function PaymentTab({
+  statement,
+  overview,
+  loading,
+  error,
+  onRetry,
+  isAdmin,
+  csrfToken,
+  onRecorded,
+}: {
+  statement: SettlementStatement
+  overview: SettlementPaymentOverview | null
+  loading: boolean
+  error: Error | null
+  onRetry: () => void
+  isAdmin: boolean
+  csrfToken: string
+  onRecorded: (overview: SettlementPaymentOverview) => void
+}) {
+  const { message } = AntdApp.useApp()
+  const [form] = Form.useForm<PaymentFormValues>()
+  // One UUID per registration intent. It survives failed submits and is only
+  // replaced after a success or an explicit 「新建凭据」.
+  const [idempotencyKey, setIdempotencyKey] = useState(() => newIdempotencyKey())
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  const startNewIntent = () => {
+    if (submitting) return
+    setIdempotencyKey(newIdempotencyKey())
+    form.resetFields()
+    setSubmitError(null)
+  }
+
+  const submit = async (values: PaymentFormValues) => {
+    if (submitting || !isAdmin || statement.status !== 'locked') return
+    const beneficiaryPartyId = values.beneficiaryPartyId
+    const amountCents = values.amountCents
+    const paidAtRaw = (values.paidAt ?? '').trim()
+    const proofRefMasked = (values.proofRefMasked ?? '').trim()
+    if (!beneficiaryPartyId || amountCents === undefined || !paidAtRaw || !proofRefMasked) {
+      return
+    }
+    const paidAt = new Date(paidAtRaw)
+    if (Number.isNaN(paidAt.getTime())) {
+      setSubmitError('付款时间格式不正确')
+      return
+    }
+    setSubmitting(true)
+    setSubmitError(null)
+    try {
+      const updated = await recordSettlementPayment(csrfToken, statement.id, {
+        beneficiaryPartyId,
+        amountCents,
+        paidAt: paidAt.toISOString(),
+        proofRefMasked,
+        idempotencyKey,
+      })
+      // The server returns the whole overview: refresh from it and only now
+      // start a new intent (new idempotency key + cleared form). The record is
+      // NOT marked verified locally.
+      onRecorded(updated)
+      setIdempotencyKey(newIdempotencyKey())
+      form.resetFields()
+      message.success('已登记，待复核：登记付款凭据 ≠ 复核核销，也不触发任何转账。')
+    } catch (cause: unknown) {
+      // Keep the same key and the entered values for an identical retry.
+      setSubmitError(describeLocalError(cause, '登记付款凭据失败'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Space orientation="vertical" size={12} style={{ width: '100%' }}>
+      <Alert
+        type="info"
+        showIcon
+        title="登记付款凭据 ≠ 复核核销"
+        description="登记只录入真实线下付款凭据，不触发任何转账，也不等于已核销；金额与受款人必须来自真实线下付款凭据。核验与争议由后续卡提供，本视图不提供这些入口。"
+      />
+
+      {error ? (
+        <Alert
+          type="error"
+          showIcon
+          title="付款凭据总览加载失败"
+          description={describeLocalError(error, '付款凭据总览加载失败')}
+          action={
+            <Button size="small" onClick={onRetry}>
+              重试
+            </Button>
+          }
+        />
+      ) : loading || overview === null ? (
+        <div className="ledger-candidate-loading" aria-live="polite">
+          <Spin />
+          <Typography.Text type="secondary">正在读取付款凭据总览…</Typography.Text>
+        </div>
+      ) : (
+        <>
+          <section className="local-section" aria-label="付款总览">
+            <Descriptions size="small" column={1} bordered>
+              <Descriptions.Item label="总览状态">
+                {SETTLEMENT_PAYMENT_STATE_LABELS[overview.state]}
+              </Descriptions.Item>
+              <Descriptions.Item label="应付（服务端）">
+                {formatCents(overview.payableCents)}
+              </Descriptions.Item>
+              <Descriptions.Item label="已登记（服务端）">
+                {formatCents(overview.recordedCents)}
+              </Descriptions.Item>
+              <Descriptions.Item label="核销（服务端）">
+                {formatCents(overview.verifiedCents)}
+              </Descriptions.Item>
+            </Descriptions>
+          </section>
+
+          <section className="local-section" aria-label="受款人">
+            <Typography.Text strong>受款人（真实登记主体）</Typography.Text>
+            <Table
+              rowKey="partyId"
+              size="small"
+              pagination={false}
+              scroll={{ x: 'max-content' }}
+              dataSource={overview.beneficiaries}
+              columns={beneficiaryColumns}
+              style={{ marginTop: 8 }}
+              locale={{
+                emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无受款人" />,
+              }}
+            />
+          </section>
+
+          <section className="local-section" aria-label="付款凭据记录">
+            <Typography.Text strong>已登记付款凭据</Typography.Text>
+            <Table
+              rowKey="id"
+              size="small"
+              pagination={false}
+              scroll={{ x: 'max-content' }}
+              dataSource={overview.records}
+              columns={paymentRecordColumns}
+              style={{ marginTop: 8 }}
+              locale={{
+                emptyText: (
+                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="尚未登记付款凭据" />
+                ),
+              }}
+            />
+          </section>
+
+          <section className="local-section" aria-label="付款事件">
+            <Typography.Text strong>付款事件（按 sequence 只读）</Typography.Text>
+            {overview.events.length === 0 ? (
+              <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+                暂无付款事件。
+              </Typography.Paragraph>
+            ) : (
+              <Space orientation="vertical" size={8} style={{ width: '100%', marginTop: 8 }}>
+                {[...overview.events]
+                  .sort((left, right) => left.sequence - right.sequence)
+                  .map((event) => (
+                    <div key={event.id} className="ledger-diff-finding">
+                      <Tag>{PAYMENT_EVENT_KIND_LABELS[event.kind]}</Tag>
+                      <span>sequence {event.sequence}</span>
+                      <Typography.Text className="ledger-cell-mono">
+                        {event.actorUserId}
+                      </Typography.Text>
+                      <span className="ledger-diff-finding-detail">
+                        {event.evidenceRef ?? '服务端未返回依据'} ·{' '}
+                        {SETTLEMENT_PAYMENT_RECORD_STATE_LABELS[event.state]} ·{' '}
+                        {formatDateTime(event.createdAt)}
+                      </span>
+                    </div>
+                  ))}
+              </Space>
+            )}
+          </section>
+
+          {!isAdmin ? (
+            <Alert
+              type="info"
+              showIcon
+              title="运营员只读"
+              description="登记线下付款凭据仅管理员可用；服务端按角色强制校验，本视图不提供登记、核验或争议入口。"
+            />
+          ) : statement.status !== 'locked' ? (
+            <Alert
+              type="warning"
+              showIcon
+              title="只有已锁定的结算单才能登记线下付款凭据"
+              description="草案或已复核但未锁定的结算单只能查看付款总览；锁定后快照冻结，才允许登记线下凭据。"
+            />
+          ) : (
+            <section className="local-section" aria-label="登记付款凭据">
+              <Typography.Text strong>登记线下付款凭据（仅管理员）</Typography.Text>
+              <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
+                这里只登记真实线下付款凭据，不发起转账；登记后记录为「待复核」，需由独立管理员核验，页面不会把登记显示成已核销。
+              </Typography.Paragraph>
+              {submitError ? (
+                <Alert
+                  type="error"
+                  showIcon
+                  title="凭据未登记"
+                  description={submitError}
+                  style={{ marginBottom: 12 }}
+                />
+              ) : null}
+              <Form<PaymentFormValues>
+                form={form}
+                layout="vertical"
+                onFinish={(values) => void submit(values)}
+              >
+                <Form.Item
+                  name="beneficiaryPartyId"
+                  label="受款人"
+                  rules={[{ required: true, message: '请选择受款人' }]}
+                >
+                  <Select
+                    placeholder="请选择受款人"
+                    options={overview.beneficiaries.map((beneficiary) => ({
+                      value: beneficiary.partyId,
+                      label: `${beneficiary.legalName} · ${SETTLEMENT_PARTY_ROLE_LABELS[beneficiary.role]}`,
+                    }))}
+                  />
+                </Form.Item>
+                <Form.Item
+                  name="amountCents"
+                  label="付款金额（整数分）"
+                  rules={[
+                    { required: true, message: '请填写付款金额（整数分）' },
+                    {
+                      validator: (_rule: unknown, value: unknown): Promise<void> => {
+                        if (value === undefined || value === null) return Promise.resolve()
+                        if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
+                          return Promise.reject(new Error('金额必须是大于 0 的整数分'))
+                        }
+                        return Promise.resolve()
+                      },
+                    },
+                  ]}
+                  tooltip="1 元 = 100 分，只填整数分；页面不做元/分浮点换算。"
+                >
+                  <InputNumber
+                    min={1}
+                    precision={0}
+                    style={{ width: '100%' }}
+                    placeholder="整数分（1 元 = 100 分）"
+                  />
+                </Form.Item>
+                <Form.Item
+                  name="paidAt"
+                  label="付款时间"
+                  rules={[{ required: true, whitespace: true, message: '请填写付款时间' }]}
+                  tooltip="按浏览器本地时区选择；提交时转换为带时区的 ISO 时间字符串。"
+                >
+                  <Input type="datetime-local" />
+                </Form.Item>
+                <Form.Item
+                  name="proofRefMasked"
+                  label="脱敏付款凭据引用"
+                  rules={[
+                    { required: true, whitespace: true, message: '请填写脱敏凭据引用' },
+                    {
+                      validator: (_rule: unknown, value: unknown): Promise<void> => {
+                        const text = typeof value === 'string' ? value.trim() : ''
+                        if (text === '') return Promise.resolve()
+                        if (text.length < 4 || text.length > 160) {
+                          return Promise.reject(new Error('脱敏凭据引用需 4-160 个字符'))
+                        }
+                        if (hasLongDigitRun(text)) {
+                          return Promise.reject(new Error(LONG_DIGIT_MESSAGE))
+                        }
+                        return Promise.resolve()
+                      },
+                    },
+                  ]}
+                  tooltip="只填写脱敏引用（如凭据编号/流水尾号），不得填写完整银行卡号、账号或任何 12 位以上连续数字。"
+                >
+                  <Input maxLength={160} placeholder="例如 BANK-20261101-001（脱敏引用）" />
+                </Form.Item>
+              </Form>
+              <Space wrap size={8}>
+                <Button
+                  type="primary"
+                  loading={submitting}
+                  disabled={submitting}
+                  onClick={() => void form.submit()}
+                >
+                  登记付款凭据
+                </Button>
+                <Button onClick={startNewIntent} disabled={submitting}>
+                  新建凭据
+                </Button>
+              </Space>
+              <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+                本次幂等键：
+                <span className="ledger-cell-mono" data-testid="payment-idempotency-key">
+                  {idempotencyKey}
+                </span>
+                （重试失败提交会复用同一键；只有登记成功或点「新建凭据」才更换）
+              </Typography.Paragraph>
+            </section>
+          )}
+        </>
+      )}
     </Space>
   )
 }

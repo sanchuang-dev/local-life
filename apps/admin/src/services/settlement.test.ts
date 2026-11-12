@@ -5,9 +5,11 @@ import type {
   CreateSettlementPartyRequest,
   CreateSettlementRuleRequest,
   CreateSettlementStatementRequest,
+  RecordSettlementPaymentRequest,
   SettlementMapping,
   SettlementOrderPartySnapshot,
   SettlementParty,
+  SettlementPaymentOverview,
   SettlementQuoteResponse,
   SettlementRuleVersion,
   SettlementStatement,
@@ -16,7 +18,9 @@ import type {
 } from '@sanchuang-dev/local-life-contracts'
 import { LocalApiError } from './localApi'
 import {
+  SETTLEMENT_BENEFICIARY_STATE_LABELS,
   SETTLEMENT_PARTY_ROLE_LABELS,
+  SETTLEMENT_PAYMENT_RECORD_STATE_LABELS,
   SETTLEMENT_PAYMENT_STATE_LABELS,
   SETTLEMENT_PROCESSOR_FEE_OWNER_LABELS,
   SETTLEMENT_RULE_FIXED_POLICY_LABELS,
@@ -28,6 +32,7 @@ import {
   createSettlementRuleVersion,
   createSettlementStatement,
   downloadSettlementCsv,
+  getSettlementPaymentOverview,
   getSettlementStatement,
   listSettlementMappings,
   listSettlementParties,
@@ -36,6 +41,7 @@ import {
   lockSettlementStatement,
   quoteSettlementOrder,
   readSettlementOrderParty,
+  recordSettlementPayment,
   reviewSettlementStatement,
   type SettlementOrderPartyResponse,
   type SettlementStatementActionRequest,
@@ -1782,5 +1788,351 @@ describe('downloadSettlementCsv', () => {
     expect(lastCall().url).toBe(
       '/api/admin/settlement/statements/stm%201%2F2%3Fx%3D1/entity.csv',
     )
+  })
+})
+
+/* -------------------------------------------------------------------------- */
+/* #225 — payment proof registration (idempotency key passed through)        */
+/* -------------------------------------------------------------------------- */
+
+const PAYMENT_RECORD_ID = '123e4567-e89b-42d3-a456-426614174801'
+const PAYMENT_EVENT_ID = '123e4567-e89b-42d3-a456-426614174802'
+const PAYMENT_IDEMPOTENCY_KEY = '123e4567-e89b-42d3-a456-426614174803'
+
+const PAYMENT_REQUEST: RecordSettlementPaymentRequest = {
+  beneficiaryPartyId: SELLER_PARTY_ID,
+  amountCents: 5_000,
+  paidAt: '2026-11-17T02:00:00.000Z',
+  proofRefMasked: '银行回单 **** 1024',
+  idempotencyKey: PAYMENT_IDEMPOTENCY_KEY,
+}
+
+const PAYMENT_OVERVIEW: SettlementPaymentOverview = {
+  statementId: STATEMENT_ID,
+  communityId: COMMUNITY_ID,
+  state: 'pending_review',
+  payableCents: 12_724,
+  recordedCents: 5_000,
+  verifiedCents: 0,
+  beneficiaries: [
+    {
+      partyId: SELLER_PARTY_ID,
+      role: 'seller',
+      legalName: '重庆幸福商贸有限公司',
+      registryRef: '91500000MA5U1234XY',
+      verificationRef: '营业执照核验单 2026-001',
+      payableCents: 7_634,
+      recordedCents: 5_000,
+      verifiedCents: 0,
+      state: 'pending_review',
+    },
+    {
+      partyId: SANCHUANG_PARTY_ID,
+      role: 'sanchuang',
+      legalName: '重庆三创数字科技有限公司',
+      registryRef: '91500000MA5U5678AB',
+      verificationRef: '营业执照核验单 2026-002',
+      payableCents: 3_181,
+      recordedCents: 0,
+      verifiedCents: 0,
+      state: 'awaiting_payment',
+    },
+    {
+      partyId: GUANGDIAN_PARTY_ID,
+      role: 'guangdian',
+      legalName: '重庆广电网络股份有限公司',
+      registryRef: '91500000MA5U9012CD',
+      verificationRef: null,
+      payableCents: 1_909,
+      recordedCents: 0,
+      verifiedCents: 0,
+      state: 'awaiting_payment',
+    },
+  ],
+  records: [
+    {
+      id: PAYMENT_RECORD_ID,
+      statementId: STATEMENT_ID,
+      communityId: COMMUNITY_ID,
+      beneficiaryPartyId: SELLER_PARTY_ID,
+      beneficiaryRole: 'seller',
+      beneficiaryLegalName: '重庆幸福商贸有限公司',
+      beneficiaryRegistryRef: '91500000MA5U1234XY',
+      beneficiaryVerificationRef: '营业执照核验单 2026-001',
+      payableCentsSnapshot: 7_634,
+      amountCents: 5_000,
+      paidAt: '2026-11-17T02:00:00.000Z',
+      proofRefMasked: '银行回单 **** 1024',
+      recorderUserId: USER_ID,
+      recordedAt: '2026-11-17T03:00:00.000Z',
+      state: 'pending_review',
+    },
+  ],
+  events: [
+    {
+      id: PAYMENT_EVENT_ID,
+      paymentRecordId: PAYMENT_RECORD_ID,
+      statementId: STATEMENT_ID,
+      kind: 'recorded',
+      sequence: 1,
+      actorUserId: USER_ID,
+      evidenceRef: null,
+      state: 'pending_review',
+      createdAt: '2026-11-17T03:00:00.000Z',
+    },
+  ],
+}
+
+const EMPTY_PAYMENT_OVERVIEW: SettlementPaymentOverview = {
+  statementId: STATEMENT_ID,
+  communityId: COMMUNITY_ID,
+  state: 'not_recorded',
+  payableCents: 0,
+  recordedCents: 0,
+  verifiedCents: 0,
+  beneficiaries: [],
+  records: [],
+  events: [],
+}
+
+function createPaymentRequest(
+  overrides: Partial<RecordSettlementPaymentRequest> = {},
+): RecordSettlementPaymentRequest {
+  return { ...PAYMENT_REQUEST, ...overrides }
+}
+
+describe('payment proof labels', () => {
+  it('凭据状态标签：待复核不等于已核销', () => {
+    expect(SETTLEMENT_PAYMENT_RECORD_STATE_LABELS).toEqual({
+      pending_review: '待复核',
+      verified: '已核销',
+      disputed: '争议',
+    })
+    expect(SETTLEMENT_PAYMENT_RECORD_STATE_LABELS.pending_review).not.toBe('已核销')
+  })
+
+  it('受款人进度标签是独立口径', () => {
+    expect(SETTLEMENT_BENEFICIARY_STATE_LABELS).toEqual({
+      awaiting_payment: '待付款',
+      pending_review: '已登记待复核',
+      partial: '部分支付',
+      verified: '已核销',
+      disputed: '争议',
+    })
+  })
+})
+
+describe('getSettlementPaymentOverview', () => {
+  it('GET 路径正确，解析 beneficiaries/records/events', async () => {
+    stubJson(200, PAYMENT_OVERVIEW)
+
+    const overview = await getSettlementPaymentOverview(STATEMENT_ID)
+
+    const { url, init, headers } = lastCall()
+    expect(url).toBe(`/api/admin/settlement/statements/${STATEMENT_ID}/payments`)
+    expect(init.method).toBe('GET')
+    expect(init.credentials).toBe('include')
+    expect(headers['x-csrf-token']).toBeUndefined()
+    expect(overview).toEqual(PAYMENT_OVERVIEW)
+    expect(overview.beneficiaries).toHaveLength(3)
+    expect(overview.records[0]?.state).toBe('pending_review')
+    expect(overview.events.map((event) => event.kind)).toEqual(['recorded'])
+    expect(overview.state).toBe('pending_review')
+  })
+
+  it('空数组是真实空态（state=not_recorded），不是失败', async () => {
+    stubJson(200, EMPTY_PAYMENT_OVERVIEW)
+
+    const overview = await getSettlementPaymentOverview(STATEMENT_ID)
+
+    expect(overview.beneficiaries).toEqual([])
+    expect(overview.records).toEqual([])
+    expect(overview.events).toEqual([])
+    expect(overview.state).toBe('not_recorded')
+  })
+
+  it('statementId 在路径中正确编码', async () => {
+    stubJson(200, EMPTY_PAYMENT_OVERVIEW)
+
+    await getSettlementPaymentOverview('stm 1/2?x=1')
+
+    expect(lastCall().url).toBe('/api/admin/settlement/statements/stm%201%2F2%3Fx%3D1/payments')
+  })
+
+  it('404（结算单不存在）与 403（非管理员）冒泡，不返回空概览', async () => {
+    stubJson(404, { error: { code: 'not_found', message: '结算单不存在' } })
+    const missing = await getSettlementPaymentOverview(STATEMENT_ID).catch(
+      (cause: unknown) => cause,
+    )
+    expect(missing).toBeInstanceOf(LocalApiError)
+    expect((missing as LocalApiError).status).toBe(404)
+    expect((missing as LocalApiError).code).toBe('not_found')
+
+    stubJson(403, { error: { code: 'forbidden', message: '只有管理员可登记或复核线下付款凭据' } })
+    const denied = await getSettlementPaymentOverview(STATEMENT_ID).catch(
+      (cause: unknown) => cause,
+    )
+    expect(denied).toBeInstanceOf(LocalApiError)
+    expect((denied as LocalApiError).status).toBe(403)
+    expect((denied as LocalApiError).code).toBe('forbidden')
+  })
+
+  it('响应不符合契约：抛 invalid_response，不返回空概览', async () => {
+    stubJson(200, { statementId: STATEMENT_ID })
+
+    const failure = await getSettlementPaymentOverview(STATEMENT_ID).catch(
+      (cause: unknown) => cause,
+    )
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).code).toBe('invalid_response')
+  })
+})
+
+describe('recordSettlementPayment', () => {
+  it('POST：CSRF + body 严格等于契约字段，201 overview 解析，幂等键原样传递', async () => {
+    stubJson(201, PAYMENT_OVERVIEW)
+
+    const overview = await recordSettlementPayment('csrf-token-payment', STATEMENT_ID, PAYMENT_REQUEST)
+
+    const { url, init, headers } = lastCall()
+    expect(url).toBe(`/api/admin/settlement/statements/${STATEMENT_ID}/payments`)
+    expect(init.method).toBe('POST')
+    expect(init.credentials).toBe('include')
+    expect(headers['x-csrf-token']).toBe('csrf-token-payment')
+    expect(headers['content-type']).toBe('application/json')
+    const body = JSON.parse(String(init.body)) as RecordSettlementPaymentRequest
+    expect(body).toEqual(PAYMENT_REQUEST)
+    expect(Object.keys(body).sort()).toEqual([
+      'amountCents',
+      'beneficiaryPartyId',
+      'idempotencyKey',
+      'paidAt',
+      'proofRefMasked',
+    ])
+    // The service must not regenerate the key it was given.
+    expect(body.idempotencyKey).toBe(PAYMENT_IDEMPOTENCY_KEY)
+    expect(body.idempotencyKey).toBe(PAYMENT_REQUEST.idempotencyKey)
+    // The response is the whole overview, not a single record.
+    expect(overview).toEqual(PAYMENT_OVERVIEW)
+    expect(overview.records[0]?.state).toBe('pending_review')
+  })
+
+  it('同一 idempotencyKey 连续调用两次：两次请求 body 的 key 完全相同', async () => {
+    stubJson(201, PAYMENT_OVERVIEW)
+    stubJson(201, PAYMENT_OVERVIEW)
+
+    await recordSettlementPayment('csrf-token-payment', STATEMENT_ID, PAYMENT_REQUEST)
+    const firstKey = (JSON.parse(String(lastCall().init.body)) as RecordSettlementPaymentRequest)
+      .idempotencyKey
+    await recordSettlementPayment('csrf-token-payment', STATEMENT_ID, PAYMENT_REQUEST)
+    const secondKey = (JSON.parse(String(lastCall().init.body)) as RecordSettlementPaymentRequest)
+      .idempotencyKey
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(firstKey).toBe(PAYMENT_IDEMPOTENCY_KEY)
+    expect(secondKey).toBe(PAYMENT_IDEMPOTENCY_KEY)
+    expect(secondKey).toBe(firstKey)
+  })
+
+  it('409 冲突（幂等键复用/超额/重复凭据/受款人不符）冒泡，不伪造成功', async () => {
+    stubJson(409, {
+      error: { code: 'conflict', message: '登记金额超过该主体锁定应付余额，禁止超额或跨账单静默抵扣' },
+    })
+
+    const failure = await recordSettlementPayment(
+      'csrf-token-payment',
+      STATEMENT_ID,
+      PAYMENT_REQUEST,
+    ).catch((cause: unknown) => cause)
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).status).toBe(409)
+    expect((failure as LocalApiError).code).toBe('conflict')
+    expect((failure as LocalApiError).message).toBe(
+      '登记金额超过该主体锁定应付余额，禁止超额或跨账单静默抵扣',
+    )
+  })
+
+  it('403（非管理员/CSRF 失败）与 404（结算单不存在）冒泡', async () => {
+    stubJson(403, { error: { code: 'forbidden', message: '只有管理员可登记或复核线下付款凭据' } })
+    const denied = await recordSettlementPayment(
+      'csrf-token-payment',
+      STATEMENT_ID,
+      PAYMENT_REQUEST,
+    ).catch((cause: unknown) => cause)
+    expect(denied).toBeInstanceOf(LocalApiError)
+    expect((denied as LocalApiError).status).toBe(403)
+    expect((denied as LocalApiError).code).toBe('forbidden')
+
+    stubJson(404, { error: { code: 'not_found', message: '结算单不存在' } })
+    const missing = await recordSettlementPayment(
+      'csrf-token-payment',
+      STATEMENT_ID,
+      PAYMENT_REQUEST,
+    ).catch((cause: unknown) => cause)
+    expect(missing).toBeInstanceOf(LocalApiError)
+    expect((missing as LocalApiError).status).toBe(404)
+    expect((missing as LocalApiError).code).toBe('not_found')
+  })
+
+  it('201 响应不是 overview（缺 records/events）：抛 invalid_response，不当作登记成功', async () => {
+    stubJson(201, { statementId: STATEMENT_ID, state: 'pending_review' })
+
+    const failure = await recordSettlementPayment(
+      'csrf-token-payment',
+      STATEMENT_ID,
+      PAYMENT_REQUEST,
+    ).catch((cause: unknown) => cause)
+
+    expect(failure).toBeInstanceOf(LocalApiError)
+    expect((failure as LocalApiError).code).toBe('invalid_response')
+  })
+
+  it('statementId 在 POST 路径中正确编码', async () => {
+    stubJson(201, PAYMENT_OVERVIEW)
+
+    await recordSettlementPayment('csrf-token-payment', 'stm 1/2?x=1', PAYMENT_REQUEST)
+
+    expect(lastCall().url).toBe(
+      '/api/admin/settlement/statements/stm%201%2F2%3Fx%3D1/payments',
+    )
+  })
+
+  describe('共享契约在发请求前拒绝弱凭据或非法金额', () => {
+    const invalidCases: Array<{ name: string; request: RecordSettlementPaymentRequest }> = [
+      {
+        name: 'proofRefMasked 含 12 位以上连续数字',
+        request: createPaymentRequest({ proofRefMasked: '6222021234567890123' }),
+      },
+      {
+        name: 'proofRefMasked 少于 4 个字符',
+        request: createPaymentRequest({ proofRefMasked: 'abc' }),
+      },
+      {
+        name: 'amountCents 非整数',
+        request: createPaymentRequest({ amountCents: 5_000.5 }),
+      },
+      {
+        name: 'amountCents < 1',
+        request: createPaymentRequest({ amountCents: 0 }),
+      },
+      {
+        name: 'idempotencyKey 非 UUID',
+        request: createPaymentRequest({ idempotencyKey: 'retry-1' }),
+      },
+    ]
+
+    it.each(invalidCases)('$name：本地拒绝且 fetch 未调用', async ({ request }) => {
+      const failure = await recordSettlementPayment(
+        'csrf-token-payment',
+        STATEMENT_ID,
+        request,
+      ).catch((cause: unknown) => cause)
+
+      expect(failure).not.toBeInstanceOf(LocalApiError)
+      expect(failure).toBeInstanceOf(Error)
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
   })
 })

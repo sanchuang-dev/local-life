@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { App as AntdApp, ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import type {
+  SettlementPaymentOverview,
   SettlementStatement,
   SettlementStatementDetail,
   SettlementTrialAllocation,
@@ -46,6 +47,8 @@ const RECEIPT_ENTRY_ID = '123e4567-e89b-42d3-a456-426614174301'
 const PERFORMANCE_ID = '123e4567-e89b-42d3-a456-426614174a01'
 const EVENT_ID = '123e4567-e89b-42d3-a456-426614174b01'
 const EVENT_2_ID = '123e4567-e89b-42d3-a456-426614174b02'
+const PAYMENT_RECORD_ID = '123e4567-e89b-42d3-a456-426614174f01'
+const PAYMENT_EVENT_ID = '123e4567-e89b-42d3-a456-426614174f02'
 const CSRF_TOKEN = 'csrf-token-for-settlement-statement-tests'
 
 const STATEMENTS_ROUTE = '/api/admin/settlement/statements'
@@ -321,6 +324,77 @@ function emptyCandidateResponse() {
     },
     payableAmountCents: null,
     settlementAmountStatus: 'pending_rule' as const,
+  }
+}
+
+/** Real recipients + one already-registered offline proof, all server values. */
+function paymentOverview(
+  overrides: Partial<SettlementPaymentOverview> = {},
+): SettlementPaymentOverview {
+  return {
+    statementId: STATEMENT_ID,
+    communityId: COMMUNITY_A.id,
+    state: 'pending_review',
+    payableCents: 12345,
+    recordedCents: 500,
+    verifiedCents: 0,
+    beneficiaries: [
+      {
+        partyId: SELLER_ID,
+        role: 'seller',
+        legalName: '杭州三创生活服务有限公司',
+        registryRef: '91330100MA2XXXXXXX',
+        verificationRef: null,
+        payableCents: 10000,
+        recordedCents: 500,
+        verifiedCents: 0,
+        state: 'partial',
+      },
+      {
+        partyId: SANCHUANG_ID,
+        role: 'sanchuang',
+        legalName: '杭州三创数字科技有限公司',
+        registryRef: '91330100MA2YYYYYYY',
+        verificationRef: '合同 HT-2026-01',
+        payableCents: 2345,
+        recordedCents: 0,
+        verifiedCents: 0,
+        state: 'awaiting_payment',
+      },
+    ],
+    records: [
+      {
+        id: PAYMENT_RECORD_ID,
+        statementId: STATEMENT_ID,
+        communityId: COMMUNITY_A.id,
+        beneficiaryPartyId: SELLER_ID,
+        beneficiaryRole: 'seller',
+        beneficiaryLegalName: '杭州三创生活服务有限公司',
+        beneficiaryRegistryRef: '91330100MA2XXXXXXX',
+        beneficiaryVerificationRef: null,
+        payableCentsSnapshot: 10000,
+        amountCents: 500,
+        paidAt: '2026-11-09T06:00:00.000Z',
+        proofRefMasked: 'BANK-20261109-001',
+        recorderUserId: USER_ID,
+        recordedAt: '2026-11-09T06:30:00.000Z',
+        state: 'pending_review',
+      },
+    ],
+    events: [
+      {
+        id: PAYMENT_EVENT_ID,
+        paymentRecordId: PAYMENT_RECORD_ID,
+        statementId: STATEMENT_ID,
+        kind: 'recorded',
+        sequence: 1,
+        actorUserId: USER_ID,
+        evidenceRef: '网点回单',
+        state: 'pending_review',
+        createdAt: '2026-11-09T06:30:00.000Z',
+      },
+    ],
+    ...overrides,
   }
 }
 
@@ -1054,5 +1128,354 @@ describe('SettlementStatementPanel · 运营员与口径', () => {
     expect(await screen.findByText('结算单（快照 · 只读）')).toBeTruthy()
     await waitFor(() => expect(readsOf(calls, STATEMENTS_ROUTE)).toHaveLength(1))
     expect(document.querySelector('[role="tabpanel"][aria-label="分成结算单"]')).toBeTruthy()
+  })
+})
+
+describe('SettlementStatementPanel · 付款凭据（#225）', () => {
+  type PaymentPostHandler = (url: string, init?: RequestInit) => Response | Promise<Response>
+
+  function paymentRoutes(options: {
+    statement?: SettlementStatement
+    overview?: () => SettlementPaymentOverview
+    post?: PaymentPostHandler
+  } = {}): readonly [string, Handler] {
+    const current = options.statement ?? statement()
+    return [
+      STATEMENTS_ROUTE,
+      (url, init) => {
+        const path = new URL(url, 'http://localhost').pathname
+        if (path === STATEMENTS_ROUTE) {
+          return json({ items: [current], total: 1, page: 1, pageSize: 20 })
+        }
+        if (path.endsWith('/payments')) {
+          if (init?.method === 'POST') {
+            return options.post
+              ? options.post(url, init)
+              : json(options.overview ? options.overview() : paymentOverview(), 201)
+          }
+          return json(options.overview ? options.overview() : paymentOverview())
+        }
+        return json({ ...detail(), statement: current })
+      },
+    ]
+  }
+
+  async function openPaymentTab() {
+    fireEvent.click(await screen.findByRole('tab', { name: /付款凭据/ }))
+  }
+
+  function paymentFormElement(): HTMLElement {
+    const form = document.querySelector('.ant-form')
+    expect(form, 'the payment form must be rendered').toBeTruthy()
+    return form as HTMLElement
+  }
+
+  function displayedKey(): string {
+    return screen.getByTestId('payment-idempotency-key').textContent ?? ''
+  }
+
+  async function fillPayment(values: {
+    amountCents?: string
+    paidAt?: string
+    proof?: string
+  } = {}) {
+    const form = paymentFormElement()
+    await chooseOption(
+      within(form).getByLabelText('受款人'),
+      '杭州三创生活服务有限公司 · 商品销售商户',
+    )
+    fireEvent.change(within(form).getByLabelText('付款金额（整数分）'), {
+      target: { value: values.amountCents ?? '500' },
+    })
+    fireEvent.change(within(form).getByLabelText('付款时间'), {
+      target: { value: values.paidAt ?? '2026-11-09T14:30' },
+    })
+    fireEvent.change(within(form).getByLabelText('脱敏付款凭据引用'), {
+      target: { value: values.proof ?? 'BANK-20261109-002' },
+    })
+  }
+
+  async function openLockedPayment() {
+    await screen.findByText('STL-20261101-0001')
+    await openDetailDrawer()
+    await openPaymentTab()
+    await screen.findByText('登记线下付款凭据（仅管理员）')
+  }
+
+  it('shows the server overview, recipients, records and events without arithmetic', async () => {
+    stubApi([paymentRoutes()])
+    renderPanel(ADMIN_SESSION)
+
+    await screen.findByText('STL-20261101-0001')
+    await openDetailDrawer()
+    await openPaymentTab()
+
+    expect(await screen.findByText('受款人（真实登记主体）')).toBeTruthy()
+    // Overview KPI are exactly the server's cents values.
+    expect(screen.getAllByText('¥123.45').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('¥5.00').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('¥0.00').length).toBeGreaterThan(0)
+    expect(screen.getByText('已登记待复核')).toBeTruthy()
+
+    // Recipients come straight from the server, missing evidence is stated.
+    expect(screen.getAllByText('杭州三创生活服务有限公司').length).toBeGreaterThan(0)
+    expect(screen.getByText('杭州三创数字科技有限公司')).toBeTruthy()
+    expect(screen.getByText('91330100MA2XXXXXXX')).toBeTruthy()
+    expect(screen.getByText('未提供')).toBeTruthy()
+    expect(screen.getByText('部分支付')).toBeTruthy()
+    expect(screen.getByText('待付款')).toBeTruthy()
+
+    // Records: masked proof only, pending review, never verified locally.
+    expect(screen.getByText('BANK-20261109-001')).toBeTruthy()
+    expect(screen.getByText('待复核')).toBeTruthy()
+    expect(screen.getAllByText(USER_ID).length).toBeGreaterThan(0)
+
+    // Events are read-only and ordered by the server sequence.
+    expect(screen.getByText('登记')).toBeTruthy()
+    expect(screen.getByText('sequence 1')).toBeTruthy()
+    expect(screen.getAllByText(/网点回单/).length).toBeGreaterThan(0)
+
+    // No client-side sums of the server's numbers (payable+recorded, payable+net).
+    expect(document.body.textContent).not.toContain('¥128.45')
+    expect(document.body.textContent).not.toContain('¥105.00')
+  })
+
+  it('refuses to render the registration form unless the statement is locked', async () => {
+    stubApi([paymentRoutes({ statement: statement() })])
+    const draftRender = renderPanel(ADMIN_SESSION)
+    await screen.findByText('STL-20261101-0001')
+    await openDetailDrawer()
+    await openPaymentTab()
+    expect(await screen.findByText('只有已锁定的结算单才能登记线下付款凭据')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '登记付款凭据' })).toBeNull()
+    draftRender.unmount()
+    vi.unstubAllGlobals()
+
+    stubApi([
+      paymentRoutes({
+        statement: statement({
+          status: 'reviewed',
+          revision: 2,
+          reviewedByUserId: USER_ID,
+          reviewEvidenceRef: '复核单 2026-11-08',
+          reviewedAt: '2026-11-08T03:00:00.000Z',
+        }),
+      }),
+    ])
+    renderPanel(ADMIN_SESSION)
+    await screen.findByText('STL-20261101-0001')
+    await openDetailDrawer()
+    await openPaymentTab()
+    expect(await screen.findByText('只有已锁定的结算单才能登记线下付款凭据')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '登记付款凭据' })).toBeNull()
+  })
+
+  it('records a locked-statement proof with CSRF and refreshes from the server overview', async () => {
+    const posts: FetchCall[] = []
+    const newRecord = {
+      ...paymentOverview().records[0]!,
+      id: '123e4567-e89b-42d3-a456-426614174f03',
+      amountCents: 500,
+      proofRefMasked: 'BANK-20261109-002',
+      paidAt: '2026-11-09T06:30:00.000Z',
+      recordedAt: '2026-11-09T07:00:00.000Z',
+    }
+    const updated = paymentOverview({
+      recordedCents: 1000,
+      records: [paymentOverview().records[0]!, newRecord],
+    })
+    stubApi([
+      paymentRoutes({
+        statement: statement({ status: 'locked', lockedByUserId: USER_ID, lockedAt: '2026-11-09T01:00:00.000Z' }),
+        post: (url, init) => {
+          posts.push({ url, init })
+          return json(updated, 201)
+        },
+      }),
+    ])
+    renderPanel(ADMIN_SESSION)
+    await openLockedPayment()
+
+    const keyBefore = displayedKey()
+    expect(keyBefore).toMatch(/^[0-9a-f-]{36}$/)
+    await fillPayment()
+    fireEvent.click(screen.getByRole('button', { name: '登记付款凭据' }))
+
+    await waitFor(() => expect(posts).toHaveLength(1))
+    const post = posts[0]!
+    expect(urlOf(post).pathname).toBe(`${STATEMENTS_ROUTE}/${STATEMENT_ID}/payments`)
+    expect(post.init?.method).toBe('POST')
+    expect(headersOf(post)['x-csrf-token']).toBe(CSRF_TOKEN)
+    expect(JSON.parse(String(post.init?.body))).toEqual({
+      beneficiaryPartyId: SELLER_ID,
+      amountCents: 500,
+      paidAt: new Date('2026-11-09T14:30').toISOString(),
+      proofRefMasked: 'BANK-20261109-002',
+      idempotencyKey: keyBefore,
+    })
+
+    expect(await screen.findByText(/已登记，待复核/)).toBeTruthy()
+    // The area is refreshed from the returned overview (new record visible).
+    expect(await screen.findByText('BANK-20261109-002')).toBeTruthy()
+    // Registration is NOT verification.
+    expect(screen.queryAllByText('已核销')).toHaveLength(0)
+    // A new intent only after success.
+    expect(displayedKey()).not.toBe(keyBefore)
+  })
+
+  it('reuses the same idempotency key after an uncertain failure and only rotates on success', async () => {
+    const posts: FetchCall[] = []
+    let attempt = 0
+    stubApi([
+      paymentRoutes({
+        statement: statement({ status: 'locked', lockedByUserId: USER_ID, lockedAt: '2026-11-09T01:00:00.000Z' }),
+        post: (url, init) => {
+          posts.push({ url, init })
+          attempt += 1
+          if (attempt === 1) throw new Error('network down')
+          return json(paymentOverview({ recordedCents: 1000 }), 201)
+        },
+      }),
+    ])
+    renderPanel(ADMIN_SESSION)
+    await openLockedPayment()
+
+    const keyBefore = displayedKey()
+    await fillPayment()
+    fireEvent.click(screen.getByRole('button', { name: '登记付款凭据' }))
+    expect(await screen.findByText(/无法连接管理后台 API/)).toBeTruthy()
+    expect(posts).toHaveLength(1)
+
+    fireEvent.click(screen.getByRole('button', { name: '登记付款凭据' }))
+    await waitFor(() => expect(posts).toHaveLength(2))
+    const first = JSON.parse(String(posts[0]!.init?.body)) as { idempotencyKey: string }
+    const second = JSON.parse(String(posts[1]!.init?.body)) as { idempotencyKey: string }
+    expect(second.idempotencyKey).toBe(first.idempotencyKey)
+    expect(second.idempotencyKey).toBe(keyBefore)
+
+    expect(await screen.findByText(/已登记，待复核/)).toBeTruthy()
+    expect(displayedKey()).not.toBe(keyBefore)
+  })
+
+  it('blocks a proof reference containing 12+ consecutive digits before any request', async () => {
+    const posts: FetchCall[] = []
+    stubApi([
+      paymentRoutes({
+        statement: statement({ status: 'locked', lockedByUserId: USER_ID, lockedAt: '2026-11-09T01:00:00.000Z' }),
+        post: (url, init) => {
+          posts.push({ url, init })
+          return json(paymentOverview(), 201)
+        },
+      }),
+    ])
+    renderPanel(ADMIN_SESSION)
+    await openLockedPayment()
+
+    await fillPayment({ proof: '6222021234567890' })
+    fireEvent.click(screen.getByRole('button', { name: '登记付款凭据' }))
+
+    expect(
+      await screen.findByText('不得填写完整银行卡号、账号或其他长数字凭据'),
+    ).toBeTruthy()
+    expect(posts).toHaveLength(0)
+  })
+
+  it('keeps the form and key when the server rejects the registration (409)', async () => {
+    const posts: FetchCall[] = []
+    stubApi([
+      paymentRoutes({
+        statement: statement({ status: 'locked', lockedByUserId: USER_ID, lockedAt: '2026-11-09T01:00:00.000Z' }),
+        post: (url, init) => {
+          posts.push({ url, init })
+          return json(
+            {
+              error: {
+                code: 'settlement_payment_overpay',
+                message: '付款登记金额超过该受款人的应付金额',
+              },
+            },
+            409,
+          )
+        },
+      }),
+    ])
+    renderPanel(ADMIN_SESSION)
+    await openLockedPayment()
+
+    const keyBefore = displayedKey()
+    await fillPayment()
+    fireEvent.click(screen.getByRole('button', { name: '登记付款凭据' }))
+
+    expect(
+      await screen.findByText(/数据已被更新：付款登记金额超过该受款人的应付金额/),
+    ).toBeTruthy()
+    expect(screen.queryByText(/已登记，待复核/)).toBeNull()
+    expect(posts).toHaveLength(1)
+    // Same key and the entered values survive the rejection.
+    expect(displayedKey()).toBe(keyBefore)
+    const input = within(paymentFormElement()).getByLabelText('脱敏付款凭据引用')
+    expect((input as HTMLInputElement).value).toBe('BANK-20261109-002')
+    // The record list still shows only the server's previous record.
+    expect(screen.queryByText('BANK-20261109-002')).toBeNull()
+  })
+
+  it('shows the server 403 to an operator, with no form and no verify/dispute entry', async () => {
+    stubApi([
+      [
+        STATEMENTS_ROUTE,
+        (url) => {
+          const path = new URL(url, 'http://localhost').pathname
+          if (path === STATEMENTS_ROUTE) {
+            return json({
+              items: [statement({ status: 'locked', lockedByUserId: USER_ID, lockedAt: '2026-11-09T01:00:00.000Z' })],
+              total: 1,
+              page: 1,
+              pageSize: 20,
+            })
+          }
+          if (path.endsWith('/payments')) {
+            return json(
+              { error: { code: 'forbidden', message: '只有管理员可登记或复核线下付款凭据' } },
+              403,
+            )
+          }
+          return json(detail())
+        },
+      ],
+    ])
+    renderPanel(OPERATOR_SESSION)
+
+    await screen.findByText('STL-20261101-0001')
+    await openDetailDrawer()
+    await openPaymentTab()
+
+    expect(
+      (await screen.findAllByText(/只有管理员可登记或复核线下付款凭据/)).length,
+    ).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: '登记付款凭据' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /核验/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /标记争议/ })).toBeNull()
+    // A 403 must not masquerade as "no payment records": no KPI/list is rendered.
+    expect(screen.queryByText('受款人（真实登记主体）')).toBeNull()
+    expect(screen.queryByText('已登记付款凭据')).toBeNull()
+    expect(screen.queryAllByText('¥0.00')).toHaveLength(0)
+    expect(screen.queryByText(/暂无付款事件|尚未登记付款凭据/)).toBeNull()
+  })
+
+  it('never claims payment/verification and offers no transfer entry', async () => {
+    stubApi([
+      paymentRoutes({
+        statement: statement({ status: 'locked', lockedByUserId: USER_ID, lockedAt: '2026-11-09T01:00:00.000Z' }),
+      }),
+    ])
+    renderPanel(ADMIN_SESSION)
+    await openLockedPayment()
+
+    expect(screen.getByText('登记付款凭据 ≠ 复核核销')).toBeTruthy()
+    expect(screen.getByText(/不触发任何转账/)).toBeTruthy()
+    expect(screen.queryAllByText('已付款')).toHaveLength(0)
+    expect(document.body.textContent).not.toMatch(/已付款/)
+    expect(screen.queryByRole('button', { name: /发起付款/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /转账/ })).toBeNull()
   })
 })
