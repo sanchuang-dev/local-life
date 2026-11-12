@@ -1076,7 +1076,7 @@ async function couponEarnedWorld() {
 
 test('100 yuan gross - 20 yuan coupon = 80 yuan cash; replay is safe and only real net earns team progress', async () => {
   const w = await couponEarnedWorld()
-  const { app, db, admin, operator, operatorId, communityId, a, b, product, activityId, teamId, couponId } = w
+  const { app, db, operator, operatorId, communityId, a, b, product, activityId, teamId, couponId } = w
   const idempotencyKey = randomUUID()
   const intent = {
     productId: product.id, quantity: 1, couponId, idempotencyKey,
