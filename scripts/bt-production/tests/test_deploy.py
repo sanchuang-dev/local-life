@@ -194,7 +194,7 @@ class CutoverFailureRegression(unittest.TestCase):
             stack.enter_context(patch.object(deploy, 'trial_api'))
             stack.enter_context(patch.object(deploy, 'harden_backup'))
             stack.enter_context(patch.object(deploy, 'node_at', side_effect=fake_node))
-            stack.enter_context(patch.object(deploy, 'panel_action', side_effect=panel))
+            stack.enter_context(patch.object(deploy, 'pm2_action', side_effect=panel))
             stack.enter_context(patch.object(deploy, 'health'))
             stack.enter_context(patch.object(deploy, 'validate_public', side_effect=break_public))
             with self.assertRaisesRegex(deploy.ReleaseError, 'Injected post-switch'):
@@ -204,7 +204,7 @@ class CutoverFailureRegression(unittest.TestCase):
     def test_schema_unchanged_rolls_back_program_and_site(self):
         calls = self.run_cutover(False)
         self.assertEqual((self.base / 'current').resolve(), self.old)
-        self.assertTrue(calls[-1] == 'start')
+        self.assertEqual(calls[-2:], ['start', 'save'])
         for d in deploy.DOMAINS.values():
             self.assertEqual((self.public / d / 'index.html').read_text(), 'a')
         self.assertFalse((self.base / 'ops/manual-recovery-required').exists())
