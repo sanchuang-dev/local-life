@@ -2,8 +2,9 @@ import { createContext, createElement, type ReactNode, useCallback, useContext, 
 import {
   API_ROUTES,
   PHONE_AUTH_ROUTES,
+  RESIDENT_PROFILE_ROUTES,
   authSessionResponseSchema,
-  wechatProfileStartResponseSchema,
+  residentProfileResponseSchema,
   wechatProfileStatusSchema,
   type WechatProfileStatusResponse,
   phoneAuthStatusResponseSchema,
@@ -14,6 +15,7 @@ import {
   type PhoneBindResponse,
   type PhoneOtpPurpose,
   type PhoneOtpRequestResponse,
+  type ResidentProfileResponse,
 } from '@sanchuang-dev/local-life-contracts'
 import { apiErrorFromResponse } from './apiError'
 import { isWeChatBrowser } from '../components/auth/wechatEnvironment'
@@ -48,6 +50,10 @@ function useResidentAuthController() {
   const [phoneStatus, setPhoneStatus] = useState<PhoneAuthStatusResponse | null>(null)
   const [wechatProfile, setWechatProfile] = useState<WechatProfileStatusResponse | null>(null)
   const [wechatProfileError, setWechatProfileError] = useState<string | null>(null)
+  const [residentProfile, setResidentProfile] = useState<ResidentProfileResponse | null>(null)
+  const [residentProfileLoading, setResidentProfileLoading] = useState(false)
+  const [residentProfileSaving, setResidentProfileSaving] = useState(false)
+  const [residentProfileError, setResidentProfileError] = useState<string | null>(null)
   const [phoneStatusLoading, setPhoneStatusLoading] = useState(true)
   const [loading, setLoading] = useState(true)
   const [sessionStatus, setSessionStatus] = useState<'loading' | 'authenticated' | 'unauthenticated' | 'error'>('loading')
@@ -59,11 +65,17 @@ function useResidentAuthController() {
   // switching. Both the resident ID and generation are checked on resolution.
   const profileOwnerRef = useRef<string | null>(null)
   const profileGenerationRef = useRef(0)
+  const residentProfileGenerationRef = useRef(0)
   const setProfileOwner = useCallback((userId: string | null) => {
     profileOwnerRef.current = userId
     profileGenerationRef.current += 1
+    residentProfileGenerationRef.current += 1
     setWechatProfile(null)
     setWechatProfileError(null)
+    setResidentProfile(null)
+    setResidentProfileError(null)
+    setResidentProfileLoading(false)
+    setResidentProfileSaving(false)
   }, [])
 
   const loadPhoneStatus = useCallback(async (): Promise<PhoneAuthStatusResponse | null> => {
@@ -106,6 +118,37 @@ function useResidentAuthController() {
     }
   }, [])
 
+  const loadResidentProfile = useCallback(async (): Promise<ResidentProfileResponse | null> => {
+    const owner = profileOwnerRef.current
+    if (!owner) {
+      setResidentProfile(null)
+      setResidentProfileLoading(false)
+      return null
+    }
+    const generation = ++residentProfileGenerationRef.current
+    const stillCurrent = () =>
+      profileOwnerRef.current === owner && residentProfileGenerationRef.current === generation
+    setResidentProfileLoading(true)
+    try {
+      const response = await fetch(`/api${RESIDENT_PROFILE_ROUTES.profile}`, {
+        credentials: 'include',
+        cache: 'no-store',
+      })
+      if (!response.ok) throw new Error(await readError(response))
+      const parsed = residentProfileResponseSchema.parse(await response.json())
+      if (!stillCurrent()) return null
+      setResidentProfile(parsed)
+      setResidentProfileError(null)
+      return parsed
+    } catch (cause) {
+      if (!stillCurrent()) return null
+      setResidentProfileError(cause instanceof Error ? cause.message : '暂时无法读取个人资料')
+      return null
+    } finally {
+      if (stillCurrent()) setResidentProfileLoading(false)
+    }
+  }, [])
+
   /** Session and login method capability are independent: a /auth/methods
    * outage must never turn a real resident into an anonymous session. */
   const refreshSession = useCallback(async () => {
@@ -132,7 +175,10 @@ function useResidentAuthController() {
       if (profileOwnerRef.current !== owner) setProfileOwner(owner)
       setSession(parsed.authenticated ? parsed : null)
       setSessionStatus(parsed.authenticated ? 'authenticated' : 'unauthenticated')
-      if (owner) void loadWechatProfile()
+      if (owner) {
+        void loadWechatProfile()
+        void loadResidentProfile()
+      }
       setError(null)
     } catch (cause) {
       if (version !== sessionRequestVersion.current) return
@@ -144,7 +190,7 @@ function useResidentAuthController() {
     } finally {
       if (version === sessionRequestVersion.current) setLoading(false)
     }
-  }, [loadWechatProfile, setProfileOwner])
+  }, [loadResidentProfile, loadWechatProfile, setProfileOwner])
 
   const invalidateSession = useCallback(() => {
     // 401 from a protected API supersedes the cached browser session.
@@ -196,6 +242,42 @@ function useResidentAuthController() {
     return ((await response.json()) as { csrfToken: string }).csrfToken
   }, [])
 
+  const saveContactAddress = useCallback(async (
+    contactAddress: string | null,
+  ): Promise<ResidentProfileResponse> => {
+    const owner = profileOwnerRef.current
+    if (!owner) throw new Error('请先登录居民账户')
+    const generation = ++residentProfileGenerationRef.current
+    setResidentProfileSaving(true)
+    setResidentProfileError(null)
+    try {
+      const token = await csrfToken()
+      const response = await fetch(`/api${RESIDENT_PROFILE_ROUTES.profile}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: {
+          'content-type': 'application/json',
+          'x-csrf-token': token,
+        },
+        body: JSON.stringify({ contactAddress }),
+      })
+      if (!response.ok) throw new Error(await readError(response))
+      const parsed = residentProfileResponseSchema.parse(await response.json())
+      if (profileOwnerRef.current === owner && residentProfileGenerationRef.current === generation) {
+        setResidentProfile(parsed)
+      }
+      return parsed
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : '保存个人资料失败'
+      if (profileOwnerRef.current === owner) setResidentProfileError(message)
+      throw cause
+    } finally {
+      if (profileOwnerRef.current === owner && residentProfileGenerationRef.current === generation) {
+        setResidentProfileSaving(false)
+      }
+    }
+  }, [csrfToken])
+
   const startWechatLogin = useCallback(() => {
     if (typeof navigator === 'undefined' || !isWeChatBrowser(navigator.userAgent)) {
       setError('请在微信内打开页面授权登录，或使用手机号登录')
@@ -207,35 +289,6 @@ function useResidentAuthController() {
     }
     window.location.assign(`/api${API_ROUTES.authWechatStart}`)
   }, [methods])
-
-  const startWechatProfileAuthorization = useCallback(async () => {
-    if (!session || session.staff) return
-    if (typeof navigator === 'undefined' || !isWeChatBrowser(navigator.userAgent)) {
-      setWechatProfileError('请在微信内打开页面，再主动授权同步头像和昵称')
-      return
-    }
-    if (!wechatProfile?.available) {
-      setWechatProfileError('当前账户没有可用的公众号微信身份，不能自动绑定其他微信账户')
-      return
-    }
-    setBusy(true)
-    setWechatProfileError(null)
-    try {
-      const token = await csrfToken()
-      const response = await fetch(`/api${API_ROUTES.authWechatProfileStart}`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'x-csrf-token': token },
-      })
-      if (!response.ok) throw new Error(await readError(response))
-      const parsed = wechatProfileStartResponseSchema.parse(await response.json())
-      window.location.assign(parsed.authorizationUrl)
-    } catch (cause) {
-      setWechatProfileError(cause instanceof Error ? cause.message : '发起微信资料授权失败')
-    } finally {
-      setBusy(false)
-    }
-  }, [session, wechatProfile, csrfToken])
 
   const developmentLogin = useCallback(async () => {
     if (!methods?.developmentResidentLogin) return
@@ -258,13 +311,15 @@ function useResidentAuthController() {
       setSession(parsed.authenticated ? parsed : null)
       setSessionStatus(parsed.authenticated ? 'authenticated' : 'unauthenticated')
       await loadPhoneStatus()
-      if (parsed.authenticated && !parsed.staff) await loadWechatProfile()
+      if (parsed.authenticated && !parsed.staff) {
+        await Promise.all([loadWechatProfile(), loadResidentProfile()])
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '测试登录失败')
     } finally {
       setBusy(false)
     }
-  }, [methods, csrfToken, loadPhoneStatus, loadWechatProfile, setProfileOwner])
+  }, [methods, csrfToken, loadPhoneStatus, loadResidentProfile, loadWechatProfile, setProfileOwner])
 
   /**
    * Request an SMS code. The code is delivered out of band by the deployment's
@@ -308,9 +363,11 @@ function useResidentAuthController() {
       setSessionStatus(parsed.authenticated ? 'authenticated' : 'unauthenticated')
       setError(null)
       await loadPhoneStatus()
-      if (parsed.authenticated && !parsed.staff) await loadWechatProfile()
+      if (parsed.authenticated && !parsed.staff) {
+        await Promise.all([loadWechatProfile(), loadResidentProfile()])
+      }
     },
-    [csrfToken, loadPhoneStatus, loadWechatProfile, setProfileOwner],
+    [csrfToken, loadPhoneStatus, loadResidentProfile, loadWechatProfile, setProfileOwner],
   )
 
   const bindPhone = useCallback(
@@ -327,10 +384,10 @@ function useResidentAuthController() {
       })
       if (!response.ok) throw new Error(await readError(response))
       const parsed = phoneBindResponseSchema.parse(await response.json())
-      await loadPhoneStatus()
+      await Promise.all([loadPhoneStatus(), loadResidentProfile()])
       return parsed
     },
-    [csrfToken, loadPhoneStatus],
+    [csrfToken, loadPhoneStatus, loadResidentProfile],
   )
 
   const logout = useCallback(async () => {
@@ -364,6 +421,10 @@ function useResidentAuthController() {
     phoneStatus,
     wechatProfile,
     wechatProfileError,
+    residentProfile,
+    residentProfileLoading,
+    residentProfileSaving,
+    residentProfileError,
     phoneStatusLoading,
     loading,
     busy,
@@ -373,9 +434,10 @@ function useResidentAuthController() {
     requestPhoneCode,
     loginWithPhone,
     bindPhone,
+    saveContactAddress,
     refreshPhoneStatus: loadPhoneStatus,
     refreshWechatProfile: loadWechatProfile,
-    startWechatProfileAuthorization,
+    refreshResidentProfile: loadResidentProfile,
     logout,
   }
 }
