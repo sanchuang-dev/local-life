@@ -1,12 +1,14 @@
 name: BT production package and secure stage
 
+# Only reviewed mvp → prod promotions may stage a production release.
+# Each prod push is independently verified against the merged GitHub PR.
 on:
   push:
-    tags:
-      - 'bt-prod-v*'
+    branches: [prod]
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: local-life-bt-production
@@ -22,15 +24,23 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - name: Pin immutable source revision
+      - name: Verify promotion came from mvp to prod
         id: version
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/prod
           sha="$(git rev-parse HEAD)"
+          test "$sha" = "$EXPECTED_SHA"
           [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
-          git fetch --no-tags origin mvp
-          git merge-base --is-ancestor "$sha" origin/mvp || { echo "::error::Production tag must point to a reviewed mvp commit"; exit 1; }
+          # GitHub's PR association proves this exact prod commit came from mvp.
+          gh api "repos/$GITHUB_REPOSITORY/commits/$sha/pulls" \
+            | jq -e --arg sha "$sha" \
+                '[.[] | select(.base.ref == "prod" and .head.ref == "mvp" and .merged_at != null and .merge_commit_sha == $sha)] | length > 0' >/dev/null \
+            || { echo "::error::prod must be promoted by a merged mvp -> prod PR; direct pushes and test -> prod are rejected"; exit 1; }
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           echo "BT_PRODUCTION_PACKAGE_SHA=$sha"
       - uses: pnpm/action-setup@v4

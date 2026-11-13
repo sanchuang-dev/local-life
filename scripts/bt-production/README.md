@@ -1,6 +1,6 @@
 # 本地生活 · 宝塔正式环境
 
-正式环境独立于 MVP，源代码仍由 GitHub 管理。标签 `bt-prod-v*` 触发 GitHub Actions，为 H5、后台与 API 生成同一 SHA 的发布包，并通过已核验主机 Ed25519 指纹的 SSH **安全上传**到服务器 `/www/local-life/incoming/<SHA>`。
+正式环境来自已验收的 MVP 晋级：`feat/* → dev → mvp（proto 联调）→ prod（宝塔正式）`。只有 `mvp → prod` 的合并 PR 会触发 GitHub Actions，为 H5、后台与 API 生成同一 SHA 的发布包，并通过已核验主机 Ed25519 指纹的 SSH **安全上传**到服务器 `/www/local-life/incoming/<SHA>`。
 
 **上传成功不等于正式上线。** 第一次部署前，宝塔 Node 项目、后台域名 HTTPS、全新 SQLite、备份和真实 API 健康检查都必须经过验证。
 
@@ -11,7 +11,7 @@
 - `BT_PROD_SSH_PASSWORD` — SSH 密码
 - `BT_PROD_SSH_PORT` — SSH 端口
 
-不得把 Secret 值放进源码或运行日志。使用已验收的 mvp 提交打独立的生产发布 tag；不要直接从未经审查的 dev 发布。
+不得把 Secret 值放进源码或运行日志。先在 proto 的 `mvp` 环境验收，再通过 `mvp → prod` 晋级 PR 合并。生产工作流会验证合并提交关联的 PR 来源，直接推 `prod`、`test → prod` 或打 tag 都不能触发正式上传。
 
 ## 已观察到的宝塔宿主机
 
@@ -32,4 +32,4 @@ Alibaba Cloud Linux 4、Linux x86_64、glibc 2.38、Node v24.22.1、Nginx、MySQ
 
 数据库和服务端密钥持久保存在 `/www/local-life/shared`，不属于发布包。新版本迁移前必须先做 SQLite 在线备份，并在备份副本上演练迁移。任何回滚不能用旧数据库覆盖已经产生的新业务记录。
 
-当前 Action **只负责构建和上传**。首轮服务配置验收通过后，再设计受控的版本切换和自动发布，不能将 staging 误报为发布成功。
+当前 Action 在 **`prod` 晋级合并后**只负责构建和上传。首轮服务配置验收通过后，再设计受控的版本切换和自动发布，不能将 staging 误报为发布成功。

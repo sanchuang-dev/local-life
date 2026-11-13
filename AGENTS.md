@@ -73,7 +73,7 @@ pnpm --filter @sanchuang-dev/local-life-api bootstrap-admin  # 初始化首个�
 
 ## 6. 分支、验证与牛马
 
-- `main` 是默认分支和工作流入口，**不是生产分支**；业务施工仍从最新 `dev` 开 `feat/*` 并向 `dev` 提交 Draft PR。**本仓库在线 MVP 验收环境的已批准例外为 `dev → mvp`**：仅经维护者验收的增量以独立晋级 PR 进入 `mvp`，合并后自动部署；居民 H5 使用 `https://local.proto.3cgroup.cn/`、管理后台使用 `https://local-admin.proto.3cgroup.cn/`，两域名各自同源 `/api/*` 代理到同一 Hono/SQLite；`mvp` 不是商用生产分支。现有 `test/prod` 继续承担 GitHub Pages 静态展示兼容，部署设计与授权边界详见 [在线 MVP 环境决策](docs/engineering/mvp-online-preview.md)。
+- `main` 是默认分支和工作流入口，**不是生产分支**；业务施工仍从最新 `dev` 开 `feat/*` 并向 `dev` 提交 Draft PR。**本仓库在线 MVP 验收环境的已批准例外为 `dev → mvp`**：仅经维护者验收的增量以独立晋级 PR 进入 `mvp`，合并后自动部署；居民 H5 使用 `https://local.proto.3cgroup.cn/`、管理后台使用 `https://local-admin.proto.3cgroup.cn/`，两域名各自同源 `/api/*` 代理到同一 Hono/SQLite；`mvp` 不是商用生产分支。**正式环境的发布链路为 `feat/* → dev → mvp → prod`**：已在 `mvp` 的 proto 原型服务器验收的改动，经独立 `mvp → prod` 晋级 PR 合并后，才允许发布到宝塔正式环境（居民 `https://local-life.3cgroup.cn/`、后台 `https://local-admin.3cgroup.cn/`）；`prod` 不再接收 `test → prod` 作为生产晋级路径。历史 `test` 保留兼容但不承担现行晋级门禁；GitHub Pages 的 `/prod/` 页面只是 `prod` 提交的静态展示镜像，并非另一套生产环境。详见 [在线 MVP 环境决策](docs/engineering/mvp-online-preview.md) 与 [宝塔正式环境](scripts/bt-production/README.md)。
 - 工程规约与 `mvp` 的当前差异、核对命令和晋级同步步骤见 [AGENTS 同步说明](docs/engineering/agents-sync.md)；`mvp` 不得直接修改，未经授权不得晋级或部署。
 - 小步施工，只修改任务范围；不顺手迁移旧页面、重构无关模块或删除历史证据。
 - **按改动范围和风险验证，不按整个应用规模验收**：施工者优先运行能证明本次变更的最低充分检查（相关类型/静态检查、受影响单元/契约/集成测试、必要构建）；普通小卡不默认做全站 E2E、无关 SQL/迁移回归或重复全量自测。需要安装依赖时使用 `pnpm install --frozen-lockfile`；仓库 `pnpm check` 仍是全量质量检查，按现有 CI/分支门禁执行，不能为省时关闭或弱化必需检查，但不再要求每个低风险施工 Agent 在自己的执行预算内重复跑完它。
