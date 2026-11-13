@@ -557,6 +557,51 @@ test('WeChat login never creates a resident when snsapi_userinfo returns another
 })
 
 
+test('WeChat login leaves no partial resident when snsapi_userinfo fails', async () => {
+  let providerCalls = 0
+  const fetcher: typeof fetch = async (input) => {
+    providerCalls += 1
+    const url = new URL(String(input))
+    if (url.pathname === '/sns/oauth2/access_token') {
+      return Response.json({
+        access_token: 'userinfo-error-access',
+        openid: 'userinfo-error-openid',
+      })
+    }
+    assert.equal(url.pathname, '/sns/userinfo')
+    return Response.json({ errcode: 40003, errmsg: 'invalid openid' })
+  }
+  const context = testContext(
+    {
+      WEB_BASE_URL: 'https://local-life.example.test',
+      TRUSTED_ORIGINS: 'https://local-life.example.test',
+    },
+    fetcher,
+    { seedWechat: true },
+  )
+
+  try {
+    const start = await context.app.request('/auth/wechat/start')
+    const state = new URL(start.headers.get('location')!).searchParams.get('state')!
+    const callback = await context.app.request(
+      `/auth/wechat/callback?state=${state}&code=userinfo-error-code`,
+      { headers: { cookie: cookiePair(start, 'll_oauth_nonce') } },
+    )
+    assert.equal(
+      new URL(callback.headers.get('location')!).search,
+      '?auth_error=wechat_provider_unavailable',
+    )
+    assert.equal(providerCalls, 2)
+    assert.equal(context.db.select().from(users).all().length, 0)
+    assert.equal(context.db.select().from(wechatIdentities).all().length, 0)
+    assert.equal(context.db.select().from(sessions).all().length, 0)
+    assert.equal(cookiePairs(callback).some((value) => value.startsWith('ll_session=')), false)
+  } finally {
+    context.sqlite.close()
+  }
+})
+
+
 test('admin community location: map key is gated and GCJ-02 coordinates persist and update', async () => {
   const { app, db, sqlite } = testContext()
   try {
