@@ -1,6 +1,6 @@
 # 本地生活 · 宝塔正式环境
 
-正式环境独立于 MVP，源代码仍由 GitHub 管理。标签 `bt-prod-v*` 触发 GitHub Actions，为 H5、后台与 API 生成同一 SHA 的发布包，并通过 SSH **安全上传**到服务器 `/www/local-life/incoming/<SHA>`。
+正式环境独立于 MVP，源代码仍由 GitHub 管理。标签 `bt-prod-v*` 触发 GitHub Actions，为 H5、后台与 API 生成同一 SHA 的发布包，并通过已核验主机 Ed25519 指纹的 SSH **安全上传**到服务器 `/www/local-life/incoming/<SHA>`。
 
 **上传成功不等于正式上线。** 第一次部署前，宝塔 Node 项目、后台域名 HTTPS、全新 SQLite、备份和真实 API 健康检查都必须经过验证。
 
@@ -25,7 +25,7 @@ Alibaba Cloud Linux 4、Linux x86_64、glibc 2.38、Node v24.22.1、Nginx、MySQ
 2. 首次完全空库时运行 `bash /www/local-life/incoming/<SHA>/bootstrap.sh <SHA>`。只创建一个持久 SQLite、独立 API 发布目录和服务器本地微信主密钥；不会迁移 MVP 数据，也不修改现有 Nginx。
 3. 在宝塔正式注册独立 Node 项目：运行目录 `/www/local-life/current/api`、Node v24.22.1、启动命令 `node dist/index.js`、运行用户 `www`。API 只监听 `127.0.0.1:18081`。
 4. 在宝塔登记两个网站并分别配置 HTTPS。两个域名的 `/api/*` 都要去掉前缀代理到同一 API。前端目录指向对应发布包、并配置 SPA history 回退。
-5. 按已有安全初始化程序创建首个管理员，验证登录权限、CSRF、SQLite 完整性和持久化。
+5. 使用上传的 register-bt-node.py 通过宝塔既有 Node 项目接口登记 local_life_api，随后按已有安全初始化程序创建首个管理员，验证登录权限、CSRF、SQLite 完整性和持久化。
 6. 启用定时在线备份，做恢复试验，再对外确认上线。
 
 ## 数据与发布纪律

@@ -21,6 +21,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: Pin immutable source revision
         id: version
         shell: bash
@@ -28,6 +29,8 @@ jobs:
           set -euo pipefail
           sha="$(git rev-parse HEAD)"
           [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+          git fetch --no-tags origin mvp
+          git merge-base --is-ancestor "$sha" origin/mvp || { echo "::error::Production tag must point to a reviewed mvp commit"; exit 1; }
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           echo "BT_PRODUCTION_PACKAGE_SHA=$sha"
       - uses: pnpm/action-setup@v4
@@ -70,9 +73,10 @@ jobs:
           tar -czf "$out/api.tar.gz" -C "$out/api" .
           cp scripts/bt-production/README.md "$out/README.md"
           cp scripts/bt-production/bootstrap.sh "$out/bootstrap.sh"
+          cp scripts/bt-production/register-bt-node.py "$out/register-bt-node.py"
           cd "$out"
-          sha256sum web.tar.gz admin.tar.gz api.tar.gz > SHA256SUMS
           printf '%s\n' '${{ steps.version.outputs.sha }}' > SOURCE_SHA
+          sha256sum web.tar.gz admin.tar.gz api.tar.gz README.md bootstrap.sh register-bt-node.py SOURCE_SHA > SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
           name: bt-production-${{ steps.version.outputs.sha }}
@@ -84,6 +88,7 @@ jobs:
             ${{ runner.temp }}/bt-package/SOURCE_SHA
             ${{ runner.temp }}/bt-package/README.md
             ${{ runner.temp }}/bt-package/bootstrap.sh
+            ${{ runner.temp }}/bt-package/register-bt-node.py
           retention-days: 7
           if-no-files-found: error
 
@@ -134,13 +139,14 @@ jobs:
           export SSHPASS
           mkdir -m 0700 -p "$RUNNER_TEMP/bt-ssh"
           known="$RUNNER_TEMP/bt-ssh/known_hosts"
-          ssh-keyscan -T 12 -p "$BT_PORT" "$BT_HOST" > "$known"
+          ssh-keyscan -T 12 -t ed25519 -p "$BT_PORT" "$BT_HOST" > "$known"
           test -s "$known"
+          ssh-keygen -lf "$known" -E sha256 | grep -Fq "SHA256:wes08oYjJSHXxJ5hsJu5v5VzM78UaREuitW/MAn1Uvc" || { echo "::error::BT host key fingerprint mismatch"; exit 1; }
           ssh_opts=(-p "$BT_PORT" -o "UserKnownHostsFile=$known" -o StrictHostKeyChecking=yes -o ConnectTimeout=15)
           scp_opts=(-P "$BT_PORT" -o "UserKnownHostsFile=$known" -o StrictHostKeyChecking=yes -o ConnectTimeout=15)
           remote="$BT_USER@$BT_HOST"
           stage="$(sshpass -e ssh "${ssh_opts[@]}" "$remote" 'set -eu; umask 077; mkdir -p /www/local-life/incoming; mktemp -d /www/local-life/incoming/.incoming.XXXXXXXX')"
           [[ "$stage" =~ ^/www/local-life/incoming/\.incoming\.[a-zA-Z0-9]+$ ]]
-          sshpass -e scp "${scp_opts[@]}" transfer/{web.tar.gz,admin.tar.gz,api.tar.gz,SHA256SUMS,SOURCE_SHA,README.md,bootstrap.sh} "$remote:$stage/"
+          sshpass -e scp "${scp_opts[@]}" transfer/{web.tar.gz,admin.tar.gz,api.tar.gz,SHA256SUMS,SOURCE_SHA,README.md,bootstrap.sh,register-bt-node.py} "$remote:$stage/"
           sshpass -e ssh "${ssh_opts[@]}" "$remote" "set -eu; test \"\$(cat '$stage/SOURCE_SHA')\" = '$SHA'; cd '$stage'; sha256sum -c SHA256SUMS; if test -e '/www/local-life/incoming/$SHA'; then echo 'BT_STAGE_ALREADY_EXISTS=$SHA'; else mv '$stage' '/www/local-life/incoming/$SHA'; echo 'BT_STAGE_READY_SHA=$SHA'; fi"
           echo "BT_PRODUCTION_STAGED_SHA=$SHA"
