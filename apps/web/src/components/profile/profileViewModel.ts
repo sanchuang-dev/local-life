@@ -3,13 +3,14 @@ export interface ResidentProfileViewInput {
   saving: boolean
   error: string | null
   hasProfile: boolean
+  phoneStatusKnown: boolean
   phoneConfigured: boolean
   maskedPhone: string | null
   changingPhone: boolean
 }
 
 export type ResidentProfileStatus = 'loading' | 'error' | 'ready'
-export type ResidentPhoneMode = 'bound' | 'bind' | 'change' | 'unavailable'
+export type ResidentPhoneMode = 'bound' | 'bind' | 'change' | 'unavailable' | 'unknown'
 
 export function residentProfileViewState(input: ResidentProfileViewInput): {
   status: ResidentProfileStatus
@@ -23,8 +24,9 @@ export function residentProfileViewState(input: ResidentProfileViewInput): {
 
   const phoneMode: ResidentPhoneMode =
     input.maskedPhone && !input.changingPhone ? 'bound'
-      : input.phoneConfigured ? (input.maskedPhone ? 'change' : 'bind')
-        : 'unavailable'
+      : !input.phoneStatusKnown ? 'unknown'
+        : input.phoneConfigured ? (input.maskedPhone ? 'change' : 'bind')
+          : 'unavailable'
 
   return {
     status,
