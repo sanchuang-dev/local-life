@@ -27,6 +27,7 @@ done
 test -s "$tmp/web/index.html" && test -s "$tmp/admin/index.html"
 test -s "$tmp/api/dist/index.js" && test -d "$tmp/api/db/migrations"
 test -d "$tmp/api/node_modules/better-sqlite3"
+test -s "$tmp/api/verify-db.mjs"
 chown -R www:www "$tmp"
 chmod -R u=rwX,g=rX,o= "$tmp"
 install -d -m 0750 -o www -g www "$base/shared/data"
@@ -66,13 +67,16 @@ cd "$1"
   if (sqlite.pragma("quick_check", { simple: true }) !== "ok") process.exit(1);
   sqlite.close();
 '\''' _ "$release/api" "$node"
-test "$(sqlite3 "$db" 'PRAGMA quick_check;')" = ok
-test -z "$(sqlite3 "$db" 'PRAGMA foreign_key_check;')"
-count="$(sqlite3 "$db" 'SELECT COUNT(*) FROM __drizzle_migrations;')"
-test "$count" -ge 28 || { echo "Insufficient migration count: $count" >&2; exit 1; }
-chown www:www "$db"
+runuser -u www -- "$node" "$release/api/verify-db.mjs" verify "$db"
+# SQLite Online Backup API, no dependency on sqlite3 shell utility.
+# A temporary www-writable snapshot is immediately copied into root-owned backups.
+tmpbackup="$base/shared/data/.initial-$sha.sqlite"
+test ! -e "$tmpbackup" || { echo 'Refusing to overwrite existing temporary snapshot' >&2; exit 1; }
+trap 'rm -f -- "$tmpbackup"' EXIT
+runuser -u www -- "$node" "$release/api/verify-db.mjs" backup "$db" "$tmpbackup"
+test ! -e "$base/backups/initial-$sha.sqlite"
+install -m 0600 -o root -g root "$tmpbackup" "$base/backups/initial-$sha.sqlite"
+rm -f -- "$tmpbackup"
+trap - EXIT
 ln -s "$release" "$base/current"
-sqlite3 "$db" ".backup '$base/backups/initial-$sha.sqlite'"
-test "$(sqlite3 "$base/backups/initial-$sha.sqlite" 'PRAGMA quick_check;')" = ok
-chmod 0600 "$base/backups/initial-$sha.sqlite"
-printf 'BT_DATABASE_INITIALIZED_SHA=%s\nBT_DATABASE_MIGRATIONS=%s\n' "$sha" "$count"
+printf 'BT_DATABASE_INITIALIZED_SHA=%s\n' "$sha"

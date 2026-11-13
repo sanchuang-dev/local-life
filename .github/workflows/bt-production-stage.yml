@@ -46,7 +46,7 @@ jobs:
           echo "BT_PRODUCTION_PACKAGE_SHA=$sha"
       - uses: pnpm/action-setup@v4
         with:
-          version: '10'
+          version: '10.19.0'
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -69,6 +69,8 @@ jobs:
           test -s "$RUNNER_TEMP/bt-package/api/dist/index.js"
           test -d "$RUNNER_TEMP/bt-package/api/db/migrations"
           test -d "$RUNNER_TEMP/bt-package/api/node_modules/better-sqlite3"
+          cp scripts/bt-production/verify-db.mjs "$RUNNER_TEMP/bt-package/api/verify-db.mjs"
+          node --check "$RUNNER_TEMP/bt-package/api/verify-db.mjs"
           API_ROOT="$RUNNER_TEMP/bt-package/api" node -e 'const Database = require(process.env.API_ROOT+"/node_modules/better-sqlite3"); const db=new Database(":memory:"); db.close();'
       - name: Verify bootstrap shell syntax
         run: bash -n scripts/bt-production/bootstrap.sh
@@ -123,7 +125,13 @@ jobs:
           set -euo pipefail
           for name in BT_HOST BT_USER BT_PORT SSHPASS; do
             if test -z "${!name}"; then
-              echo "::error::Missing required Actions Secret: BT_PROD_SSH_${name#BT_}"
+              case "$name" in
+                BT_HOST) required=BT_PROD_SSH_HOST ;;
+                BT_USER) required=BT_PROD_SSH_USER ;;
+                BT_PORT) required=BT_PROD_SSH_PORT ;;
+                SSHPASS) required=BT_PROD_SSH_PASSWORD ;;
+              esac
+              echo "::error::Missing required Actions Secret: $required"
               exit 1
             fi
           done
