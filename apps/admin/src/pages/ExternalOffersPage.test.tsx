@@ -77,7 +77,7 @@ describe('External offers DataPanel integration', () => {
     const panel = await screen.findByRole('region', { name: '精选优惠列表' })
     await within(panel).findByText('美团外卖活动')
 
-    expect(panel.className).toContain('data-panel')
+    expect(panel.className).toContain('data-panel--fill')
     expect(within(panel).getByRole('button', { name: '下载Excel模板' })).toBeTruthy()
     expect(within(panel).getByRole('button', { name: 'Excel批量导入' })).toBeTruthy()
     expect(within(panel).getByRole('button', { name: /刷\s*新/ })).toBeTruthy()

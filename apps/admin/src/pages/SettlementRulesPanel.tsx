@@ -1,3 +1,4 @@
+import { PageInfoAlert } from '../components/PageInfoHelp'
 import {
   Alert,
   App as AntdApp,
@@ -435,7 +436,7 @@ export function SettlementRulesPanel() {
 
   return (
     <section aria-label="合同规则版本">
-      <Alert
+      <PageInfoAlert
         type="info"
         showIcon
         title="规则版本只读 · 登记不等于结算或付款"

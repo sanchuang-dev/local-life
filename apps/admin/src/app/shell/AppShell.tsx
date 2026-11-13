@@ -11,6 +11,7 @@ import {
 } from './navigation'
 import { useAdminAuth } from '../auth-context'
 import { AppSidebar } from './AppSidebar'
+import { PageInfoProvider } from '../../components/PageInfoHelp'
 import {
   addWorkTab,
   closeOtherWorkTabs,
@@ -192,7 +193,7 @@ export function AppShell() {
 
         <Content className="app-content">
           {error ? <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} /> : null}
-          <Outlet />
+          <PageInfoProvider key={location.pathname}><Outlet /></PageInfoProvider>
         </Content>
       </Layout>
 

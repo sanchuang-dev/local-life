@@ -15,6 +15,8 @@ import {
   residentCommunityBindings,
   sessions,
   staffAccounts,
+  staffCommunityAssignments,
+  auditLogs,
   users,
   wechatIdentities,
 } from '../src/db/schema.js'
@@ -246,6 +248,88 @@ test('staff login, account creation and community scope are enforced by the API'
       headers: { cookie: gridCookies },
     })
     assert.deepEqual(await afterLogout.json(), { authenticated: false })
+  } finally {
+    sqlite.close()
+  }
+})
+
+test('an existing staff identity can be linked to a new community with audited admin-only scope', async () => {
+  const { app, db, sqlite } = testContext()
+  try {
+    const admin = await createAdmin(db)
+    const signedIn = await login(app, 'admin', 'Admin-Password-123!')
+    assert.equal(signedIn.response.status, 200)
+    const token = signedIn.csrfToken!
+    const cookies = cookieHeader(
+      cookiePair(signedIn.response, 'll_session'),
+      cookiePair(signedIn.response, 'll_csrf'),
+    )
+    const communityResult = await app.request('/admin/communities', {
+      method: 'POST', headers: postHeaders(cookies, token),
+      body: JSON.stringify({ name: '社区关联验收' }),
+    })
+    assert.equal(communityResult.status, 201)
+    const community = await communityResult.json() as { id: string }
+    const now = new Date()
+    const workerId = randomUUID()
+    const workerUserId = randomUUID()
+    db.insert(users).values({
+      id: workerUserId, displayName: '现有网格员', createdAt: now, updatedAt: now,
+    }).run()
+    db.insert(staffAccounts).values({
+      id: workerId, userId: workerUserId, username: 'existing.grid',
+      passwordHash: await hashPassword('ExistingWorkerPassword123!'),
+      role: 'grid_worker', status: 'active', createdAt: now, updatedAt: now,
+    }).run()
+    const path = `/admin/communities/${community.id}/staff`
+    const link = (body: unknown, headers = postHeaders(cookies, token)) =>
+      app.request(path, { method: 'POST', headers, body: JSON.stringify(body) })
+
+    assert.equal((await link({ staffAccountId: workerId }, {
+      ...postHeaders(cookies, token), 'x-csrf-token': 'wrong',
+    })).status, 403)
+    assert.equal((await link({ staffAccountId: workerId }, {
+      ...postHeaders(cookies, token), origin: 'https://unauthorized.example',
+    })).status, 403)
+    assert.equal((await link({ staffAccountId: workerId, unsafe: true })).status, 400)
+    assert.equal((await link({ staffAccountId: 'not-a-uuid' })).status, 400)
+    assert.equal((await link({ staffAccountId: randomUUID() })).status, 404)
+    assert.equal((await link({ staffAccountId: admin.staffId })).status, 400)
+
+    const workerLogin = await login(app, 'existing.grid', 'ExistingWorkerPassword123!')
+    assert.equal(workerLogin.response.status, 200)
+    const workerCookies = cookieHeader(
+      cookiePair(workerLogin.response, 'll_session'),
+      cookiePair(workerLogin.response, 'll_csrf'),
+    )
+    const forbidden = await app.request(path, {
+      method: 'POST', headers: postHeaders(workerCookies, workerLogin.csrfToken!),
+      body: JSON.stringify({ staffAccountId: workerId }),
+    })
+    assert.equal(forbidden.status, 403)
+    assert.equal(db.select().from(staffCommunityAssignments).all().length, 0)
+
+    const accepted = await link({ staffAccountId: workerId })
+    assert.equal(accepted.status, 201)
+    assert.deepEqual(await accepted.json(), { staffAccountId: workerId, communityId: community.id })
+    const assignment = db.select().from(staffCommunityAssignments).get()
+    assert.equal(assignment?.communityId, community.id)
+    assert.equal(assignment?.staffAccountId, workerId)
+    assert.equal((await link({ staffAccountId: workerId })).status, 409)
+    assert.equal(db.select().from(staffCommunityAssignments).all().length, 1)
+
+    const staffList = await app.request('/admin/staff', { headers: { cookie: cookies } })
+    const staff = (await staffList.json()) as { items: Array<{ id: string; communities: Array<{ id: string }> }> }
+    assert.deepEqual(staff.items.find((row) => row.id === workerId)?.communities.map((row) => row.id), [community.id])
+    const currentSession = await app.request('/auth/session', { headers: { cookie: workerCookies } })
+    const current = await currentSession.json() as { staff: { communities: Array<{ id: string }> } }
+    assert.deepEqual(current.staff.communities.map((row) => row.id), [community.id])
+
+    const audits = db.select().from(auditLogs).all().filter((row) => row.event === 'staff.community_assigned')
+    assert.equal(audits.length, 1)
+    assert.equal(audits[0]?.actorUserId, admin.userId)
+    assert.equal(audits[0]?.targetId, workerId)
+    assert.equal(JSON.parse(audits[0]!.metadata!).communityId, community.id)
   } finally {
     sqlite.close()
   }

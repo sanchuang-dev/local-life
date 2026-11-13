@@ -13,7 +13,7 @@ import type {
 import { AdminAuthProvider } from '../app/auth-context'
 import { adminTheme } from '../app/theme'
 import type { AuthenticatedSession } from '../services/auth'
-import { SettlementsPage } from './SettlementsPage'
+import { ReconciliationPage } from './ReconciliationPage'
 
 /**
  * Drives the real 对账结算 page against an explicitly stubbed `fetch`.
@@ -228,8 +228,8 @@ function stubApi(routes: ReadonlyArray<readonly [string, Handler]>): FetchCall[]
 }
 
 function renderPage(session: AuthenticatedSession) {
-  const router = createMemoryRouter([{ path: '/settlements', element: <SettlementsPage /> }], {
-    initialEntries: ['/settlements'],
+  const router = createMemoryRouter([{ path: '/reconciliation', element: <ReconciliationPage /> }], {
+    initialEntries: ['/reconciliation'],
   })
   const result = render(
     <ConfigProvider locale={zhCN} theme={adminTheme}>
@@ -313,7 +313,7 @@ describe('SettlementsPage permission boundary', () => {
 
     renderPage(GRID_SESSION)
 
-    expect(await screen.findByText('网格员没有对账结算权限')).toBeTruthy()
+    expect(await screen.findByText('网格员没有经营对账权限')).toBeTruthy()
     expect(screen.getByText(/服务端同样返回 403/)).toBeTruthy()
     expect(calls).toEqual([])
   })

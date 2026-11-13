@@ -11,6 +11,14 @@ import type { ThemeConfig } from 'antd'
 export const adminTheme: ThemeConfig = {
   token: {
     colorPrimary: '#116d63',
+    // Ant Design 6 derives a muddy gray (#a3adaa) as colorPrimaryBg from
+    // this dark teal. That alias also feeds Select/Pagination selected options,
+    // date pickers and other active controls. Keep one consistent mint scale
+    // here rather than patching individual component popup styles.
+    colorPrimaryBg: '#e8f6f0',
+    colorPrimaryBgHover: '#d6eee4',
+    colorPrimaryBorder: '#b4ddce',
+    colorPrimaryBorderHover: '#8bc9b5',
     // Info stays blue; Success is a distinct, readable green rather than
     // reusing brand teal. All status components consume this same palette.
     colorInfo: '#1677ff',

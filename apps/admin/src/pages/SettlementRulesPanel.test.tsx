@@ -620,8 +620,8 @@ describe('SettlementRulesPanel · 页面口径与挂载', () => {
     ])
     renderPage()
 
-    expect(await screen.findByRole('tab', { name: '经营对账' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('tab', { name: '分成结算单' }))
+    expect(await screen.findByRole('tab', { name: '候选看板' })).toBeTruthy()
+    expect(screen.queryByRole('tab', { name: '经营对账' })).toBeNull()
 
     expect(await screen.findByRole('tab', { name: '合同规则' })).toBeTruthy()
     expect(screen.getByRole('tab', { name: '候选看板' })).toBeTruthy()

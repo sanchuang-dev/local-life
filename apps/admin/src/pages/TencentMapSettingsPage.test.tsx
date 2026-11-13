@@ -87,7 +87,7 @@ describe('Tencent map admin settings', () => {
     await waitFor(() => expect(calls.some((x) => x.init?.method === 'PUT')).toBe(true))
     const put = calls.find((x) => x.init?.method === 'PUT')!
     expect(put.url).toBe(PATH)
-    expect((put.init?.headers as Record<string, string>)['x-csrf-token']).toBe(CSRF_TOKEN)
+    expect((put.init?.headers as Record<string, string> | undefined)?.['x-csrf-token']).toBe(CSRF_TOKEN)
     expect(JSON.parse(String(put.init?.body))).toEqual({ key: SECRETISH_KEY, appName: '默认应用' })
     expect(await screen.findByText('••••ABCD')).toBeTruthy()
     await waitFor(() => expect(screen.queryByLabelText('腾讯位置服务 Key')).toBeNull())

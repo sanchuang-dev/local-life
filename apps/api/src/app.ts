@@ -24,6 +24,7 @@ import {
   tencentMapConfigStatusSchema,
   tencentMapPickerConfigSchema,
   createStaffAccountRequestSchema,
+  linkCommunityStaffRequestSchema,
   healthResponseSchema,
   isActivityId,
   staffLoginRequestSchema,
@@ -1473,6 +1474,64 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
         communities: staffCommunities(db, account.id),
       }))
     return c.json({ items: staff })
+  })
+
+  // Existing identities are created under System / Access. A community may
+  // link an existing scoped staff identity, never create another account.
+  app.post('/admin/communities/:communityId/staff', async (c) => {
+    const session = c.get('authSession')
+    if (!session?.staff) return fail(c, 401, API_ERROR_CODES.unauthorized, '请先登录管理后台')
+    if (session.staff.role !== 'admin') {
+      return fail(c, 403, API_ERROR_CODES.forbidden, '只有管理员可以关联社区工作人员')
+    }
+    if (!validCsrf(c, config, session)) {
+      return fail(c, 403, API_ERROR_CODES.forbidden, 'CSRF 校验失败')
+    }
+    const communityId = c.req.param('communityId')
+    const body = bodySchemaError(await c.req.json().catch(() => null), linkCommunityStaffRequestSchema)
+    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '关联信息不正确')
+    const community = db.select({ id: communities.id }).from(communities)
+      .where(eq(communities.id, communityId)).get()
+    if (!community) return fail(c, 404, API_ERROR_CODES.notFound, '社区不存在')
+    const member = db.select({ id: staffAccounts.id, role: staffAccounts.role, status: staffAccounts.status })
+      .from(staffAccounts).where(eq(staffAccounts.id, body.staffAccountId)).get()
+    if (!member) return fail(c, 404, API_ERROR_CODES.notFound, '后台账户不存在')
+    if (member.role === 'admin') {
+      return fail(c, 400, API_ERROR_CODES.invalidRequest, '平台管理员天然管理全部社区，无需单独关联')
+    }
+    if (member.status !== 'active') {
+      return fail(c, 409, API_ERROR_CODES.conflict, '不能关联已停用的账户')
+    }
+    const existing = db.select({ staffAccountId: staffCommunityAssignments.staffAccountId })
+      .from(staffCommunityAssignments)
+      .where(and(
+        eq(staffCommunityAssignments.staffAccountId, member.id),
+        eq(staffCommunityAssignments.communityId, communityId),
+      )).get()
+    if (existing) return fail(c, 409, API_ERROR_CODES.conflict, '该账户已关联此社区')
+
+    const now = new Date()
+    try {
+      db.transaction((tx) => {
+        tx.insert(staffCommunityAssignments).values({
+          staffAccountId: member.id, communityId, createdAt: now,
+        }).run()
+        tx.insert(auditLogs).values({
+          id: randomUUID(),
+          actorUserId: session.userId,
+          event: 'staff.community_assigned',
+          targetId: member.id,
+          metadata: JSON.stringify({ communityId }),
+          createdAt: now,
+        }).run()
+      })
+    } catch (cause) {
+      if (cause instanceof Error && /unique|primary key/i.test(cause.message)) {
+        return fail(c, 409, API_ERROR_CODES.conflict, '该账户已关联此社区')
+      }
+      throw cause
+    }
+    return c.json({ staffAccountId: member.id, communityId }, 201)
   })
 
   app.post('/admin/staff', async (c) => {

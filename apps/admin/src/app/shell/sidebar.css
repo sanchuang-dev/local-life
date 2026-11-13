@@ -6,9 +6,23 @@
   position: sticky !important;
   top: 0;
   height: 100vh;
+  overflow: hidden;
+  background: #fff;
+}
+
+/* Only the menu scrolls; the brand and search are persistent sidebar chrome. */
+.app-sider > .ant-layout-sider-children {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.app-sidebar-nav {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  background: #fff;
   scrollbar-width: thin;
 }
 
@@ -24,6 +38,7 @@
 }
 
 .app-brand {
+  flex: 0 0 52px;
   height: 52px;
   display: flex;
   align-items: center;
@@ -83,6 +98,7 @@
  * so the input sits on the same line as the tabs instead of floating lower.
  */
 .app-sidebar-search {
+  flex: 0 0 38px;
   display: flex;
   align-items: center;
   height: 38px;
@@ -166,8 +182,11 @@
 }
 
 .app-sidebar-drawer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
   background: #fff;
-  min-height: 100%;
 }
 
 .app-sidebar-drawer .app-sidebar-search {

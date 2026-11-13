@@ -5,7 +5,6 @@ import { App as AntdApp, ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import type {
-  ReconciliationBatch,
   SettlementCandidate,
   SettlementCandidateListResponse,
 } from '@sanchuang-dev/local-life-contracts'
@@ -20,8 +19,8 @@ import { SettlementCandidatePanel } from './SettlementCandidatePanel'
  *
  * What these tests protect:
  *
- * - the tab is a page-local view: it adds no URL parameter, the default is
- *   经营对账, and the candidate endpoint is not called until 分成结算单 is opened;
+ * - /settlements is independent from /reconciliation; candidates open as
+ *   the default settlement tab without querying reconciliation batches;
  * - the panel only renders server DTO values: 待核定 is text (never ¥0/0%), a
  *   missing receipt is 「无收款凭据」 (never a zero amount), and no wording claims
  *   已付款/已结清/已核销;
@@ -47,7 +46,6 @@ const SELLER_PARTY_ID = '123e4567-e89b-42d3-a456-426614174501'
 const SANCHUANG_PARTY_ID = '123e4567-e89b-42d3-a456-426614174502'
 const GUANGDIAN_PARTY_ID = '123e4567-e89b-42d3-a456-426614174503'
 const CSRF_TOKEN = 'csrf-token-for-settlement-candidate-tests'
-const BATCH_NO = 'RCN-20261101-0001'
 
 const ADMIN_SESSION: AuthenticatedSession = {
   authenticated: true,
@@ -203,23 +201,6 @@ function emptyResponse(): SettlementCandidateListResponse {
   })
 }
 
-function openBatch(): ReconciliationBatch {
-  return {
-    batchId: '9f1c5d2e-0000-4a11-8b22-0000000000b1',
-    batchNo: BATCH_NO,
-    periodFrom: '2026-11-01',
-    periodTo: '2026-11-07',
-    status: 'open',
-    entryCount: 2,
-    totalCents: 7960,
-    note: null,
-    lockedAt: null,
-    lockedByUserId: null,
-    lockedByStaffId: null,
-    createdAt: '2026-11-08T01:00:00.000Z',
-    updatedAt: '2026-11-08T01:00:00.000Z',
-  }
-}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -249,7 +230,6 @@ function stubApi(routes: ReadonlyArray<readonly [string, Handler]>): FetchCall[]
 }
 
 const CANDIDATE_ROUTE = '/api/admin/settlement/candidates'
-const BATCH_ROUTE = '/api/admin/reconciliation/batches'
 
 function candidateRoute(
   body: SettlementCandidateListResponse | (() => SettlementCandidateListResponse) = candidateResponse(),
@@ -348,87 +328,51 @@ function expectNoInventedZeroFinancialAmount(text: string | null | undefined) {
   )
 }
 
-describe('SettlementsPage 双 Tab 宿主', () => {
-  it('defaults to 经营对账, keeps the old page working, and only fetches candidates after switching', async () => {
-    const calls = stubApi([
-      [BATCH_ROUTE, () => json({ items: [openBatch()], asOf: '2026-11-08T04:00:00.000Z' })],
-      candidateRoute(),
-    ])
-
+describe('SettlementsPage independent route and white subnavigation', () => {
+  it('opens candidates directly without fetching or rendering reconciliation batches', async () => {
+    const calls = stubApi([candidateRoute()])
     const { router } = renderPage()
 
-    // 默认经营对账：旧批次列表照常读，候选接口一次都不该被调用。
-    expect(await screen.findByText(BATCH_NO)).toBeTruthy()
-    expect(screen.getByRole('tab', { name: '经营对账' })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: '分成结算单' })).toBeTruthy()
-    expect(activeHeaderTab()).toBe('经营对账')
-    expect(candidateCalls(calls)).toHaveLength(0)
-    expect(screen.getByRole('button', { name: '新建对账批次' })).toBeTruthy()
-
-    fireEvent.click(screen.getByRole('tab', { name: '分成结算单' }))
-
-    await waitFor(() => expect(candidateCalls(calls)).toHaveLength(1))
-    expect(candidateCalls(calls)[0]!.url).toContain(`${CANDIDATE_ROUTE}?`)
+    expect(await screen.findByText('有凭据实收毛额（仅当前页）')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: '分成结算' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: '候选看板' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: '合同规则' })).toBeTruthy()
+    expect(activeHeaderTab()).toBe('候选看板')
+    expect(screen.queryByRole('tab', { name: '经营对账' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '新建对账批次' })).toBeNull()
+    expect(candidateCalls(calls)).toHaveLength(1)
     expect(candidateCalls(calls)[0]!.url).toContain('page=1')
     expect(candidateCalls(calls)[0]!.url).toContain('pageSize=20')
-    expect(activeHeaderTab()).toBe('分成结算单')
-    // Tab state is local: it must not add a URL contract (back still leaves the page).
+    expect(router.state.location.pathname).toBe('/settlements')
     expect(router.state.location.search).toBe('')
-
-    expect(await screen.findByText('有凭据实收毛额（仅当前页）')).toBeTruthy()
     expect(screen.getAllByText('待核定').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('本看板未查询付款记录').length).toBeGreaterThan(0)
     expectNoInventedZeroFinancialAmount(document.body.textContent)
     expect(document.body.textContent).not.toMatch(/已付款|已结清|已核销/)
-
-    // 切回经营对账：旧内容仍在且没有额外请求候选接口。
-    fireEvent.click(screen.getByRole('tab', { name: '经营对账' }))
-    expect(await screen.findByRole('button', { name: '新建对账批次' })).toBeTruthy()
-    expect(screen.getByText(BATCH_NO)).toBeTruthy()
-    expect(activeHeaderTab()).toBe('经营对账')
-    expect(candidateCalls(calls)).toHaveLength(1)
   })
 
-  it('mounts the candidate view lazily, keeps both panels alive, and never refetches on toggle', async () => {
+  it('retains visited subpages without re-requesting the candidate data on tab changes', async () => {
     const calls = stubApi([
-      [BATCH_ROUTE, () => json({ items: [openBatch()], asOf: '2026-11-08T04:00:00.000Z' })],
       candidateRoute(),
+      ['/api/admin/settlement/parties', () => json([])],
     ])
-
     renderPage()
-    expect(await screen.findByText(BATCH_NO)).toBeTruthy()
-
-    // Before the first activation the candidate view is not in the DOM at all, so
-    // the default tab cannot have issued a candidate request (asserted above).
-    expect(tabpanel('分成结算单')).toBeNull()
-    expect(tabpanel('经营对账')).toBeTruthy()
-    expect(tabpanel('经营对账')!.hasAttribute('hidden')).toBe(false)
-    expect(candidateCalls(calls)).toHaveLength(0)
-    const batchCallsBefore = calls.filter((call) => call.url.startsWith(BATCH_ROUTE)).length
-
-    fireEvent.click(screen.getByRole('tab', { name: '分成结算单' }))
-    await screen.findByText('有凭据实收毛额（仅当前页）')
+    expect(await screen.findByText('有凭据实收毛额（仅当前页）')).toBeTruthy()
     expect(tabpanel('分成结算单')).toBeTruthy()
-    expect(tabpanel('分成结算单')!.hasAttribute('hidden')).toBe(false)
-    expect(tabpanel('经营对账')!.hasAttribute('hidden')).toBe(true)
     expect(candidateCalls(calls)).toHaveLength(1)
-    // Only the visible panel's table is exposed to assistive tech.
     expect(screen.getAllByRole('table')).toHaveLength(1)
 
-    // Away and back: the reconciliation panel stays mounted (its rows are still
-    // in the DOM) and neither side re-fetches, so a toggle cannot replay an old
-    // response over newer state.
-    fireEvent.click(screen.getByRole('tab', { name: '经营对账' }))
-    expect(tabpanel('经营对账')!.hasAttribute('hidden')).toBe(false)
-    expect(tabpanel('分成结算单')!.hasAttribute('hidden')).toBe(true)
-    expect(screen.getByText(BATCH_NO)).toBeTruthy()
-    expect(screen.getAllByRole('table')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('tab', { name: '主体目录' }))
+    expect(activeHeaderTab()).toBe('主体目录')
+    expect(tabpanel('分成结算单')).toBeTruthy()
+    const cachedCandidate = screen.getByText('有凭据实收毛额（仅当前页）')
+    expect(cachedCandidate.closest('[hidden]')).toBeTruthy()
+    expect(calls.filter((call) => call.url.startsWith('/api/admin/settlement/parties')).length).toBeGreaterThanOrEqual(1)
 
-    fireEvent.click(screen.getByRole('tab', { name: '分成结算单' }))
-    expect(tabpanel('分成结算单')!.hasAttribute('hidden')).toBe(false)
+    fireEvent.click(screen.getByRole('tab', { name: '候选看板' }))
+    expect(activeHeaderTab()).toBe('候选看板')
     expect(await screen.findByText('ORD-20261102-0001')).toBeTruthy()
     expect(candidateCalls(calls)).toHaveLength(1)
-    expect(calls.filter((call) => call.url.startsWith(BATCH_ROUTE))).toHaveLength(batchCallsBefore)
+    expect(calls.some((call) => call.url.startsWith('/api/admin/reconciliation/'))).toBe(false)
   })
 })
 

@@ -255,6 +255,11 @@ export const createCommunityRequestSchema = z.strictObject({
   location: communityLocationSchema.optional(),
 })
 
+/** Add an existing scoped operator/grid worker to a community, never create a new identity. */
+export const linkCommunityStaffRequestSchema = z.strictObject({
+  staffAccountId: z.string().uuid(),
+})
+
 export const createStaffAccountRequestSchema = z.object({
   username: z.string().trim().regex(/^[a-zA-Z0-9._-]{3,32}$/),
   displayName: z.string().trim().min(1).max(40),

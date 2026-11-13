@@ -1,3 +1,4 @@
+import { PageInfoAlert } from '../components/PageInfoHelp'
 import {
   Alert,
   Button,
@@ -396,7 +397,7 @@ export function SettlementCandidatePanel() {
 
   return (
     <section aria-label="分成结算候选看板">
-      <Alert
+      <PageInfoAlert
         type="info"
         showIcon
         title="只读候选 · 不产生应付金额"
@@ -923,7 +924,7 @@ function CandidateDetail({ row }: { row: SettlementCandidate }) {
       <section className="local-section" aria-label="为什么不能结算">
         <Typography.Text strong>为什么不能结算</Typography.Text>
         {row.blockingReasons.length === 0 ? (
-          <Alert
+          <PageInfoAlert inline
             style={{ marginTop: 8 }}
             type="info"
             showIcon

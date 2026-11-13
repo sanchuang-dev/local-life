@@ -1,3 +1,4 @@
+import { PageInfoAlert } from '../components/PageInfoHelp'
 import {
   Alert,
   App as AntdApp,
@@ -82,7 +83,7 @@ export function SettlementQuotePanel() {
 
   return (
     <section aria-label="服务端试算">
-      <Alert
+      <PageInfoAlert
         type="info"
         showIcon
         title="试算 ≠ 实际应付 ≠ 结算单锁定 ≠ 付款"

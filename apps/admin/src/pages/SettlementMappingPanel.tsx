@@ -1,3 +1,4 @@
+import { PageInfoAlert } from '../components/PageInfoHelp'
 import {
   Alert,
   App as AntdApp,
@@ -464,7 +465,7 @@ export function SettlementMappingPanel() {
 
   return (
     <section aria-label="商户映射与订单主体确认">
-      <Alert
+      <PageInfoAlert
         type="info"
         showIcon
         title="映射是版本化记录，订单主体必须逐单确认"
@@ -661,7 +662,7 @@ export function SettlementMappingPanel() {
                   选择一个当前商户映射版本与可核对的确认依据。确认是追加式快照：不可回写，只影响这一张订单，不会确认其他历史订单，也不代表已付款或可结算。
                 </Typography.Paragraph>
                 {sellerParties.length === 0 ? (
-                  <Alert
+                  <PageInfoAlert inline
                     style={{ marginBottom: 12 }}
                     type="info"
                     showIcon

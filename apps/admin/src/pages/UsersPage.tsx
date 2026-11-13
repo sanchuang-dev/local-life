@@ -468,11 +468,6 @@ export function UsersPage({ session }: UsersPageProps) {
             {session.staff.role === 'admin' ? '管理员：全部用户' : '仅权限范围内用户'}
           </Tag>
         }
-        extra={
-          <Button onClick={refresh} loading={loading}>
-            刷新
-          </Button>
-        }
       />
 
       {communityOptionsError ? (
