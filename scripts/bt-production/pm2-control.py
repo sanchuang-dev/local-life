@@ -41,6 +41,9 @@ def call(*args):
 
 
 def managed():
+    # First invocation may spawn PM2 and prepend daemon logs to jlist output.
+    # Ping first so jlist is pure JSON, including on a fresh www PM2_HOME.
+    call("ping")
     apps = json.loads(call("jlist"))
     target = [app for app in apps if app.get("name") == NAME]
     if len(target) > 1:
