@@ -204,6 +204,13 @@
       "when": 1794535200000,
       "tag": "0028_wechat_full_profile",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1794542400000,
+      "tag": "0029_resident_profile",
+      "breakpoints": true
     }
   ]
 }

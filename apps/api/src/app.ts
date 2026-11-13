@@ -77,6 +77,7 @@ import { registerDrawRoutes } from './draw/routes.js'
 import { registerUserDirectoryRoutes } from './users/routes.js'
 // #171 LL-IDENTITY-001: resident permanent-community read + explicit confirmation.
 import { registerResidentCommunityRoutes } from './resident-community/routes.js'
+import { registerResidentProfileRoutes } from './resident-profile/routes.js'
 // A login may leave one server-derived candidate; nothing is ever auto-confirmed.
 import { recordBindingCandidate } from './resident-community/service.js'
 import { registerCrmebRoutes } from './crmeb/routes.js'
@@ -1755,6 +1756,15 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
   // Resident permanent community (#171 LL-IDENTITY-001): the one read behind
   // 未绑定/已确认/待核查/冲突 plus the resident's explicit first confirmation.
   // No rebind/unbind route exists; see `resident-community` contract docs.
+  registerResidentProfileRoutes(app, {
+    db,
+    config,
+    fail,
+    validCsrf,
+    bodySchemaError,
+    now: options.now ?? (() => new Date()),
+  })
+
   registerResidentCommunityRoutes(app, {
     db,
     config,

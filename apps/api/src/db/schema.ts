@@ -78,6 +78,26 @@ export const users = sqliteTable('users', {
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 })
 
+/** Resident-owned editable profile fields. Phone identity deliberately lives elsewhere. */
+export const residentProfiles = sqliteTable(
+  'resident_profiles',
+  {
+    userId: text('user_id')
+      .primaryKey()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    contactAddress: text('contact_address'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    check(
+      'resident_profiles_contact_address_check',
+      sql`${table.contactAddress} IS NULL
+        OR (length(trim(${table.contactAddress})) BETWEEN 1 AND 200)`,
+    ),
+  ],
+)
+
 export const wechatIdentities = sqliteTable(
   'wechat_identities',
   {
