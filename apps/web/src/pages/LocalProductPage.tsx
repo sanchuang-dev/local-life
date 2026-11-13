@@ -14,11 +14,13 @@ import {
   RefreshCw,
   ShoppingBasket,
   Store,
+  Ticket,
   UsersRound,
 } from 'lucide-react'
 import { PageHeader } from '../components/PageHeader'
 import { useBackTarget } from '../hooks/useBackTarget'
 import { useLocalProduct } from '../hooks/useLocalCatalog'
+import { useCouponWallet } from '../hooks/useCouponWallet'
 import { useLocalOrderTeamOptions } from '../hooks/useLocalOrders'
 import { useResidentAuth } from '../hooks/useResidentAuth'
 import { buildResidentLoginHref } from '../components/auth/residentLogin'
@@ -30,6 +32,7 @@ import { reportResidentSessionExpired } from '../services/residentSessionEvents'
 import {
   formatLocalDateTime,
   formatLocalPriceCents,
+  localOrderStatusLabels,
 } from '../components/life/localOrderLabels'
 import {
   buildLocalOrderRegistration,
@@ -42,6 +45,13 @@ import {
   teamSelectionMode,
   type LocalOrderSubmissionAttempt,
 } from '../components/life/localOrderAttribution'
+import {
+  buildLocalOrderCouponOptions,
+  chooseUsableCoupon,
+  hasUnresolvedCouponSelection,
+  localOrderAmountLines,
+  shortCouponId,
+} from '../components/life/localOrderCoupon'
 import { registerLocalOrder } from '../services/localOrders'
 import { describeLocalError, isLocalApiError, newIdempotencyKey } from '../services/localApi'
 
@@ -129,8 +139,10 @@ export function LocalProductPage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [registeredOrder, setRegisteredOrder] = useState<LocalOrderDetail | null>(null)
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
-  // One attempt = one idempotency key + one frozen consumption-team attribution.
-  // A network retry replays both, so it can neither duplicate nor switch teams.
+  const [selectedCouponId, setSelectedCouponId] = useState<string | null>(null)
+  // One attempt = one idempotency key + one frozen team + one coupon. A network
+  // retry replays all three, so it can neither duplicate an order, switch teams
+  // nor reserve a second coupon.
   const [attempt, setAttempt] = useState<LocalOrderSubmissionAttempt | null>(null)
   const [attemptMayReset, setAttemptMayReset] = useState(false)
 
@@ -139,6 +151,10 @@ export function LocalProductPage() {
   const session = auth.session
   const teamOptions = useLocalOrderTeamOptions({
     productId: product?.id ?? null,
+    sessionKey: session?.user.id ?? null,
+    authLoading: auth.loading,
+  })
+  const couponWallet = useCouponWallet({
     sessionKey: session?.user.id ?? null,
     authLoading: auth.loading,
   })
@@ -151,12 +167,43 @@ export function LocalProductPage() {
   const teamChoiceMissing = teamMode === 'choice' && !attempt && !selectedTeam
   const inputsLocked = submitting || registeredOrder !== null || attempt !== null
   const teamReady = teamOptions.state.status === 'ready'
+
+  const couponItems = couponWallet.state.status === 'ready' ? couponWallet.state.items : []
+  const couponOptions = product
+    ? buildLocalOrderCouponOptions(couponItems, {
+        grossCents: totalCents,
+        communityId: product.community.id,
+      })
+    : []
+  // A stale id, a refreshed wallet or a quantity change can invalidate the
+  // selected coupon. Resolve to null and require an explicit new choice; never
+  // silently fall back to another coupon or to a discount.
+  const selectedCoupon = chooseUsableCoupon(couponOptions, selectedCouponId)
+  // A selected coupon must not silently turn into a full-price order if the
+  // wallet refresh is pending, failed, or returns an empty list. A frozen retry
+  // keeps its original coupon regardless of the refreshed wallet state.
+  const couponChoiceMissing =
+    !attempt && hasUnresolvedCouponSelection(selectedCouponId, selectedCoupon)
+  const previewDiscountCents = attempt
+    ? attempt.couponFaceValueCents
+    : selectedCoupon?.coupon.faceValueCents ?? 0
+  const previewNetPayableCents = Math.max(0, totalCents - previewDiscountCents)
+  const previewAmounts = localOrderAmountLines({
+    totalCents,
+    couponDiscountCents: previewDiscountCents,
+    netPayableCents: previewNetPayableCents,
+  })
+  const registeredAmounts = registeredOrder
+    ? localOrderAmountLines(registeredOrder.snapshot)
+    : []
+
   const canRegister =
     Boolean(session) &&
     state.status === 'ready' &&
     product?.status === 'on_shelf' &&
     teamReady &&
     !teamChoiceMissing &&
+    !couponChoiceMissing &&
     registeredOrder === null
 
   const unavailableAction = useMemo(() => {
@@ -171,6 +218,11 @@ export function LocalProductPage() {
       setSubmitError('消费团归属还未读取完成，请稍后重试。')
       return
     }
+    if (couponChoiceMissing) {
+      setSubmitError('所选消费券已不可用，请重新选择或不使用消费券。')
+      couponWallet.reload()
+      return
+    }
 
     const resolution = attempt
       ? { ok: true as const, attribution: attempt.attribution }
@@ -180,9 +232,19 @@ export function LocalProductPage() {
       return
     }
 
+    const frozenCoupon = attempt
+      ? attempt.couponId
+        ? { id: attempt.couponId, faceValueCents: attempt.couponFaceValueCents }
+        : null
+      : selectedCoupon
+        ? {
+            id: selectedCoupon.coupon.id,
+            faceValueCents: selectedCoupon.coupon.faceValueCents,
+          }
+        : null
     const nextAttempt = resolveSubmissionAttempt(
       attempt,
-      resolution.attribution,
+      { attribution: resolution.attribution, coupon: frozenCoupon },
       newIdempotencyKey,
     )
     setAttempt(nextAttempt)
@@ -197,18 +259,24 @@ export function LocalProductPage() {
           quantity,
           note,
           attribution: nextAttempt.attribution,
+          couponId: nextAttempt.couponId,
           idempotencyKey: nextAttempt.idempotencyKey,
         }),
       )
       setRegisteredOrder(order)
       setAttempt(null)
+      couponWallet.reload()
     } catch (cause) {
       setAttemptMayReset(isLocalApiError(cause) && mayDiscardRejectedOrderAttempt(cause))
       setSubmitError(describeLocalError(cause, '登记订单失败，请稍后重试'))
-      if (isLocalApiError(cause) && (cause.status === 401 || cause.status === 409)) {
-        // The snapshot or the shelf state changed, or the session expired: re-read
-        // the product so the resident sees the real current state, not a stale one.
-        if (cause.status === 409) reload()
+      if (isLocalApiError(cause) && (cause.status === 400 || cause.status === 401 || cause.status === 409)) {
+        // The snapshot, shelf state or coupon reservation may have changed, or
+        // the session expired: re-read both server truths instead of trusting
+        // the form's preview.
+        if (cause.status === 400 || cause.status === 409) {
+          reload()
+          couponWallet.reload()
+        }
         if (cause.status === 401) {
           // No order was written for an unauthenticated request; do not keep a
           // frozen attempt from blocking the form after the resident logs in.
@@ -393,10 +461,170 @@ export function LocalProductPage() {
               </div>
             </div>
 
-            <p className="mt-2 text-right text-[12px] text-slate-500">
-              参考合计 <span className="font-semibold text-[#8a6132]">{formatLocalPriceCents(totalCents)}</span>
-              （以登记确认时的价格为准）
-            </p>
+            <div className="mt-3 rounded-[14px] bg-[#f4f8f6] px-3.5 py-3">
+              <dl className="space-y-1.5">
+                {previewAmounts.map((line) => (
+                  <div
+                    key={line.label}
+                    className={`flex items-baseline justify-between gap-3 ${
+                      line.label === '待实际支付' ? 'border-t border-slate-200 pt-1.5' : ''
+                    }`}
+                  >
+                    <dt className="text-[12px] text-slate-500">{line.label}</dt>
+                    <dd
+                      className={`text-[13px] font-semibold ${
+                        line.label === '待实际支付'
+                          ? 'text-[#8a6132]'
+                          : line.label === '券抵扣'
+                            ? 'text-teal-700'
+                            : 'text-slate-700'
+                      }`}
+                    >
+                      {line.text}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="mt-2 text-[10px] leading-4 text-slate-400">
+                商品总额按参考单价计算；券抵扣与待实际支付以服务端登记结果为准。
+              </p>
+            </div>
+
+            {session && !registeredOrder ? (
+              <div className="mt-3 rounded-[14px] border border-slate-200 bg-[#f8faf9] px-3.5 py-3">
+                <p className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-700">
+                  <Ticket size={14} className="shrink-0 text-teal-700" aria-hidden="true" />
+                  消费券（不使用 / 选一张）
+                </p>
+
+                {attempt ? (
+                  <p className="mt-1.5 break-words text-[11px] leading-5 text-slate-600">
+                    本次登记原选消费券：
+                    {attempt.couponId
+                      ? `${formatLocalPriceCents(attempt.couponFaceValueCents)} 券（已锁定重试）`
+                      : '不使用消费券（已锁定重试）'}
+                  </p>
+                ) : couponWallet.state.status === 'loading' ||
+                  couponWallet.state.status === 'idle' ? (
+                  <p
+                    role="status"
+                    aria-live="polite"
+                    className="mt-1.5 flex items-center gap-1.5 text-[11px] leading-5 text-slate-500"
+                  >
+                    <LoaderCircle size={13} className="shrink-0 animate-spin text-teal-600" aria-hidden="true" />
+                    正在读取可用消费券…
+                  </p>
+                ) : couponWallet.state.status === 'error' ? (
+                  <div className="mt-1.5" role="alert">
+                    <p className="break-words text-[11px] leading-5 text-[#8a6132]">
+                      {couponWallet.state.message}
+                    </p>
+                    <p className="mt-0.5 text-[10px] leading-4 text-slate-400">
+                      未读取到券包时不会替你选择消费券，本单仍可不使用消费券登记。
+                    </p>
+                    <button
+                      type="button"
+                      onClick={couponWallet.reload}
+                      className="mt-1.5 inline-flex min-h-[36px] items-center gap-1 rounded-full border border-slate-300 bg-white px-3 text-[11px] font-semibold text-slate-600"
+                    >
+                      <RefreshCw size={12} aria-hidden="true" />
+                      重新读取消费券
+                    </button>
+                  </div>
+                ) : couponWallet.state.status === 'unauthenticated' ? (
+                  <p className="mt-1.5 text-[11px] leading-5 text-slate-500">
+                    登录状态已失效，暂未读取到消费券；本单仍可不使用消费券登记。
+                  </p>
+                ) : couponWallet.state.status === 'ready' && couponItems.length === 0 ? (
+                  <p className="mt-1.5 text-[11px] leading-5 text-slate-500">
+                    你的账户暂无消费券，本单将按商品总额登记。
+                  </p>
+                ) : couponWallet.state.status === 'ready' ? (
+                  <>
+                    <fieldset className="mt-2 space-y-2">
+                      <legend className="sr-only">选择本单使用的消费券</legend>
+                      <label
+                        className={`flex items-start gap-2.5 rounded-[12px] border px-3 py-2.5 transition-colors ${
+                          selectedCouponId === null
+                            ? 'border-teal-300 bg-[#eef7f2]'
+                            : 'border-slate-200 bg-white hover:border-teal-200'
+                        } ${inputsLocked ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
+                      >
+                        <input
+                          type="radio"
+                          name="local-order-coupon"
+                          value="none"
+                          checked={selectedCouponId === null}
+                          disabled={inputsLocked}
+                          onChange={() => setSelectedCouponId(null)}
+                          className="mt-0.5 h-4 w-4 shrink-0 accent-teal-700"
+                        />
+                        <span className="min-w-0">
+                          <span className="block text-[12px] font-semibold leading-5 text-slate-700">
+                            不使用消费券
+                          </span>
+                          <span className="mt-0.5 block text-[10px] leading-4 text-slate-400">
+                            按商品总额登记，不占用任何消费券。
+                          </span>
+                        </span>
+                      </label>
+
+                      {couponOptions.map((option) => (
+                        <label
+                          key={option.coupon.id}
+                          className={`flex items-start gap-2.5 rounded-[12px] border px-3 py-2.5 transition-colors ${
+                            selectedCouponId === option.coupon.id && option.usable
+                              ? 'border-teal-300 bg-[#eef7f2]'
+                              : 'border-slate-200 bg-white hover:border-teal-200'
+                          } ${option.usable ? '' : 'opacity-70'} ${
+                            inputsLocked || !option.usable ? 'cursor-not-allowed' : 'cursor-pointer'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="local-order-coupon"
+                            value={option.coupon.id}
+                            checked={selectedCouponId === option.coupon.id}
+                            disabled={inputsLocked || !option.usable}
+                            onChange={() => setSelectedCouponId(option.coupon.id)}
+                            className="mt-0.5 h-4 w-4 shrink-0 accent-teal-700"
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-center justify-between gap-2">
+                              <span className="break-words text-[12px] font-semibold leading-5 text-slate-700">
+                                消费券 · {formatLocalPriceCents(option.coupon.faceValueCents)}
+                              </span>
+                              <span
+                                className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                                  option.usable
+                                    ? 'bg-[#eef7f2] text-[#388b77]'
+                                    : 'bg-slate-100 text-slate-500'
+                                }`}
+                              >
+                                {option.usable ? '可用' : '不可用'}
+                              </span>
+                            </span>
+                            <span className="mt-0.5 block text-[10px] leading-4 text-slate-400">
+                              {option.unavailableReason ??
+                                `有效期至 ${formatLocalDateTime(option.coupon.expiresAt)}`}
+                            </span>
+                          </span>
+                        </label>
+                      ))}
+                    </fieldset>
+
+                    {couponChoiceMissing ? (
+                      <p className="mt-1.5 text-[10px] leading-4 text-[#a96b2f]">
+                        所选消费券已不可用，请重新选择或不使用消费券。
+                      </p>
+                    ) : null}
+                    <p className="mt-1.5 text-[10px] leading-4 text-slate-400">
+                      仅可使用当前居民账户、本商品所在社区活动发放的消费券；每单最多一张，不叠加、不找零、不转赠。
+                    </p>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="mt-3 rounded-[14px] border border-slate-200 bg-[#f8faf9] px-3.5 py-3">
               <p className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-700">
@@ -506,7 +734,7 @@ export function LocalProductPage() {
                     <div className="mt-2 rounded-[10px] border border-slate-200 bg-white px-2.5 py-2">
                       <p className="flex items-start gap-1.5 text-[10px] leading-4 text-slate-500">
                         <LockKeyhole size={12} className="mt-0.5 shrink-0" aria-hidden="true" />
-                        本次重试会沿用原消费团归属与幂等键，不会切换归属。
+                        本次重试会沿用原消费团归属、消费券与幂等键，不会切换归属或重复占券。
                       </p>
                       {attemptMayReset ? (
                         <button
@@ -559,11 +787,28 @@ export function LocalProductPage() {
                   订单已提交，工作人员会按登记信息联系你。平台不收款，这也不代表业务已开通。
                 </p>
                 <p className="mt-1 break-words text-[11px] font-medium leading-5 text-[#225c4c]">
+                  处理状态：{localOrderStatusLabels[registeredOrder.status]}
+                </p>
+                <dl className="mt-2 space-y-1 border-t border-teal-200/70 pt-2">
+                  {registeredAmounts.map((line) => (
+                    <div key={line.label} className="flex items-baseline justify-between gap-3">
+                      <dt className="text-[11px] text-[#52786c]">{line.label}</dt>
+                      <dd className="text-[12px] font-semibold text-[#225c4c]">{line.text}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <p className="mt-1.5 break-words text-[11px] leading-5 text-[#225c4c]">
+                  消费券：
+                  {registeredOrder.snapshot.couponId
+                    ? `已由服务端为该订单占用（编号 ${shortCouponId(registeredOrder.snapshot.couponId)}）`
+                    : '未使用消费券'}
+                </p>
+                <p className="mt-1 break-words text-[11px] font-medium leading-5 text-[#225c4c]">
                   消费团归属：{describeOrderAttribution(registeredOrder)}
                 </p>
                 <p className="mt-0.5 flex items-start gap-1.5 text-[10px] leading-4 text-[#52786c]">
                   <LockKeyhole size={12} className="mt-0.5 shrink-0" aria-hidden="true" />
-                  该归属在登记时锁定，提交后不能修改或转团。
+                  归属在登记时锁定，提交后不能修改或转团；以上金额为服务端订单快照，登记成功不等于付款成功。
                 </p>
                 <Link
                   to={`/me/orders/${registeredOrder.id}`}
@@ -596,7 +841,7 @@ export function LocalProductPage() {
                 ) : registeredOrder ? (
                   '已登记'
                 ) : attempt ? (
-                  '重试登记（沿用原归属）'
+                  '重试登记（沿用原归属与消费券）'
                 ) : (
                   '登记订单 / 提交办理意向'
                 )}

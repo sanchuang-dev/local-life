@@ -926,6 +926,7 @@ test('third join issues exactly one identical coupon to each member after existi
     const coupon = wallet.items[0]!
     assert.equal(coupon.activityId, activityId)
     assert.equal(coupon.teamId, teamId)
+    assert.equal(coupon.communityId, communityId)
     assert.equal(coupon.status, 'available')
     assert.equal(coupon.faceValueCents, 200)
     assert.equal(coupon.reservedOrderId, null)

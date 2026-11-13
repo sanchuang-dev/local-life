@@ -173,7 +173,18 @@ export function getMyCoupons(
   userId: string,
   now: Date = new Date(),
 ): CouponWalletResponse {
-  const rows = db.select().from(couponIssues)
+  const rows = db.select({
+    id: couponIssues.id,
+    activityId: couponIssues.activityId,
+    teamId: couponIssues.teamId,
+    communityId: activities.communityId,
+    faceValueCents: couponIssues.faceValueCents,
+    status: couponIssues.status,
+    issuedAt: couponIssues.issuedAt,
+    expiresAt: couponIssues.expiresAt,
+    reservedOrderId: couponIssues.reservedOrderId,
+  }).from(couponIssues)
+    .innerJoin(activities, eq(couponIssues.activityId, activities.id))
     .where(eq(couponIssues.userId, userId))
     .orderBy(desc(couponIssues.issuedAt), desc(couponIssues.id)).all()
   return couponWalletResponseSchema.parse({
@@ -181,6 +192,7 @@ export function getMyCoupons(
       id: row.id,
       activityId: row.activityId,
       teamId: row.teamId,
+      communityId: row.communityId,
       faceValueCents: row.faceValueCents,
       status: row.status === 'available' && row.expiresAt.getTime() <= now.getTime()
         ? 'expired' : row.status,

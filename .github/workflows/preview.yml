@@ -1,9 +1,9 @@
 # A GitHub Pages repository has one site. Publish dev at the existing root
-# and the separately built prod branch under /prod/ in one atomic artifact.
-# The source for the production showcase is always the prod branch.
+# and a read-only showcase mirror of the new production branch at /prod/.
+# This Pages output is not the BT production release or a promotion route.
 #
-# dev is already a pnpm workspace. prod may still be the legacy single-package
-# layout until it is promoted, so the prod build keeps a documented fallback.
+# prod is promoted only from reviewed mvp; the legacy single-package fallback
+# remains until the existing prod branch has completed its first promotion.
 name: Local Life Pages (Dev and Prod)
 
 on:

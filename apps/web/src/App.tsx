@@ -2,7 +2,9 @@ import { Navigate, Route, Routes, useLocation } from 'react-router'
 import { AppShell } from './components/shell/AppShell'
 import { RequireResidentAuth } from './components/auth/RequireResidentAuth'
 import { ResidentSiteGate } from './components/auth/ResidentSiteGate'
+import { shouldShowWeChatGate } from './components/auth/wechatEnvironment'
 import { ResidentAuthProvider } from './hooks/useResidentAuth'
+import { OpenInWeChatPage } from './pages/OpenInWeChatPage'
 import { CommunityDiscoveryPage } from './pages/CommunityDiscoveryPage'
 import { ACTIVITY_DETAIL_PATH, communityRootRedirect } from './lib/communityHomeRoute'
 import { CommunityActivityPage } from './pages/CommunityActivityPage'
@@ -43,7 +45,30 @@ import { WorkbenchOrderNewPage } from './pages/workbench/WorkbenchOrderNewPage'
 import { WorkbenchOrdersPage } from './pages/workbench/WorkbenchOrdersPage'
 import { WorkbenchVerifyPage } from './pages/workbench/WorkbenchVerifyPage'
 
+// Persist the local-only UI preview switch across HashRouter navigation and login.
+// Production builds never read or honor this flag.
+const developmentPreviewEnabled = (() => {
+  if (!import.meta.env.DEV) return false
+  const previewParam = new URLSearchParams(window.location.search).get('previewApp')
+  try {
+    if (previewParam === '1') sessionStorage.setItem('local-life:preview-app', '1')
+    if (previewParam === '0') sessionStorage.removeItem('local-life:preview-app')
+    return sessionStorage.getItem('local-life:preview-app') === '1'
+  } catch {
+    return previewParam === '1'
+  }
+})()
+
 export default function App() {
+  const location = useLocation()
+  if (shouldShowWeChatGate({
+    userAgent: navigator.userAgent,
+    pathname: location.pathname,
+    search: window.location.search,
+    isDevelopment: import.meta.env.DEV,
+    previewSessionEnabled: developmentPreviewEnabled,
+  })) return <OpenInWeChatPage />
+
   return (
     <ResidentAuthProvider>
       <ResidentSiteGate>

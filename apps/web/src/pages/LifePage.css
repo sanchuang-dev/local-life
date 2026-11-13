@@ -1,0 +1,288 @@
+.life-market {
+  --life-ink: #1d3c32;
+  --life-muted: #6e827a;
+  width: 100%;
+  min-height: 100%;
+  margin-inline: auto;
+  padding-bottom: 30px;
+  background: #f5f8f6;
+  color: var(--life-ink);
+}
+.life-market__hero {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  min-height: 206px;
+  padding: 24px 19px 45px;
+  overflow: hidden;
+  background: radial-gradient(circle at 82% 7%, rgba(180, 242, 186, .31), transparent 35%), linear-gradient(112deg, #117b6c 0%, #169884 56%, #65b898 100%);
+  color: #fff;
+}
+.life-market__hero-content { position: relative; z-index: 1; width: 100%; }
+.life-market__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #c9f1de;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: .09em;
+}
+.life-market__hero h1 {
+  margin: 9px 0 0;
+  font-size: 30px;
+  line-height: 1.2;
+  letter-spacing: -.045em;
+  font-weight: 800;
+}
+.life-market__hero p { margin: 8px 0 0; color: #e7faf0; font-size: 13px; line-height: 1.65; }
+.life-market__hero-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 18px;
+  padding: 4px;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 999px;
+  background: rgba(12, 90, 77, .36);
+}
+.life-market__hero-tabs span,
+.life-market__hero-tabs a {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 4px 15px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 680;
+  line-height: 1.35;
+  text-decoration: none;
+}
+.life-market__hero-tabs span { background: #fff; color: #137968; }
+.life-market__hero-tabs a { color: #f3fff9; }
+.life-market__hero-decoration { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.life-market__hero-orbit { position: absolute; display: block; border: 1px solid rgba(255,255,255,.19); border-radius: 50%; }
+.life-market__hero-orbit--one { width: 230px; height: 230px; right: -100px; top: -95px; }
+.life-market__hero-orbit--two { width: 160px; height: 160px; right: -26px; top: 55px; }
+.life-market__hero-bag {
+  position: absolute;
+  top: 41px;
+  right: 27px;
+  display: grid;
+  width: 109px;
+  height: 109px;
+  place-items: center;
+  transform: rotate(-9deg);
+  border: 1px solid rgba(255,255,255,.26);
+  border-radius: 29px;
+  background: linear-gradient(135deg, rgba(255,255,255,.23), rgba(255,255,255,.08));
+  box-shadow: 0 16px 24px rgba(0, 68, 54, .15), inset 0 1px 1px rgba(255,255,255,.28);
+  color: #f3ffe9;
+}
+.life-market__shortcuts {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1px;
+  margin: -22px 12px 0;
+  padding: 17px 4px 13px;
+  border: 1px solid #fff;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 10px 25px rgba(33, 88, 66, .09);
+}
+.life-market__shortcuts a,
+.life-market__shortcuts button {
+  display: flex;
+  min-width: 0;
+  min-height: 83px;
+  align-items: center;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 9px;
+  padding: 3px 1px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: #365146;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.3;
+  font-weight: 650;
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.life-market__shortcuts a:active, .life-market__shortcuts button:active { background: #f4f8f5; }
+.life-market__shortcut-icon {
+  display: grid;
+  width: 45px;
+  height: 45px;
+  flex: none;
+  place-items: center;
+  border-radius: 15px;
+}
+.life-market__shortcut-icon--green { background: #e6f6e9; color: #3f9b65; }
+.life-market__shortcut-icon--coral { background: #fff0ed; color: #df8971; }
+.life-market__shortcut-icon--orange { background: #fff2e3; color: #df9a4e; }
+.life-market__shortcut-icon--blue { background: #eaf2fb; color: #6691bb; }
+.life-market__shortcut-icon--pink { background: #fff0f3; color: #d87992; }
+.life-market__unavailable {
+  margin: 14px 16px 0;
+  padding: 12px 14px;
+  border: 1px solid #edddc6;
+  border-radius: 13px;
+  background: #fff9f0;
+  color: #906a3e;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.life-market__content { padding: 24px 13px 6px; }
+.life-market__section-title {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 4px 15px;
+}
+.life-market__section-title h2 { margin: 3px 0 0; font-size: 21px; font-weight: 780; line-height: 1.3; letter-spacing: -.025em; }
+.life-market__section-title > span { padding-bottom: 3px; font-size: 10px; color: #84988d; white-space: nowrap; }
+.life-market__grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); align-items: start; gap: 12px; }
+.life-shelf-card,
+.life-market__order-tile {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 259px;
+  overflow: hidden;
+  padding: 15px 13px 14px;
+  border: 1px solid rgba(255,255,255,.88);
+  border-radius: 23px;
+  box-shadow: 0 8px 22px rgba(56, 105, 67, .045);
+  scroll-margin-top: 14px;
+}
+.life-shelf-card--local { background: linear-gradient(160deg, #eef8e9, #f9fcf3); }
+.life-shelf-card--offers { background: linear-gradient(155deg, #fff2eb, #fffbf5); }
+.life-shelf-card--deals { background: linear-gradient(155deg, #eaf4f9, #fbfdf9); }
+.life-shelf-card--expanded { grid-column: 1 / -1; min-height: 0; background: #fff; }
+.life-shelf-card__header { display: flex; align-items: flex-start; gap: 7px; }
+.life-shelf-card__icon { display: grid; width: 34px; height: 34px; flex: none; place-items: center; border-radius: 12px; background: rgba(255,255,255,.7); }
+.life-shelf-card--local .life-shelf-card__icon { color: #378c59; }
+.life-shelf-card--offers .life-shelf-card__icon { color: #d97d58; }
+.life-shelf-card--deals .life-shelf-card__icon { color: #5b8fae; }
+.life-shelf-card__heading { display: grid; gap: 5px; min-width: 0; }
+.life-shelf-card__heading h3 { margin: 0; font-size: 16px; line-height: 1.4; font-weight: 780; letter-spacing: -.025em; color: #254639; }
+.life-shelf-card__heading p { margin: 0; font-size: 11px; line-height: 1.5; color: #73867a; }
+.life-shelf-card__body { display: flex; flex: 1; min-width: 0; flex-direction: column; }
+.life-shelf-card__illustration {
+  display: grid;
+  place-items: center;
+  width: 94px;
+  height: 78px;
+  flex: none;
+  margin: 12px auto 7px;
+  border-radius: 32px 39px 28px 42px;
+  background: rgba(255,255,255,.56);
+  transform: rotate(-4deg);
+}
+.life-shelf-card__illustration svg { transform: rotate(4deg); }
+.life-shelf-card--local .life-shelf-card__illustration { color: #5aab70; }
+.life-shelf-card--offers .life-shelf-card__illustration { color: #e7a083; }
+.life-shelf-card--deals .life-shelf-card__illustration { color: #91aec4; }
+.life-shelf-card__status { margin: 1px 0 0; color: #4a6356; font-size: 12px; font-weight: 720; line-height: 1.5; text-align: center; }
+.life-shelf-card__detail { margin: 5px 0 0; color: #809286; font-size: 11px; line-height: 1.55; text-align: center; overflow-wrap: anywhere; }
+.life-shelf-card__action {
+  display: inline-flex;
+  width: 100%;
+  min-height: 39px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: auto;
+  padding: 8px 7px;
+  border: 1px solid rgba(41,126,88,.24);
+  border-radius: 12px;
+  background: #fff;
+  color: #27865a;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+.life-shelf-card__body > .life-shelf-card__action { margin-top: auto; }
+.life-shelf-card__footer { margin: 10px 0 0; color: #849189; font-size: 10px; line-height: 1.55; }
+.life-shelf-card__footer a { color: #237d5f; font-weight: 700; text-decoration: underline; }
+.life-shelf-card__product-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.life-shelf-card__product-grid > * { min-width: 0; }
+.life-shelf-card__message { margin: 11px 0; color: #a35449; font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.life-shelf-card__label { margin-top: 10px; color: #5f7769; font-size: 11px; line-height: 1.6; }
+.life-shelf-card--expanded .life-shelf-card__body { display: block; }
+.life-shelf-card--expanded .life-shelf-card__illustration { display: none; }
+.life-market__order-tile {
+  min-height: 259px;
+  background: linear-gradient(152deg, #fff5e7, #fffcf3);
+  color: #6c5538;
+  text-decoration: none;
+  position: relative;
+}
+.life-market__order-kicker { display: inline-flex; align-items: center; gap: 4px; width: fit-content; padding: 4px 7px; border-radius: 999px; background: rgba(255,255,255,.68); font-size: 10px; color: #ba8751; font-weight: 700; }
+.life-market__order-title { margin-top: 12px; color: #56402d; font-size: 17px; line-height: 1.35; font-weight: 770; }
+.life-market__order-subtitle { margin-top: 6px; color: #94836d; font-size: 11px; line-height: 1.6; }
+.life-market__order-illustration { display: grid; align-self: center; place-items: center; width: 94px; height: 79px; margin: 12px 0 4px; color: #d4ab7c; border-radius: 30px; background: rgba(255,255,255,.51); }
+.life-market__order-action { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 39px; margin-top: auto; padding: 7px 6px; border-radius: 12px; background: #e5aa71; color: #fff; font-size: 11px; font-weight: 750; }
+
+.life-market__offer {
+  display: flex;
+  min-height: 150px;
+  flex-direction: column;
+  padding: 13px;
+  border: 1px solid #f1eee9;
+  border-radius: 16px;
+  background: #fffaf7;
+}
+.life-market__offer-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  color: #a86d50;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.life-market__offer h4 {
+  margin: 9px 0 0;
+  color: #283d32;
+  font-size: 14px;
+  line-height: 1.45;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+.life-market__offer p { margin: 6px 0 0; font-size: 12px; line-height: 1.55; color: #75857b; overflow-wrap: anywhere; }
+.life-market__offer a { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; margin-top: auto; color: #bc7555; text-decoration: none; font-size: 12px; font-weight: 750; }
+.life-shelf-card > a.life-shelf-card__footer { align-self: flex-start; color: #337f62; text-decoration: none; font-weight: 700; }
+.life-shelf-card > a.life-shelf-card__footer svg { vertical-align: text-bottom; }
+.life-shelf-card__body > .life-shelf-card__body { min-height: 166px; }
+.life-market__footnote { margin: 22px 7px 0; color: #95a198; font-size: 11px; line-height: 1.7; text-align: center; }
+.life-market a:focus-visible, .life-market button:focus-visible { outline: 2px solid #126e58; outline-offset: 3px; }
+@media (max-width: 360px) {
+  .life-market__hero { padding-inline: 15px; }
+  .life-market__hero-bag { width: 88px; height: 88px; right: 14px; top: 47px; }
+  .life-market__hero-bag svg { width: 55px; }
+  .life-market__shortcuts { margin-inline: 7px; padding-inline: 1px; }
+  .life-market__shortcuts a, .life-market__shortcuts button { font-size: 10px; }
+  .life-market__shortcut-icon { width: 40px; height: 40px; }
+  .life-market__content { padding-inline: 9px; }
+  .life-market__grid { gap: 9px; }
+  .life-shelf-card, .life-market__order-tile { padding-inline: 10px; }
+  .life-shelf-card__heading h3 { font-size: 15px; }
+  .life-market__section-title > span { font-size: 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .life-market__shortcuts a, .life-market__shortcuts button { transition: none; }
+}

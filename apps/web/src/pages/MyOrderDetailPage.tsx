@@ -10,6 +10,7 @@ import {
   localOrderStatusTone,
 } from '../components/life/localOrderLabels'
 import { describeOrderAttribution } from '../components/life/localOrderAttribution'
+import { localOrderAmountLines, shortCouponId } from '../components/life/localOrderCoupon'
 import { useBackTarget } from '../hooks/useBackTarget'
 import { useMyLocalOrder } from '../hooks/useLocalOrders'
 import { useResidentAuth } from '../hooks/useResidentAuth'
@@ -46,7 +47,16 @@ function OrderDetailBody({ order }: { order: LocalOrderDetail }) {
     { label: '商品', value: order.snapshot.productName },
     { label: '单价', value: formatLocalPriceCents(order.snapshot.unitPriceCents) },
     { label: '数量', value: `${order.snapshot.quantity} 件` },
-    { label: '参考合计', value: formatLocalPriceCents(order.snapshot.totalCents) },
+    ...localOrderAmountLines(order.snapshot).map((line) => ({
+      label: line.label,
+      value: line.text,
+    })),
+    {
+      label: '消费券',
+      value: order.snapshot.couponId
+        ? `已绑定 · ${shortCouponId(order.snapshot.couponId)}`
+        : '未使用',
+    },
     { label: '社区', value: order.community.name },
     { label: '登记时间', value: formatLocalDateTime(order.createdAt) },
     { label: '最后更新', value: formatLocalDateTime(order.updatedAt) },
@@ -93,6 +103,9 @@ function OrderDetailBody({ order }: { order: LocalOrderDetail }) {
             </div>
           ))}
         </dl>
+        <p className="mt-2 text-[10px] leading-4 text-slate-400">
+          券抵扣与待实际支付来自服务端冻结快照；订单登记成功不等于付款成功，平台不收款。
+        </p>
         {order.note ? (
           <p className="mt-2 break-words rounded-[12px] bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-500">
             我的备注：{order.note}

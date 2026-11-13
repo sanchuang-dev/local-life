@@ -8,6 +8,7 @@ import { parseInviteParam } from '../components/activity/share'
 import { isWeChatBrowser } from '../components/auth/wechatEnvironment'
 import { PhoneVerificationForm } from '../components/auth/PhoneVerificationForm'
 import { UnifiedLoginView } from '../components/auth/UnifiedLoginView'
+import { OpenInWeChatPage } from './OpenInWeChatPage'
 import {
   buildResidentWechatLoginRequest, resolveResidentLoginTarget,
 } from '../components/auth/residentLogin'
@@ -69,6 +70,20 @@ export function ResidentLoginPage() {
       ? wechatUnavailableMessage(auth.methods.wechatUnavailableReason)
       : !auth.methods && !auth.methodsLoading ? '登录方式暂时无法读取，请刷新重试。' :
       null
+
+  // Browser-only entry uses the new standalone visual; the existing WeChat
+  // OAuth and phone flows remain unchanged inside WeChat.
+  if (!wechatBrowser) {
+    return (
+      <OpenInWeChatPage
+        developmentLogin={import.meta.env.DEV && auth.methods?.developmentResidentLogin ? {
+          onLogin: () => void auth.developmentLogin(),
+          busy: auth.busy,
+          error: auth.error,
+        } : undefined}
+      />
+    )
+  }
 
   return (
     <UnifiedLoginView

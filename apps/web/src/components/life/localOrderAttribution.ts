@@ -79,24 +79,45 @@ export function resolveOrderAttribution(
   }
 }
 
+export interface LocalOrderCouponSelection {
+  id: string
+  faceValueCents: number
+}
+
+export interface LocalOrderSubmissionIntent {
+  attribution: LocalOrderAttribution
+  coupon: LocalOrderCouponSelection | null
+}
+
 export interface LocalOrderSubmissionAttempt {
   idempotencyKey: string
   attribution: LocalOrderAttribution
+  /** Frozen coupon id, or null for an order without a coupon. */
+  couponId: string | null
+  /** Frozen preview only; the server re-reads the real face value. */
+  couponFaceValueCents: number
 }
 
 /**
- * One submission attempt = one idempotency key + one frozen attribution.
+ * One submission attempt = one idempotency key + one frozen team + one coupon.
  *
- * Once an attempt exists every retry reuses both. Changing the UI selection can
- * therefore not turn a replay into a different order; the resident must
- * explicitly discard the attempt before choosing another team.
+ * Once an attempt exists every retry reuses all three. Changing the UI selection
+ * can therefore not turn a replay into a different order or reserve a second
+ * coupon; the resident must explicitly discard the attempt before editing.
  */
 export function resolveSubmissionAttempt(
   previous: LocalOrderSubmissionAttempt | null,
-  attribution: LocalOrderAttribution,
+  intent: LocalOrderSubmissionIntent,
   createKey: () => string,
 ): LocalOrderSubmissionAttempt {
-  return previous ?? { idempotencyKey: createKey(), attribution }
+  return (
+    previous ?? {
+      idempotencyKey: createKey(),
+      attribution: intent.attribution,
+      couponId: intent.coupon?.id ?? null,
+      couponFaceValueCents: intent.coupon?.faceValueCents ?? 0,
+    }
+  )
 }
 
 /**
@@ -118,6 +139,7 @@ export function buildLocalOrderRegistration(input: {
   quantity: number
   note: string
   attribution: LocalOrderAttribution
+  couponId: string | null
   idempotencyKey: string
 }): CreateLocalOrderRequest {
   const note = input.note.trim()
@@ -126,6 +148,7 @@ export function buildLocalOrderRegistration(input: {
     quantity: input.quantity,
     ...(note ? { note } : {}),
     ...input.attribution,
+    ...(input.couponId ? { couponId: input.couponId } : {}),
     idempotencyKey: input.idempotencyKey,
   }
 }
