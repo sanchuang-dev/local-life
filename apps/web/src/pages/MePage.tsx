@@ -113,7 +113,9 @@ export function MePage() {
                 {auth.session?.staff ? staffRoleLabels[auth.session.staff.role] : '社区居民'}
               </span>
             </div>
-            {nickname && <p className="me-redesign__nickname">微信昵称：{nickname}</p>}
+            {nickname && nickname !== auth.session?.user.displayName && (
+              <p className="me-redesign__nickname">微信昵称：{nickname}</p>
+            )}
             <Link to="/me/community" className="me-redesign__community-link">
               <MapPin size={15} aria-hidden="true" />
               <span>{communityName}</span>
