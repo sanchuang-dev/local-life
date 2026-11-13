@@ -27,7 +27,7 @@ export function LifePage() {
 
   return (
     <div className="life-market">
-      <header className="life-market__hero">
+      <header className="life-market__hero" style={{ backgroundImage: `url(${import.meta.env.BASE_URL}images/life-market-hero.webp)` }}>
         <div className="life-market__hero-content">
           <span className="life-market__eyebrow"><Sparkles size={13} aria-hidden="true" /> 社区好物 · 邻里优惠</span>
           <h1>惠生活</h1>
@@ -36,11 +36,6 @@ export function LifePage() {
             <span aria-current="page">惠生活</span>
             <Link to="/" aria-label="前往社区活动">社区活动 <ArrowRight size={14} aria-hidden="true" /></Link>
           </div>
-        </div>
-        <div className="life-market__hero-decoration" aria-hidden="true">
-          <span className="life-market__hero-orbit life-market__hero-orbit--one" />
-          <span className="life-market__hero-orbit life-market__hero-orbit--two" />
-          <span className="life-market__hero-bag"><ShoppingBasket size={66} strokeWidth={1.45} /></span>
         </div>
       </header>
 

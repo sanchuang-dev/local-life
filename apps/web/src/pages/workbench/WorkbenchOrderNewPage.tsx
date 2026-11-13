@@ -69,7 +69,7 @@ function CreateOrderForm({ lead }: { lead: CrmLeadDetail }) {
     <div className="px-4 pb-8 pt-4">
       <div className="flex items-center gap-3">
         <span
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-[#fff3e6] text-[#c6925c]"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#fff3e6] text-[#c6925c]"
           aria-hidden="true"
         >
           <ClipboardPlus size={21} strokeWidth={1.8} />
@@ -80,7 +80,7 @@ function CreateOrderForm({ lead }: { lead: CrmLeadDetail }) {
         </div>
       </div>
 
-      <div className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+      <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <p className="text-[11px] text-slate-400">当前线索</p>
         <div className="mt-1 flex items-center justify-between gap-2">
           <p className="text-[14px] font-semibold text-slate-800">
@@ -104,7 +104,7 @@ function CreateOrderForm({ lead }: { lead: CrmLeadDetail }) {
         </div>
       ) : null}
 
-      <div className="mt-3 flex items-start gap-2 rounded-[14px] border border-[#f2dcc0] bg-[#fff7ec] px-3.5 py-2.5 text-[11px] leading-5 text-[#8a6132]">
+      <div className="mt-3 flex items-start gap-2 rounded-xl border border-[#f2dcc0] bg-[#fff7ec] px-3.5 py-2.5 text-[11px] leading-5 text-[#8a6132]">
         <ShieldAlert size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
         <p>
           创建后状态为“已提交受理”，需继续提交处理并送运营核验，不表示运营商侧业务已完成。
@@ -112,7 +112,7 @@ function CreateOrderForm({ lead }: { lead: CrmLeadDetail }) {
       </div>
 
       <form className="mt-4" onSubmit={(event) => void submit(event)}>
-        <section className="rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm">
+        <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <Field
             label="受理单号"
             htmlFor="order-no"
@@ -176,7 +176,7 @@ function CreateOrderForm({ lead }: { lead: CrmLeadDetail }) {
           </Field>
         </section>
 
-        <section className="mt-4 rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm">
+        <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <Field
             label="脱敏凭据引用"
             htmlFor="order-evidence-ref"

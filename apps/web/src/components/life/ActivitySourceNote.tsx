@@ -25,7 +25,7 @@ export function ActivitySourceNote({
       <div
         role="status"
         aria-live="polite"
-        className="mt-3 flex items-center gap-2 rounded-[14px] border border-teal-200/70 bg-[#eef7f2] px-3.5 py-2.5 text-[11px] leading-5 text-[#52786c]"
+        className="mt-3 flex items-center gap-2 rounded-xl border border-teal-200/70 bg-[#eef7f2] px-3.5 py-2.5 text-[11px] leading-5 text-[#52786c]"
       >
         <span
           className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-teal-600/25 border-t-teal-600"
@@ -40,7 +40,7 @@ export function ActivitySourceNote({
     return (
       <div
         role="alert"
-        className="mt-3 rounded-[14px] border border-[#f2dcc0] bg-[#fff7ec] px-3.5 py-3 text-[11px] leading-5 text-[#8a6132]"
+        className="mt-3 rounded-xl border border-[#f2dcc0] bg-[#fff7ec] px-3.5 py-3 text-[11px] leading-5 text-[#8a6132]"
       >
         <p className="flex items-center gap-1.5 font-semibold">
           <AlertTriangle size={14} aria-hidden="true" />
@@ -66,7 +66,7 @@ export function ActivitySourceNote({
 
   return (
     <div
-      className={`mt-3 rounded-[14px] border px-3.5 py-3 text-[11px] leading-5 ${
+      className={`mt-3 rounded-xl border px-3.5 py-3 text-[11px] leading-5 ${
         published
           ? 'border-teal-200/70 bg-[#eef7f2] text-[#52786c]'
           : 'border-[#f2dcc0] bg-[#fff7ec] text-[#8a6132]'

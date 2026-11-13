@@ -80,7 +80,7 @@ export function ActivityLoginSuccessNotice({
   return (
     <p
       role="status"
-      className="mt-3 flex items-start gap-2 rounded-[12px] bg-[#eef7f2] px-3 py-2.5 text-[12px] leading-5 text-[#1f6b51]"
+      className="mt-3 flex items-start gap-2 rounded-xl bg-[#eef7f2] px-3 py-2.5 text-[12px] leading-5 text-[#1f6b51]"
     >
       <CheckCircle2 size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
       <span className="min-w-0">微信登录成功。页面不会自动报名，参与仍需你在下方主动确认。</span>

@@ -277,7 +277,7 @@ export function ShopProductDetail({ rawProductId }: { rawProductId: string }) {
       <div className="px-4 pb-7 pt-3">
         {header}
         <div role="status" aria-live="polite" className="mt-4">
-          <div className="h-[300px] animate-pulse rounded-[20px] border border-slate-100 bg-white" />
+          <div className="h-[300px] animate-pulse rounded-2xl border border-slate-100 bg-white" />
           <p className="mt-2.5 text-[11px] leading-5 text-slate-400">
             正在读取商城商品详情…
           </p>
@@ -342,7 +342,7 @@ export function ShopProductDetail({ rawProductId }: { rawProductId: string }) {
     <div className="px-4 pb-7 pt-3">
       {header}
 
-      <article className="mt-4 overflow-hidden rounded-[20px] border border-slate-100 bg-white shadow-sm">
+      <article className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
         <ShopProductImage
           src={product.images[0]}
           alt={product.name}
@@ -398,7 +398,7 @@ export function ShopProductDetail({ rawProductId }: { rawProductId: string }) {
       </article>
 
       {showSkus ? (
-        <section className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+        <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <h2 className="text-[16px] font-semibold text-slate-800">规格与价格</h2>
           <ul className="mt-2 divide-y divide-slate-100 border-t border-slate-100">
             {product.skus.map((sku) => (
@@ -422,7 +422,7 @@ export function ShopProductDetail({ rawProductId }: { rawProductId: string }) {
       ) : null}
 
       {detailText ? (
-        <section className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+        <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <h2 className="text-[16px] font-semibold text-slate-800">商品详情</h2>
           <p className="mt-2 whitespace-pre-wrap break-words text-[12px] leading-6 text-slate-600">
             {detailText}
@@ -433,7 +433,7 @@ export function ShopProductDetail({ rawProductId }: { rawProductId: string }) {
         </section>
       ) : null}
 
-      <section className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+      <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <h2 className="text-[16px] font-semibold text-slate-800">购买与来源</h2>
 
         <dl className="mt-2 divide-y divide-slate-100 border-t border-slate-100">
@@ -470,7 +470,7 @@ export function ShopProductDetail({ rawProductId }: { rawProductId: string }) {
         {activityBlocked ? (
           <div
             role="alert"
-            className="mt-3 rounded-[14px] border border-[#f2dcc0] bg-[#fff7ec] px-3.5 py-3 text-[11px] leading-5 text-[#8a6132]"
+            className="mt-3 rounded-xl border border-[#f2dcc0] bg-[#fff7ec] px-3.5 py-3 text-[11px] leading-5 text-[#8a6132]"
           >
             <p className="flex items-start gap-1.5 font-semibold">
               <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
@@ -491,7 +491,7 @@ export function ShopProductDetail({ rawProductId }: { rawProductId: string }) {
         ) : null}
 
         {!auth.session ? (
-          <div className="mt-3 rounded-[14px] bg-[#f4f8f6] p-3.5">
+          <div className="mt-3 rounded-xl bg-[#f4f8f6] p-3.5">
             <p className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
               <LogIn size={15} aria-hidden="true" />
               购买需先登录居民账户
@@ -579,7 +579,7 @@ export function ShopProductDetail({ rawProductId }: { rawProductId: string }) {
         {purchaseError ? (
           <div
             role="alert"
-            className="mt-3 rounded-[14px] border border-rose-200 bg-rose-50/70 px-3.5 py-3 text-[11px] leading-5 text-rose-700"
+            className="mt-3 rounded-xl border border-rose-200 bg-rose-50/70 px-3.5 py-3 text-[11px] leading-5 text-rose-700"
           >
             <p className="flex items-start gap-1.5 font-semibold">
               <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
@@ -606,7 +606,7 @@ export function ShopProductDetail({ rawProductId }: { rawProductId: string }) {
         {purchaseResult ? (
           <div
             role="status"
-            className="mt-3 rounded-[14px] border border-teal-200/80 bg-[#eef7f2] px-3.5 py-3 text-[11px] leading-5 text-[#376958]"
+            className="mt-3 rounded-xl border border-teal-200/80 bg-[#eef7f2] px-3.5 py-3 text-[11px] leading-5 text-[#376958]"
           >
             <p className="flex items-start gap-1.5 font-semibold">
               <CheckCircle2 size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
@@ -637,7 +637,7 @@ export function ShopProductDetail({ rawProductId }: { rawProductId: string }) {
           </div>
         ) : null}
 
-        <div className="mt-3 rounded-[14px] bg-slate-50 px-3.5 py-3">
+        <div className="mt-3 rounded-xl bg-slate-50 px-3.5 py-3">
           <p className="text-[11px] font-semibold text-slate-600">购买前须知</p>
           <ul className="mt-1.5 space-y-1 text-[11px] leading-5 text-slate-500">
             {CRMEB_PURCHASE_WARNINGS.map((warning) => (

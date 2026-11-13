@@ -34,10 +34,10 @@ export function HealthPage() {
         本页依据 V0.3 健康页迁移，设备、数值与讲堂内容均为演示；不采集个人健康信息，也不提供医疗建议。
       </DemoNote>
 
-      <article className="mt-5 rounded-[20px] border border-teal-300/60 bg-[#eef7f2] p-4">
+      <article className="mt-5 rounded-2xl border border-teal-300/60 bg-[#eef7f2] p-4">
         <div className="flex items-center gap-3">
           <span
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-white text-teal-700"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-teal-700"
             aria-hidden="true"
           >
             <AssistantIcon size={24} strokeWidth={1.7} />
@@ -67,10 +67,10 @@ export function HealthPage() {
               key={id}
               type="button"
               onClick={() => show(pendingNotice)}
-              className="flex min-h-[88px] flex-col items-center justify-center gap-2 rounded-[18px] border border-slate-100 bg-white px-1 py-3 shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+              className="flex min-h-[88px] flex-col items-center justify-center gap-2 rounded-2xl border border-slate-100 bg-white px-1 py-3 shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
             >
               <span
-                className={`flex h-10 w-10 items-center justify-center rounded-[14px] ${toneStyles[tone]}`}
+                className={`flex h-10 w-10 items-center justify-center rounded-xl ${toneStyles[tone]}`}
                 aria-hidden="true"
               >
                 <Icon size={21} strokeWidth={1.7} />
@@ -91,7 +91,7 @@ export function HealthPage() {
           actionTo="/me/devices"
           actionState={{ from: '/health' }}
         />
-        <article className="rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm">
+        <article className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <div className="grid grid-cols-2 gap-3">
             {healthMetrics.map((metric) => (
               <div key={metric.id}>
@@ -123,10 +123,10 @@ export function HealthPage() {
             <Link
               key={id}
               to="/health/lecture"
-              className="flex w-full items-center gap-3 rounded-[18px] border border-slate-100 bg-white p-4 text-left shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+              className="flex w-full items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
             >
               <span
-                className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-[16px] ${toneStyles[tone]}`}
+                className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${toneStyles[tone]}`}
                 aria-hidden="true"
               >
                 <Icon size={23} strokeWidth={1.6} />

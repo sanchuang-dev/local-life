@@ -15,8 +15,15 @@ describe('adminTheme semantic tokens', () => {
     expect(adminTheme.token?.colorInfo).not.toBe('#138b79')
   })
 
-  it('derives distinct info/success surface and text tokens', () => {
+  it('keeps success statuses on a clean green surface, not the muddy derived gray', () => {
     const derived = theme.getDesignToken(adminTheme)
+    // These aliases feed Ant Design 6 filled/outlined Tag, Alert and status styles.
+    expect(derived.colorSuccess).toBe('#187d4d')
+    expect(derived.colorSuccessBg).toBe('#e9f8ee')
+    expect(derived.colorSuccessBgHover).toBe('#d5f0df')
+    expect(derived.colorSuccessBorder).toBe('#a6dcba')
+    expect(derived.colorSuccessBorderHover).toBe('#83c9a0')
+    expect(derived.colorSuccessText).toBe('#187d4d')
     expect(derived.colorInfoBg).not.toBe(derived.colorSuccessBg)
     expect(derived.colorInfoBorder).not.toBe(derived.colorSuccessBorder)
     expect(derived.colorInfoText).not.toBe(derived.colorSuccessText)

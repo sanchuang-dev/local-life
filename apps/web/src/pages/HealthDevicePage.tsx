@@ -28,7 +28,7 @@ export function HealthDevicePage() {
         本页只展示旧版原型中的设备能力方向，不提供设备配对、检测或解读；所有能力均未接入。
       </DemoNote>
 
-      <article className="mt-4 overflow-hidden rounded-[20px] border border-slate-100 bg-white shadow-sm">
+      <article className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
         <div
           className="flex h-32 items-center justify-center border-b border-slate-100 bg-gradient-to-br from-[#e3f2ea] to-[#c9e7d9]"
           aria-hidden="true"
@@ -72,7 +72,7 @@ export function HealthDevicePage() {
             筹备中
           </span>
         </div>
-        <div className="overflow-hidden rounded-[18px] border border-slate-100 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
           {mirrorCapabilities.map(({ id, title, meta, icon: Icon }, index) => (
             <div
               key={id}
@@ -98,7 +98,7 @@ export function HealthDevicePage() {
         </div>
       </section>
 
-      <div className="mt-4 flex items-start gap-2.5 rounded-[16px] border border-[#f2dcc0] bg-[#fff7ec] px-3.5 py-3 text-[12px] leading-5 text-[#8a6132]">
+      <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-[#f2dcc0] bg-[#fff7ec] px-3.5 py-3 text-[12px] leading-5 text-[#8a6132]">
         <Info size={16} className="mt-0.5 shrink-0 text-[#b97b3e]" aria-hidden="true" />
         <p>{healthDeviceDisclaimer}</p>
       </div>

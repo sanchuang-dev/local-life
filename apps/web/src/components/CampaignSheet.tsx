@@ -50,8 +50,8 @@ export function CampaignSheet({
         aria-modal="true"
         aria-label={title}
         className={isPoster
-          ? "flex max-h-[calc(100dvh-32px)] w-full max-w-[350px] flex-col overflow-hidden rounded-[24px] bg-white shadow-[0_18px_54px_rgba(15,23,42,0.22)]"
-          : "max-h-[82dvh] w-full max-w-[390px] overflow-hidden rounded-t-[24px] bg-white shadow-[0_-16px_44px_rgba(15,23,42,0.18)] md:rounded-[24px]"
+          ? "flex max-h-[calc(100dvh-32px)] w-full max-w-[350px] flex-col overflow-hidden rounded-3xl bg-white shadow-[0_18px_54px_rgba(15,23,42,0.22)]"
+          : "max-h-[82dvh] w-full max-w-[390px] overflow-hidden rounded-t-3xl bg-white shadow-[0_-16px_44px_rgba(15,23,42,0.18)] md:rounded-3xl"
         }
       >
         <div className={isPoster

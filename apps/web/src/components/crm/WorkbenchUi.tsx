@@ -51,7 +51,7 @@ export function LoadingBlock({ label = '正在加载…' }: { label?: string }) 
   return (
     <div
       role="status"
-      className="flex min-h-[120px] flex-col items-center justify-center gap-2.5 rounded-[18px] border border-slate-100 bg-white px-4 py-8 text-[13px] text-slate-500"
+      className="flex min-h-[120px] flex-col items-center justify-center gap-2.5 rounded-2xl border border-slate-100 bg-white px-4 py-8 text-[13px] text-slate-500"
     >
       <LoaderCircle size={22} className="animate-spin text-teal-600" aria-hidden="true" />
       <span>{label}</span>
@@ -71,7 +71,7 @@ export function ErrorBlock({
   return (
     <div
       role="alert"
-      className="rounded-[18px] border border-rose-100 bg-white px-4 py-4 shadow-sm"
+      className="rounded-2xl border border-rose-100 bg-white px-4 py-4 shadow-sm"
     >
       <div className="flex items-start gap-2.5">
         <CircleAlert size={18} className="mt-0.5 shrink-0 text-rose-500" aria-hidden="true" />
@@ -110,7 +110,7 @@ export function EmptyBlock({
   onAction?: () => void
 }) {
   return (
-    <div className="rounded-[18px] border border-dashed border-slate-200 bg-white px-5 py-8 text-center">
+    <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-5 py-8 text-center">
       <p className="text-[14px] font-semibold text-slate-700">{title}</p>
       <p className="mx-auto mt-1.5 max-w-[260px] text-[12px] leading-5 text-slate-400">
         {description}
@@ -162,7 +162,7 @@ export function StatusNotice({
   return (
     <div
       role={tone === 'error' ? 'alert' : 'status'}
-      className={`flex items-start gap-2 rounded-[14px] border px-3.5 py-2.5 text-[12px] leading-5 ${noticeStyles[tone]}`}
+      className={`flex items-start gap-2 rounded-xl border px-3.5 py-2.5 text-[12px] leading-5 ${noticeStyles[tone]}`}
     >
       <Icon size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
       <div className="min-w-0 flex-1 break-words">{children}</div>
@@ -247,7 +247,7 @@ export type TimelineEntry = {
 /** Append-only event timeline; every row comes from the server response. */
 export function EventTimeline({ entries, emptyText }: { entries: TimelineEntry[]; emptyText: string }) {
   if (entries.length === 0) {
-    return <p className="rounded-[14px] bg-slate-50 px-3.5 py-3 text-[12px] text-slate-400">{emptyText}</p>
+    return <p className="rounded-xl bg-slate-50 px-3.5 py-3 text-[12px] text-slate-400">{emptyText}</p>
   }
 
   return (

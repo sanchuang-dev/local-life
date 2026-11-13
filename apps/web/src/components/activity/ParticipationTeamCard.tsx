@@ -43,7 +43,7 @@ type ParticipationTeamCardProps = {
 }
 
 const cardClassName =
-  'relative z-[2] mx-4 -mt-14 scroll-mt-4 rounded-[22px] border border-slate-100 bg-white p-4 shadow-[0_16px_40px_rgba(15,52,44,0.12)]'
+  'relative z-[2] mx-4 -mt-14 scroll-mt-4 rounded-3xl border border-slate-100 bg-white p-4 shadow-[0_16px_40px_rgba(15,52,44,0.12)]'
 
 function LoadingLine({ text }: { text: string }) {
   return (
@@ -121,7 +121,7 @@ export function ParticipationTeamCard({
       ? '活动信息加载失败，参与状态需要先确认活动。'
       : '请稍候…'
     body = activityError ? (
-      <div className="mt-3 rounded-[14px] bg-[#fff7f0] p-3 text-[#7a4a2c]">
+      <div className="mt-3 rounded-xl bg-[#fff7f0] p-3 text-[#7a4a2c]">
         <p className="break-words text-[12px] leading-5">{activityError}</p>
         <button
           type="button"
@@ -148,7 +148,7 @@ export function ParticipationTeamCard({
     body = (
       <>
         {inviteCode ? (
-          <p className="mt-3 rounded-[12px] bg-[#fff7ec] px-3 py-2.5 text-[12px] leading-5 text-[#8a6132]">
+          <p className="mt-3 rounded-xl bg-[#fff7ec] px-3 py-2.5 text-[12px] leading-5 text-[#8a6132]">
             你打开了邀请链接。登录后还需要你主动确认，才会加入三人团并记录邀请归属。
           </p>
         ) : null}
@@ -169,7 +169,7 @@ export function ParticipationTeamCard({
     description = '请稍后重试。'
     statusChip = { text: '读取失败', tone: 'orange' }
     body = (
-      <div className="mt-3 rounded-[14px] bg-[#fff7f0] p-3 text-[#7a4a2c]">
+      <div className="mt-3 rounded-xl bg-[#fff7f0] p-3 text-[#7a4a2c]">
         <p className="break-words text-[12px] leading-5">{loadState.message}</p>
         <button
           type="button"
@@ -199,12 +199,12 @@ export function ParticipationTeamCard({
       body = (
         <>
           {inviteCode ? (
-            <p className="mt-3 rounded-[12px] bg-[#fff7ec] px-3 py-2.5 text-[12px] leading-5 text-[#8a6132]">
+            <p className="mt-3 rounded-xl bg-[#fff7ec] px-3 py-2.5 text-[12px] leading-5 text-[#8a6132]">
               你通过邀请链接进入。确认参与后，本场活动的邀请归属会记录为这次邀请，之后打开其他链接不会改变归属。
             </p>
           ) : null}
           {inviteInvalid ? (
-            <p className="mt-3 rounded-[12px] bg-[#fff7f0] px-3 py-2.5 text-[12px] leading-5 text-[#7a4a2c]">
+            <p className="mt-3 rounded-xl bg-[#fff7f0] px-3 py-2.5 text-[12px] leading-5 text-[#7a4a2c]">
               邀请链接中的邀请参数无效，本次不会记录邀请归属；你仍可以自行参与。
             </p>
           ) : null}
@@ -212,7 +212,7 @@ export function ParticipationTeamCard({
             type="button"
             disabled={!data.joinable || participation.confirming}
             onClick={() => void handleConfirm()}
-            className={`mt-3 flex min-h-[48px] w-full items-center justify-center rounded-[14px] px-4 text-[14px] font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 ${
+            className={`mt-3 flex min-h-[48px] w-full items-center justify-center rounded-xl px-4 text-[14px] font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 ${
               data.joinable
                 ? 'bg-teal-700 text-white hover:bg-teal-800 disabled:cursor-wait disabled:opacity-70'
                 : 'cursor-not-allowed bg-slate-100 text-slate-500'
@@ -279,7 +279,7 @@ export function ParticipationTeamCard({
                 return (
                   <div
                     key={seatNo}
-                    className="min-w-0 rounded-[16px] border border-teal-100 bg-[#f4fbf8] p-2 text-center"
+                    className="min-w-0 rounded-2xl border border-teal-100 bg-[#f4fbf8] p-2 text-center"
                   >
                     <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-teal-700 text-[13px] font-bold text-white">
                       {(seatMember.isSelf ? '我' : seatMember.displayName.trim().slice(0, 1)) || '居'}
@@ -302,7 +302,7 @@ export function ParticipationTeamCard({
                   disabled={!canInvite}
                   onClick={canInvite ? onShare : undefined}
                   aria-label={canInvite ? `邀请街坊加入第 ${seatNo} 席` : `第 ${seatNo} 席待加入`}
-                  className={`min-h-[92px] min-w-0 rounded-[16px] border border-dashed p-2 text-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 ${
+                  className={`min-h-[92px] min-w-0 rounded-2xl border border-dashed p-2 text-center focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 ${
                     canInvite
                       ? 'border-orange-200 bg-[#fffaf3]'
                       : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400'
@@ -330,13 +330,13 @@ export function ParticipationTeamCard({
             <button
               type="button"
               onClick={onShare}
-              className="mt-3 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] bg-teal-700 px-4 text-[14px] font-bold text-white transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+              className="mt-3 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 text-[14px] font-bold text-white transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
             >
               <Share2 size={17} aria-hidden="true" />
               邀请 {remaining} 位街坊加入三人团
             </button>
           ) : (
-            <p className="mt-3 rounded-[12px] bg-[#eef7f2] px-3 py-2.5 text-[12px] leading-5 text-[#315f4d]">
+            <p className="mt-3 rounded-xl bg-[#eef7f2] px-3 py-2.5 text-[12px] leading-5 text-[#315f4d]">
               {locked
                 ? '已成团，本场不再接受新成员；邀请入口已关闭。'
                 : '团队邀请码暂不可用，暂时无法邀请街坊。'}
@@ -389,7 +389,7 @@ export function ParticipationTeamCard({
               <RefreshCw size={17} aria-hidden="true" />
             </button>
           ) : null}
-          <div className="rounded-[16px] bg-[#fff3e6] p-2.5 text-[#b97836]" aria-hidden="true">
+          <div className="rounded-2xl bg-[#fff3e6] p-2.5 text-[#b97836]" aria-hidden="true">
             {loadState.status === 'ready' && loadState.data.team?.status === 'locked' ? (
               <LockKeyhole size={24} />
             ) : (
@@ -402,7 +402,7 @@ export function ParticipationTeamCard({
       {feedback ? (
         <p
           role={feedback.tone === 'error' ? 'alert' : 'status'}
-          className={`mt-3 flex items-start gap-2 rounded-[12px] px-3 py-2.5 text-[12px] leading-5 ${
+          className={`mt-3 flex items-start gap-2 rounded-xl px-3 py-2.5 text-[12px] leading-5 ${
             feedback.tone === 'error'
               ? 'bg-[#fff1ee] text-rose-700'
               : 'bg-[#eef7f2] text-[#1f6b51]'

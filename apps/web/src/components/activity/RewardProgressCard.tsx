@@ -8,14 +8,11 @@ import {
   RefreshCw,
   ShieldCheck,
   Ticket,
-  Users,
 } from 'lucide-react'
-import { Link } from 'react-router'
 import type { useResidentAuth } from '../../hooks/useResidentAuth'
 import type { useRewardProgress } from '../../hooks/useRewardProgress'
 import { browserLocation, buildWechatLoginRequest, saveActivityLoginContext } from './loginReturn'
 import { isWeChatBrowser } from '../auth/wechatEnvironment'
-import { SILVER_NEIGHBORHOOD_ACTIVITY_PATH } from './share'
 import {
   claimRecipientLabels,
   credentialExpiryText,
@@ -34,9 +31,9 @@ type Progress = ReturnType<typeof useRewardProgress>
 type Feedback = { tone: 'success' | 'error'; text: string } | null
 
 const primaryButton =
-  'flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] bg-teal-700 px-4 text-[14px] font-bold text-white transition-colors hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600'
+  'flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 text-[14px] font-bold text-white transition-colors hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600'
 const secondaryButton =
-  'flex min-h-[44px] items-center justify-center gap-1.5 rounded-full border border-teal-200 bg-white px-4 text-[12px] font-semibold text-teal-700 transition-colors hover:bg-[#f2f8f5] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600'
+  'flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-teal-200 bg-white px-4 text-[12px] font-semibold text-teal-700 transition-colors hover:bg-[#f2f8f5] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600'
 
 function ProgressBar({ value, total, label }: { value: number; total: number; label: string }) {
   const percent = total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0
@@ -163,13 +160,13 @@ export function RewardProgressCard({
   }
 
   return (
-    <div className="mt-4">
+    <div className="mt-4 border-t border-slate-100 pt-4">
       {state.status === 'idle' || state.status === 'loading' ? (
         <LoadingLine text={auth.loading ? '正在读取登录状态…' : '正在读取签到与奖励状态…'} />
       ) : null}
 
       {state.status === 'unauthenticated' ? (
-        <div className="rounded-[14px] bg-[#f6f8f7] px-3 py-3">
+        <div className="rounded-xl bg-[#f6f8f7] px-3 py-3">
           <p className="text-[12px] leading-5 text-slate-600">
             登录后查看签到与团队奖励。签到前请先加入三人团。
           </p>
@@ -195,7 +192,7 @@ export function RewardProgressCard({
             ) : null}
           </div>
           {auth.methods && !auth.methods.wechat && !auth.methods.developmentResidentLogin ? (
-            <p className="mt-2 rounded-[12px] bg-slate-50 px-3 py-2.5 text-[11px] leading-5 text-slate-500">
+            <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2.5 text-[11px] leading-5 text-slate-500">
               微信网页授权暂不可用：未配置公众号 AppID / AppSecret 或授权回调地址，请联系运营人员。
             </p>
           ) : null}
@@ -208,7 +205,7 @@ export function RewardProgressCard({
       ) : null}
 
       {state.status === 'error' ? (
-        <div className="rounded-[14px] bg-[#fff7f0] p-3 text-[#7a4a2c]">
+        <div className="rounded-xl bg-[#fff7f0] p-3 text-[#7a4a2c]">
           <p className="break-words text-[12px] leading-5">{state.message}</p>
           <button type="button" onClick={progress.refresh} className={`${secondaryButton} mt-2`}>
             <RefreshCw size={14} aria-hidden="true" />
@@ -218,9 +215,9 @@ export function RewardProgressCard({
       ) : null}
 
       {state.status === 'ready' ? (
-        <div className="grid gap-3">
+        <div>
           {/* ------------------------------ Check-in ------------------------------ */}
-          <div className="rounded-[16px] border border-slate-100 bg-white p-3.5">
+          <section className="pb-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="flex items-center gap-1.5 text-[14px] font-bold text-slate-800">
@@ -249,7 +246,7 @@ export function RewardProgressCard({
             </div>
 
             {state.data.checkin.checkin ? (
-              <div className="mt-2.5 rounded-[12px] bg-[#f4f9f6] px-3 py-2.5">
+              <div className="mt-2.5 rounded-xl bg-[#f4f9f6] px-3 py-2.5">
                 <p className="text-[12px] font-semibold leading-5 text-[#225c4c]">
                   {state.data.checkin.countsForReward
                     ? '签到已由工作人员现场核验，计入团队奖励进度。'
@@ -282,39 +279,30 @@ export function RewardProgressCard({
               </button>
             ) : null}
 
-            {!state.data.checkin.checkin && !state.data.checkin.available ? (
-              <Link
-                to={SILVER_NEIGHBORHOOD_ACTIVITY_PATH}
-                className={`${secondaryButton} mt-2 w-full`}
-              >
-                <Users size={14} aria-hidden="true" />
-                查看三人团状态
-              </Link>
-            ) : null}
-          </div>
+          </section>
 
           {/* ---------------------------- Team reward ---------------------------- */}
-          <div className="rounded-[16px] border border-slate-100 bg-white p-3.5">
+          <section className="border-t border-slate-100 pt-4">
             <p className="flex items-center gap-1.5 text-[14px] font-bold text-slate-800">
               <Gift size={15} className="shrink-0 text-teal-700" aria-hidden="true" />
               团队奖励
             </p>
 
             {state.data.gate?.kind === 'no_team' ? (
-              <p className="mt-2 rounded-[12px] bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-600">
+              <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-600">
                 你还没有加入三人团，暂不满足奖励条件。成团后可以查看签到与奖励进度。
               </p>
             ) : null}
 
             {state.data.gate?.kind === 'plan_missing' ? (
-              <p className="mt-2 rounded-[12px] bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-600">
+              <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-600">
                 本活动暂未开放奖励领取。
               </p>
             ) : null}
 
             {state.data.reward && state.data.reward.planConfigured && state.data.reward.reward ? (
               <>
-                <div className="mt-2.5 rounded-[12px] bg-[#f4f9f6] px-3 py-2.5">
+                <div className="mt-2.5 rounded-xl bg-[#f4f9f6] px-3 py-2.5">
                   <p className="text-[13px] font-bold text-[#225c4c]">
                     {state.data.reward.reward.prizeName} · 每团 {state.data.reward.reward.prizeQuantityPerTeam} 份
                   </p>
@@ -372,7 +360,7 @@ export function RewardProgressCard({
                 </p>
 
                 {state.data.reward.grant || state.data.reward.credential ? (
-                  <div className="mt-3 rounded-[12px] border border-slate-100 bg-[#fbfdfc] px-3 py-2.5">
+                  <div className="mt-3 rounded-xl border border-slate-100 bg-[#fbfdfc] px-3 py-2.5">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-[12px] font-bold text-slate-800">我的奖励凭据</p>
                       <span
@@ -407,7 +395,7 @@ export function RewardProgressCard({
                 ) : null}
 
                 {issuedCode ? (
-                  <div className="mt-3 rounded-[12px] border border-teal-200 bg-[#eef8f3] px-3 py-3">
+                  <div className="mt-3 rounded-xl border border-teal-200 bg-[#eef8f3] px-3 py-3">
                     <p className="flex items-center gap-1.5 text-[12px] font-bold text-[#225c4c]">
                       <ShieldCheck size={14} aria-hidden="true" />
                       {issuedCode.prizeName} · 核销凭据码
@@ -449,7 +437,7 @@ export function RewardProgressCard({
                 {state.data.reward.eligible &&
                 !state.data.reward.grant &&
                 !state.data.reward.claimableByMe ? (
-                  <p className="mt-2 rounded-[12px] bg-[#fff7ec] px-3 py-2 text-[11px] leading-[18px] text-[#8a6132]">
+                  <p className="mt-2 rounded-xl bg-[#fff7ec] px-3 py-2 text-[11px] leading-[18px] text-[#8a6132]">
                     {state.data.reward.reward.claimRecipient === 'leader'
                       ? '按本活动规则，只有队长可以领取该团队奖励。'
                       : '当前账号不可以领取该团队奖励，请联系队长或现场工作人员。'}
@@ -457,18 +445,18 @@ export function RewardProgressCard({
                 ) : null}
 
                 {!state.data.reward.eligible ? (
-                  <p className="mt-2 rounded-[12px] bg-slate-50 px-3 py-2 text-[11px] leading-[18px] text-slate-600">
+                  <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-[11px] leading-[18px] text-slate-600">
                     {rewardReasonText(state.data.reward.unavailableReason)}
                   </p>
                 ) : null}
               </>
             ) : null}
-          </div>
+          </section>
 
           {feedback ? (
             <p
               role={feedback.tone === 'error' ? 'alert' : 'status'}
-              className={`flex items-start gap-1.5 rounded-[12px] px-3 py-2 text-[12px] leading-5 ${
+              className={`mt-3 flex items-start gap-1.5 rounded-xl px-3 py-2 text-[12px] leading-5 ${
                 feedback.tone === 'error'
                   ? 'bg-rose-50 text-rose-700'
                   : 'bg-[#eef8f3] text-[#225c4c]'

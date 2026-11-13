@@ -15,6 +15,7 @@ import {
   type PublicCommunity,
 } from '@sanchuang-dev/local-life-contracts'
 import { useResidentAuth } from '../hooks/useResidentAuth'
+import { useBackTarget } from '../hooks/useBackTarget'
 import { useResidentCommunity } from '../hooks/useResidentCommunity'
 import { buildResidentLoginHref } from '../components/auth/residentLogin'
 import { parseInviteParam } from '../components/activity/share'
@@ -26,7 +27,6 @@ import {
   confirmationErrorMessage,
   canOfferConfirmation,
   formatResidentCommunityDate,
-  irreversibleWarning,
   readConfirmCommunityId,
   residentCommunitySummary,
 } from '../lib/residentCommunity'
@@ -46,11 +46,8 @@ const secondaryButton =
  *
  * The page is reachable only with a real `communityId` naming the community the
  * resident is looking at. It shows the community name and service-point address
- * from the API, states irreversibility in a prominent way, and requires two
- * separate intentional actions:
- *
- *   1. 「我已了解，继续」 — reveals the final step;
- *   2. tick the acknowledgement, then press 「确认绑定为常驻社区」.
+ * from the API, and requires one explicit acknowledgement checkbox before
+ * the single binding action. The server still owns eligibility and finality.
  *
  * Nothing here can switch, unbind or rebind: a confirmed resident is told so and
  * offered only reading. The confirm request body is `{ communityId }` built by the
@@ -63,6 +60,7 @@ const secondaryButton =
 export function ResidentCommunityConfirmPage() {
   const [searchParams] = useSearchParams()
   const location = useLocation()
+  const { backTo } = useBackTarget('/', '返回')
   const auth = useResidentAuth()
   const residentCommunity = useResidentCommunity({
     sessionKey: auth.session?.user.id ?? null,
@@ -74,8 +72,8 @@ export function ResidentCommunityConfirmPage() {
 
   const [lookup, setLookup] = useState<CommunityLookup>({ status: 'loading' })
   const [lookupToken, setLookupToken] = useState(0)
-  const [step, setStep] = useState<'review' | 'final'>('review')
-  const [acknowledged, setAcknowledged] = useState(false)
+  // Consent is tied to the exact community being confirmed, not merely the page instance.
+  const [acknowledgedCommunityId, setAcknowledgedCommunityId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
   const [confirmedName, setConfirmedName] = useState<string | null>(null)
@@ -133,7 +131,7 @@ export function ResidentCommunityConfirmPage() {
   })
 
   async function submit() {
-    if (!communityId || !auth.session || !confirmationOpen || submitting) return
+    if (!communityId || !auth.session || !confirmationOpen || acknowledgedCommunityId !== communityId || submitting) return
     setSubmitting(true)
     setFailure(null)
     try {
@@ -153,9 +151,9 @@ export function ResidentCommunityConfirmPage() {
   }
 
   const backLink = (
-    <Link to={RESIDENT_COMMUNITY_PAGE} className="inline-flex min-h-11 items-center gap-1.5 text-[13px] font-medium text-[#5b6c67]">
+    <Link to={backTo} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg text-[13px] font-medium text-[#5b6c67] hover:text-[#116d63] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700">
       <ArrowLeft size={16} aria-hidden="true" />
-      返回我的常驻社区
+      返回
     </Link>
   )
 
@@ -186,10 +184,6 @@ export function ResidentCommunityConfirmPage() {
     <div className="mx-auto w-full max-w-[480px] px-4 pb-8 pt-3 text-[#172d28]">
       {backLink}
       <h1 className="mt-1 text-[22px] font-bold">确认常驻社区</h1>
-      <p className="mt-1 text-[13px] leading-6 text-[#5b6c67]">
-        常驻社区需要你本人首次主动确认，无法由浏览、定位或历史登录自动产生。
-      </p>
-
       {confirmedName ? (
         <section className="mt-4 rounded-2xl border border-[#cfe8de] bg-[#f0f8f4] p-4" role="status">
           <p className="flex items-center gap-2 text-[15px] font-semibold text-[#116d63]">
@@ -287,85 +281,41 @@ export function ResidentCommunityConfirmPage() {
       {statusData && !confirmedName && confirmationOpen && lookup.status === 'ready' && lookup.community && auth.session ? (
         <section className="mt-4 rounded-2xl border border-[#dce6e2] bg-white p-4">
           <div className="flex items-start gap-3">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e8f6f0] text-[#116d63]">
-              <MapPin size={21} aria-hidden="true" />
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e8f6f0] text-[#116d63]">
+              <MapPin size={20} aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <h2 className="text-[19px] font-bold leading-7">{lookup.community.name}</h2>
-              <p className="mt-0.5 break-words text-[13px] leading-5 text-[#5b6c67]">
+              <h2 className="text-[17px] font-semibold leading-6">{lookup.community.name}</h2>
+              <p className="mt-0.5 break-words text-[12px] leading-5 text-[#5b6c67]">
                 {lookup.community.address || '社区服务点地址暂未录入'}
               </p>
             </div>
           </div>
 
-          <div className="mt-3 rounded-xl border border-[#e7b8a8] bg-[#fff1ee] p-3" role="alert">
-            <p className="flex items-center gap-1.5 text-[13px] font-bold text-[#b23c2e]">
-              <CircleAlert size={16} aria-hidden="true" />
-              绑定后不可修改
-            </p>
-            <p className="mt-1 text-[12px] leading-5 text-[#934a35]">
-              {irreversibleWarning(lookup.community.name, lookup.community.address)}
-              {PERMANENT_BINDING_NOTICE}
-            </p>
-          </div>
+          <label className="mt-4 flex min-h-11 cursor-pointer items-start gap-2.5 text-[13px] leading-6 text-[#3b4f49]">
+            <input
+              type="checkbox"
+              checked={acknowledgedCommunityId === communityId}
+              onChange={(event) => setAcknowledgedCommunityId(event.target.checked ? communityId : null)}
+              className="mt-1 h-5 w-5 shrink-0 accent-[#138b79]"
+            />
+            <span>我确认将「{lookup.community.name}」设为常驻社区，绑定后不可自行修改。</span>
+          </label>
 
           {failure ? (
-            <p className="mt-3 rounded-xl bg-[#fff1ee] px-3 py-2 text-[12px] leading-5 text-[#b23c2e]" role="alert">
+            <p className="mt-2 text-[12px] leading-5 text-[#b23c2e]" role="alert">
               {failure}
             </p>
           ) : null}
 
-          {step === 'review' ? (
-            <>
-              <button
-                type="button"
-                className={`${primaryButton} mt-3`}
-                onClick={() => {
-                  setFailure(null)
-                  setStep('final')
-                }}
-              >
-                我已了解，继续确认
-              </button>
-              <p className="mt-2 text-[11px] leading-5 text-[#5b6c67]">
-                这一步不会提交任何绑定；下一步还需要勾选确认并再次点击按钮。
-              </p>
-            </>
-          ) : (
-            <>
-              <label className="mt-3 flex items-start gap-2 rounded-xl bg-[#f5f7f7] p-3 text-[12px] leading-5 text-[#3b4f49]">
-                <input
-                  type="checkbox"
-                  checked={acknowledged}
-                  onChange={(event) => setAcknowledged(event.target.checked)}
-                  className="mt-0.5 h-5 w-5 shrink-0 accent-[#138b79]"
-                />
-                <span>
-                  我已确认这是我的常驻社区「{lookup.community.name}」，并理解确认后居民端无法修改。
-                </span>
-              </label>
-              <button
-                type="button"
-                className={`${primaryButton} mt-3`}
-                disabled={!acknowledged || submitting}
-                onClick={() => void submit()}
-              >
-                {submitting ? '正在提交确认…' : '确认绑定为常驻社区'}
-              </button>
-              <button
-                type="button"
-                className="mt-2 min-h-11 w-full text-[13px] font-semibold text-[#5b6c67] underline"
-                onClick={() => {
-                  setAcknowledged(false)
-                  setFailure(null)
-                  setStep('review')
-                }}
-              >
-                返回上一步
-              </button>
-            </>
-          )}
-          {browserShelter}
+          <button
+            type="button"
+            className={`${primaryButton} mt-3`}
+            disabled={acknowledgedCommunityId !== communityId || submitting}
+            onClick={() => void submit()}
+          >
+            {submitting ? '正在绑定…' : '确认绑定'}
+          </button>
         </section>
       ) : null}
     </div>
