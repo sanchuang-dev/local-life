@@ -188,11 +188,21 @@ test('an empty database migrates to the encrypted config schema and single-activ
       .prepare('PRAGMA table_info(wechat_identities)')
       .all() as TableInfoRow[]
     const identityColumnNames = identityColumns.map((column) => column.name)
-    for (const expected of ['nickname', 'avatar_url', 'profile_authorized_at']) {
+    for (const expected of [
+      'nickname',
+      'avatar_url',
+      'sex',
+      'province',
+      'city',
+      'country',
+      'privilege_json',
+      'profile_authorized_at',
+      'profile_updated_at',
+    ]) {
       assert.ok(identityColumnNames.includes(expected), `missing WeChat profile column ${expected}`)
     }
-    for (const forbidden of ['sex', 'province', 'city', 'country', 'location']) {
-      assert.equal(identityColumnNames.includes(forbidden), false, `unexpected profile column ${forbidden}`)
+    for (const forbidden of ['location', 'access_token', 'refresh_token', 'oauth_code']) {
+      assert.equal(identityColumnNames.includes(forbidden), false, `unexpected sensitive profile column ${forbidden}`)
     }
 
     const foreignKeys = sqlite

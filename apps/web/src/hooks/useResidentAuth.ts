@@ -3,7 +3,6 @@ import {
   API_ROUTES,
   PHONE_AUTH_ROUTES,
   authSessionResponseSchema,
-  wechatProfileStartResponseSchema,
   wechatProfileStatusSchema,
   type WechatProfileStatusResponse,
   phoneAuthStatusResponseSchema,
@@ -208,35 +207,6 @@ function useResidentAuthController() {
     window.location.assign(`/api${API_ROUTES.authWechatStart}`)
   }, [methods])
 
-  const startWechatProfileAuthorization = useCallback(async () => {
-    if (!session || session.staff) return
-    if (typeof navigator === 'undefined' || !isWeChatBrowser(navigator.userAgent)) {
-      setWechatProfileError('请在微信内打开页面，再主动授权同步头像和昵称')
-      return
-    }
-    if (!wechatProfile?.available) {
-      setWechatProfileError('当前账户没有可用的公众号微信身份，不能自动绑定其他微信账户')
-      return
-    }
-    setBusy(true)
-    setWechatProfileError(null)
-    try {
-      const token = await csrfToken()
-      const response = await fetch(`/api${API_ROUTES.authWechatProfileStart}`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'x-csrf-token': token },
-      })
-      if (!response.ok) throw new Error(await readError(response))
-      const parsed = wechatProfileStartResponseSchema.parse(await response.json())
-      window.location.assign(parsed.authorizationUrl)
-    } catch (cause) {
-      setWechatProfileError(cause instanceof Error ? cause.message : '发起微信资料授权失败')
-    } finally {
-      setBusy(false)
-    }
-  }, [session, wechatProfile, csrfToken])
-
   const developmentLogin = useCallback(async () => {
     if (!methods?.developmentResidentLogin) return
     setBusy(true)
@@ -375,7 +345,6 @@ function useResidentAuthController() {
     bindPhone,
     refreshPhoneStatus: loadPhoneStatus,
     refreshWechatProfile: loadWechatProfile,
-    startWechatProfileAuthorization,
     logout,
   }
 }

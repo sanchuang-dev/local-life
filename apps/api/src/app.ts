@@ -412,6 +412,39 @@ function normalizeWechatAvatarUrl(value: unknown): string | null {
   }
 }
 
+function normalizeWechatProfileText(value: unknown, maxLength = 128): string | null {
+  if (typeof value !== 'string') return null
+  const normalized = Array.from(value)
+    .filter((character) => {
+      const codePoint = character.codePointAt(0) ?? 0
+      return codePoint > 0x1f && codePoint !== 0x7f
+    })
+    .join('')
+    .trim()
+  return normalized ? Array.from(normalized).slice(0, maxLength).join('') : null
+}
+
+function normalizeWechatSex(value: unknown): 0 | 1 | 2 | null {
+  return value === 0 || value === 1 || value === 2 ? value : null
+}
+
+function normalizeWechatOpaqueId(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const normalized = value.trim()
+  return normalized && normalized.length <= 255 ? normalized : null
+}
+
+function normalizeWechatPrivilege(value: unknown): string {
+  const items = Array.isArray(value)
+    ? value
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => normalizeWechatProfileText(item, 128))
+        .filter((item): item is string => item !== null)
+        .slice(0, 32)
+    : []
+  return JSON.stringify(items)
+}
+
 function bodySchemaError<T>(
   value: unknown,
   schema: z.ZodType<T>,
@@ -679,9 +712,10 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
   })
 
   /**
-   * Explicit, CSRF-protected resident action. It uses the same OAuth state,
-   * nonce, TTL, config-version binding and callback as login; only the purpose
-   * and requested scope differ.
+   * Legacy #121 compatibility endpoint. New H5 builds never call this: complete
+   * snsapi_userinfo consent is part of the normal WeChat login now. Keep the
+   * endpoint temporarily so an older deployed H5 cannot strand a signed-in user;
+   * the callback remains user-bound and cannot create or switch identities.
    */
   app.post('/auth/wechat/profile/start', (c) => {
     const session = c.get('authSession')
@@ -864,7 +898,7 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
       // read-only redirect URI and the one registered in the WeChat console.
       redirect_uri: wechatCallbackUrl(config.webBaseUrl),
       response_type: 'code',
-      scope: 'snsapi_base',
+      scope: 'snsapi_userinfo',
       state,
     }).toString()
     authorizeUrl.hash = 'wechat_redirect'
@@ -1025,65 +1059,119 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
           ? redirectWechatProfileResult(c, config, 'provider_unavailable', boundReturnTo)
           : redirectToWeb(c, config, 'wechat_identity_unavailable', boundReturnTo)
       }
+      if (!tokenPayload.access_token) {
+        // snsapi_userinfo login is not complete until a profile access token is
+        // present; never create an OpenID-only resident as a fallback.
+        clearOauthCookies(c, config)
+        return isProfileState
+          ? redirectWechatProfileResult(c, config, 'provider_unavailable', boundReturnTo)
+          : redirectToWeb(c, config, 'wechat_provider_unavailable', boundReturnTo)
+      }
 
+      let profileIdentity: { id: string; userId: string; unionId: string | null } | null = null
       if (isProfileState) {
         const boundUserId = stateRecord.userId
-        if (!boundUserId || !tokenPayload.access_token) {
+        if (!boundUserId) {
           clearOauthCookies(c, config)
           return redirectWechatProfileResult(c, config, 'provider_unavailable', boundReturnTo)
         }
-
-        // The OpenID must already belong to the exact user that initiated this
-        // consent. A missing or different mapping is a refusal, never a bind.
-        const identity = db
-          .select({ id: wechatIdentities.id, userId: wechatIdentities.userId })
+        // Legacy profile-consent attempts remain bound to the exact account that
+        // minted the state. This branch exists only for older H5/in-flight states.
+        profileIdentity = db
+          .select({
+            id: wechatIdentities.id,
+            userId: wechatIdentities.userId,
+            unionId: wechatIdentities.unionId,
+          })
           .from(wechatIdentities)
           .where(and(
             eq(wechatIdentities.appId, provider.appId),
             eq(wechatIdentities.openId, tokenPayload.openid),
           ))
-          .get()
-        if (!identity || identity.userId !== boundUserId) {
+          .get() ?? null
+        if (!profileIdentity || profileIdentity.userId !== boundUserId) {
           clearOauthCookies(c, config)
           return redirectWechatProfileResult(c, config, 'identity_mismatch', boundReturnTo)
         }
+      }
 
-        const userInfoUrl = new URL('https://api.weixin.qq.com/sns/userinfo')
-        userInfoUrl.search = new URLSearchParams({
-          access_token: tokenPayload.access_token,
-          openid: tokenPayload.openid,
-          lang: 'zh_CN',
-        }).toString()
-        const userInfoResponse = await fetcher(userInfoUrl, {
-          signal: AbortSignal.timeout(10_000),
-        })
-        if (!userInfoResponse.ok) {
-          clearOauthCookies(c, config)
-          return redirectWechatProfileResult(c, config, 'provider_unavailable', boundReturnTo)
-        }
-        const userInfoPayload = (await userInfoResponse.json()) as {
-          openid?: string
-          nickname?: string
-          headimgurl?: string
-          errcode?: number | string
-        }
-        if (userInfoPayload.errcode) {
-          clearOauthCookies(c, config)
-          return redirectWechatProfileResult(c, config, 'provider_unavailable', boundReturnTo)
-        }
-        if (!userInfoPayload.openid || userInfoPayload.openid !== tokenPayload.openid) {
-          clearOauthCookies(c, config)
-          return redirectWechatProfileResult(c, config, 'identity_mismatch', boundReturnTo)
-        }
+      // #256: every successful WeChat login is a complete profile authorization.
+      // Fetch before any identity/user write so provider failure can never leave a
+      // half-created "微信用户" row behind.
+      const userInfoUrl = new URL('https://api.weixin.qq.com/sns/userinfo')
+      userInfoUrl.search = new URLSearchParams({
+        access_token: tokenPayload.access_token,
+        openid: tokenPayload.openid,
+        lang: 'zh_CN',
+      }).toString()
+      const userInfoResponse = await fetcher(userInfoUrl, {
+        signal: AbortSignal.timeout(10_000),
+      })
+      if (!userInfoResponse.ok) {
+        clearOauthCookies(c, config)
+        return isProfileState
+          ? redirectWechatProfileResult(c, config, 'provider_unavailable', boundReturnTo)
+          : redirectToWeb(c, config, 'wechat_provider_unavailable', boundReturnTo)
+      }
+      const userInfoPayload = (await userInfoResponse.json()) as {
+        openid?: string
+        unionid?: string
+        nickname?: string
+        sex?: number
+        province?: string
+        city?: string
+        country?: string
+        headimgurl?: string
+        privilege?: unknown
+        errcode?: number | string
+      }
+      if (userInfoPayload.errcode) {
+        clearOauthCookies(c, config)
+        return isProfileState
+          ? redirectWechatProfileResult(c, config, 'provider_unavailable', boundReturnTo)
+          : redirectToWeb(c, config, 'wechat_provider_unavailable', boundReturnTo)
+      }
+      if (!userInfoPayload.openid || userInfoPayload.openid !== tokenPayload.openid) {
+        clearOauthCookies(c, config)
+        return isProfileState
+          ? redirectWechatProfileResult(c, config, 'identity_mismatch', boundReturnTo)
+          : redirectToWeb(c, config, 'wechat_identity_unavailable', boundReturnTo)
+      }
 
-        const nickname = normalizeWechatNickname(userInfoPayload.nickname)
-        const avatarUrl = normalizeWechatAvatarUrl(userInfoPayload.headimgurl)
+      const nickname = normalizeWechatNickname(userInfoPayload.nickname)
+      const avatarUrl = normalizeWechatAvatarUrl(userInfoPayload.headimgurl)
+      const sex = normalizeWechatSex(userInfoPayload.sex)
+      const province = normalizeWechatProfileText(userInfoPayload.province)
+      const city = normalizeWechatProfileText(userInfoPayload.city)
+      const country = normalizeWechatProfileText(userInfoPayload.country)
+      const privilegeJson = normalizeWechatPrivilege(userInfoPayload.privilege)
+      const unionId =
+        normalizeWechatOpaqueId(tokenPayload.unionid) ??
+        normalizeWechatOpaqueId(userInfoPayload.unionid)
+      const profileValues = {
+        nickname,
+        avatarUrl,
+        sex,
+        province,
+        city,
+        country,
+        privilegeJson,
+        profileAuthorizedAt: now,
+        profileUpdatedAt: now,
+      }
+
+      if (isProfileState) {
+        const boundUserId = stateRecord.userId!
         const saved = db.transaction((tx) => {
           const currentIdentity = tx
-            .select({ id: wechatIdentities.id, userId: wechatIdentities.userId })
+            .select({
+              id: wechatIdentities.id,
+              userId: wechatIdentities.userId,
+              unionId: wechatIdentities.unionId,
+            })
             .from(wechatIdentities)
             .where(and(
-              eq(wechatIdentities.id, identity.id),
+              eq(wechatIdentities.id, profileIdentity!.id),
               eq(wechatIdentities.appId, provider.appId),
               eq(wechatIdentities.openId, tokenPayload.openid!),
             ))
@@ -1091,7 +1179,10 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
           if (!currentIdentity || currentIdentity.userId !== boundUserId) return false
           const updated = tx
             .update(wechatIdentities)
-            .set({ nickname, avatarUrl, profileAuthorizedAt: now })
+            .set({
+              ...profileValues,
+              unionId: unionId ?? currentIdentity.unionId,
+            })
             .where(and(
               eq(wechatIdentities.id, currentIdentity.id),
               eq(wechatIdentities.userId, boundUserId),
@@ -1110,7 +1201,11 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
 
       const userId = db.transaction((tx) => {
         const identity = tx
-          .select({ userId: wechatIdentities.userId })
+          .select({
+            id: wechatIdentities.id,
+            userId: wechatIdentities.userId,
+            unionId: wechatIdentities.unionId,
+          })
           .from(wechatIdentities)
           .where(
             and(
@@ -1120,50 +1215,63 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
           )
           .get()
 
-        let resolvedUserId = identity?.userId
-        if (!resolvedUserId) {
-          resolvedUserId = randomUUID()
-          tx.insert(users)
-            .values({
-              id: resolvedUserId,
-              displayName: '微信用户',
-              createdAt: now,
-              updatedAt: now,
+        if (identity) {
+          tx.update(wechatIdentities)
+            .set({
+              ...profileValues,
+              unionId: unionId ?? identity.unionId,
             })
+            .where(eq(wechatIdentities.id, identity.id))
             .run()
-          tx.insert(wechatIdentities)
-            .values({
-              id: randomUUID(),
-              userId: resolvedUserId,
-              appId: provider.appId,
-              openId: tokenPayload.openid!,
-              unionId: tokenPayload.unionid ?? null,
-              createdAt: now,
-            })
-            .run()
+
+          // Historical pre-#256 accounts often still carry the generated
+          // "微信用户" placeholder. Upgrade only that sentinel/null value;
+          // a resident's real platform display name is never overwritten.
+          const currentUser = tx
+            .select({ displayName: users.displayName })
+            .from(users)
+            .where(eq(users.id, identity.userId))
+            .get()
+          if (
+            nickname &&
+            currentUser &&
+            (currentUser.displayName === null || currentUser.displayName === '微信用户')
+          ) {
+            tx.update(users)
+              .set({ displayName: nickname, updatedAt: now })
+              .where(eq(users.id, identity.userId))
+              .run()
+          }
+          return identity.userId
         }
-        // #171 LL-IDENTITY-001: logging in authenticates the person, it does NOT
-        // create a permanent community. The retired #123 behaviour inserted a
-        // `resident_community_assignments` row here, which silently made every
-        // activity login look like a residence claim. The community derived from
-        // the `activityId` is now at most a one-time *candidate* that the resident
-        // must confirm themself; see `POST /resident-community/confirm`.
-        //
-        // Deliberately no participation write here either: logging in only
-        // establishes identity. Joining an activity (and its invite attribution)
-        // stays an explicit `POST /activities/:activityId/participation`
-        // confirmed by the resident, so opening an invite link never auto-enrols
-        // anyone.
+
+        const resolvedUserId = randomUUID()
+        tx.insert(users)
+          .values({
+            id: resolvedUserId,
+            displayName: nickname ?? '微信用户',
+            createdAt: now,
+            updatedAt: now,
+          })
+          .run()
+        tx.insert(wechatIdentities)
+          .values({
+            id: randomUUID(),
+            userId: resolvedUserId,
+            appId: provider.appId,
+            openId: tokenPayload.openid!,
+            unionId,
+            ...profileValues,
+            createdAt: now,
+          })
+          .run()
+        // #171 LL-IDENTITY-001: login authenticates identity only. The activity
+        // community remains a candidate requiring explicit resident confirmation.
         return resolvedUserId
       })
 
       // A successful login may leave the resident ONE server-derived suggestion:
-      // the community the `activityId` they opened resolved to, stored in the
-      // consumed `oauth_states` row by `/auth/wechat/start`. It is written after
-      // the identity exists and is only ever a suggestion — the resident still has
-      // to confirm it, and a resident who already confirmed gets nothing written
-      // (the service refuses and returns false). The value never comes from the
-      // request: `start` derives it from the activity row.
+      // the community the activityId resolved to. It is never a permanent bind.
       if (stateRecord.communityId) {
         recordBindingCandidate(db, {
           userId,
