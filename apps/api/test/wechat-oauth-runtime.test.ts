@@ -486,7 +486,10 @@ test('an in-flight callback completes with the version it started with, after a 
     // at WeChat and, worse, could map the code to the wrong account.
     const callbackA = await finishLogin(harness.app, startA, { code: 'code-from-a' })
     assert.equal(new URL(callbackA.headers.get('location')!).search, '?auth=success')
-    const callA = harness.provider.calls[0]!
+    const callA = harness.provider.calls.find(
+      (url) => url.pathname === '/sns/oauth2/access_token' && url.searchParams.get('code') === 'code-from-a',
+    )
+    assert.ok(callA)
     assert.equal(callA.searchParams.get('appid'), TEST_APP_ID)
     assert.equal(callA.searchParams.get('secret'), TEST_APP_SECRET)
     assert.equal(callA.searchParams.get('code'), 'code-from-a')
@@ -501,7 +504,10 @@ test('an in-flight callback completes with the version it started with, after a 
     assert.equal(new URL(startB.headers.get('location')!).searchParams.get('appid'), TEST_APP_ID_B)
     const callbackB = await finishLogin(harness.app, startB, { code: 'code-from-b' })
     assert.equal(new URL(callbackB.headers.get('location')!).search, '?auth=success')
-    const callB = harness.provider.calls[1]!
+    const callB = harness.provider.calls.find(
+      (url) => url.pathname === '/sns/oauth2/access_token' && url.searchParams.get('code') === 'code-from-b',
+    )
+    assert.ok(callB)
     assert.equal(callB.searchParams.get('appid'), TEST_APP_ID_B)
     assert.equal(callB.searchParams.get('secret'), TEST_APP_SECRET_B)
 
