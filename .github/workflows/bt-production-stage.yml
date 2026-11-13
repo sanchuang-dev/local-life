@@ -1,4 +1,4 @@
-name: BT production package and secure stage
+name: BT production verified build and activation
 
 # Only reviewed mvp → prod promotions may stage a production release.
 # Each prod push is independently verified against the merged GitHub PR.
@@ -72,8 +72,12 @@ jobs:
           cp scripts/bt-production/verify-db.mjs "$RUNNER_TEMP/bt-package/api/verify-db.mjs"
           node --check "$RUNNER_TEMP/bt-package/api/verify-db.mjs"
           API_ROOT="$RUNNER_TEMP/bt-package/api" node -e 'const Database = require(process.env.API_ROOT+"/node_modules/better-sqlite3"); const db=new Database(":memory:"); db.close();'
-      - name: Verify bootstrap shell syntax
-        run: bash -n scripts/bt-production/bootstrap.sh
+      - name: Verify Baota deployment code and safety regressions
+        run: |
+          bash -n scripts/bt-production/bootstrap.sh
+          node --check scripts/bt-production/migrate-db.mjs
+          python3 -c 'import ast,pathlib; ast.parse(pathlib.Path("scripts/bt-production/deploy.py").read_text())'
+          python3 -m unittest discover -s scripts/bt-production/tests -v
       - name: Pack immutable release archives
         shell: bash
         run: |
@@ -87,9 +91,11 @@ jobs:
           cp scripts/bt-production/README.md "$out/README.md"
           cp scripts/bt-production/bootstrap.sh "$out/bootstrap.sh"
           cp scripts/bt-production/register-bt-node.py "$out/register-bt-node.py"
+          cp scripts/bt-production/deploy.py "$out/deploy.py"
+          cp scripts/bt-production/migrate-db.mjs "$out/migrate-db.mjs"
           cd "$out"
           printf '%s\n' '${{ steps.version.outputs.sha }}' > SOURCE_SHA
-          sha256sum web.tar.gz admin.tar.gz api.tar.gz README.md bootstrap.sh register-bt-node.py SOURCE_SHA > SHA256SUMS
+          sha256sum web.tar.gz admin.tar.gz api.tar.gz README.md bootstrap.sh register-bt-node.py deploy.py migrate-db.mjs SOURCE_SHA > SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
           name: bt-production-${{ steps.version.outputs.sha }}
@@ -102,6 +108,8 @@ jobs:
             ${{ runner.temp }}/bt-package/README.md
             ${{ runner.temp }}/bt-package/bootstrap.sh
             ${{ runner.temp }}/bt-package/register-bt-node.py
+            ${{ runner.temp }}/bt-package/deploy.py
+            ${{ runner.temp }}/bt-package/migrate-db.mjs
           retention-days: 7
           if-no-files-found: error
 
@@ -166,6 +174,32 @@ jobs:
           remote="$BT_USER@$BT_HOST"
           stage="$(sshpass -e ssh "${ssh_opts[@]}" "$remote" 'set -eu; umask 077; mkdir -p /www/local-life/incoming; mktemp -d /www/local-life/incoming/.incoming.XXXXXXXX')"
           [[ "$stage" =~ ^/www/local-life/incoming/\.incoming\.[a-zA-Z0-9]+$ ]]
-          sshpass -e scp "${scp_opts[@]}" transfer/{web.tar.gz,admin.tar.gz,api.tar.gz,SHA256SUMS,SOURCE_SHA,README.md,bootstrap.sh,register-bt-node.py} "$remote:$stage/"
+          sshpass -e scp "${scp_opts[@]}" transfer/{web.tar.gz,admin.tar.gz,api.tar.gz,SHA256SUMS,SOURCE_SHA,README.md,bootstrap.sh,register-bt-node.py,deploy.py,migrate-db.mjs} "$remote:$stage/"
           sshpass -e ssh "${ssh_opts[@]}" "$remote" "set -eu; test \"\$(cat '$stage/SOURCE_SHA')\" = '$SHA'; cd '$stage'; sha256sum -c SHA256SUMS; if test -e '/www/local-life/incoming/$SHA'; then echo 'BT_STAGE_ALREADY_EXISTS=$SHA'; else mv '$stage' '/www/local-life/incoming/$SHA'; echo 'BT_STAGE_READY_SHA=$SHA'; fi"
           echo "BT_PRODUCTION_STAGED_SHA=$SHA"
+
+      - name: Verify HEAD and activate reviewed production release on Baota
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BT_HOST: ${{ secrets.BT_PROD_SSH_HOST }}
+          BT_USER: ${{ secrets.BT_PROD_SSH_USER }}
+          BT_PORT: ${{ secrets.BT_PROD_SSH_PORT }}
+          SSHPASS: ${{ secrets.BT_PROD_SSH_PASSWORD }}
+          SHA: ${{ needs.package.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          latest="$(gh api "repos/$GITHUB_REPOSITORY/branches/prod" --jq '.commit.sha')"
+          if test "$latest" != "$SHA"; then
+            echo "::error::Refusing stale prod release: a newer prod HEAD exists"
+            exit 1
+          fi
+          export SSHPASS
+          known="$RUNNER_TEMP/bt-ssh/known_hosts"
+          test -s "$known"
+          sshpass -e ssh -p "$BT_PORT" \
+            -o "UserKnownHostsFile=$known" \
+            -o StrictHostKeyChecking=yes -o ConnectTimeout=15 \
+            "$BT_USER@$BT_HOST" \
+            "python3 '/www/local-life/incoming/$SHA/deploy.py' '$SHA' --apply"
+          echo "BT_PRODUCTION_ACTIVATED_SHA=$SHA"
