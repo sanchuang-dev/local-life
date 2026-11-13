@@ -150,7 +150,20 @@ test('a real-socket activity login writes exactly one community suggestion and n
     const url = input instanceof URL ? input : new URL(String(input))
     if (url.pathname === '/sns/oauth2/access_token') {
       tokenCalls.push(url.searchParams.get('appid') ?? '')
-      return Response.json({ openid: 'network-resident-openid', unionid: 'network-unionid' })
+      return Response.json({
+        access_token: 'network-profile-token',
+        openid: 'network-resident-openid',
+        unionid: 'network-unionid',
+      })
+    }
+    if (url.pathname === '/sns/userinfo') {
+      return Response.json({
+        openid: 'network-resident-openid',
+        unionid: 'network-unionid',
+        nickname: '线下测试居民',
+        headimgurl: 'https://wx.example.test/avatar/network-resident',
+        privilege: [],
+      })
     }
     throw new Error(`unexpected external request to ${url.pathname}`)
   }) as typeof fetch
@@ -407,7 +420,18 @@ test('a real-socket login without activity context creates no residence', async 
   const wechatBoundary = (async (input: string | URL) => {
     const url = input instanceof URL ? input : new URL(String(input))
     if (url.pathname === '/sns/oauth2/access_token') {
-      return Response.json({ openid: 'plain-login-openid' })
+      return Response.json({
+        access_token: 'plain-profile-token',
+        openid: 'plain-login-openid',
+      })
+    }
+    if (url.pathname === '/sns/userinfo') {
+      return Response.json({
+        openid: 'plain-login-openid',
+        nickname: '普通登录居民',
+        headimgurl: 'https://wx.example.test/avatar/plain-resident',
+        privilege: [],
+      })
     }
     throw new Error(`unexpected external request to ${url.pathname}`)
   }) as typeof fetch
