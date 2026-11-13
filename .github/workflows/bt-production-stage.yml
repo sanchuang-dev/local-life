@@ -1,0 +1,146 @@
+name: BT production package and secure stage
+
+on:
+  push:
+    tags:
+      - 'bt-prod-v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: local-life-bt-production
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: ubuntu-22.04
+    outputs:
+      source_sha: ${{ steps.version.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Pin immutable source revision
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse HEAD)"
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "BT_PRODUCTION_PACKAGE_SHA=$sha"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '10'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - name: Install and validate
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm check
+      - name: Build dedicated root-path web and admin
+        run: |
+          pnpm --filter @sanchuang-dev/local-life-web build:mvp
+          pnpm --filter @sanchuang-dev/local-life-admin build:mvp
+          node scripts/mvp/verify-build.mjs
+      - name: Create Node 24 production runtime with native SQLite
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bt-package/api"
+          pnpm --filter @sanchuang-dev/local-life-api deploy --legacy --prod "$RUNNER_TEMP/bt-package/api"
+          test -s "$RUNNER_TEMP/bt-package/api/dist/index.js"
+          test -d "$RUNNER_TEMP/bt-package/api/db/migrations"
+          test -d "$RUNNER_TEMP/bt-package/api/node_modules/better-sqlite3"
+          API_ROOT="$RUNNER_TEMP/bt-package/api" node -e 'const Database = require(process.env.API_ROOT+"/node_modules/better-sqlite3"); const db=new Database(":memory:"); db.close();'
+      - name: Verify bootstrap shell syntax
+        run: bash -n scripts/bt-production/bootstrap.sh
+      - name: Pack immutable release archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/bt-package"
+          test -s apps/web/dist/index.html
+          test -s apps/admin/dist/index.html
+          tar -czf "$out/web.tar.gz" -C apps/web/dist .
+          tar -czf "$out/admin.tar.gz" -C apps/admin/dist .
+          tar -czf "$out/api.tar.gz" -C "$out/api" .
+          cp scripts/bt-production/README.md "$out/README.md"
+          cp scripts/bt-production/bootstrap.sh "$out/bootstrap.sh"
+          cd "$out"
+          sha256sum web.tar.gz admin.tar.gz api.tar.gz > SHA256SUMS
+          printf '%s\n' '${{ steps.version.outputs.sha }}' > SOURCE_SHA
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bt-production-${{ steps.version.outputs.sha }}
+          path: |
+            ${{ runner.temp }}/bt-package/web.tar.gz
+            ${{ runner.temp }}/bt-package/admin.tar.gz
+            ${{ runner.temp }}/bt-package/api.tar.gz
+            ${{ runner.temp }}/bt-package/SHA256SUMS
+            ${{ runner.temp }}/bt-package/SOURCE_SHA
+            ${{ runner.temp }}/bt-package/README.md
+            ${{ runner.temp }}/bt-package/bootstrap.sh
+          retention-days: 7
+          if-no-files-found: error
+
+  stage:
+    needs: package
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: bt-production-${{ needs.package.outputs.source_sha }}
+          path: transfer
+      - name: Check package integrity and SSH Secret presence
+        shell: bash
+        env:
+          BT_HOST: ${{ secrets.BT_PROD_SSH_HOST }}
+          BT_USER: ${{ secrets.BT_PROD_SSH_USER }}
+          BT_PORT: ${{ secrets.BT_PROD_SSH_PORT }}
+          SSHPASS: ${{ secrets.BT_PROD_SSH_PASSWORD }}
+          EXPECTED_SHA: ${{ needs.package.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          for name in BT_HOST BT_USER BT_PORT SSHPASS; do
+            if test -z "${!name}"; then
+              echo "::error::Missing required Actions Secret: BT_PROD_SSH_${name#BT_}"
+              exit 1
+            fi
+          done
+          [[ "$BT_HOST" =~ ^[a-zA-Z0-9.-]+$ ]]
+          [[ "$BT_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
+          [[ "$BT_PORT" =~ ^[0-9]+$ ]]
+          test "$(cat transfer/SOURCE_SHA)" = "$EXPECTED_SHA"
+          cd transfer
+          sha256sum -c SHA256SUMS
+      - name: Install isolated SSH transport client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends sshpass >/dev/null
+      - name: Upload release into server staging (no activation)
+        shell: bash
+        env:
+          BT_HOST: ${{ secrets.BT_PROD_SSH_HOST }}
+          BT_USER: ${{ secrets.BT_PROD_SSH_USER }}
+          BT_PORT: ${{ secrets.BT_PROD_SSH_PORT }}
+          SSHPASS: ${{ secrets.BT_PROD_SSH_PASSWORD }}
+          SHA: ${{ needs.package.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          export SSHPASS
+          mkdir -m 0700 -p "$RUNNER_TEMP/bt-ssh"
+          known="$RUNNER_TEMP/bt-ssh/known_hosts"
+          ssh-keyscan -T 12 -p "$BT_PORT" "$BT_HOST" > "$known"
+          test -s "$known"
+          ssh_opts=(-p "$BT_PORT" -o "UserKnownHostsFile=$known" -o StrictHostKeyChecking=yes -o ConnectTimeout=15)
+          scp_opts=(-P "$BT_PORT" -o "UserKnownHostsFile=$known" -o StrictHostKeyChecking=yes -o ConnectTimeout=15)
+          remote="$BT_USER@$BT_HOST"
+          stage="$(sshpass -e ssh "${ssh_opts[@]}" "$remote" 'set -eu; umask 077; mkdir -p /www/local-life/incoming; mktemp -d /www/local-life/incoming/.incoming.XXXXXXXX')"
+          [[ "$stage" =~ ^/www/local-life/incoming/\.incoming\.[a-zA-Z0-9]+$ ]]
+          sshpass -e scp "${scp_opts[@]}" transfer/{web.tar.gz,admin.tar.gz,api.tar.gz,SHA256SUMS,SOURCE_SHA,README.md,bootstrap.sh} "$remote:$stage/"
+          sshpass -e ssh "${ssh_opts[@]}" "$remote" "set -eu; test \"\$(cat '$stage/SOURCE_SHA')\" = '$SHA'; cd '$stage'; sha256sum -c SHA256SUMS; if test -e '/www/local-life/incoming/$SHA'; then echo 'BT_STAGE_ALREADY_EXISTS=$SHA'; else mv '$stage' '/www/local-life/incoming/$SHA'; echo 'BT_STAGE_READY_SHA=$SHA'; fi"
+          echo "BT_PRODUCTION_STAGED_SHA=$SHA"
