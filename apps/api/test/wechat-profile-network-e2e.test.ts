@@ -559,10 +559,16 @@ test('real HTTP + SQLite keep first-login WeChat profile authorization atomic an
     assert.equal(finalStatus.status, 200)
     assert.doesNotMatch(finalStatusText, /openid|access_token|secret/i)
 
-    // The pre-existing identity mapping still owns its OpenID; this feature
-    // adds no token/Secret storage and does not persist sex/region/location.
+    // The pre-existing identity mapping still owns its OpenID. Public profile
+    // fields are durable, while location and OAuth credentials remain absent.
     const identityColumns = sqlite.prepare('PRAGMA table_info(wechat_identities)').all() as Array<{ name: string }>
-    assert.equal(identityColumns.some((column) => ['sex', 'province', 'city', 'country', 'location'].includes(column.name)), false)
+    const identityColumnNames = identityColumns.map((column) => column.name)
+    for (const expected of ['sex', 'province', 'city', 'country', 'privilege_json', 'profile_updated_at']) {
+      assert.ok(identityColumnNames.includes(expected), `missing profile column ${expected}`)
+    }
+    for (const forbidden of ['location', 'access_token', 'refresh_token', 'oauth_code']) {
+      assert.equal(identityColumnNames.includes(forbidden), false)
+    }
     const databaseBytes = readFileSync(databasePath)
     assert.equal(databaseBytes.includes(Buffer.from(TEST_APP_SECRET)), false)
     assert.equal(databaseBytes.includes(Buffer.from(TEST_APP_SECRET_B)), false)
