@@ -27,7 +27,7 @@
 
 两个网站仍由宝塔管理：`local-life.3cgroup.cn` /
 `local-admin.3cgroup.cn`，API 在宝塔的 `local_life_api` Node 项目中，
-监听 `127.0.0.1:18081`。两个站点原静态根保持不变，不修改
+由 **www 专用 PM2** (`PM2_HOME=/home/www/.pm2`, `pm2-www.service`) 守护，单实例监听 `127.0.0.1:18081`。两个站点原静态根保持不变，不修改
 全局 Nginx、MySQL、Redis 或其他 PM2 服务，不在共享主机编译 React。
 
 ## 自动发布与迁移演练
@@ -37,9 +37,9 @@
    SQLite 临时副本，**真实执行新版本 Drizzle 迁移**。
 3. 新 API 在仅监听本机的临时端口 `18082` 对迁移副本做真实启动健康检查。
    预演失败，禁止停止现网。
-4. 通过宝塔接口停止旧 API，制作停写之后的 root-only 在线数据库备份，
+4. 通过 www 专用 PM2 停止旧 API，制作停写之后的 root-only 在线数据库备份，
    再次用新版本迁移该备份的临时副本。
-5. 在真实 SQLite 执行迁移，原子切换 `current`，通过宝塔启动新 API，
+5. 在真实 SQLite 执行迁移，原子切换 `current`，通过 www 专用 PM2 启动新 API，
    先检查本机 API 健康。
 6. 分别复制 H5/Admin 静态文件，先复制全部资源，**最后原子替换首页
    index.html**，并保留旧哈希文件以支持正在打开的旧页面。
@@ -49,7 +49,7 @@
 ## 失败与自动回退的边界
 
 - 无 Schema 变化：自动恢复旧 `current` 以及两套原站静态文件，通过宝塔
-  重启旧 API，重新检查健康；Action 仍然报错，绝不假绿。
+  由 www PM2 重建旧 API 并保存开机恢复快照，重新检查健康；Action 仍然报错，绝不假绿。
 - 已开始 Schema 变更：自动**停止 API 并保留数据库现场及恢复快照**，
   设定 `manual-recovery-required`，暂停后续自动发布。不擅自用旧数据库
   覆盖可能已经产生的新业务写入。
@@ -59,7 +59,10 @@
 ## 运维入口
 
 - 宝塔「网站」：两个正式域名 / TLS / Nginx。
-- 宝塔「Node 项目」：`local_life_api` 服务及日志。
+- 宝塔「Node 项目」：保留 `local_life_api` 登记供历史识别，**已禁用其开机和手动启动脚本**，不能再从这里启动第二个 API。
+- 正式运行由 `pm2-www.service` 和 `www` 独立 PM2 管理，日志位于 `/home/www/.pm2/logs`。
+- PM2 控制统一由仓库的 `pm2-control.py` 负责；发布后健康检查通过才执行 PM2 `save`。
+- 首次接管需运行仓库的 `pm2-takeover.py handoff` 并安装 `pm2-www.service`，恢复原宝塔启停权限用 `restore`。
 - 宝塔「SQLite」：`local-life-prod` 供表浏览、只读 SQL。
 - 宝塔「计划任务」：每日 03:45 运行 `/www/local-life/ops/backup-sqlite.sh`。
 
