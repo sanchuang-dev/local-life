@@ -13,6 +13,7 @@ import {
   residentCommunityAssignments,
   residentCommunityBindingCandidates,
   residentCommunityBindings,
+  sessions,
   staffAccounts,
   users,
   wechatIdentities,
