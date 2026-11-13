@@ -1,5 +1,7 @@
 # 本地生活 · 在线 MVP 验收环境决策（2026-11-04）
 
+> **2026-11-13 正式环境决策补充**：本篇保留 11 月 4 日 MVP 上线设计及历史记录。现行完整晋级链路已明确为 `feat/* → dev → mvp（proto）→ prod（宝塔）`，旧 `test → prod` 不再是生产发布路径。`prod` 上的新工作流仅在 `mvp → prod` 晋级合并后执行，详见 `scripts/bt-production/README.md`；原文历史性的 `test/prod` Pages 兼容说明不再定义正式环境的分支职责。
+
 > **决策状态：负责人已确认双域名、两个入口各自同源代理、`dev → mvp` 合并后自动部署；尚未完成部署。**
 > 本文是仓库级环境例外和实现约束，不是现有服务已运行的证明。实际部署证据记录在对应 PR / Issue。关联总里程碑 [#66](https://github.com/sanchuang-dev/local-life/issues/66) 与最终验收 [#65](https://github.com/sanchuang-dev/local-life/issues/65)。
 

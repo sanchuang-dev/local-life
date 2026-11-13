@@ -16,6 +16,16 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      - name: Require mvp as the only source of prod promotion
+        if: github.event_name == 'pull_request' && github.base_ref == 'prod'
+        shell: bash
+        env:
+          PROMOTION_SOURCE: ${{ github.head_ref }}
+        run: |
+          if [[ "$PROMOTION_SOURCE" != "mvp" ]]; then
+            echo "::error::Only reviewed mvp -> prod PRs may promote production"
+            exit 1
+          fi
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
