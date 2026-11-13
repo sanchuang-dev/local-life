@@ -86,10 +86,19 @@ export const wechatIdentities = sqliteTable(
     appId: text('app_id').notNull(),
     openId: text('open_id').notNull(),
     unionId: text('union_id'),
-    /** Optional resident-consented profile fields; never copied to users.displayName. */
+    /**
+     * WeChat profile captured from snsapi_userinfo. OpenID remains the provider
+     * identity key; these fields are profile facts, never authentication secrets.
+     */
     nickname: text('nickname'),
     avatarUrl: text('avatar_url'),
+    sex: integer('sex'),
+    province: text('province'),
+    city: text('city'),
+    country: text('country'),
+    privilegeJson: text('privilege_json'),
     profileAuthorizedAt: integer('profile_authorized_at', { mode: 'timestamp_ms' }),
+    profileUpdatedAt: integer('profile_updated_at', { mode: 'timestamp_ms' }),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   },
   (table) => [
