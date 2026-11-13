@@ -166,7 +166,20 @@ function detail(overrides: Partial<UserDirectoryDetail> = {}): UserDirectoryDeta
       ],
     }),
     wechatLinkedIdentityCount: 1,
+    wechatLinkedUnionId: true,
+    wechatProfile: {
+      sex: 'female',
+      country: '中国',
+      province: '浙江省',
+      city: '杭州市',
+      updatedAt: '2026-10-09T08:30:00.000Z',
+    },
     maskedPhone: '138****8000',
+    contact: {
+      visibility: 'full',
+      phone: '13800138000',
+      address: '杭州市西湖区文三路 100 号 3 幢 501 室',
+    },
     staffAccount: {
       username: 'grid.b',
       status: 'active',
@@ -204,7 +217,10 @@ function legacyDetail(): UserDirectoryDetail {
   return {
     ...legacyEntry(),
     wechatLinkedIdentityCount: 0,
+    wechatLinkedUnionId: false,
+    wechatProfile: null,
     maskedPhone: null,
+    contact: { visibility: 'full', phone: null, address: null },
     staffAccount: null,
   }
 }
@@ -484,7 +500,13 @@ describe('UsersPage read-only detail drawer', () => {
 
     expect(await screen.findByText('用户详情 · 王小网')).toBeTruthy()
     const body = drawerBody()
-    expect(within(body).getByText('138****8000')).toBeTruthy()
+    // #258: an administrator sees the complete verified phone and the
+    // resident-entered address, plus the #256 profile summary.
+    expect(within(body).getByText('13800138000')).toBeTruthy()
+    expect(within(body).getByText('杭州市西湖区文三路 100 号 3 幢 501 室')).toBeTruthy()
+    expect(within(body).getByText('女')).toBeTruthy()
+    expect(within(body).getByText('浙江省')).toBeTruthy()
+    expect(within(body).getByText('已关联 UnionID')).toBeTruthy()
     expect(within(body).getByText('grid.b')).toBeTruthy()
     expect(within(body).getByText('正常')).toBeTruthy()
     expect(within(body).getByText('1 个（仅计数）')).toBeTruthy()
@@ -592,6 +614,65 @@ describe('UsersPage read-only detail drawer', () => {
     expect(within(row).queryByText(/常驻：/)).toBeNull()
   })
 
+  it('shows masked contact to a scoped operator without leaking the full number or address', async () => {
+    stubDirectory(() =>
+      json(detail({
+        contact: { visibility: 'masked', phone: null, address: null },
+      })),
+    )
+    renderPage(OPERATOR_SESSION)
+    await screen.findByText('王小网')
+
+    fireEvent.click(screen.getAllByRole('button', { name: '详情' })[1]!)
+
+    expect(await screen.findByText('用户详情 · 王小网')).toBeTruthy()
+    const body = drawerBody()
+    expect(within(body).getByText('138****8000')).toBeTruthy()
+    expect(within(body).getByText('当前角色仅可见脱敏号码')).toBeTruthy()
+    expect(within(body).getByText('当前角色不可查看联系地址')).toBeTruthy()
+    // The full smartcard-like values must not exist anywhere in the drawer.
+    expect(within(body).queryByText('13800138000')).toBeNull()
+    expect(within(body).queryByText('杭州市西湖区文三路 100 号 3 幢 501 室')).toBeNull()
+  })
+
+  it('shows explicit 待补充/未填写 states for historic and incomplete profiles', async () => {
+    stubDirectory(() =>
+      json(detail({
+        identityMethods: ['wechat'],
+        staffRole: null,
+        staffAccount: null,
+        wechatNickname: '微信王小网',
+        wechatProfileAuthorizedAt: '2026-10-06T00:00:00.000Z',
+        wechatProfile: {
+          sex: null,
+          country: null,
+          province: null,
+          city: null,
+          updatedAt: null,
+        },
+        wechatLinkedUnionId: false,
+        maskedPhone: null,
+        contact: { visibility: 'full', phone: null, address: null },
+      })),
+    )
+    renderPage(ADMIN_SESSION)
+    await screen.findByText('王小网')
+
+    fireEvent.click(screen.getAllByRole('button', { name: '详情' })[1]!)
+
+    expect(await screen.findByText('用户详情 · 王小网')).toBeTruthy()
+    const body = drawerBody()
+    // Historic pre-#256 profile: every extra field is explicitly 待补充/未提供.
+    expect(within(body).getByText('待补充（历史资料）')).toBeTruthy()
+    expect(within(body).getAllByText('未提供').length).toBe(4)
+    expect(within(body).getByText('未关联 UnionID')).toBeTruthy()
+    // No fabricated phone or address.
+    expect(within(body).getByText('未绑定手机号')).toBeTruthy()
+    expect(
+      within(body).getByText('未填写（居民本人尚未填写联系地址）'),
+    ).toBeTruthy()
+  })
+
   it('discards one account before another detail request can show it', async () => {
     let resolveSecond: ((value: Response) => void) | undefined
     stubDirectory((userId) => {
@@ -650,9 +731,11 @@ describe('UsersPage read-only detail drawer', () => {
       expect(await screen.findByText(expected, { exact: false })).toBeTruthy()
       expect(screen.getByText('用户详情加载失败')).toBeTruthy()
       // The list still exists behind the drawer, but no detail fields from any
-      // account are rendered: the drawer has no stale 138****8000 or username.
+      // account are rendered: the drawer has no stale phone, address or username.
       const body = drawerBody()
+      expect(within(body).queryByText('13800138000')).toBeNull()
       expect(within(body).queryByText('138****8000')).toBeNull()
+      expect(within(body).queryByText('杭州市西湖区文三路 100 号 3 幢 501 室')).toBeNull()
       expect(within(body).queryByText('grid.b')).toBeNull()
       expect(within(body).queryByText('王小网')).toBeNull()
     },
@@ -708,9 +791,13 @@ describe('UsersPage legacy account without any persistent identity', () => {
     const body = drawerBody()
     expect(within(body).getByText('无持久身份')).toBeTruthy()
     expect(within(body).getByText('居民')).toBeTruthy()
-    expect(within(body).getByText('未绑定')).toBeTruthy()
+    expect(within(body).getByText('未绑定手机号')).toBeTruthy()
+    expect(within(body).getByText('未填写（居民本人尚未填写联系地址）')).toBeTruthy()
+    expect(within(body).getByText('未关联 UnionID')).toBeTruthy()
     expect(within(body).getByText('0 个（仅计数）')).toBeTruthy()
     expect(within(body).getByText('未授权或未设置')).toBeTruthy()
+    // No profile at all: the profile rows report 未授权 instead of a guess.
+    expect(within(body).getAllByText('未授权').length).toBeGreaterThan(0)
     expect(within(body).getByText('未关联社区（账号真实存在，可正常登录）')).toBeTruthy()
     expect(
       within(body).getByText('无（该账号只有居民身份，不是后台工作人员）'),
