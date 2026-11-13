@@ -13,6 +13,7 @@ import {
   residentCommunityAssignments,
   residentCommunityBindingCandidates,
   residentCommunityBindings,
+  sessions,
   staffAccounts,
   users,
   wechatIdentities,
@@ -281,13 +282,31 @@ test('resident development login is isolated and never enabled in production', a
   }
 })
 
-test('WeChat OAuth binds one stable resident identity, validates state/nonce and rejects replay', async () => {
+test('WeChat OAuth binds one stable resident identity, captures full profile and rejects replay', async () => {
   let providerCalls = 0
-  const fetcher: typeof fetch = async () => {
+  const fetcher: typeof fetch = async (input) => {
     providerCalls += 1
-    return new Response(JSON.stringify({ openid: 'wechat-openid-1', unionid: 'wechat-union-1' }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
+    const url = new URL(String(input))
+    if (url.pathname === '/sns/oauth2/access_token') {
+      return Response.json({
+        access_token: 'wechat-oauth-access-1',
+        openid: 'wechat-openid-1',
+        unionid: 'wechat-union-1',
+      })
+    }
+    assert.equal(url.pathname, '/sns/userinfo')
+    assert.equal(url.searchParams.get('access_token'), 'wechat-oauth-access-1')
+    assert.equal(url.searchParams.get('openid'), 'wechat-openid-1')
+    return Response.json({
+      openid: 'wechat-openid-1',
+      unionid: 'wechat-union-1',
+      nickname: '测试微信昵称',
+      sex: 2,
+      province: '广东',
+      city: '韶关',
+      country: '中国',
+      headimgurl: 'https://wx.example.test/avatar/1',
+      privilege: ['tester', 'community'],
     })
   }
   const context = testContext(
@@ -305,7 +324,6 @@ test('WeChat OAuth binds one stable resident identity, validates state/nonce and
       .insert(communities)
       .values({ id: communityId, name: '微信授权社区', createdAt: new Date() })
       .run()
-    // #123: the H5 names the activity, never the community.
     const { activityId } = seedActivity(context.db, communityId)
 
     const start = await context.app.request(`/auth/wechat/start?activityId=${activityId}`)
@@ -313,20 +331,16 @@ test('WeChat OAuth binds one stable resident identity, validates state/nonce and
     const authorizeUrl = new URL(start.headers.get('location')!)
     const state = authorizeUrl.searchParams.get('state')
     assert.ok(state)
-    assert.equal(authorizeUrl.searchParams.get('scope'), 'snsapi_base')
-    // The AppID and callback URL come from the seeded database row and the
-    // derived callback rule, never from an env snapshot.
+    assert.equal(authorizeUrl.searchParams.get('scope'), 'snsapi_userinfo')
     assert.equal(authorizeUrl.searchParams.get('appid'), TEST_APP_ID)
     assert.equal(
       authorizeUrl.searchParams.get('redirect_uri'),
       'https://local-life.example.test/api/auth/wechat/callback',
     )
     const nonceCookie = cookiePair(start, 'll_oauth_nonce')
-    // The browser visits /api/auth/wechat/callback (proxy strips /api only on
-    // the server). A cookie scoped to /auth/wechat would be silently omitted.
     const nonceSetCookie = start.headers.get('set-cookie') ?? ''
     assert.match(nonceSetCookie, /ll_oauth_nonce=[^;]+;/i)
-    assert.match(nonceSetCookie, /;\s*Path=\/;/i)
+    assert.match(nonceSetCookie, /;\s*Path=\//i)
     assert.match(nonceSetCookie, /HttpOnly/i)
     assert.match(nonceSetCookie, /SameSite=Lax/i)
 
@@ -346,7 +360,7 @@ test('WeChat OAuth binds one stable resident identity, validates state/nonce and
     assert.equal(new URL(callback.headers.get('location')!).pathname, '/me')
     assert.equal(new URL(callback.headers.get('location')!).search, '?auth=success')
     assert.match(callback.headers.get('set-cookie') ?? '', /ll_oauth_nonce=;/i)
-    assert.equal(providerCalls, 1)
+    assert.equal(providerCalls, 2)
 
     const sessionCookies = cookieHeader(
       cookiePair(callback, 'll_session'),
@@ -361,8 +375,22 @@ test('WeChat OAuth binds one stable resident identity, validates state/nonce and
       staff: unknown
     }
     assert.equal(sessionBody.authenticated, true)
-    assert.equal(sessionBody.user.displayName, '微信用户')
+    assert.equal(sessionBody.user.displayName, '测试微信昵称')
     assert.equal(sessionBody.staff, null)
+
+    const identity = context.db.select().from(wechatIdentities).get()
+    assert.ok(identity)
+    assert.equal(identity.openId, 'wechat-openid-1')
+    assert.equal(identity.unionId, 'wechat-union-1')
+    assert.equal(identity.nickname, '测试微信昵称')
+    assert.equal(identity.avatarUrl, 'https://wx.example.test/avatar/1')
+    assert.equal(identity.sex, 2)
+    assert.equal(identity.province, '广东')
+    assert.equal(identity.city, '韶关')
+    assert.equal(identity.country, '中国')
+    assert.deepEqual(JSON.parse(identity.privilegeJson ?? 'null'), ['tester', 'community'])
+    assert.ok(identity.profileAuthorizedAt)
+    assert.ok(identity.profileUpdatedAt)
 
     const replay = await context.app.request(
       `/auth/wechat/callback?state=${state}&code=oauth-code`,
@@ -370,7 +398,7 @@ test('WeChat OAuth binds one stable resident identity, validates state/nonce and
     )
     assert.equal(new URL(replay.headers.get('location')!).pathname, '/me')
     assert.equal(new URL(replay.headers.get('location')!).search, '?auth_error=wechat_state_invalid')
-    assert.equal(providerCalls, 1)
+    assert.equal(providerCalls, 2)
 
     const secondStart = await context.app.request(`/auth/wechat/start?activityId=${activityId}`)
     const secondState = new URL(secondStart.headers.get('location')!).searchParams.get('state')!
@@ -379,12 +407,13 @@ test('WeChat OAuth binds one stable resident identity, validates state/nonce and
       { headers: { cookie: cookiePair(secondStart, 'll_oauth_nonce') } },
     )
     assert.equal(secondCallback.status, 302)
-    // Re-login reuses the identity: one WeChat identity, one resident, one
-    // session. #171 LL-IDENTITY-001: the activity-derived community is only ever a
-    // SUGGESTION after login — the retired #123 flow wrote a
-    // `resident_community_assignments` row here, which is exactly the
-    // auto-attribution this issue removes.
-    assert.equal(context.db.select().from(wechatIdentities).all().length, 1)
+    assert.equal(providerCalls, 4)
+    assert.equal(
+      context.db.select().from(wechatIdentities)
+        .where(eq(wechatIdentities.openId, 'wechat-openid-1')).all().length,
+      1,
+    )
+    assert.equal(context.db.select().from(users).all().length, 2)
     assert.equal(
       context.db
         .select()
@@ -403,6 +432,175 @@ test('WeChat OAuth binds one stable resident identity, validates state/nonce and
     assert.equal(candidates.length, 1, 'exactly one server-derived suggestion may exist')
     assert.equal(candidates[0]?.communityId, communityId)
     assert.equal(candidates[0]?.source, 'activity_oauth_candidate')
+  } finally {
+    context.sqlite.close()
+  }
+})
+
+test('WeChat login backfills an OpenID-only resident without replacing a custom display name', async () => {
+  let nickname = '补齐后的微信昵称'
+  const fetcher: typeof fetch = async (input) => {
+    const url = new URL(String(input))
+    if (url.pathname === '/sns/oauth2/access_token') {
+      return Response.json({
+        access_token: 'backfill-access',
+        openid: 'legacy-openid',
+        unionid: 'legacy-unionid',
+      })
+    }
+    return Response.json({
+      openid: 'legacy-openid',
+      nickname,
+      sex: 1,
+      province: '广东',
+      city: '广州',
+      country: '中国',
+      headimgurl: 'https://wx.example.test/avatar/legacy',
+      privilege: [],
+    })
+  }
+  const context = testContext(
+    {
+      WEB_BASE_URL: 'https://local-life.example.test',
+      TRUSTED_ORIGINS: 'https://local-life.example.test',
+    },
+    fetcher,
+    { seedWechat: true },
+  )
+  try {
+    const userId = randomUUID()
+    const now = new Date()
+    context.db.insert(users).values({
+      id: userId,
+      displayName: '微信用户',
+      createdAt: now,
+      updatedAt: now,
+    }).run()
+    context.db.insert(wechatIdentities).values({
+      id: randomUUID(),
+      userId,
+      appId: TEST_APP_ID,
+      openId: 'legacy-openid',
+      createdAt: now,
+    }).run()
+
+    const start = await context.app.request('/auth/wechat/start')
+    const state = new URL(start.headers.get('location')!).searchParams.get('state')!
+    const callback = await context.app.request(
+      `/auth/wechat/callback?state=${state}&code=legacy-code`,
+      { headers: { cookie: cookiePair(start, 'll_oauth_nonce') } },
+    )
+    assert.equal(new URL(callback.headers.get('location')!).search, '?auth=success')
+    assert.equal(context.db.select().from(users).all().length, 1)
+    assert.equal(context.db.select().from(wechatIdentities).all().length, 1)
+    assert.equal(context.db.select().from(users).where(eq(users.id, userId)).get()?.displayName, '补齐后的微信昵称')
+    const backfilled = context.db.select().from(wechatIdentities).where(eq(wechatIdentities.userId, userId)).get()
+    assert.equal(backfilled?.nickname, '补齐后的微信昵称')
+    assert.equal(backfilled?.unionId, 'legacy-unionid')
+    assert.ok(backfilled?.profileAuthorizedAt)
+    assert.ok(backfilled?.profileUpdatedAt)
+
+    context.db.update(users).set({ displayName: '居民自己改的名字', updatedAt: new Date() })
+      .where(eq(users.id, userId)).run()
+    nickname = '微信昵称后来变了'
+    const secondStart = await context.app.request('/auth/wechat/start')
+    const secondState = new URL(secondStart.headers.get('location')!).searchParams.get('state')!
+    await context.app.request(
+      `/auth/wechat/callback?state=${secondState}&code=legacy-code-2`,
+      { headers: { cookie: cookiePair(secondStart, 'll_oauth_nonce') } },
+    )
+    assert.equal(
+      context.db.select().from(users).where(eq(users.id, userId)).get()?.displayName,
+      '居民自己改的名字',
+    )
+    assert.equal(
+      context.db.select().from(wechatIdentities).where(eq(wechatIdentities.userId, userId)).get()?.nickname,
+      '微信昵称后来变了',
+    )
+  } finally {
+    context.sqlite.close()
+  }
+})
+
+test('WeChat login never creates a resident when snsapi_userinfo returns another OpenID', async () => {
+  const fetcher: typeof fetch = async (input) => {
+    const url = new URL(String(input))
+    if (url.pathname === '/sns/oauth2/access_token') {
+      return Response.json({ access_token: 'mismatch-access', openid: 'openid-a' })
+    }
+    return Response.json({
+      openid: 'openid-b',
+      nickname: '不应保存',
+      headimgurl: 'https://wx.example.test/avatar/mismatch',
+    })
+  }
+  const context = testContext(
+    {
+      WEB_BASE_URL: 'https://local-life.example.test',
+      TRUSTED_ORIGINS: 'https://local-life.example.test',
+    },
+    fetcher,
+    { seedWechat: true },
+  )
+  try {
+    const start = await context.app.request('/auth/wechat/start')
+    const state = new URL(start.headers.get('location')!).searchParams.get('state')!
+    const callback = await context.app.request(
+      `/auth/wechat/callback?state=${state}&code=mismatch-code`,
+      { headers: { cookie: cookiePair(start, 'll_oauth_nonce') } },
+    )
+    assert.equal(
+      new URL(callback.headers.get('location')!).search,
+      '?auth_error=wechat_identity_unavailable',
+    )
+    assert.equal(context.db.select().from(users).all().length, 0)
+    assert.equal(context.db.select().from(wechatIdentities).all().length, 0)
+    assert.equal(cookiePairs(callback).some((value) => value.startsWith('ll_session=')), false)
+  } finally {
+    context.sqlite.close()
+  }
+})
+
+
+test('WeChat login leaves no partial resident when snsapi_userinfo fails', async () => {
+  let providerCalls = 0
+  const fetcher: typeof fetch = async (input) => {
+    providerCalls += 1
+    const url = new URL(String(input))
+    if (url.pathname === '/sns/oauth2/access_token') {
+      return Response.json({
+        access_token: 'userinfo-error-access',
+        openid: 'userinfo-error-openid',
+      })
+    }
+    assert.equal(url.pathname, '/sns/userinfo')
+    return Response.json({ errcode: 40003, errmsg: 'invalid openid' })
+  }
+  const context = testContext(
+    {
+      WEB_BASE_URL: 'https://local-life.example.test',
+      TRUSTED_ORIGINS: 'https://local-life.example.test',
+    },
+    fetcher,
+    { seedWechat: true },
+  )
+
+  try {
+    const start = await context.app.request('/auth/wechat/start')
+    const state = new URL(start.headers.get('location')!).searchParams.get('state')!
+    const callback = await context.app.request(
+      `/auth/wechat/callback?state=${state}&code=userinfo-error-code`,
+      { headers: { cookie: cookiePair(start, 'll_oauth_nonce') } },
+    )
+    assert.equal(
+      new URL(callback.headers.get('location')!).search,
+      '?auth_error=wechat_provider_unavailable',
+    )
+    assert.equal(providerCalls, 2)
+    assert.equal(context.db.select().from(users).all().length, 0)
+    assert.equal(context.db.select().from(wechatIdentities).all().length, 0)
+    assert.equal(context.db.select().from(sessions).all().length, 0)
+    assert.equal(cookiePairs(callback).some((value) => value.startsWith('ll_session=')), false)
   } finally {
     context.sqlite.close()
   }

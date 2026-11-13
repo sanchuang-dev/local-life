@@ -22,10 +22,12 @@ import {
  * communities and must not be able to widen scope with `role`, `keyword`,
  * `community` or a direct detail ID.
  *
- * Minimum-necessary data only. These DTOs deliberately have no OpenID/unionid,
- * no plaintext phone, no AppSecret/token/session/cookie, no password hash and
- * no fabricated login history. The masked phone is the only phone shape that
- * ever leaves the API.
+ * Minimum-necessary data only. These DTOs deliberately have no OpenID/unionid
+ * value, no AppSecret/token/session/cookie, no password hash and no fabricated
+ * login history. The masked phone is the only phone shape the list ever returns;
+ * a complete verified phone and the resident-entered address appear exclusively
+ * in the detail response for a caller authorized as `full` (an administrator
+ * today), never in the list.
  */
 
 const isoTimestamp = z
@@ -101,6 +103,26 @@ export type UserDirectoryCommunityFilter = z.infer<typeof userDirectoryCommunity
 /** Staff account lifecycle, surfaced on the detail page only. */
 export const userStaffStatusSchema = z.enum(['active', 'disabled'])
 export type UserStaffStatus = z.infer<typeof userStaffStatusSchema>
+
+/**
+ * WeChat-reported gender, normalized from the provider's numeric code. `null`
+ * means the provider did not report a value (or the profile predates the field);
+ * it is never rendered as a guess.
+ */
+export const userWechatSexSchema = z.enum(['unknown', 'male', 'female'])
+export type UserWechatSex = z.infer<typeof userWechatSexSchema>
+
+/**
+ * Contact visibility for the *caller* of a detail request.
+ *
+ * `full` exposes the complete verified phone and the resident-entered contact
+ * address; `masked` means both are withheld. The flag exists so the admin UI can
+ * tell 「未填写」 apart from 「当前角色不可见」 instead of rendering a fabricated
+ * value. Only an administrator gets `full` today: the community-scoped operator
+ * workflow has no explicit grant for a resident's account-bound contact data.
+ */
+export const userContactVisibilitySchema = z.enum(['full', 'masked'])
+export type UserContactVisibility = z.infer<typeof userContactVisibilitySchema>
 
 /* -------------------------------------------------------------------------- */
 /* Query                                                                      */
@@ -205,6 +227,45 @@ export const userStaffAccountSchema = z.strictObject({
   communities: z.array(authCommunitySchema),
 })
 export type UserStaffAccount = z.infer<typeof userStaffAccountSchema>
+
+/**
+ * The remaining consented WeChat profile facts (#256) beyond the nickname,
+ * avatar and authorization time already carried by the directory entry.
+ *
+ * Every field is `null` when WeChat did not report it. A historic row that was
+ * authorized before #256 recorded these columns therefore shows explicit
+ * 「待补充」 states rather than invented values. The object itself is present only
+ * when a profile under the currently active public account is authorized.
+ */
+export const userWechatProfileDetailSchema = z.strictObject({
+  sex: userWechatSexSchema.nullable(),
+  country: z.string().nullable(),
+  province: z.string().nullable(),
+  city: z.string().nullable(),
+  /** Last refresh of the consented profile; `null` when never refreshed since capture. */
+  updatedAt: isoTimestamp.nullable(),
+})
+export type UserWechatProfileDetail = z.infer<typeof userWechatProfileDetailSchema>
+
+/**
+ * Contact details of one account, restricted to what the caller may see.
+ *
+ * This is the only place a complete phone may appear, and only with
+ * `visibility: 'full'`. In `masked` mode both fields are `null` — the caller
+ * still gets `maskedPhone` on the entry, but must not infer an address or a full
+ * number from an absent field. OpenID/unionid values never appear here.
+ */
+export const userDirectoryContactSchema = z.strictObject({
+  visibility: userContactVisibilitySchema,
+  /** Complete verified mainland phone in `full` mode; `null` when absent/withheld. */
+  phone: z
+    .string()
+    .regex(/^1\d{10}$/u, 'must be a canonical mainland phone')
+    .nullable(),
+  /** Resident-entered contact address in `full` mode; `null` when absent/withheld. */
+  address: z.string().min(1).max(200).nullable(),
+})
+export type UserDirectoryContact = z.infer<typeof userDirectoryContactSchema>
 
 /* -------------------------------------------------------------------------- */
 /* List                                                                       */
@@ -394,11 +455,26 @@ const userDirectoryDetailBaseSchema = userDirectoryBaseSchema.extend({
    * never an identifier: no OpenID/unionid is exposed anywhere in this DTO.
    */
   wechatLinkedIdentityCount: z.number().int().nonnegative(),
-  /** `138****8000`; the only phone shape the API returns. */
+  /**
+   * Whether any linked WeChat identity carries a UnionID. Only this boolean is
+   * ever exposed: the cross-application identifier itself is not an operational
+   * field and must not leave the API.
+   */
+  wechatLinkedUnionId: z.boolean(),
+  /**
+   * Consented #256 WeChat profile facts under the currently active public
+   * account. `null` when the account has no authorized profile there — the
+   * entry's `wechatNickname`/`wechatAvatarUrl` are null in exactly that case.
+   * Individual fields stay nullable for historic profiles that predate #256.
+   */
+  wechatProfile: userWechatProfileDetailSchema.nullable(),
+  /** `138****8000`; the only phone shape the API returns in every mode. */
   maskedPhone: z
     .string()
     .regex(/^1\d{2}\*{4}\d{4}$/, 'must be a masked mainland phone like 138****8000')
     .nullable(),
+  /** Complete contact data allowed for this caller; see {@link userDirectoryContactSchema}. */
+  contact: userDirectoryContactSchema,
   /** Back-office account attached to this platform user, or `null`. */
   staffAccount: userStaffAccountSchema.nullable(),
 })
@@ -433,6 +509,38 @@ export const userDirectoryDetailSchema = userDirectoryDetailBaseSchema.superRefi
         code: 'custom',
         message: 'wechat 身份方式与 wechatLinkedIdentityCount 必须一致',
         path: ['wechatLinkedIdentityCount'],
+      })
+    }
+    if (value.wechatLinkedIdentityCount === 0 && value.wechatLinkedUnionId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'wechatLinkedUnionId 不得在没有任何微信身份时成立',
+        path: ['wechatLinkedUnionId'],
+      })
+    }
+    if (value.wechatProfileAuthorizedAt === null && value.wechatProfile !== null) {
+      ctx.addIssue({
+        code: 'custom',
+        message: '微信资料补充字段只能在当前公众号已记录授权时返回',
+        path: ['wechatProfile'],
+      })
+    }
+    // Contact visibility is structural: a masked caller cannot receive either
+    // field, and a privileged caller's full phone must agree with the masked
+    // identity presence. The address may be null independently (未填写).
+    if (value.contact.visibility === 'masked') {
+      if (value.contact.phone !== null || value.contact.address !== null) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'contact.visibility=masked 不得返回完整手机号或联系地址',
+          path: ['contact'],
+        })
+      }
+    } else if ((value.contact.phone === null) !== (value.maskedPhone === null)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: '完整手机号与脱敏手机号必须同时存在或同时为空',
+        path: ['contact', 'phone'],
       })
     }
   },
