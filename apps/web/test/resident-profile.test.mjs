@@ -7,6 +7,7 @@ const base = {
   saving: false,
   error: null,
   hasProfile: true,
+  phoneStatusKnown: true,
   phoneConfigured: true,
   maskedPhone: null,
   changingPhone: false,
@@ -27,6 +28,10 @@ test('resident profile view exposes honest loading/error/save states', () => {
 
 test('resident profile phone mode never pretends an unverified phone is bound', () => {
   assert.equal(residentProfileViewState(base).phoneMode, 'bind')
+  assert.equal(
+    residentProfileViewState({ ...base, phoneStatusKnown: false }).phoneMode,
+    'unknown',
+  )
   assert.equal(
     residentProfileViewState({ ...base, phoneConfigured: false }).phoneMode,
     'unavailable',
