@@ -211,3 +211,96 @@
 @media (prefers-reduced-motion: reduce) {
   .me-profile-drawer__field input, .me-profile-drawer__field textarea { transition: none; }
 }
+
+.me-profile-drawer__state {
+  margin: 0 20px 22px;
+  padding: 24px 16px;
+  border-radius: 14px;
+  background: #f5f8f4;
+  color: #627166;
+  text-align: center;
+  font-size: 13px;
+}
+.me-profile-drawer__state--error { color: #9b4c40; }
+.me-profile-drawer__state button,
+.me-profile-drawer__phone button,
+.me-profile-drawer__phone-cancel {
+  min-height: 36px;
+  border: 1px solid #d9e7db;
+  border-radius: 10px;
+  background: #fff;
+  color: #3d8b56;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+}
+.me-profile-drawer__identity-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 15px;
+  background: #f3f8f2;
+}
+.me-profile-drawer__avatar {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #e5f0e4;
+  color: #56936a;
+}
+.me-profile-drawer__avatar img { width: 100%; height: 100%; object-fit: cover; }
+.me-profile-drawer__identity-card strong,
+.me-profile-drawer__identity-card small { display: block; }
+.me-profile-drawer__identity-card strong { font-size: 15px; color: #284432; }
+.me-profile-drawer__identity-card small { margin-top: 3px; color: #718076; font-size: 11px; }
+.me-profile-drawer__phone {
+  padding: 14px;
+  border: 1px solid #e4ece3;
+  border-radius: 15px;
+  background: #fff;
+}
+.me-profile-drawer__phone-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.me-profile-drawer__phone-heading > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #294c32;
+  font-size: 14px;
+  font-weight: 680;
+}
+.me-profile-drawer__phone-heading svg { color: #65a579; }
+.me-profile-drawer__phone-heading button { padding: 0 10px; }
+.me-profile-drawer__phone-heading button:disabled { opacity: .55; cursor: not-allowed; }
+.me-profile-drawer__phone-current,
+.me-profile-drawer__phone-unavailable {
+  margin: 9px 0 0;
+  color: #68786c;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.me-profile-drawer__phone-cancel { width: 100%; margin-top: 8px; }
+.me-profile-drawer__counter {
+  justify-self: end;
+  margin-top: -6px;
+  color: #98a39a;
+  font-size: 10px;
+}
+.me-profile-drawer__error,
+.me-profile-drawer__success {
+  margin: -4px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.me-profile-drawer__error { color: #a6493b; }
+.me-profile-drawer__success { color: #368451; }
+.me-profile-drawer__footer button:disabled { opacity: .5; cursor: not-allowed; }
