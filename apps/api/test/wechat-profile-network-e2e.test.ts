@@ -51,7 +51,7 @@ function redirectLocation(response: Response): URL {
   return new URL(value)
 }
 
-test('real HTTP + SQLite keep base login and resident-consented WeChat profile authorization separate', async () => {
+test('real HTTP + SQLite keep first-login WeChat profile authorization atomic and legacy refresh isolated', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'local-life-wechat-profile-'))
   const databasePath = join(directory, 'profile.sqlite')
   const { db, sqlite } = createDatabase(databasePath, migrationsFolder)
@@ -71,7 +71,7 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
       return Response.json({
         access_token:
           code === 'login-code'
-            ? 'base-only-access-token'
+            ? 'login-profile-access-token'
             : code === 'userinfo-error-code'
               ? 'profile-error-token'
               : code === 'userinfo-mismatch-code'
@@ -567,7 +567,7 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
     assert.equal(databaseBytes.includes(Buffer.from(TEST_APP_SECRET)), false)
     assert.equal(databaseBytes.includes(Buffer.from(TEST_APP_SECRET_B)), false)
     assert.equal(databaseBytes.includes(Buffer.from(PROFILE_ACCESS_TOKEN)), false)
-    assert.equal(databaseBytes.includes(Buffer.from('base-only-access-token')), false)
+    assert.equal(databaseBytes.includes(Buffer.from('login-profile-access-token')), false)
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))
     sqlite.close()
