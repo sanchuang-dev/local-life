@@ -37,9 +37,10 @@ jobs:
           test "$sha" = "$EXPECTED_SHA"
           [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
           # GitHub's PR association proves this exact prod commit came from mvp.
-          gh api "repos/$GITHUB_REPOSITORY/commits/$sha/pulls" \
-            | jq -e --arg sha "$sha" \
-                '[.[] | select(.base.ref == "prod" and .head.ref == "mvp" and .merged_at != null and .merge_commit_sha == $sha)] | length > 0' >/dev/null \
+          promotion_count="$(gh api -H 'Accept: application/vnd.github+json' \
+            "repos/$GITHUB_REPOSITORY/commits/$sha/pulls" \
+            --jq "[.[] | select(.base.ref == \"prod\" and .head.ref == \"mvp\" and .merged_at != null and .merge_commit_sha == \"$sha\")] | length")"
+          test "$promotion_count" -ge 1 \
             || { echo "::error::prod must be promoted by a merged mvp -> prod PR; direct pushes and test -> prod are rejected"; exit 1; }
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           echo "BT_PRODUCTION_PACKAGE_SHA=$sha"
