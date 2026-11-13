@@ -28,6 +28,7 @@ export function ResidentProfileDrawer({ auth, onClose }: ResidentProfileDrawerPr
     saving: auth.residentProfileSaving,
     error: auth.residentProfileError,
     hasProfile: profile !== null,
+    phoneStatusKnown: auth.phoneStatus !== null,
     phoneConfigured,
     maskedPhone,
     changingPhone: phoneEditing,
@@ -180,6 +181,12 @@ export function ResidentProfileDrawer({ auth, onClose }: ResidentProfileDrawerPr
               </div>
               {view.phoneMode === 'bound' && (
                 <p className="me-profile-drawer__phone-current">已验证 {maskedPhone}</p>
+              )}
+              {view.phoneMode === 'unknown' && (
+                <div className="me-profile-drawer__phone-unavailable">
+                  <p>暂时无法读取手机号服务状态；联系地址仍可正常保存。</p>
+                  <button type="button" onClick={() => void auth.refreshPhoneStatus()}>重新读取手机号状态</button>
+                </div>
               )}
               {view.phoneMode === 'unavailable' && (
                 <p className="me-profile-drawer__phone-unavailable">
