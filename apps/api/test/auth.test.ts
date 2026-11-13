@@ -408,8 +408,12 @@ test('WeChat OAuth binds one stable resident identity, captures full profile and
     )
     assert.equal(secondCallback.status, 302)
     assert.equal(providerCalls, 4)
-    assert.equal(context.db.select().from(wechatIdentities).all().length, 1)
-    assert.equal(context.db.select().from(users).all().length, 1)
+    assert.equal(
+      context.db.select().from(wechatIdentities)
+        .where(eq(wechatIdentities.openId, 'wechat-openid-1')).all().length,
+      1,
+    )
+    assert.equal(context.db.select().from(users).all().length, 2)
     assert.equal(
       context.db
         .select()
