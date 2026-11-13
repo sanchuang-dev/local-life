@@ -91,7 +91,10 @@ const staffEntry = {
 const staffDetail = {
   ...staffEntry,
   wechatLinkedIdentityCount: 0,
+  wechatLinkedUnionId: false,
+  wechatProfile: null,
   maskedPhone: '138****8000',
+  contact: { visibility: 'full', phone: '13800138000', address: '杭州市西湖区文三路 100 号' },
   staffAccount: {
     username: 'operator-a',
     status: 'active',
@@ -357,11 +360,22 @@ describe('userDirectoryDetailSchema', () => {
     const parsed = userDirectoryDetailSchema.parse({
       ...unassignedEntry,
       wechatLinkedIdentityCount: 2,
+      wechatLinkedUnionId: true,
+      wechatProfile: {
+        sex: 'female',
+        country: '中国',
+        province: '浙江省',
+        city: '杭州市',
+        updatedAt: '2026-10-02T00:00:00.000Z',
+      },
       maskedPhone: null,
+      contact: { visibility: 'full', phone: null, address: null },
       staffAccount: null,
     })
     assert.equal(parsed.staffAccount, null)
     assert.equal(parsed.wechatLinkedIdentityCount, 2)
+    assert.equal(parsed.wechatLinkedUnionId, true)
+    assert.equal(parsed.wechatProfile.sex, 'female')
   })
 
   it('accepts a legacy account with no identity, phone or staff account', () => {
@@ -370,9 +384,12 @@ describe('userDirectoryDetailSchema', () => {
       wechatNickname: null,
       wechatAvatarUrl: null,
       wechatProfileAuthorizedAt: null,
+      wechatProfile: null,
       identityMethods: [],
       wechatLinkedIdentityCount: 0,
+      wechatLinkedUnionId: false,
       maskedPhone: null,
+      contact: { visibility: 'full', phone: null, address: null },
       staffAccount: null,
     })
     assert.deepEqual(parsed.identityMethods, [])
@@ -385,13 +402,19 @@ describe('userDirectoryDetailSchema', () => {
       {
         ...unassignedEntry,
         wechatLinkedIdentityCount: 0,
+        wechatLinkedUnionId: false,
+        wechatProfile: null,
         maskedPhone: null,
+        contact: { visibility: 'full', phone: null, address: null },
         staffAccount: null,
       },
       {
         ...unassignedEntry,
         wechatLinkedIdentityCount: 1,
+        wechatLinkedUnionId: false,
+        wechatProfile: null,
         maskedPhone: null,
+        contact: { visibility: 'full', phone: null, address: null },
         staffAccount: { username: 'ops', status: 'active', communities: [] },
       },
     ]
@@ -400,13 +423,93 @@ describe('userDirectoryDetailSchema', () => {
     }
   })
 
-  it('exposes no plaintext phone, credential or identifier column', () => {
+  it('keeps complete contact administrator-only and structurally separated (#258)', () => {
+    // `masked` is the scoped-staff shape: neither contact value may travel.
+    const masked = userDirectoryDetailSchema.parse({
+      ...staffDetail,
+      contact: { visibility: 'masked', phone: null, address: null },
+    })
+    assert.deepEqual(masked.contact, { visibility: 'masked', phone: null, address: null })
+
+    for (const value of [
+      { ...staffDetail, contact: { visibility: 'masked', phone: '13800138000', address: null } },
+      { ...staffDetail, contact: { visibility: 'masked', phone: null, address: '某地址' } },
+      // Full phone presence must agree with the masked phone identity.
+      { ...staffDetail, contact: { visibility: 'full', phone: null, address: null } },
+      // A canonical mainland phone is the only accepted shape.
+      { ...staffDetail, contact: { visibility: 'full', phone: '1380013800', address: null } },
+      { ...staffDetail, contact: { visibility: 'full', phone: '23800138000', address: null } },
+      // No address is fine; an empty/oversized address is not.
+      { ...staffDetail, contact: { visibility: 'full', phone: '13800138000', address: '' } },
+      {
+        ...staffDetail,
+        contact: { visibility: 'full', phone: '13800138000', address: 'x'.repeat(201) },
+      },
+      // Unknown visibility or extra contact columns are rejected.
+      { ...staffDetail, contact: { visibility: 'partial', phone: null, address: null } },
+      {
+        ...staffDetail,
+        contact: { visibility: 'full', phone: '13800138000', address: null, openId: 'o-1' },
+      },
+    ]) {
+      assert.equal(userDirectoryDetailSchema.safeParse(value).success, false, JSON.stringify(value))
+    }
+  })
+
+  it('never returns #256 profile facts without a recorded consent (#258)', () => {
+    for (const extra of [
+      {
+        wechatProfile: {
+          sex: 'female',
+          country: null,
+          province: null,
+          city: null,
+          updatedAt: null,
+        },
+      },
+      { wechatProfile: { sex: 'other', country: null, province: null, city: null, updatedAt: null } },
+      { wechatLinkedUnionId: true },
+    ]) {
+      assert.equal(
+        userDirectoryDetailSchema.safeParse({
+          ...unassignedEntry,
+          wechatLinkedIdentityCount: 0,
+          wechatLinkedUnionId: false,
+          wechatProfile: null,
+          maskedPhone: null,
+          contact: { visibility: 'full', phone: null, address: null },
+          wechatNickname: null,
+          wechatAvatarUrl: null,
+          wechatProfileAuthorizedAt: null,
+          identityMethods: [],
+          staffAccount: null,
+          ...extra,
+        }).success,
+        false,
+        JSON.stringify(extra),
+      )
+    }
+    // An authorized historic row may carry all-null profile fields.
+    assert.equal(
+      userDirectoryDetailSchema.safeParse({
+        ...unassignedEntry,
+        wechatLinkedIdentityCount: 1,
+        wechatLinkedUnionId: false,
+        wechatProfile: { sex: null, country: null, province: null, city: null, updatedAt: null },
+        maskedPhone: null,
+        contact: { visibility: 'full', phone: null, address: null },
+        staffAccount: null,
+      }).success,
+      true,
+    )
+  })
+
+  it('exposes no credential or provider identifier column', () => {
     const forbidden = [
       'openId',
       'openid',
       'unionId',
       'unionid',
-      'phone',
       'phoneNumber',
       'passwordHash',
       'password',
@@ -425,15 +528,11 @@ describe('userDirectoryDetailSchema', () => {
     for (const key of forbidden) {
       assert.equal(keys.has(key), false, `contract must not declare ${key}`)
     }
-    const serialized = JSON.stringify({ detail: staffDetail, entry: unassignedEntry })
-    for (const key of forbidden) {
-      assert.equal(
-        serialized.includes(`"${key}":`),
-        false,
-        `serialized DTO leaked ${key}`,
-      )
-    }
-    for (const extra of [{ openId: 'o-1' }, { phone: '13800138000' }, { passwordHash: 'x' }]) {
+    // The only phone-shaped field is the explicitly scoped `contact.phone`;
+    // the list entry never declares one.
+    assert.equal(schemaKeys(userDirectoryDetailSchema).has('phone'), true)
+    assert.equal(schemaKeys(userDirectoryEntrySchema).has('phone'), false)
+    for (const extra of [{ openId: 'o-1' }, { unionId: 'u-1' }, { passwordHash: 'x' }]) {
       assert.equal(
         userDirectoryDetailSchema.safeParse({ ...staffDetail, ...extra }).success,
         false,
@@ -460,6 +559,7 @@ describe('userDirectoryDetailSchema', () => {
     assert.deepEqual(Object.keys(userDirectoryDetailSchema.shape).sort(), [
       'communityRelationSource',
       'confirmedCommunity',
+      'contact',
       'createdAt',
       'displayName',
       'id',
@@ -472,7 +572,9 @@ describe('userDirectoryDetailSchema', () => {
       'staffRole',
       'wechatAvatarUrl',
       'wechatLinkedIdentityCount',
+      'wechatLinkedUnionId',
       'wechatNickname',
+      'wechatProfile',
       'wechatProfileAuthorizedAt',
     ])
   })
