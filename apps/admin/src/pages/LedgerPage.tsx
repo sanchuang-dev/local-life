@@ -3,7 +3,6 @@ import {
   Alert,
   App as AntdApp,
   Button,
-  Card,
   Descriptions,
   Drawer,
   Result,
@@ -378,14 +377,26 @@ function LedgerConsole({ session }: { session: AuthenticatedSession }) {
       key: 'fact',
       title: '事实',
       hideable: false,
-      render: (_value: unknown, row: LedgerEntry) => (
-        <Space orientation="vertical" size={2}>
-          <Tag color={FACT_KIND_COLORS[row.factKind]}>{LEDGER_FACT_KIND_LABELS[row.factKind]}</Tag>
-          <Typography.Text type="secondary" className="ledger-cell-mono">
-            {row.sourceDisplayNo}
-          </Typography.Text>
-        </Space>
-      ),
+      render: (_value: unknown, row: LedgerEntry) => {
+        // Keep the business number readable; a raw UUID is shortened but the
+        // full stored value stays available by hover and copy.
+        const displayNo = UUID_PATTERN.test(row.sourceDisplayNo)
+          ? `${row.sourceDisplayNo.slice(0, 8)}…`
+          : row.sourceDisplayNo
+        return (
+          <Space orientation="vertical" size={2}>
+            <Tag color={FACT_KIND_COLORS[row.factKind]}>{LEDGER_FACT_KIND_LABELS[row.factKind]}</Tag>
+            <Typography.Text
+              type="secondary"
+              className="ledger-cell-mono"
+              title={row.sourceDisplayNo}
+              copyable={{ text: row.sourceDisplayNo }}
+            >
+              {displayNo}
+            </Typography.Text>
+          </Space>
+        )
+      },
     },
     {
       key: 'amount',
@@ -561,30 +572,45 @@ function LedgerConsole({ session }: { session: AuthenticatedSession }) {
         size={620}
         open={entryOpen}
         onClose={() => setEntryOpen(false)}
-        rootClassName="local-drawer"
+        rootClassName="local-drawer ledger-detail-drawer"
         destroyOnHidden
       >
         {entry ? (
-          <Space orientation="vertical" size={16} style={{ width: '100%' }}>
-            <section className="local-section" aria-label="事实信息">
-              <Descriptions size="small" column={1} bordered>
-                <Descriptions.Item label="事实类型">
-                  <Tag color={FACT_KIND_COLORS[entry.factKind]}>
-                    {LEDGER_FACT_KIND_LABELS[entry.factKind]}
+          <div className="ledger-detail-body">
+            <header className="ledger-detail-summary" aria-label="事实摘要">
+              <Space wrap size={6}>
+                <Tag color={FACT_KIND_COLORS[entry.factKind]}>
+                  {LEDGER_FACT_KIND_LABELS[entry.factKind]}
+                </Tag>
+                <Tag color={entry.reconciliationState === 'reconciled' ? 'green' : 'default'}>
+                  {LEDGER_RECONCILIATION_STATE_LABELS[entry.reconciliationState]}
+                </Tag>
+                {(anomaliesByEntry.get(entry.entryId) ?? []).length > 0 ? (
+                  <Tag color="red">
+                    未解决异常 {anomaliesByEntry.get(entry.entryId)?.length}
                   </Tag>
-                </Descriptions.Item>
-                <Descriptions.Item label="金额">
-                  <Space orientation="vertical" size={2}>
-                    <Typography.Text strong>{formatCents(entry.amountCents)}</Typography.Text>
-                    <Typography.Text type="secondary">
-                      账面登记毛额 · {SETTLEMENT_AMOUNT_STATUS_LABELS[entry.settlementAmountStatus]}
-                      （本 MVP 无结算规则，不据此计算应付）
-                    </Typography.Text>
-                  </Space>
-                </Descriptions.Item>
+                ) : null}
+              </Space>
+              <Typography.Title level={3} className="ledger-detail-amount">
+                {formatCents(entry.amountCents)}
+              </Typography.Title>
+              <Typography.Text type="secondary">
+                账面登记毛额 · {SETTLEMENT_AMOUNT_STATUS_LABELS[entry.settlementAmountStatus]}
+                （本 MVP 无结算规则，不据此计算应付）
+              </Typography.Text>
+            </header>
+
+            <section className="ledger-detail-section" aria-label="事实信息">
+              <Typography.Title level={5}>事实信息</Typography.Title>
+              <Descriptions size="small" column={1} colon={false}>
                 <Descriptions.Item label="来源">
-                  {LEDGER_SOURCE_SYSTEM_LABELS[entry.sourceSystem]} ·{' '}
-                  <span className="ledger-cell-mono">{entry.sourceDisplayNo}</span>
+                  {LEDGER_SOURCE_SYSTEM_LABELS[entry.sourceSystem]}
+                  <Typography.Text
+                    className="ledger-cell-mono"
+                    copyable={{ text: entry.sourceDisplayNo }}
+                  >
+                    {entry.sourceDisplayNo}
+                  </Typography.Text>
                 </Descriptions.Item>
                 <Descriptions.Item label="社区">{communityName(entry.communityId)}</Descriptions.Item>
                 <Descriptions.Item label="业务时间">
@@ -597,20 +623,17 @@ function LedgerConsole({ session }: { session: AuthenticatedSession }) {
               </Descriptions>
             </section>
 
-            <section className="local-section" aria-label="归属与凭据">
-              <Descriptions size="small" column={1} bordered>
+            <section className="ledger-detail-section" aria-label="归属与凭据">
+              <Typography.Title level={5}>归属与凭据</Typography.Title>
+              <Descriptions size="small" column={1} colon={false}>
                 <Descriptions.Item label="业绩归属">
-                  <Space orientation="vertical" size={2}>
-                    <span>
-                      {LEDGER_ATTRIBUTION_STATE_LABELS[entry.attribution.state]}
-                      {entry.attribution.staffId
-                        ? ` · ${staffName(entry.attribution.staffId)}`
-                        : ''}
-                    </span>
-                    <Typography.Text type="secondary">
-                      依据：{LEDGER_ATTRIBUTION_BASIS_LABELS[entry.attribution.basis]}
-                    </Typography.Text>
-                  </Space>
+                  <span>
+                    {LEDGER_ATTRIBUTION_STATE_LABELS[entry.attribution.state]}
+                    {entry.attribution.staffId ? ` · ${staffName(entry.attribution.staffId)}` : ''}
+                  </span>
+                  <Typography.Text type="secondary">
+                    依据：{LEDGER_ATTRIBUTION_BASIS_LABELS[entry.attribution.basis]}
+                  </Typography.Text>
                 </Descriptions.Item>
                 <Descriptions.Item label="关联本地订单">
                   {entryOrder ? (
@@ -631,54 +654,57 @@ function LedgerConsole({ session }: { session: AuthenticatedSession }) {
                   ) : (entryOrderError ? entryOrderError : '未关联本地订单（历史流水不自动匹配）')}
                 </Descriptions.Item>
                 <Descriptions.Item label="凭据">
-                  <Space orientation="vertical" size={2}>
-                    <span>{LEDGER_EVIDENCE_KIND_LABELS[entry.evidence.kind]}</span>
-                    {entry.evidence.ref ? (
-                      <Typography.Text type="secondary" className="ledger-cell-mono">
-                        {entry.evidence.ref}
-                      </Typography.Text>
-                    ) : (
-                      <Typography.Text type="secondary">无凭据引用</Typography.Text>
-                    )}
-                  </Space>
+                  <span>{LEDGER_EVIDENCE_KIND_LABELS[entry.evidence.kind]}</span>
+                  {entry.evidence.ref ? (
+                    <Typography.Text type="secondary" className="ledger-cell-mono" copyable={{ text: entry.evidence.ref }}>
+                      {entry.evidence.ref}
+                    </Typography.Text>
+                  ) : (
+                    <Typography.Text type="secondary">无凭据引用</Typography.Text>
+                  )}
                 </Descriptions.Item>
                 {entry.counterEntryId ? (
                   <Descriptions.Item label="冲正对象">
-                    <span className="ledger-cell-mono">{entry.counterEntryId}</span>
+                    <Typography.Text className="ledger-cell-mono" copyable={{ text: entry.counterEntryId }}>
+                      {entry.counterEntryId}
+                    </Typography.Text>
                   </Descriptions.Item>
                 ) : null}
               </Descriptions>
             </section>
 
-            <section className="local-section" aria-label="对账状态">
-              <Descriptions size="small" column={1} bordered>
+            <section className="ledger-detail-section" aria-label="对账状态">
+              <Typography.Title level={5}>对账状态</Typography.Title>
+              <Descriptions size="small" column={1} colon={false}>
                 <Descriptions.Item label="对账状态">
                   {LEDGER_RECONCILIATION_STATE_LABELS[entry.reconciliationState]}
                 </Descriptions.Item>
                 <Descriptions.Item label="所属批次">
                   {entry.batchId ? (
-                    <span className="ledger-cell-mono">{entry.batchId}</span>
+                    <Typography.Text className="ledger-cell-mono" copyable={{ text: entry.batchId }}>
+                      {entry.batchId}
+                    </Typography.Text>
                   ) : (
                     '未进入任何批次'
                   )}
                 </Descriptions.Item>
                 <Descriptions.Item label="流水号">
-                  <span className="ledger-cell-mono">{entry.entryId}</span>
+                  <Typography.Text className="ledger-cell-mono" copyable={{ text: entry.entryId }}>
+                    {entry.entryId}
+                  </Typography.Text>
                 </Descriptions.Item>
               </Descriptions>
             </section>
 
-            <section className="local-section" aria-label="未解决异常">
-              <Typography.Text strong>未解决异常</Typography.Text>
+            <section className="ledger-detail-section" aria-label="未解决异常">
+              <Typography.Title level={5}>未解决异常</Typography.Title>
               {(anomaliesByEntry.get(entry.entryId) ?? []).length === 0 ? (
-                <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
-                  该笔流水没有未解决异常。异常是复核提示，不会修改流水本身。
-                </Typography.Paragraph>
+                <Typography.Text type="secondary">无未解决异常</Typography.Text>
               ) : (
-                <Space orientation="vertical" size={8} style={{ width: '100%', marginTop: 8 }}>
+                <div className="ledger-anomaly-list">
                   {(anomaliesByEntry.get(entry.entryId) ?? []).map((anomaly) => (
-                    <Card size="small" key={anomaly.anomalyId}>
-                      <Space wrap>
+                    <div className="ledger-anomaly-item" key={anomaly.anomalyId}>
+                      <Space wrap size={6}>
                         <Tag color={anomaly.severity === 'high' ? 'red' : 'orange'}>
                           {LEDGER_ANOMALY_SEVERITY_LABELS[anomaly.severity]}
                         </Tag>
@@ -688,16 +714,23 @@ function LedgerConsole({ session }: { session: AuthenticatedSession }) {
                         </Typography.Text>
                       </Space>
                       {anomaly.note ? (
-                        <Typography.Paragraph style={{ margin: '8px 0 0' }}>
+                        <Typography.Paragraph className="ledger-anomaly-note">
                           {anomaly.note}
                         </Typography.Paragraph>
                       ) : null}
-                    </Card>
+                      <Typography.Text
+                        type="secondary"
+                        className="ledger-cell-mono"
+                        copyable={{ text: anomaly.anomalyId }}
+                      >
+                        异常标识 {anomaly.anomalyId.slice(0, 8)}…
+                      </Typography.Text>
+                    </div>
                   ))}
-                </Space>
+                </div>
               )}
             </section>
-          </Space>
+          </div>
         ) : null}
       </Drawer>
     </div>
