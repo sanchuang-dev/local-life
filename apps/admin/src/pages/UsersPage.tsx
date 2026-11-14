@@ -78,6 +78,12 @@ const IDENTITY_METHOD_LABELS = {
   staff: '后台账户',
 } as const
 
+const WECHAT_SEX_LABELS = {
+  male: '男',
+  female: '女',
+  unknown: '微信未明确',
+} as const
+
 const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
   timeZone: 'Asia/Shanghai',
   year: 'numeric',
@@ -184,6 +190,83 @@ function residentStateNode(state: UserDirectoryEntry['residentCommunityState']):
     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
       {residentStateUnavailableReason(state)}
     </Typography.Text>
+  )
+}
+
+/**
+ * #256 profile facts in the drawer. A field that WeChat never reported is shown
+ * as 「待补充」/「未提供」 — never as a guessed region or gender. A historic row
+ * whose consent predates #256 is distinguishable by `wechatProfile === null`
+ * while `wechatProfileAuthorizedAt` is recorded.
+ */
+function WechatProfileValue({
+  authorizedAt,
+  profile,
+  field,
+}: {
+  authorizedAt: UserDirectoryDetail['wechatProfileAuthorizedAt']
+  profile: UserDirectoryDetail['wechatProfile']
+  field: 'sex' | 'country' | 'province' | 'city' | 'updatedAt'
+}): ReactNode {
+  if (!profile) {
+    return (
+      <Typography.Text type="secondary">
+        {authorizedAt ? '待补充（历史资料）' : '未授权'}
+      </Typography.Text>
+    )
+  }
+  if (field === 'sex') {
+    return profile.sex ? (
+      WECHAT_SEX_LABELS[profile.sex]
+    ) : (
+      <Typography.Text type="secondary">未提供</Typography.Text>
+    )
+  }
+  if (field === 'updatedAt') {
+    return profile.updatedAt ? (
+      formatDateTime(profile.updatedAt)
+    ) : (
+      <Typography.Text type="secondary">待补充（历史资料）</Typography.Text>
+    )
+  }
+  const value = profile[field]
+  return value || <Typography.Text type="secondary">未提供</Typography.Text>
+}
+
+/**
+ * #258 contact block. `visibility` comes from the server, so 「当前角色不可见」
+ * is never confused with a resident who has not filled the field in.
+ */
+function contactPhoneNode(detail: UserDirectoryDetail): ReactNode {
+  if (detail.contact.visibility === 'masked') {
+    return detail.maskedPhone ? (
+      <Space size={4} wrap>
+        <Typography.Text>{detail.maskedPhone}</Typography.Text>
+        <Tag>当前角色仅可见脱敏号码</Tag>
+      </Space>
+    ) : (
+      <Typography.Text type="secondary">未绑定手机号</Typography.Text>
+    )
+  }
+  return detail.contact.phone ? (
+    <Typography.Text>{detail.contact.phone}</Typography.Text>
+  ) : (
+    <Typography.Text type="secondary">未绑定手机号</Typography.Text>
+  )
+}
+
+function contactAddressNode(detail: UserDirectoryDetail): ReactNode {
+  if (detail.contact.visibility === 'masked') {
+    return (
+      <Typography.Text type="secondary">
+        当前角色不可查看联系地址
+      </Typography.Text>
+    )
+  }
+  return detail.contact.address ? (
+    <Typography.Text>{detail.contact.address}</Typography.Text>
+  ) : (
+    <Typography.Text type="secondary">未填写（居民本人尚未填写联系地址）</Typography.Text>
   )
 }
 
@@ -575,14 +658,62 @@ export function UsersPage({ session }: UsersPageProps) {
                   ? `已授权（${formatDateTime(detail.wechatProfileAuthorizedAt)}）`
                   : '未授权'}
               </Descriptions.Item>
+              <Descriptions.Item label="微信资料更新时间">
+                <WechatProfileValue
+                  authorizedAt={detail.wechatProfileAuthorizedAt}
+                  profile={detail.wechatProfile}
+                  field="updatedAt"
+                />
+              </Descriptions.Item>
+              <Descriptions.Item label="性别">
+                <WechatProfileValue
+                  authorizedAt={detail.wechatProfileAuthorizedAt}
+                  profile={detail.wechatProfile}
+                  field="sex"
+                />
+              </Descriptions.Item>
+              <Descriptions.Item label="国家">
+                <WechatProfileValue
+                  authorizedAt={detail.wechatProfileAuthorizedAt}
+                  profile={detail.wechatProfile}
+                  field="country"
+                />
+              </Descriptions.Item>
+              <Descriptions.Item label="省份">
+                <WechatProfileValue
+                  authorizedAt={detail.wechatProfileAuthorizedAt}
+                  profile={detail.wechatProfile}
+                  field="province"
+                />
+              </Descriptions.Item>
+              <Descriptions.Item label="城市">
+                <WechatProfileValue
+                  authorizedAt={detail.wechatProfileAuthorizedAt}
+                  profile={detail.wechatProfile}
+                  field="city"
+                />
+              </Descriptions.Item>
               <Descriptions.Item label="关联微信身份">
                 {detail.wechatLinkedIdentityCount} 个（仅计数）
               </Descriptions.Item>
-              <Descriptions.Item label="手机号">
-                {detail.maskedPhone || '未绑定'}
+              <Descriptions.Item label="跨应用 UnionID">
+                {detail.wechatLinkedUnionId ? (
+                  <Tag color="green">已关联 UnionID</Tag>
+                ) : (
+                  <Tag>未关联 UnionID</Tag>
+                )}
               </Descriptions.Item>
               <Descriptions.Item label="注册时间">
                 {formatDateTime(detail.createdAt)}
+              </Descriptions.Item>
+            </Descriptions>
+
+            <Descriptions size="small" column={1} bordered title="联系方式（只读）">
+              <Descriptions.Item label="手机号">
+                {contactPhoneNode(detail)}
+              </Descriptions.Item>
+              <Descriptions.Item label="联系地址">
+                {contactAddressNode(detail)}
               </Descriptions.Item>
             </Descriptions>
 

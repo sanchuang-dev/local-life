@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ProfilePreviewDrawer, type ProfilePreviewData } from '../components/profile/ProfilePreviewDrawer'
+import { ResidentProfileDrawer } from '../components/profile/ProfilePreviewDrawer'
 import {
   CalendarCheck2, ChevronRight, ClipboardList, Gift, Home,
   MapPin, ShieldCheck, UserRound,
@@ -36,14 +36,7 @@ const PROFILE_MESSAGES: Record<string, string> = {
 export function MePage() {
   const auth = useResidentAuth()
   const [profileDrawerOpen, setProfileDrawerOpen] = useState(false)
-  const [profilePreview, setProfilePreview] = useState<ProfilePreviewData>({ phone: '', address: '' })
-  const [profilePreviewSaved, setProfilePreviewSaved] = useState(false)
   const closeProfileDrawer = useCallback(() => setProfileDrawerOpen(false), [])
-  const saveProfilePreview = useCallback((value: ProfilePreviewData) => {
-    setProfilePreview(value)
-    setProfilePreviewSaved(true)
-    setProfileDrawerOpen(false)
-  }, [])
   const [searchParams, setSearchParams] = useSearchParams()
   const [profileNotice] = useState(() => {
     const result = searchParams.get('wechat_profile')
@@ -150,7 +143,8 @@ export function MePage() {
               type="button"
               className="me-redesign__service-tile"
               aria-haspopup="dialog"
-              onClick={() => { setProfilePreviewSaved(false); setProfileDrawerOpen(true) }}
+              disabled={!auth.session || Boolean(auth.session.staff)}
+              onClick={() => setProfileDrawerOpen(true)}
             >
               <span className="me-redesign__service-icon me-redesign__icon--green">
                 <UserRound size={27} strokeWidth={1.85} aria-hidden="true" />
@@ -172,22 +166,12 @@ export function MePage() {
               </Link>
             ))}
           </div>
-          {profilePreviewSaved && (
-            <p className="me-redesign__preview-feedback" role="status">
-              已应用到本次页面预览，未保存至服务器。
-            </p>
-          )}
         </section>
 
-        <MeAccountPanel auth={auth} />
+        <MeAccountPanel auth={auth} onEditProfile={() => setProfileDrawerOpen(true)} />
       </div>
       {profileDrawerOpen && (
-        <ProfilePreviewDrawer
-          value={profilePreview}
-          userId={auth.session?.user.id ?? null}
-          onClose={closeProfileDrawer}
-          onSave={saveProfilePreview}
-        />
+        <ResidentProfileDrawer auth={auth} onClose={closeProfileDrawer} />
       )}
     </div>
   )

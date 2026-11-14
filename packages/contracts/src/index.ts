@@ -2301,6 +2301,7 @@ export * from './purchase-reward.js'
 export * from './ledger.js'
 export * from './user-directory.js'
 export * from './resident-community.js'
+export * from './resident-profile.js'
 export * from './draw.js'
 
 /* -------------------------------------------------------------------------- */
