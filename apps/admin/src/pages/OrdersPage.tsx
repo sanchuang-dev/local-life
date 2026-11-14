@@ -30,9 +30,15 @@ import {
   type PanelFilter,
   type PanelQuery,
 } from '../shared/components/DataPanel'
-import { listAdminCommunities } from '../services/activities'
 import type { AuthenticatedSession } from '../services/auth'
 import { describeLocalError, isLocalApiError } from '../services/localApi'
+import {
+  communityOptionsOf,
+  gridStaffOptionsOf,
+  staffOptionsOf,
+  useAdminFilterOptions,
+} from './useAdminFilterOptions'
+import { OrderReceiptSection } from '../components/OrderReceiptSection'
 import {
   getAdminLocalOrder,
   listAdminLocalOrders,
@@ -63,9 +69,6 @@ const STATUS_OPTIONS = (Object.keys(ORDER_STATUS_META) as LocalOrderStatus[]).ma
   label: ORDER_STATUS_META[status].label,
   value: status,
 }))
-
-/** Structural shape of `authCommunitySchema`; the contracts package exports schemas only. */
-type CommunityRef = { id: string; name: string }
 
 const RECORD_SOURCE_META = {
   resident: '居民自助登记',
@@ -180,9 +183,12 @@ function OrderConsole({ session }: { session: AuthenticatedSession }) {
   const isAdmin = session.staff.role === 'admin'
   const assigned = session.staff.communities
 
-  const [communities, setCommunities] = useState<readonly CommunityRef[]>([])
-  const [communitiesError, setCommunitiesError] = useState<string | null>(null)
-  const [communitiesToken, setCommunitiesToken] = useState(0)
+  const {
+    communities,
+    staff,
+    error: filterOptionsError,
+    retry: retryFilterOptions,
+  } = useAdminFilterOptions()
 
   const [query, setQuery] = useState<PanelQuery<OrderFilters, OrderSortKey>>(() => ({
     filters: { ...initialFilters, communityId: isAdmin ? undefined : assigned[0]?.id },
@@ -209,25 +215,6 @@ function OrderConsole({ session }: { session: AuthenticatedSession }) {
   const [rejectNote, setRejectNote] = useState('')
   const [rejectError, setRejectError] = useState<string | null>(null)
   const detailRequestRef = useRef(0)
-
-  useEffect(() => {
-    let active = true
-    const controller = new AbortController()
-    setCommunitiesError(null)
-    listAdminCommunities(controller.signal)
-      .then((items) => {
-        if (active) setCommunities(items)
-      })
-      .catch((cause: unknown) => {
-        if (!active || controller.signal.aborted) return
-        setCommunities([])
-        setCommunitiesError(describeLocalError(cause, '无法读取社区列表'))
-      })
-    return () => {
-      active = false
-      controller.abort()
-    }
-  }, [communitiesToken])
 
   useEffect(() => {
     let active = true
@@ -264,10 +251,9 @@ function OrderConsole({ session }: { session: AuthenticatedSession }) {
     }
   }, [query, listToken])
 
-  const communityOptions = useMemo(
-    () => communities.map((item) => ({ label: item.name, value: item.id })),
-    [communities],
-  )
+  const communityOptions = useMemo(() => communityOptionsOf(communities), [communities])
+  const receiptStaffOptions = useMemo(() => staffOptionsOf(staff), [staff])
+  const receiptGridStaffOptions = useMemo(() => gridStaffOptionsOf(staff), [staff])
 
   const refreshList = () => setListToken((value) => value + 1)
 
@@ -510,7 +496,7 @@ function OrderConsole({ session }: { session: AuthenticatedSession }) {
     <div className="page">
       <PageHeader
         title="订单管理"
-        description="查询居民登记的本地商品订单、处理状态并做运营人工核验。价格与商品名称以登记时冻结的快照为准；「人工核验通过」只是运营员对订单事实的人工确认，不代表收款或业务办理已完成。"
+        description="查询居民登记的本地商品订单、处理状态、人工核验与收款凭据。价格以登记时冻结的快照为准；「人工核验通过」只是对订单事实的人工确认，不代表收款或业务办理已完成。"
       />
 
       <div className="page-stack">
@@ -529,17 +515,13 @@ function OrderConsole({ session }: { session: AuthenticatedSession }) {
           />
         ) : null}
 
-        {communitiesError ? (
+        {filterOptionsError ? (
           <Alert
             type="warning"
             showIcon
-            title="社区列表加载失败"
-            description={communitiesError}
-            action={
-              <Button size="small" onClick={() => setCommunitiesToken((value) => value + 1)}>
-                重试
-              </Button>
-            }
+            title="社区与人员列表加载失败"
+            description={filterOptionsError}
+            action={<Button size="small" onClick={retryFilterOptions}>重试</Button>}
           />
         ) : null}
 
@@ -816,6 +798,15 @@ function OrderConsole({ session }: { session: AuthenticatedSession }) {
                 </div>
               </section>
             ) : null}
+
+            <OrderReceiptSection
+              orderId={detail.id}
+              refreshKey={detail.updatedAt}
+              csrfToken={session.csrfToken}
+              defaultStaffId={session.staff.id}
+              staffOptions={receiptStaffOptions}
+              gridStaffOptions={receiptGridStaffOptions}
+            />
 
             <section className="local-section" aria-label="订单时间线">
               <Typography.Title level={5}>订单时间线</Typography.Title>

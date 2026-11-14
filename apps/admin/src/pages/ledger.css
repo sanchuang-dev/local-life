@@ -1,5 +1,5 @@
 /*
- * 业绩看板 + 对账结算（LL-MVP-008 / Issue #64）。
+ * 业绩总览 / 经营流水 / 对账结算（LL-MVP-008 / Issue #64）。
  *
  * Page-local composition only: colours come from the antd theme tokens already
  * mounted by the admin provider, and the shared `.local-*` primitives in
@@ -32,9 +32,74 @@
   color: var(--ant-color-text-secondary, #475569);
 }
 
-.ledger-report-footnote {
-  margin: 16px 0 0;
-  font-size: 12px;
+/* ------------------------- 业绩总览: filters + KPI grid -------------------- */
+
+.ledger-overview-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--ant-color-border-secondary, #e8f0ec);
+  border-radius: 10px;
+  background: var(--ant-color-bg-container, #fff);
+}
+
+.ledger-overview-filters .ledger-filter-field {
+  flex: 0 1 220px;
+  min-width: 160px;
+}
+
+.ledger-overview-filters .ledger-filter-reset {
+  margin-left: auto;
+}
+
+.ledger-report-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.ledger-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+/* KPI cards are direct grid children: no outer Card wrapping another Card. */
+.ledger-kpi-grid > .ledger-kpi {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px 18px;
+  border: 1px solid var(--ant-color-border-secondary, #e8f0ec);
+  border-radius: 10px;
+  background: var(--ant-color-bg-container, #fff);
+}
+
+.ledger-kpi-grid .ledger-kpi-secondary {
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+.ledger-report-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  border: 1px dashed var(--ant-color-border-secondary, #e8f0ec);
+  border-radius: 10px;
+  background: var(--ant-color-bg-container, #fff);
+}
+
+.ledger-info-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.ledger-info-list li {
+  margin: 3px 0;
   line-height: 1.6;
 }
 
