@@ -56,10 +56,10 @@ export function ShopStateCard({
   return (
     <section
       role={tone === 'error' ? 'alert' : 'status'}
-      className={`rounded-[20px] border px-5 py-8 text-center shadow-sm ${styles.box}`}
+      className={`rounded-2xl border px-5 py-8 text-center shadow-sm ${styles.box}`}
     >
       <span
-        className={`mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] ${styles.iconBox}`}
+        className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl ${styles.iconBox}`}
         aria-hidden="true"
       >
         <Icon size={26} strokeWidth={1.6} />

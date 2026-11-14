@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import {
   AlertTriangle,
-  Gift,
   RefreshCw,
   Ticket,
   Wallet,
@@ -12,6 +11,8 @@ import type {
   CouponWalletItem,
 } from '@sanchuang-dev/local-life-contracts'
 import { PageHeader } from '../components/PageHeader'
+import { ActivityArtwork } from '../components/activity/ActivityArtwork'
+import { EmptyState } from '../components/common/EmptyState'
 import {
   credentialExpiryText,
   formatCents,
@@ -151,7 +152,7 @@ export function MyRewardsPage() {
       ) : null}
 
       {wallet.state.status === 'unauthenticated' ? (
-        <section className="mt-4 rounded-[18px] bg-white p-4">
+        <section className="mt-4 rounded-2xl bg-white p-4">
           <p className="text-[13px] font-medium text-slate-700">登录状态已失效，请重新登录。</p>
           <Link to={buildResidentLoginHref('/me/rewards', { activityId: null, inviteCode: null, inviteInvalid: false })}
             className="mt-3 inline-flex min-h-[44px] items-center rounded-xl bg-teal-700 px-4 text-[13px] font-semibold text-white">
@@ -161,7 +162,7 @@ export function MyRewardsPage() {
       ) : null}
 
       {wallet.state.status === 'error' ? (
-        <section className="mt-4 rounded-[18px] border border-[#f0d5bd] bg-[#fff7f0] p-4">
+        <section className="mt-4 rounded-2xl border border-[#f0d5bd] bg-[#fff7f0] p-4">
           <p className="flex items-center gap-1.5 text-[13px] font-bold text-[#7a4a2c]">
             <AlertTriangle size={15} className="shrink-0" aria-hidden="true" />
             我的奖励读取失败
@@ -181,27 +182,23 @@ export function MyRewardsPage() {
       ) : null}
 
       {noRewards ? (
-        <section className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
-          <p className="flex items-center gap-1.5 text-[14px] font-bold text-slate-800">
-            <Gift size={16} className="shrink-0 text-teal-700" aria-hidden="true" />
-            暂无活动奖励
-          </p>
-          <p className="mt-1 text-[12px] leading-5 text-slate-500">
-            暂时没有团队奖励、消费券或抽奖中奖。参与社区活动后，可以在这里查看自己的真实奖励与核销凭据。
-          </p>
-          <Link
-            to="/community/activity"
-            className="mt-3 flex min-h-[48px] items-center justify-center rounded-[14px] bg-teal-700 px-4 text-[14px] font-bold text-white"
-          >
-            去看看社区活动
-          </Link>
-        </section>
+        <EmptyState
+          layout="centered"
+          className="mt-4"
+          illustration={<ActivityArtwork variant="page" />}
+          title="暂无奖励记录"
+          description="团队奖励、抽奖奖品和消费券会显示在这里。"
+        />
       ) : null}
 
       {wallet.state.status === 'ready' && entries.length > 0 && visible.length === 0 ? (
-        <p className="mt-6 rounded-[16px] border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-[12px] leading-5 text-slate-500">
-          当前筛选下没有奖励。
-        </p>
+        <EmptyState
+          layout="centered"
+          className="mt-3"
+          illustration={<ActivityArtwork variant="page" />}
+          title="当前筛选下没有奖励"
+          description="可以选择其他奖励状态查看已有记录。"
+        />
       ) : null}
 
       <DrawWalletSection entries={drawEntries} />
@@ -221,7 +218,7 @@ export function MyRewardsPage() {
       ) : null}
 
       {couponWallet.state.status === 'error' ? (
-        <section className="mt-5 rounded-[18px] border border-[#f0d5bd] bg-[#fff7f0] p-4">
+        <section className="mt-5 rounded-2xl border border-[#f0d5bd] bg-[#fff7f0] p-4">
           <p className="flex items-center gap-1.5 text-[13px] font-bold text-[#7a4a2c]">
             <AlertTriangle size={15} className="shrink-0" aria-hidden="true" />
             消费券包读取失败
@@ -256,9 +253,13 @@ export function MyRewardsPage() {
             allLabel={`全部 ${couponItems.length}`}
           />
           {visibleCoupons.length === 0 ? (
-            <p className="mt-3 rounded-[16px] border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-[12px] leading-5 text-slate-500">
-              当前筛选下没有消费券。
-            </p>
+            <EmptyState
+              layout="centered"
+              className="mt-3"
+              illustration={<ActivityArtwork variant="page" />}
+              title="当前筛选下没有消费券"
+              description="可以选择其他消费券状态查看已有记录。"
+            />
           ) : (
             <ul className="mt-3 grid gap-3">
               {visibleCoupons.map((coupon) => (
@@ -280,9 +281,11 @@ export function MyRewardsPage() {
         </section>
       ) : null}
 
-      <p className="mt-5 text-[11px] leading-[1.7] text-slate-400">
-        团队签到奖励凭据请在领取时保存；抽奖中奖的有效核销码可在本页查看；消费券状态来自全量券包，请勿公开分享兑换信息。
-      </p>
+      {entries.length > 0 || drawEntries.length > 0 || couponItems.length > 0 ? (
+        <p className="mt-5 text-[11px] leading-[1.7] text-slate-400">
+          团队签到奖励凭据请在领取时保存；抽奖中奖的有效核销码可在本页查看；消费券状态来自全量券包，请勿公开分享兑换信息。
+        </p>
+      ) : null}
     </div>
   )
 }
@@ -290,7 +293,7 @@ export function MyRewardsPage() {
 function CouponWalletCard({ coupon }: { coupon: CouponWalletItem }) {
   const status = couponStatusView(coupon)
   return (
-    <li className="rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+    <li className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 text-[14px] font-bold text-slate-900">
@@ -319,7 +322,7 @@ function CouponWalletCard({ coupon }: { coupon: CouponWalletItem }) {
       <Link
         to={`/community/activity/silver-neighborhood?activityId=${coupon.activityId}`}
         state={{ from: '/me/rewards' }}
-        className="mt-3 flex min-h-[44px] items-center justify-center rounded-[13px] bg-[#f2f7f4] px-3 text-[13px] font-semibold text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+        className="mt-3 flex min-h-[44px] items-center justify-center rounded-xl bg-[#f2f7f4] px-3 text-[13px] font-semibold text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
       >
         查看活动与消费团进度
       </Link>
@@ -333,7 +336,7 @@ function RewardWalletCard({ entry }: { entry: RewardWalletEntry }) {
   const grant = reward.grant
 
   return (
-    <li className="rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+    <li className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="break-words text-[14px] font-bold text-slate-900">{entry.activityTitle}</p>
@@ -355,7 +358,7 @@ function RewardWalletCard({ entry }: { entry: RewardWalletEntry }) {
       <p className="mt-1 text-[12px] leading-5 text-slate-500">{rewardBucketDetail(reward)}</p>
 
       {credential ? (
-        <div className="mt-2.5 rounded-[12px] bg-[#f4f9f6] px-3 py-2.5">
+        <div className="mt-2.5 rounded-xl bg-[#f4f9f6] px-3 py-2.5">
           <p className="flex items-center gap-1.5 font-mono text-[14px] font-bold tracking-[0.12em] text-[#195B4C]">
             <Ticket size={14} className="shrink-0" aria-hidden="true" />
             {credential.maskedCode}
@@ -398,7 +401,7 @@ function RewardWalletCard({ entry }: { entry: RewardWalletEntry }) {
       <Link
         to={`/community/activity/silver-neighborhood?activityId=${entry.activityId}`}
         state={{ from: '/me/rewards' }}
-        className="mt-3 flex min-h-[44px] items-center justify-center rounded-[13px] bg-[#f2f7f4] px-3 text-[13px] font-semibold text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+        className="mt-3 flex min-h-[44px] items-center justify-center rounded-xl bg-[#f2f7f4] px-3 text-[13px] font-semibold text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
       >
         查看活动与团队进度
       </Link>

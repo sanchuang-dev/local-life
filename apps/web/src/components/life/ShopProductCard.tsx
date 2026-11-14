@@ -27,7 +27,7 @@ export function ShopProductCard({
       to={{ pathname: `/life/product/${product.crmebProductId}`, search: productSearch }}
       state={{ from }}
       aria-label={`${product.name}，${formatPriceCents(product.priceCents)}，查看商品详情`}
-      className="group flex min-w-0 flex-col overflow-hidden rounded-[18px] border border-slate-100 bg-white shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+      className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
     >
       <ShopProductImage
         src={product.images[0]}

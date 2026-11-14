@@ -44,7 +44,7 @@ export function CommunityActivitySection({ activities }: CommunityActivitySectio
           )
 
           const cardClass =
-            'overflow-hidden rounded-[18px] border border-slate-100 bg-white text-left shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600'
+            'overflow-hidden rounded-2xl border border-slate-100 bg-white text-left shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600'
 
           return to ? (
             <Link key={id} to={to} state={{ from: '/' }} className={cardClass}>

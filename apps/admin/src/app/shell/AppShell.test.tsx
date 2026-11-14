@@ -42,7 +42,19 @@ describe('admin AppShell', () => {
     expect(screen.getByRole('menuitem', { name: '活动管理' })).toBeTruthy()
     expect(screen.getByRole('menuitem', { name: '系统信息' })).toBeTruthy()
     expect(screen.getByRole('tab', { name: '经营工作台' })).toBeTruthy()
-    expect(screen.getByText('已验证身份')).toBeTruthy()
+    expect(screen.queryByText('已验证身份')).toBeNull()
+  })
+
+  it('keeps brand and search outside the independently scrollable navigation', async () => {
+    renderAdmin('/')
+    await screen.findByRole('textbox', { name: '搜索菜单' })
+
+    const sider = document.querySelector('.app-sider')
+    expect(sider?.querySelector(':scope > .ant-layout-sider-children > .app-brand')).toBeTruthy()
+    expect(sider?.querySelector(':scope > .ant-layout-sider-children > .app-sidebar-search')).toBeTruthy()
+    expect(sider?.querySelector(':scope > .ant-layout-sider-children > .app-sidebar-nav')).toBeTruthy()
+    expect(sider?.querySelector('.app-sidebar-nav .app-brand')).toBeNull()
+    expect(sider?.querySelector('.app-sidebar-nav .app-sidebar-search')).toBeNull()
   })
 
   it('narrows the menu by search and shows an honest empty state', async () => {

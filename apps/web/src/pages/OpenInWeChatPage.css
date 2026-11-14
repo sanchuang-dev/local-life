@@ -126,7 +126,7 @@
   min-height: 44px;
   padding: 10px 12px;
   border: 1px solid #a3d5b1;
-  border-radius: 12px;
+  border-radius: var(--app-radius-control);
   background: #fff;
   color: #315c3d;
   font-size: 12px;
@@ -137,7 +137,7 @@
   margin-top: 22px;
   padding: 24px 20px 26px;
   border: 1px solid rgba(255, 255, 255, 0.84);
-  border-radius: 28px;
+  border-radius: var(--app-radius-panel);
   background: rgba(255, 255, 255, 0.91);
   box-shadow: 0 14px 36px rgba(62, 92, 62, 0.07);
   backdrop-filter: blur(12px);
@@ -201,7 +201,7 @@
   place-items: center;
   width: 60px;
   height: 60px;
-  border-radius: 20px;
+  border-radius: var(--app-radius-control);
   background: #edf8e9;
   color: #4aaf61;
 }
@@ -226,7 +226,7 @@
 .wechat-open__dev-entry button {
   min-height: 44px;
   border: 1px solid #b9d6be;
-  border-radius: 14px;
+  border-radius: var(--app-radius-control);
   background: rgba(255, 255, 255, 0.88);
   color: #32734b;
   font-size: 13px;

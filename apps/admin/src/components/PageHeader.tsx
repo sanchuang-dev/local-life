@@ -1,10 +1,11 @@
 import { Space, Typography } from 'antd'
 import type { ReactNode } from 'react'
+import { PageInfoControl } from './PageInfoHelp'
 
 export interface PageHeaderProps {
   title: string
   description: ReactNode
-  /** Status tags rendered next to the title (for example 待建设 / 开发预览). */
+  /** Meaningful business states only (for example 待建设 / 已锁定). */
   status?: ReactNode
   /** Page-level primary actions, right aligned. */
   extra?: ReactNode
@@ -28,6 +29,7 @@ export function PageHeader({ title, description, status, extra, subnav }: PageHe
         <div className="page-header-title">
           <Typography.Title level={2}>{title}</Typography.Title>
           {status}
+          <PageInfoControl />
         </div>
         <Typography.Text type="secondary" className="page-header-description">
           {description}

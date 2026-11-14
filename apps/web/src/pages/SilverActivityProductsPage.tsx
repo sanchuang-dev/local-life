@@ -30,12 +30,12 @@ const productTones: Record<SilverActivityProductCategory, string> = {
 
 function ProductIllustration({ product, large = false }: { product: SilverActivityProduct; large?: boolean }) {
   const Icon = deviceIcons[product.kind]
-  const sizeClass = large ? 'h-[150px] w-full rounded-[19px]' : 'h-[112px] w-full rounded-t-[17px]'
+  const sizeClass = large ? 'h-[150px] w-full rounded-2xl' : 'h-[112px] w-full rounded-t-2xl'
   return (
     <div className={'relative flex shrink-0 items-center justify-center overflow-hidden bg-gradient-to-br ' + productTones[product.category] + ' ' + sizeClass} aria-hidden="true">
       <span className="absolute -right-6 -top-9 h-28 w-28 rounded-full border-[14px] border-white/40" />
       <span className="absolute -bottom-10 -left-7 h-28 w-28 rounded-full bg-white/25" />
-      <div className="relative flex h-[84px] w-[92px] items-center justify-center rounded-[22px] border border-white/70 bg-white/45 shadow-[0_9px_20px_rgba(38,72,68,0.1)]">
+      <div className="relative flex h-[84px] w-[92px] items-center justify-center rounded-3xl border border-white/70 bg-white/45 shadow-[0_9px_20px_rgba(38,72,68,0.1)]">
         <Icon size={large ? 58 : 48} strokeWidth={1.55} />
       </div>
       {product.category === '魔镜体验' ? <Sparkles className="absolute right-5 top-4 opacity-65" size={18} /> : null}
@@ -53,7 +53,7 @@ export function SilverActivityProductsPage() {
     return (
       <div className="px-4 pb-8 pt-4">
         {product ? (
-          <article className="mt-3 overflow-hidden rounded-[22px] border border-slate-100 bg-white shadow-sm">
+          <article className="mt-3 overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-sm">
             <div className="p-3"><ProductIllustration product={product} large /></div>
             <div className="px-4 pb-5">
               <span className="inline-flex rounded-full bg-[#eaf5ed] px-2.5 py-1 text-[11px] font-medium text-teal-700">
@@ -71,7 +71,7 @@ export function SilverActivityProductsPage() {
                   </li>
                 ))}
               </ul>
-              <div className="mt-4 rounded-[14px] bg-[#f2f8f5] p-3 text-[12px] leading-5 text-[#376958]">
+              <div className="mt-4 rounded-xl bg-[#f2f8f5] p-3 text-[12px] leading-5 text-[#376958]">
                 活动展示方案，非已上架商品。具体品牌、型号、价格、可购资格和服务范围待确认。
               </div>
               <Link to={product.relatedPath} state={{ from: productsPath + '/' + product.id }}
@@ -81,7 +81,7 @@ export function SilverActivityProductsPage() {
             </div>
           </article>
         ) : (
-          <div className="mt-4 rounded-[18px] bg-white p-6 text-center text-[14px] text-slate-500">未找到该展示项目。</div>
+          <div className="mt-4 rounded-2xl bg-white p-6 text-center text-[14px] text-slate-500">未找到该展示项目。</div>
         )}
         <Link to={activityPath} className="mt-4 flex min-h-11 items-center justify-center rounded-xl border border-teal-200 bg-white text-[13px] font-semibold text-teal-700">返回银发社区欢乐季</Link>
       </div>
@@ -94,7 +94,7 @@ export function SilverActivityProductsPage() {
         <Radio className="text-teal-700" size={23} aria-hidden="true" />
         <h1 className="text-[21px] font-bold text-slate-900">参与活动的商品</h1>
       </div>
-      <div className="relative mt-3 overflow-hidden rounded-[19px] bg-gradient-to-br from-[#176b59] to-[#2d8a7b] px-4 py-4 text-white">
+      <div className="relative mt-3 overflow-hidden rounded-2xl bg-gradient-to-br from-[#176b59] to-[#2d8a7b] px-4 py-4 text-white">
         <div className="absolute -right-5 -bottom-8 opacity-20"><Tv size={125} strokeWidth={1} /></div>
         <p className="text-[11px] font-medium tracking-widest text-white/80">银发社区欢乐季 · 好物体验</p>
         <p className="relative mt-1 text-[19px] font-bold">大屏影音 · 智能生活</p>
@@ -122,7 +122,7 @@ export function SilverActivityProductsPage() {
       <div className="mt-3 grid grid-cols-2 gap-3">
         {visibleProducts.map((item) => (
           <Link key={item.id} to={productsPath + '/' + item.id}
-            className="group flex min-w-0 flex-col overflow-hidden rounded-[18px] border border-slate-100 bg-white shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600">
+            className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600">
             <ProductIllustration product={item} />
             <div className="flex flex-1 flex-col px-3 pb-3 pt-2.5">
               <span className="text-[10px] font-medium text-teal-700">{item.tag}</span>

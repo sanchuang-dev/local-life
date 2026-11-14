@@ -70,7 +70,7 @@ function OrderDetailBody({ order }: { order: LocalOrderDetail }) {
 
   return (
     <>
-      <section className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+      <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-[15px] font-semibold text-slate-800">订单状态</h2>
           <StatusPill order={order} />
@@ -79,7 +79,7 @@ function OrderDetailBody({ order }: { order: LocalOrderDetail }) {
           {localOrderStatusDescriptions[order.status]}
         </p>
         {order.statusNote ? (
-          <p className="mt-2 break-words rounded-[12px] bg-[#fff7ec] px-3 py-2 text-[11px] leading-5 text-[#8a6132]">
+          <p className="mt-2 break-words rounded-xl bg-[#fff7ec] px-3 py-2 text-[11px] leading-5 text-[#8a6132]">
             处理备注：{order.statusNote}
           </p>
         ) : null}
@@ -88,7 +88,7 @@ function OrderDetailBody({ order }: { order: LocalOrderDetail }) {
         </p>
       </section>
 
-      <section className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+      <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <h2 className="text-[15px] font-semibold text-slate-800">商品快照</h2>
         <p className="mt-1 text-[11px] leading-5 text-slate-400">
           快照在登记时冻结，商品后续改价或下架都不会改写这笔订单。
@@ -107,14 +107,14 @@ function OrderDetailBody({ order }: { order: LocalOrderDetail }) {
           券抵扣与待实际支付来自服务端冻结快照；订单登记成功不等于付款成功，平台不收款。
         </p>
         {order.note ? (
-          <p className="mt-2 break-words rounded-[12px] bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-500">
+          <p className="mt-2 break-words rounded-xl bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-500">
             我的备注：{order.note}
           </p>
         ) : null}
       </section>
 
       {order.verification ? (
-        <section className="mt-4 rounded-[18px] border border-teal-200/70 bg-[#eef7f2] p-4">
+        <section className="mt-4 rounded-2xl border border-teal-200/70 bg-[#eef7f2] p-4">
           <h2 className="text-[15px] font-semibold text-[#225c4c]">运营人工核验</h2>
           <dl className="mt-2 space-y-1.5 text-[12px] leading-5 text-[#52786c]">
             <div className="flex items-start justify-between gap-3">
@@ -142,7 +142,7 @@ function OrderDetailBody({ order }: { order: LocalOrderDetail }) {
         </section>
       ) : null}
 
-      <section className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+      <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <h2 className="text-[15px] font-semibold text-slate-800">处理时间线</h2>
         <ol className="mt-2.5">
           {order.events.map((event) => (
@@ -211,7 +211,7 @@ export function MyOrderDetailPage() {
       ) : null}
 
       {state.status === 'unauthenticated' ? (
-        <section className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+        <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <p className="text-[14px] font-bold text-slate-800">登录后查看订单详情</p>
           <p className="mt-1 text-[12px] leading-5 text-slate-500">
             订单绑定居民账户，登录后才能读取这笔订单。
@@ -231,7 +231,7 @@ export function MyOrderDetailPage() {
       {state.status === 'error' ? (
         <section
           role="alert"
-          className="mt-4 rounded-[18px] border border-rose-100 bg-white px-4 py-4 shadow-sm"
+          className="mt-4 rounded-2xl border border-rose-100 bg-white px-4 py-4 shadow-sm"
         >
           <p className="flex items-center gap-1.5 text-[13px] font-bold text-rose-700">
             <AlertTriangle size={15} className="shrink-0" aria-hidden="true" />

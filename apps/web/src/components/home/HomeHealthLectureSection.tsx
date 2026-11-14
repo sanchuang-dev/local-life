@@ -28,10 +28,10 @@ export function HomeHealthLectureSection() {
             key={id}
             to="/health/lecture"
             state={{ from: '/' }}
-            className="flex w-full items-center gap-3 rounded-[18px] border border-slate-100 bg-white p-4 text-left shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+            className="flex w-full items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
           >
             <span
-              className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-[16px] ${toneStyles[tone]}`}
+              className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${toneStyles[tone]}`}
               aria-hidden="true"
             >
               <Icon size={23} strokeWidth={1.6} />

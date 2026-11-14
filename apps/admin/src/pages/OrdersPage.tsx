@@ -1,3 +1,4 @@
+import { PageInfoAlert } from '../components/PageInfoHelp'
 import {
   Alert,
   App as AntdApp,
@@ -510,12 +511,11 @@ function OrderConsole({ session }: { session: AuthenticatedSession }) {
       <PageHeader
         title="订单管理"
         description="查询居民登记的本地商品订单、处理状态并做运营人工核验。价格与商品名称以登记时冻结的快照为准；「人工核验通过」只是运营员对订单事实的人工确认，不代表收款或业务办理已完成。"
-        status={<Tag color="green">真实数据</Tag>}
       />
 
       <div className="page-stack">
         {!isAdmin ? (
-          <Alert
+          <PageInfoAlert
             type="info"
             showIcon
             title="运营员视图"
@@ -693,7 +693,7 @@ function OrderConsole({ session }: { session: AuthenticatedSession }) {
                 </Descriptions.Item>
               </Descriptions>
 
-              <Alert
+              <PageInfoAlert inline
                 style={{ marginTop: 12 }}
                 type="info"
                 showIcon

@@ -1,3 +1,4 @@
+import { PageInfoAlert } from '../components/PageInfoHelp'
 import { PlusOutlined } from '@ant-design/icons'
 import {
   Alert,
@@ -773,7 +774,7 @@ function RewardPlanFields() {
         <Input.TextArea rows={2} maxLength={500} showCount placeholder="例如：奖品由社区仓库统一发放" />
       </Form.Item>
 
-      <Alert
+      <PageInfoAlert inline
         type="info"
         showIcon
         title="资格口径"
@@ -824,7 +825,7 @@ function PurchaseRewardBudgetHint({
     Number.isInteger(maxRewardedTeams)
   if (!hasInputs) {
     return (
-      <Alert
+      <PageInfoAlert inline
         type="info"
         showIcon
         title="团队券总预算（只读计算）"
@@ -950,7 +951,7 @@ function PurchaseRewardPlanFields() {
         )}
       </Form.Item>
 
-      <Alert
+      <PageInfoAlert inline
         type="info"
         showIcon
         title="消费奖励口径"
@@ -1492,34 +1493,41 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
 
   const rowActions = (row: AdminActivitySummary) => {
     const busy = transitioningId === row.id
+    const stateAction: ActivityTransition | null =
+      row.status === 'draft' ? 'publish' :
+      row.status === 'published' ? 'pause' :
+      row.status === 'paused' ? 'resume' : null
+    const stateLabel = {
+      publish: '发布',
+      pause: '暂停',
+      resume: '恢复',
+      end: '结束',
+    } as const
     return [
-      { key: 'edit', label: '编辑', onClick: () => openEdit(row) },
       {
-        key: 'publish',
-        label: '发布',
-        disabled: busy || row.status !== 'draft',
-        onClick: () => confirmTransition(row, 'publish'),
+        key: 'edit',
+        label: row.status === 'ended' ? '查看' : '编辑',
+        primary: true,
+        disabled: busy,
+        onClick: () => openEdit(row),
       },
-      {
-        key: 'pause',
-        label: '暂停',
-        disabled: busy || row.status !== 'published',
-        onClick: () => confirmTransition(row, 'pause'),
-      },
-      {
-        key: 'resume',
-        label: '恢复',
-        disabled: busy || row.status !== 'paused',
-        onClick: () => confirmTransition(row, 'resume'),
-      },
-      {
+      ...(stateAction ? [{
+        key: stateAction,
+        label: stateLabel[stateAction],
+        primary: true,
+        disabled: busy,
+        onClick: () => confirmTransition(row, stateAction),
+      }] : []),
+      ...((row.status === 'published' || row.status === 'paused') ? [{
         key: 'end',
         label: '结束',
         danger: true,
-        disabled: busy || (row.status !== 'published' && row.status !== 'paused'),
+        disabled: busy,
         onClick: () => confirmTransition(row, 'end'),
-      },
+      }] : []),
       { key: 'versions', label: '规则版本', onClick: () => openVersions(row) },
+      // Keep the existing entry for every state; draw-pool availability is
+      // decided by its domain page, not silently removed by table cosmetics.
       { key: 'draw', label: '今日抽奖', onClick: () => setDrawPoolActivity(row) },
       { key: 'audit', label: '审计', onClick: () => openAudit(row) },
     ]
@@ -1541,34 +1549,11 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
       <PageHeader
         title="活动管理"
         description="创建草稿、配置规则并发布活动；已发布规则冻结为只读版本，居民 H5 读取同一份活动数据。"
-        status={<Tag color="green">真实数据</Tag>}
-        extra={
-          <Tooltip
-            title={
-              createDisabled
-                ? communitiesLoading
-                  ? '正在读取社区列表'
-                  : '没有可用社区，无法创建活动'
-                : '创建活动草稿'
-            }
-          >
-            <span>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                disabled={createDisabled}
-                onClick={openCreate}
-              >
-                新建活动
-              </Button>
-            </span>
-          </Tooltip>
-        }
       />
 
       <div className="page-stack">
         {role === 'operator' ? (
-          <Alert
+          <PageInfoAlert
             type="info"
             showIcon
             title="运营员视图"
@@ -1623,6 +1608,28 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
           filters={filters}
           columns={columns}
           onRefresh={refreshList}
+          toolbarExtra={
+            <Tooltip
+              title={
+                createDisabled
+                  ? communitiesLoading
+                    ? '正在读取社区列表'
+                    : '没有可用社区，无法创建活动'
+                  : '创建活动草稿'
+              }
+            >
+              <span>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  disabled={createDisabled}
+                  onClick={openCreate}
+                >
+                  新建活动
+                </Button>
+              </span>
+            </Tooltip>
+          }
           errorTitle={listErrorTitle(listError)}
           rowActions={rowActions}
           renderCard={(row) => (
@@ -1678,7 +1685,7 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
           />
         ) : readOnlyEditor && detail ? (
           <div className="activity-drawer-readonly">
-            <Alert
+            <PageInfoAlert inline
               type="info"
               showIcon
               title="活动已结束"
@@ -1945,7 +1952,7 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
                 getFieldValue('rewardPlanEnabled') ? (
                   <RewardPlanFields />
                 ) : (
-                  <Alert
+                  <PageInfoAlert inline
                     type="info"
                     showIcon
                     title={
@@ -1968,7 +1975,7 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
             </Typography.Text>
 
             {editorMode === 'edit' && detail && detail.status !== 'draft' ? (
-              <Alert
+              <PageInfoAlert inline
                 type="info"
                 showIcon
                 title="消费组团奖励已冻结"
@@ -2003,7 +2010,7 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
                     getFieldValue('purchaseRewardEnabled') ? (
                       <PurchaseRewardPlanFields />
                     ) : (
-                      <Alert
+                      <PageInfoAlert inline
                         type="info"
                         showIcon
                         title={
@@ -2024,7 +2031,7 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
             )}
 
             {editorMode === 'edit' && detail?.status === 'draft' ? (
-              <Alert
+              <PageInfoAlert inline
                 type="info"
                 showIcon
                 title="草稿阶段修改规则不会生成版本"

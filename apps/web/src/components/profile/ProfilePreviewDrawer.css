@@ -16,7 +16,7 @@
   max-height: 88vh;
   max-height: 88dvh;
   overflow: hidden;
-  border-radius: 27px 27px 0 0;
+  border-radius: var(--app-radius-panel) var(--app-radius-panel) 0 0;
   background: #fcfdfb;
   box-shadow: 0 -18px 55px rgba(18, 48, 28, .16);
   color: #213d29;
@@ -28,7 +28,7 @@
   width: 38px;
   height: 5px;
   margin: 10px 0 5px;
-  border-radius: 20px;
+  border-radius: 999px;
   background: #d8e6d9;
 }
 .me-profile-drawer__header {
@@ -43,7 +43,7 @@
   width: 44px;
   height: 44px;
   place-items: center;
-  border-radius: 16px;
+  border-radius: var(--app-radius-control);
   background: #eaf6e9;
   color: #42965b;
 }
@@ -73,7 +73,7 @@
   gap: 4px;
   padding: 0 9px;
   border: 1px solid #d4e7d8;
-  border-radius: 10px;
+  border-radius: var(--app-radius-control);
   background: #f1f8f0;
   color: #3b8c55;
   font: inherit;
@@ -113,7 +113,7 @@
   gap: 8px;
   margin: 0;
   padding: 13px 14px;
-  border-radius: 13px;
+  border-radius: var(--app-radius-card);
   background: #f1f8ef;
   color: #548260;
   font-size: 12px;
@@ -144,7 +144,7 @@
   min-height: 50px;
   padding: 13px 15px;
   border: 1px solid #e2ebe1;
-  border-radius: 15px;
+  border-radius: var(--app-radius-control);
   background: #f7faf6;
   color: #27392c;
   font: inherit;
@@ -181,7 +181,7 @@
 }
 .me-profile-drawer__footer button {
   min-height: 50px;
-  border-radius: 15px;
+  border-radius: var(--app-radius-control);
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
@@ -202,7 +202,7 @@
   outline-offset: 3px;
 }
 @media (min-width: 640px) {
-  .me-profile-drawer { margin-bottom: 3vh; border-radius: 27px; }
+  .me-profile-drawer { margin-bottom: 3vh; border-radius: var(--app-radius-panel); }
 }
 @media (max-height: 640px) {
   .me-profile-drawer { max-height: 95dvh; }

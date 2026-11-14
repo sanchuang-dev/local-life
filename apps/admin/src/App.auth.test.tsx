@@ -54,14 +54,14 @@ it('authenticates from a deep link and logs out through the real API contract', 
     if (url === '/api/auth/csrf') return new Response(JSON.stringify({ csrfToken: 'csrf-from-api-acceptance-tests-long' }))
     if (url === '/api/auth/login') {
       expect(init?.method).toBe('POST')
-      expect((init?.headers as Record<string, string>)['x-csrf-token']).toBe('csrf-from-api-acceptance-tests-long')
+      expect((init?.headers as Record<string, string> | undefined)?.['x-csrf-token']).toBe('csrf-from-api-acceptance-tests-long')
       return new Response(JSON.stringify(STAFF_SESSION))
     }
     if (url === '/api/admin/communities') return new Response(JSON.stringify({ items: [] }))
     if (url === '/api/admin/staff') return new Response(JSON.stringify({ items: [] }))
     if (url === '/api/auth/logout') {
       expect(init?.method).toBe('POST')
-      expect((init?.headers as Record<string, string>)['x-csrf-token']).toBe('csrf-from-api-acceptance-tests-long')
+      expect((init?.headers as Record<string, string> | undefined)?.['x-csrf-token']).toBe('csrf-from-api-acceptance-tests-long')
       return new Response(null, { status: 204 })
     }
     throw new Error('Unexpected test API: ' + url)

@@ -1,5 +1,6 @@
+import { PageInfoAlert } from './PageInfoHelp'
 import { useEffect, useMemo, useRef } from 'react'
-import { Alert, Modal, Typography } from 'antd'
+import { Modal, Typography } from 'antd'
 import type { CommunityLocation } from '@sanchuang-dev/local-life-contracts'
 
 const PICKER_ORIGIN = 'https://apis.map.qq.com'
@@ -77,7 +78,7 @@ export function TencentLocationPicker({
       destroyOnHidden
       width={760}
     >
-      <Alert
+      <PageInfoAlert inline
         type="info"
         showIcon
         message="搜索社区或服务中心，再在地图上确认位置"

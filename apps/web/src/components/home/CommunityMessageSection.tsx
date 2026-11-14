@@ -20,10 +20,10 @@ export function CommunityMessageSection({
     <section className="mx-4 mt-7">
       <SectionHeading title="社区消息" actionLabel="全部消息" actionTo="/community" />
 
-      <article className="rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+      <article className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <div className="flex items-start gap-3">
           <span
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-[#e8f6f0] text-[#388b77]"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#e8f6f0] text-[#388b77]"
             aria-hidden="true"
           >
             <RadioTower size={21} strokeWidth={1.7} />
@@ -43,7 +43,7 @@ export function CommunityMessageSection({
         </Link>
       </article>
 
-      <div className="mt-3 overflow-hidden rounded-[18px] border border-slate-100 bg-white shadow-sm">
+      <div className="mt-3 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
         {notices.map((notice, index) => {
           const Icon = notice.icon
           return (

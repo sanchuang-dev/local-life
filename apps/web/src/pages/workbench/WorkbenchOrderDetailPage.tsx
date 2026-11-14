@@ -133,7 +133,7 @@ function OrderDetailContent({ order, reload }: { order: CrmOrderDetail; reload: 
 
   return (
     <>
-      <section className="rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm">
+      <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
@@ -150,7 +150,7 @@ function OrderDetailContent({ order, reload }: { order: CrmOrderDetail; reload: 
         </div>
 
         <div
-          className={`mt-3 rounded-[14px] px-3.5 py-3 text-[12px] leading-5 ${
+          className={`mt-3 rounded-xl px-3.5 py-3 text-[12px] leading-5 ${
             order.status === 'confirmed'
               ? 'bg-[#e8f6f0] text-[#2f6b5d]'
               : order.status === 'failed'
@@ -242,7 +242,7 @@ function OrderDetailContent({ order, reload }: { order: CrmOrderDetail; reload: 
         </div>
       ) : null}
 
-      <section className="mt-4 rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm">
+      <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <h2 className="text-[16px] font-semibold text-slate-900">成交归属快照</h2>
         <p className="mt-0.5 text-[11px] leading-5 text-slate-400">
           创建时冻结，后续线索转交不会改写本受理单归属。
@@ -256,7 +256,7 @@ function OrderDetailContent({ order, reload }: { order: CrmOrderDetail; reload: 
         </dl>
       </section>
 
-      <section className="mt-4 rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm">
+      <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <h2 className="text-[16px] font-semibold text-slate-900">受理信息</h2>
         <dl className="mt-2 divide-y divide-slate-100 border-t border-slate-100">
           <InfoRow label="受理单号" value={order.orderNo} />
@@ -274,7 +274,7 @@ function OrderDetailContent({ order, reload }: { order: CrmOrderDetail; reload: 
             }
           />
         </dl>
-        <div className="mt-2 flex items-start gap-2 rounded-[12px] bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
+        <div className="mt-2 flex items-start gap-2 rounded-xl bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
           <StickyNote size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
           <p>
             只登记脱敏凭据引用，禁止填写身份证号、银行卡号、运营商密码或完整证件照片。
@@ -282,14 +282,14 @@ function OrderDetailContent({ order, reload }: { order: CrmOrderDetail; reload: 
         </div>
       </section>
 
-      <section className="mt-4 rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm">
+      <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <h2 className="text-[16px] font-semibold text-slate-900">状态流转</h2>
         <p className="mt-1 text-[11px] leading-5 text-slate-400">
           确认有效成交需由运营人员核验。
         </p>
 
         {actions.length === 0 ? (
-          <p className="mt-3 rounded-[12px] bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-500">
+          <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-500">
             {order.status === 'confirmed'
               ? '已由运营核验为有效成交，状态锁定，工作台不可再修改。'
               : '当前状态为终态，不可再流转。'}
@@ -313,7 +313,7 @@ function OrderDetailContent({ order, reload }: { order: CrmOrderDetail; reload: 
         )}
 
         {draft ? (
-          <div className="mt-3 rounded-[14px] bg-slate-50 p-3">
+          <div className="mt-3 rounded-xl bg-slate-50 p-3">
             <p className="text-[12px] font-semibold text-slate-700">
               确认执行“{draft.label}”？
             </p>
@@ -385,7 +385,7 @@ function OrderDetailContent({ order, reload }: { order: CrmOrderDetail; reload: 
         ) : null}
       </section>
 
-      <section className="mt-4 rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm">
+      <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <h2 className="text-[16px] font-semibold text-slate-900">事件时间线</h2>
         <p className="mt-0.5 text-[11px] text-slate-400">处理记录</p>
         <div className="mt-3">

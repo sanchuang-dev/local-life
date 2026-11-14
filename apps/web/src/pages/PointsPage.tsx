@@ -29,7 +29,7 @@ export function PointsPage() {
         subtitle="余额 · 获取任务 · 明细与规则"
       />
 
-      <article className="mt-4 rounded-[20px] border border-[#e8d2a8] bg-[#fff7ec] p-4">
+      <article className="mt-4 rounded-2xl border border-[#e8d2a8] bg-[#fff7ec] p-4">
         <span className="text-[10px] font-semibold tracking-[0.16em] text-[#a96b2f]">
           RESIDENT POINTS
         </span>
@@ -61,7 +61,7 @@ export function PointsPage() {
 
       <section className="mt-6">
         <SectionHeading title="积分获取" note="任务示例" />
-        <div className="overflow-hidden rounded-[18px] border border-slate-100 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
           {pointsTasks.map(({ id, title, meta, award, icon: Icon, tone, state, to, actionLabel }, index) => {
             const content = (
               <>
@@ -110,7 +110,7 @@ export function PointsPage() {
 
       <section className="mt-6">
         <SectionHeading title="积分明细" note="示例数据" />
-        <ul className="overflow-hidden rounded-[18px] border border-slate-100 bg-white shadow-sm">
+        <ul className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
           {pointsTransactions.map(({ id, title, meta, amount }, index) => (
             <li
               key={id}
@@ -137,7 +137,7 @@ export function PointsPage() {
 
       <section className="mt-6">
         <SectionHeading title="积分规则" />
-        <div className="rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <ul className="space-y-3">
             {pointsRules.map((rule) => (
               <li key={rule} className="flex gap-2.5 text-[12px] leading-6 text-slate-500">

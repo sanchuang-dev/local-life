@@ -57,11 +57,11 @@ function OrderCard({ order, from }: { order: CrmOrderSummary; from: string }) {
     <Link
       to={`/workbench/orders/${order.id}`}
       state={{ from }}
-      className="block rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+      className="block rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
     >
       <div className="flex items-start gap-3">
         <span
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[#fff3e6] text-[#c6925c]"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#fff3e6] text-[#c6925c]"
           aria-hidden="true"
         >
           <ClipboardList size={20} strokeWidth={1.8} />
@@ -201,7 +201,7 @@ function OrdersView() {
         </Link>
       </div>
 
-      <p className="mt-2 rounded-[14px] bg-[#fff7ec] px-3.5 py-2.5 text-[11px] leading-5 text-[#8a6132]">
+      <p className="mt-2 rounded-xl bg-[#fff7ec] px-3.5 py-2.5 text-[11px] leading-5 text-[#8a6132]">
         “待运营核验”不等于成交；只有运营人员人工核验后才会显示“有效成交（人工核验）”，也不代表运营商侧已完成业务处理。
       </p>
 

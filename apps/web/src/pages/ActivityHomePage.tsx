@@ -207,7 +207,7 @@ export function ActivityHomePage() {
               </h2>
             </div>
           </div>
-          <div className="rounded-[20px] border border-slate-100 bg-white p-3.5 shadow-sm">
+          <div className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm">
             <RewardProgressCard
               auth={auth}
               progress={rewardProgress}
@@ -221,7 +221,7 @@ export function ActivityHomePage() {
 
       {activity && shareUrl ? (
         <section className="mx-4 mt-4" aria-labelledby="activity-invite-heading">
-          <div className="rounded-[18px] border border-teal-200/70 bg-[#eef7f2] px-4 py-3.5">
+          <div className="rounded-2xl border border-teal-200/70 bg-[#eef7f2] px-4 py-3.5">
             <p
               id="activity-invite-heading"
               className="flex items-center gap-1.5 text-[13px] font-bold text-[#225c4c]"
@@ -255,10 +255,10 @@ export function ActivityHomePage() {
               key={id}
               to={to}
               state={{ from: '/' }}
-              className="flex min-h-[76px] items-center gap-2.5 rounded-[16px] border border-slate-100 bg-white p-3 shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+              className="flex min-h-[76px] items-center gap-2.5 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
             >
               <span
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-[#e8f6f0] text-[#388b77]"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#e8f6f0] text-[#388b77]"
                 aria-hidden="true"
               >
                 <Icon size={18} strokeWidth={1.8} />
@@ -281,7 +281,7 @@ export function ActivityHomePage() {
       >
         {activity ? (
           <>
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-[14px] bg-[#eef7f2] p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#eef7f2] p-3">
               <p className="text-[13px] font-bold text-[#225b44]">已发布规则快照</p>
               <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-teal-700">
                 {activity.ruleVersion === null ? '未记录版本号' : `第 ${activity.ruleVersion} 版`}
@@ -294,7 +294,7 @@ export function ActivityHomePage() {
                 { label: '消费规则', text: activity.publicRules.purchase },
                 { label: '奖品领取', text: activity.publicRules.prizeClaim },
               ].map((rule, index) => (
-                <li key={rule.label} className="flex gap-3 rounded-[14px] bg-slate-50 p-3">
+                <li key={rule.label} className="flex gap-3 rounded-xl bg-slate-50 p-3">
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-teal-700 text-[12px] font-bold text-white">
                     {index + 1}
                   </span>
@@ -306,7 +306,7 @@ export function ActivityHomePage() {
               ))}
             </ol>
             {activity.publicRules.notes ? (
-              <div className="mt-3 rounded-[14px] bg-[#fff7ec] p-3 text-[12px] leading-6 text-[#8a6132]">
+              <div className="mt-3 rounded-xl bg-[#fff7ec] p-3 text-[12px] leading-6 text-[#8a6132]">
                 <p className="font-bold">补充说明</p>
                 <p className="mt-1 break-words">{activity.publicRules.notes}</p>
               </div>
@@ -320,7 +320,7 @@ export function ActivityHomePage() {
             </p>
           </>
         ) : (
-          <p className="rounded-[14px] bg-slate-50 p-3 text-[13px] leading-6 text-slate-500">
+          <p className="rounded-xl bg-slate-50 p-3 text-[13px] leading-6 text-slate-500">
             尚未读取到已发布活动，暂无可展示的活动规则。
           </p>
         )}
@@ -357,7 +357,7 @@ function ActivityHomeStatus({
   if (state.status === 'loading') {
     return (
       <section
-        className="mx-4 mt-5 rounded-[20px] border border-slate-100 bg-white p-5 shadow-sm"
+        className="mx-4 mt-5 rounded-2xl border border-slate-100 bg-white p-5 shadow-sm"
         role="status"
         aria-live="polite"
       >
@@ -371,7 +371,7 @@ function ActivityHomeStatus({
         <div className="mt-3 grid gap-2" aria-hidden="true">
           <div className="h-4 w-2/3 animate-pulse rounded-full bg-slate-100" />
           <div className="h-4 w-1/2 animate-pulse rounded-full bg-slate-100" />
-          <div className="h-11 w-full animate-pulse rounded-[14px] bg-slate-100" />
+          <div className="h-11 w-full animate-pulse rounded-xl bg-slate-100" />
         </div>
       </section>
     )
@@ -379,7 +379,7 @@ function ActivityHomeStatus({
 
   if (state.status === 'empty') {
     return (
-      <section className="mx-4 mt-5 rounded-[20px] border border-dashed border-slate-200 bg-white px-4 py-8 text-center shadow-sm">
+      <section className="mx-4 mt-5 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center shadow-sm">
         <span
           className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#eef7f2] text-teal-700"
           aria-hidden="true"
@@ -412,7 +412,7 @@ function ActivityHomeStatus({
   }
 
   return (
-    <section className="mx-4 mt-5 rounded-[20px] border border-[#efd0b8] bg-[#fff7f0] px-4 py-4" role="alert">
+    <section className="mx-4 mt-5 rounded-2xl border border-[#efd0b8] bg-[#fff7f0] px-4 py-4" role="alert">
       <p className="flex items-center gap-1.5 text-[14px] font-bold text-[#7a4a2c]">
         <AlertTriangle size={16} aria-hidden="true" />
         活动信息加载失败

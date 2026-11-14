@@ -148,14 +148,14 @@ export function DailyDrawCard({
   }
 
   return (
-    <section className="mx-4 mt-5 rounded-[20px] border border-[#cfe7d6] bg-white p-4 shadow-sm"
+    <section className="mx-4 mt-5 rounded-2xl border border-[#cfe7d6] bg-white p-4 shadow-sm"
       aria-labelledby="daily-draw-heading">
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="text-[11px] font-bold tracking-[0.14em] text-[#22835a]">DAILY DRAW</p>
           <h2 id="daily-draw-heading" className="mt-1 text-[19px] font-bold text-[#22543d]">今日抽奖</h2>
         </div>
-        <span className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[#edf8f0] text-teal-700">
+        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#edf8f0] text-teal-700">
           <Gift size={23} aria-hidden="true" />
         </span>
       </div>
@@ -178,7 +178,7 @@ export function DailyDrawCard({
           {data.pool.available && data.pool.prizes.length > 0 ? (
             <ul className="mt-4 grid grid-cols-2 gap-2" aria-label="今日可抽奖品">
               {data.pool.prizes.map((prize) => (
-                <li key={prize.id} className="min-w-0 overflow-hidden rounded-[14px] border border-[#e1ede3] bg-[#fbfdfb]">
+                <li key={prize.id} className="min-w-0 overflow-hidden rounded-xl border border-[#e1ede3] bg-[#fbfdfb]">
                   {prize.imageUrl ? (
                     <img src={prize.imageUrl} alt={prize.name} loading="lazy"
                       className="aspect-[4/3] w-full bg-slate-50 object-cover" />
@@ -197,7 +197,7 @@ export function DailyDrawCard({
           ) : null}
 
           {state ? (
-            <div className="mt-3 rounded-[12px] bg-[#f2f8f4] px-3 py-3 text-[12px] text-[#456a53]">
+            <div className="mt-3 rounded-xl bg-[#f2f8f4] px-3 py-3 text-[12px] text-[#456a53]">
               {state.available ? (
                 <p>今天还可抽 <strong className="text-[#17663a]">{state.remainingToday}</strong> 次
                   <span className="ml-1 text-[11px] text-slate-500">（北京时间）</span>
@@ -209,12 +209,12 @@ export function DailyDrawCard({
           ) : null}
 
           {!userId && !authLoading ? (
-            <Link to={loginHref} className="mt-3 flex min-h-[48px] items-center justify-center rounded-[13px] bg-teal-700 px-4 text-[14px] font-bold text-white">
+            <Link to={loginHref} className="mt-3 flex min-h-[48px] items-center justify-center rounded-xl bg-teal-700 px-4 text-[14px] font-bold text-white">
               登录后参与抽奖
             </Link>
           ) : (
             <button type="button" onClick={() => void runDraw()} disabled={disabled}
-              className="mt-3 inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[13px] bg-teal-700 px-4 text-[14px] font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600">
+              className="mt-3 inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 text-[14px] font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600">
               <Sparkles size={18} aria-hidden="true" />
               {busy ? '正在开奖…' : state?.available ? '抽一次' : '暂不能抽奖'}
             </button>
@@ -224,7 +224,7 @@ export function DailyDrawCard({
           </p>
 
           {displayed ? (
-            <div className="mt-4 rounded-[14px] border border-[#d5e9d9] bg-[#f5faf6] p-3" role="status" aria-live="polite">
+            <div className="mt-4 rounded-xl border border-[#d5e9d9] bg-[#f5faf6] p-3" role="status" aria-live="polite">
               <p className="text-[13px] font-bold text-[#22543d]">
                 {displayed.outcome === 'won' ? '恭喜中奖！' : '这次没有中奖'}
               </p>
@@ -260,7 +260,7 @@ export function DailyDrawCard({
             </p>
           ) : null}
           {error ? (
-            <div className="mt-3 rounded-[12px] border border-[#e9d0b9] bg-[#fff7f0] p-3" role="alert">
+            <div className="mt-3 rounded-xl border border-[#e9d0b9] bg-[#fff7f0] p-3" role="alert">
               <p className="text-[12px] text-[#885432]">{error}</p>
               <p className="mt-1 text-[11px] text-[#885432]">
                 网络中断后再次点击会沿用同一个请求编号，不会重新随机发奖。
@@ -268,7 +268,7 @@ export function DailyDrawCard({
             </div>
           ) : null}
           {data.history && data.history.attempts.length > 0 ? (
-            <details className="mt-3 rounded-[12px] border border-slate-100 bg-white p-3">
+            <details className="mt-3 rounded-xl border border-slate-100 bg-white p-3">
               <summary className="min-h-[32px] cursor-pointer text-[12px] font-semibold text-teal-700">
                 查看抽奖记录（最近 {data.history.attempts.length} 次）
               </summary>

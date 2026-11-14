@@ -38,7 +38,7 @@ function PointsProductDetail({ productId }: { productId: string }) {
           <ArrowLeft size={16} aria-hidden="true" />
           {backLabel}
         </Link>
-        <div className="mt-6 rounded-[18px] border border-dashed border-slate-200 bg-white px-4 py-12 text-center">
+        <div className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-12 text-center">
           <p className="text-[14px] font-semibold text-slate-500">商品不存在</p>
           <p className="mt-2 text-[11px] leading-5 text-slate-400">
             该示例商品可能已下线，或链接有误。真实优惠购商品使用数字 id。
@@ -73,7 +73,7 @@ function PointsProductDetail({ productId }: { productId: string }) {
         subtitle={`${product.category} · 示例商品`}
       />
 
-      <article className="mt-4 overflow-hidden rounded-[20px] border border-slate-100 bg-white shadow-sm">
+      <article className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
         <div
           className={`flex aspect-[4/3] items-center justify-center ${toneStyles[tone]}`}
           aria-hidden="true"
@@ -119,7 +119,7 @@ function PointsProductDetail({ productId }: { productId: string }) {
         <DemoNote tone="warn">{lifeRedemptionNotice}</DemoNote>
       </div>
 
-      <section className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+      <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <h2 className="text-[16px] font-semibold text-slate-800">兑换与核销说明</h2>
         <dl className="mt-2 divide-y divide-slate-100 border-t border-slate-100">
           {fields.map(({ label, value }) => (
@@ -129,7 +129,7 @@ function PointsProductDetail({ productId }: { productId: string }) {
             </div>
           ))}
         </dl>
-        <p className="mt-3 rounded-[14px] bg-slate-50 px-3.5 py-3 text-[12px] leading-5 text-slate-500">
+        <p className="mt-3 rounded-xl bg-slate-50 px-3.5 py-3 text-[12px] leading-5 text-slate-500">
           {product.note}
         </p>
       </section>
