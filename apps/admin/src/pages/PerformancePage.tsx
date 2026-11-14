@@ -1,6 +1,7 @@
 import { PageInfoAlert } from '../components/PageInfoHelp'
 import {
   Alert,
+  App as AntdApp,
   Button,
   DatePicker,
   Empty,
@@ -22,13 +23,14 @@ import { useAdminAuth } from '../app/auth-context'
 import { PageHeader } from '../components/PageHeader'
 import type { DateRangeValue } from '../shared/components/DataPanel'
 import type { AuthenticatedSession } from '../services/auth'
-import { isLocalApiError } from '../services/localApi'
+import { describeLocalError, isLocalApiError } from '../services/localApi'
 import {
   LEDGER_FACT_KIND_LABELS,
   SETTLEMENT_AMOUNT_STATUS_LABELS,
   formatCents,
   formatDateTime,
   getLedgerOverview,
+  syncLedgerSourceFacts,
 } from '../services/ledger'
 import {
   communityOptionsOf,
@@ -88,6 +90,7 @@ export function PerformancePage() {
 }
 
 function PerformanceConsole({ session }: { session: AuthenticatedSession }) {
+  const { message } = AntdApp.useApp()
   const navigate = useNavigate()
   const isAdmin = session.staff.role === 'admin'
   const assigned = session.staff.communities
@@ -102,6 +105,7 @@ function PerformanceConsole({ session }: { session: AuthenticatedSession }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
   const [token, setToken] = useState(0)
+  const [syncing, setSyncing] = useState(false)
 
   const from = scope.range?.start
   const to = scope.range?.end
@@ -141,6 +145,30 @@ function PerformanceConsole({ session }: { session: AuthenticatedSession }) {
     scope.staffId === undefined &&
     scope.communityId === defaultCommunityId
 
+  const syncSources = async () => {
+    setSyncing(true)
+    try {
+      const result = await syncLedgerSourceFacts(session.csrfToken)
+      setToken((value) => value + 1)
+      message.success(
+        `同步完成：新增 ${result.created} 条，已存在 ${result.skipped} 条（扫描 ${result.scanned} 条）。`,
+      )
+    } catch (cause: unknown) {
+      message.error(describeLocalError(cause, '同步来源事实失败'))
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const anomalyHref = () => {
+    const params = new URLSearchParams({ anomalyOnly: 'true' })
+    if (scope.communityId) params.set('communityId', scope.communityId)
+    if (scope.staffId) params.set('staffId', scope.staffId)
+    if (from) params.set('from', from)
+    if (to) params.set('to', to)
+    return `/performance/ledger?${params.toString()}`
+  }
+
   const rangeValue: [dayjs.Dayjs | null, dayjs.Dayjs | null] = [
     scope.range?.start ? dayjs(scope.range.start) : null,
     scope.range?.end ? dayjs(scope.range.end) : null,
@@ -151,7 +179,20 @@ function PerformanceConsole({ session }: { session: AuthenticatedSession }) {
       <PageHeader
         title="业绩总览"
         description="统一经营流水的账面汇总：登记金额、已核验业绩、人工实收与冲正、奖励成本与冲正分列，不计算应付或分账。"
-        extra={<Button onClick={() => setToken((value) => value + 1)} loading={loading}>刷新</Button>}
+        extra={
+          <Space wrap>
+            <Button onClick={syncSources} loading={syncing} disabled={loading}>
+              同步来源事实
+            </Button>
+            <Button
+              onClick={() => setToken((value) => value + 1)}
+              loading={loading}
+              disabled={syncing}
+            >
+              重读总览
+            </Button>
+          </Space>
+        }
       />
 
       <div className="page-stack">
@@ -164,8 +205,8 @@ function PerformanceConsole({ session }: { session: AuthenticatedSession }) {
               <li>六类事实不合并：登记金额与已核验业绩常描述同一笔业务，因此不提供合计金额。</li>
               <li>人工实收只统计带凭据的线下收款；冲正单独成行，不减记实收。</li>
               <li>归属只取来源事实上明确存在的网格员，待归属不计入任何人的业绩。</li>
-              <li>本页只按业务日期、社区与业绩归属汇总；事实类型、来源与异常筛选在「经营流水」页。</li>
-              <li>来源事实需在「经营流水」页由运营人员显式同步，本页不做自动实时刷新。</li>
+              <li>结算规则未配置，金额均为账面登记毛额（{SETTLEMENT_AMOUNT_STATUS_LABELS.pending_rule}），不据此计算应付或分账。</li>
+              <li>「重读总览」只重新读取服务端投影；新订单核验后需先「同步来源事实」，本页不做自动实时同步。</li>
             </ul>
           }
         />
@@ -270,7 +311,7 @@ function PerformanceConsole({ session }: { session: AuthenticatedSession }) {
           <LedgerReport
             overview={overview}
             loading={loading}
-            onShowAnomalies={() => navigate('/performance/ledger?anomalyOnly=true')}
+            onShowAnomalies={() => navigate(anomalyHref())}
           />
         )}
       </div>
@@ -353,15 +394,6 @@ function LedgerReport({
 
   return (
     <>
-      <div className="ledger-report-meta">
-        <Tag color={overview.amountStatus === 'pending_rule' ? 'orange' : 'blue'}>
-          {SETTLEMENT_AMOUNT_STATUS_LABELS[overview.amountStatus]}
-        </Tag>
-        <Typography.Text type="secondary">
-          数据截至 {formatDateTime(overview.asOf)}（{overview.timeZone}）· 服务端聚合
-        </Typography.Text>
-      </div>
-
       <div className="ledger-kpi-grid" aria-label="经营指标">
         <MetricCard
           title={LEDGER_FACT_KIND_LABELS.order_registered}
@@ -435,6 +467,14 @@ function LedgerReport({
           }
         />
       </div>
+      {overview.totals.entryCount === 0 ? (
+        <Typography.Paragraph className="ledger-report-empty-note" type="secondary">
+          当前范围暂无经营流水。完成订单核验等业务后，请先点击「同步来源事实」再查看。
+        </Typography.Paragraph>
+      ) : null}
+      <Typography.Text className="ledger-report-asof" type="secondary">
+        数据截至 {formatDateTime(overview.asOf)}（{overview.timeZone}）
+      </Typography.Text>
     </>
   )
 }

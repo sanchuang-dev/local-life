@@ -34,6 +34,16 @@ const ADMIN_SESSION: AuthenticatedSession = {
   csrfToken: CSRF_TOKEN,
 }
 
+const OPERATOR_SESSION: AuthenticatedSession = {
+  ...ADMIN_SESSION,
+  staff: {
+    id: STAFF_ID,
+    username: 'operator.a',
+    role: 'operator',
+    communities: [COMMUNITY_A],
+  },
+}
+
 const GRID_SESSION: AuthenticatedSession = {
   ...ADMIN_SESSION,
   staff: {
@@ -397,14 +407,45 @@ describe('LedgerPage list and detail', () => {
     )
   })
 
-  it('starts from the anomaly-only filter when the overview links here', async () => {
+  it('starts from the overview scope when the overview links here', async () => {
     const calls = stubApi(stubBaseline())
 
-    renderPage(ADMIN_SESSION, '/performance/ledger?anomalyOnly=true')
+    renderPage(
+      ADMIN_SESSION,
+      `/performance/ledger?anomalyOnly=true&communityId=${COMMUNITY_A.id}` +
+        `&staffId=${GRID_ID}&from=2026-11-01&to=2026-11-07`,
+    )
     await waitForList()
 
-    await waitFor(() => expect(entryUrls(calls)[0]).toContain('anomalyOnly=true'))
+    await waitFor(() => {
+      const url = entryUrls(calls)[0]!
+      expect(url).toContain('anomalyOnly=true')
+      expect(url).toContain(`communityId=${COMMUNITY_A.id}`)
+      expect(url).toContain(`staffId=${GRID_ID}`)
+      expect(url).toContain('from=2026-11-01')
+      expect(url).toContain('to=2026-11-07')
+    })
     expect(firstLabel('未解决异常')).toBeTruthy()
+  })
+
+  it('does not let a crafted deep link widen an operator community scope', async () => {
+    const calls = stubApi(stubBaseline())
+
+    renderPage(
+      OPERATOR_SESSION,
+      `/performance/ledger?communityId=${COMMUNITY_B.id}&staffId=${GRID_ID}` +
+        '&from=invalid&to=2026-11-07',
+    )
+    await waitForList()
+
+    await waitFor(() => {
+      const url = entryUrls(calls)[0]!
+      expect(url).toContain(`communityId=${COMMUNITY_A.id}`)
+      expect(url).not.toContain(COMMUNITY_B.id)
+      expect(url).toContain(`staffId=${GRID_ID}`)
+      expect(url).toContain('to=2026-11-07')
+      expect(url).not.toContain('from=')
+    })
   })
 
   it('renders the entry drawer from the list row and its unresolved anomalies', async () => {

@@ -84,6 +84,25 @@ function overview(overrides: Partial<LedgerOverview> = {}): LedgerOverview {
   }
 }
 
+function emptyOverview(): LedgerOverview {
+  return overview({
+    buckets: [
+      { factKind: 'order_registered', entryCount: 0, grossAmountCents: 0 },
+      { factKind: 'order_verified', entryCount: 0, grossAmountCents: 0 },
+      { factKind: 'payment_received', entryCount: 0, grossAmountCents: 0 },
+      { factKind: 'payment_reversed', entryCount: 0, grossAmountCents: 0 },
+      { factKind: 'reward_cost', entryCount: 0, grossAmountCents: 0 },
+      { factKind: 'reward_reversed', entryCount: 0, grossAmountCents: 0 },
+    ],
+    totals: { entryCount: 0, grossAmountCents: 0 },
+    attributed: { entryCount: 0, amountCents: 0 },
+    pendingAttribution: { entryCount: 0, amountCents: 0 },
+    openAnomalies: { count: 0 },
+    payment: { receivedCents: 0, reversedCents: 0 },
+    reward: { costCents: 0, reversedCents: 0 },
+  })
+}
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -275,7 +294,7 @@ describe('PerformancePage report', () => {
     expect(screen.getByTestId('ledger-anomalies').textContent).toContain('共 5 笔流水')
 
     // No settlement rule ⇒ 待核定, and no payable/commission wording anywhere.
-    expect(screen.getAllByText('待核定').length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/待核定/).length).toBeGreaterThan(0)
     expect(document.body.textContent).not.toMatch(/支付成功|已成交|已开通|已结算|佣金应付/)
     expect(document.body.textContent).not.toContain('174.20')
     expect(screen.queryByText('合计金额')).toBeNull()
@@ -293,7 +312,7 @@ describe('PerformancePage report', () => {
     renderPage(ADMIN_SESSION)
 
     expect(
-      await screen.findByText(/数据截至 2026-11-07 12:00（Asia\/Shanghai）· 服务端聚合/),
+      await screen.findByText(/数据截至 2026-11-07 12:00（Asia\/Shanghai）/),
     ).toBeTruthy()
   })
 
@@ -311,28 +330,7 @@ describe('PerformancePage report', () => {
   it('renders zero metrics without inventing a total or a list', async () => {
     stubApi([
       ['/api/admin/crm/filter-options', () => json(FILTER_OPTIONS)],
-      [
-        '/api/admin/ledger/overview',
-        () =>
-          json(
-            overview({
-              buckets: [
-                { factKind: 'order_registered', entryCount: 0, grossAmountCents: 0 },
-                { factKind: 'order_verified', entryCount: 0, grossAmountCents: 0 },
-                { factKind: 'payment_received', entryCount: 0, grossAmountCents: 0 },
-                { factKind: 'payment_reversed', entryCount: 0, grossAmountCents: 0 },
-                { factKind: 'reward_cost', entryCount: 0, grossAmountCents: 0 },
-                { factKind: 'reward_reversed', entryCount: 0, grossAmountCents: 0 },
-              ],
-              totals: { entryCount: 0, grossAmountCents: 0 },
-              attributed: { entryCount: 0, amountCents: 0 },
-              pendingAttribution: { entryCount: 0, amountCents: 0 },
-              openAnomalies: { count: 0 },
-              payment: { receivedCents: 0, reversedCents: 0 },
-              reward: { costCents: 0, reversedCents: 0 },
-            }),
-          ),
-      ],
+      ['/api/admin/ledger/overview', () => json(emptyOverview())],
     ])
 
     renderPage(ADMIN_SESSION)
@@ -340,6 +338,7 @@ describe('PerformancePage report', () => {
     expect(await screen.findByText('登记金额')).toBeTruthy()
     expect(screen.getByTestId('ledger-anomalies').textContent).toContain('未解决异常')
     expect(screen.getByTestId('ledger-anomalies').textContent).toContain('共 0 笔流水')
+    expect(screen.getByText(/当前范围暂无经营流水/)).toBeTruthy()
     expect(screen.queryByText('当前筛选条件下没有经营流水。')).toBeNull()
   })
 
@@ -360,6 +359,59 @@ describe('PerformancePage report', () => {
 
     settleOverview(json(overview()))
     expect(await screen.findByText('登记金额')).toBeTruthy()
+  })
+})
+
+describe('PerformancePage source sync', () => {
+  it('syncs source facts and re-reads the overview so newly verified data appears', async () => {
+    let syncCall: FetchCall | undefined
+    let overviewReads = 0
+    stubApi([
+      ['/api/admin/crm/filter-options', () => json(FILTER_OPTIONS)],
+      [
+        '/api/admin/ledger/overview',
+        () => {
+          overviewReads += 1
+          return json(overviewReads === 1 ? emptyOverview() : overview())
+        },
+      ],
+      [
+        '/api/admin/ledger/sync',
+        (url, init) => {
+          syncCall = { url, init }
+          return json({
+            scanned: 4,
+            created: 2,
+            skipped: 2,
+            sources: {
+              localOrder: { scanned: 2, created: 1, skipped: 1 },
+              crmServiceOrder: { scanned: 1, created: 1, skipped: 0 },
+              activityRewardGrant: { scanned: 1, created: 0, skipped: 1 },
+            },
+          })
+        },
+      ],
+    ])
+
+    renderPage(ADMIN_SESSION)
+    expect(await screen.findByText(/当前范围暂无经营流水/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '同步来源事实' }))
+
+    await waitFor(() => expect(syncCall).toBeTruthy())
+    const sent = syncCall!
+    expect(sent.url).toBe('/api/admin/ledger/sync')
+    expect(sent.init?.method).toBe('POST')
+    expect((sent.init!.headers as Record<string, string>)['x-csrf-token']).toBe(
+      ADMIN_SESSION.csrfToken,
+    )
+    expect(await screen.findByText(/同步完成：新增 2 条/)).toBeTruthy()
+    await waitFor(() => expect(overviewReads).toBeGreaterThan(1))
+    await waitFor(() => {
+      const registered = document.querySelector('[data-fact-kind="order_registered"]')
+      expect(registered?.textContent).toContain('79.60')
+    })
+    expect(screen.queryByText(/当前范围暂无经营流水/)).toBeNull()
   })
 })
 
@@ -431,6 +483,36 @@ describe('PerformancePage filters', () => {
     await waitFor(() => {
       expect(router.state.location.pathname).toBe('/performance/ledger')
       expect(router.state.location.search).toContain('anomalyOnly=true')
+    })
+  })
+
+  it('carries the current community, date and staff scope into the anomaly list', async () => {
+    const calls = stubApi(stubBaseline())
+
+    const { router } = renderPage(ADMIN_SESSION)
+    await screen.findByText('登记金额')
+
+    await chooseOption(screen.getByLabelText('社区'), '幸福社区')
+    await chooseOption(screen.getByLabelText('业绩归属'), '网格员甲（网格员）')
+    await pickDateRange('2026-11-01', '2026-11-07')
+    await waitFor(
+      () => {
+        const url = overviewUrls(calls).at(-1)!
+        expect(url).toContain('from=2026-11-01')
+        expect(url).toContain('to=2026-11-07')
+      },
+      { timeout: 5000 },
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '查看异常流水' }))
+
+    await waitFor(() => {
+      const params = new URL(router.state.location.search, 'http://test.local').searchParams
+      expect(params.get('anomalyOnly')).toBe('true')
+      expect(params.get('communityId')).toBe(COMMUNITY_A.id)
+      expect(params.get('staffId')).toBe(GRID_ID)
+      expect(params.get('from')).toBe('2026-11-01')
+      expect(params.get('to')).toBe('2026-11-07')
     })
   })
 })

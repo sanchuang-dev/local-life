@@ -78,6 +78,10 @@ interface LedgerFilters {
 /** No server-side sort exists in the contract, so the panel gets no sort keys. */
 type LedgerSortKey = never
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const BUSINESS_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
 const initialFilters: LedgerFilters = {
   range: undefined,
   communityId: undefined,
@@ -149,17 +153,40 @@ function LedgerConsole({ session }: { session: AuthenticatedSession }) {
 
   /* ------------------------------- the query ------------------------------- */
 
-  const [query, setQuery] = useState<PanelQuery<LedgerFilters, LedgerSortKey>>(() => ({
-    filters: {
-      ...initialFilters,
-      communityId: isAdmin ? undefined : assigned[0]?.id,
-      // 业绩总览 links here with `?anomalyOnly=true`; the filter stays a normal
-      // panel filter afterwards, so the operator can clear it in place.
-      anomalyOnly: searchParams.get('anomalyOnly') === 'true' ? 'true' : undefined,
-    },
-    page: 1,
-    pageSize: 20,
-  }))
+  const [query, setQuery] = useState<PanelQuery<LedgerFilters, LedgerSortKey>>(() => {
+    // 业绩总览 links here with its current scope. Parse defensively: a crafted
+    // community id must not widen an operator's scope, and malformed dates or
+    // ids would otherwise reach the server as a 400.
+    const requestedCommunityId = searchParams.get('communityId')
+    const requestedStaffId = searchParams.get('staffId')
+    const rawFrom = searchParams.get('from')
+    const rawTo = searchParams.get('to')
+    const from = rawFrom && BUSINESS_DATE_PATTERN.test(rawFrom) ? rawFrom : undefined
+    const to = rawTo && BUSINESS_DATE_PATTERN.test(rawTo) ? rawTo : undefined
+    const range = from && to && to < from ? undefined : from || to ? { start: from, end: to } : undefined
+    const candidateCommunityId =
+      requestedCommunityId && UUID_PATTERN.test(requestedCommunityId)
+        ? requestedCommunityId
+        : undefined
+    const communityId = isAdmin
+      ? candidateCommunityId
+      : assigned.some((item) => item.id === candidateCommunityId)
+        ? candidateCommunityId
+        : assigned[0]?.id
+
+    return {
+      filters: {
+        ...initialFilters,
+        communityId,
+        staffId:
+          requestedStaffId && UUID_PATTERN.test(requestedStaffId) ? requestedStaffId : undefined,
+        range,
+        anomalyOnly: searchParams.get('anomalyOnly') === 'true' ? 'true' : undefined,
+      },
+      page: 1,
+      pageSize: 20,
+    }
+  })
 
   /* ------------------------------- the list -------------------------------- */
 
