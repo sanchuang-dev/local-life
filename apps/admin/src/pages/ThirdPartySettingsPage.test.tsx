@@ -166,8 +166,13 @@ describe('ThirdPartySettingsPage cards', () => {
     await within(wechat).findByText('未配置')
     expect(within(map).getByText('已启用')).toBeTruthy()
 
+    // The initial server read must finish before clicking Refresh. Under
+    // GitHub Actions the AntD Button can still be in its loading state after
+    // the data card has rendered, and intentionally ignores clicks then.
+    const refresh = screen.getByRole('button', { name: '刷新状态' })
+    await waitFor(() => expect(refresh.classList.contains('ant-btn-loading')).toBe(false))
     wechatAvailable = false
-    fireEvent.click(screen.getByRole('button', { name: '刷新状态' }))
+    fireEvent.click(refresh)
     expect(await within(wechat).findByText('状态读取失败')).toBeTruthy()
     expect(within(wechat).queryByText('未配置')).toBeNull()
     expect(within(wechat).queryByText('尚未启用')).toBeNull()
