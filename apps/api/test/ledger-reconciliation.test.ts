@@ -177,7 +177,12 @@ async function makeWorld(): Promise<World> {
       .run()
     for (const community of scoped) {
       db.insert(staffCommunityAssignments)
-        .values({ staffAccountId: staffId, communityId: community, createdAt: DAY_START })
+        .values({
+          staffAccountId: staffId,
+          communityId: community,
+          assignmentKind: role === 'grid_worker' ? 'grid_territory' : 'operator_scope',
+          createdAt: DAY_START,
+        })
         .run()
     }
     const session = await login(app, username, password)

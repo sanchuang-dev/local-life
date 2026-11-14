@@ -79,6 +79,10 @@ function getCalls(calls: FetchCall[], path: string): FetchCall[] {
   return calls.filter((call) => call.url === path && !call.init?.method)
 }
 
+function methodCalls(calls: FetchCall[], path: string, method: string): FetchCall[] {
+  return calls.filter((call) => call.url === path && call.init?.method === method)
+}
+
 /** antd Drawer keeps children mounted after close; openness lives on the root class. */
 function openDrawers(): number {
   return document.querySelectorAll('.ant-drawer-open').length
@@ -201,7 +205,9 @@ describe('CommunitiesPage management surface', () => {
     })
     renderPage(ADMIN_SESSION)
 
-    expect(await screen.findByText('王小网 · 网格员')).toBeTruthy()
+    expect(await screen.findByText('王小网')).toBeTruthy()
+    expect(screen.getAllByText('经营网格员').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('运营员授权').length).toBeGreaterThan(0)
     expect(screen.queryByText('后台账户')).toBeNull()
   })
 
@@ -211,7 +217,8 @@ describe('CommunitiesPage management surface', () => {
 
     expect(await screen.findByRole('heading', { name: '社区管理' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /新建社区/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: /关联人员/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: '经营负责人' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '运营员授权' })).toBeNull()
     // No admin-only surface is even mounted, so no admin write request can happen.
     expect(document.querySelector('.ant-drawer')).toBeNull()
     expect(screen.queryByPlaceholderText('例如：幸福社区')).toBeNull()
@@ -391,17 +398,205 @@ describe('Community association with an existing account', () => {
     })
     renderPage(ADMIN_SESSION)
     const community = (await screen.findByText('阳光社区')).closest('tr')!
-    fireEvent.click(within(community).getByRole('button', { name: '关联人员' }))
+    fireEvent.click(within(community).getByRole('button', { name: '运营员授权' }))
     const drawer = document.querySelector('.ant-drawer-open') as HTMLElement
     expect(drawer).toBeTruthy()
-    await chooseOption(within(drawer).getByRole('combobox'), '王运营 · 运营员 · operator.a')
-    fireEvent.click(within(drawer).getByRole('button', { name: /建立关联/ }))
+    await chooseOption(within(drawer).getByRole('combobox'), '王运营 · operator.a')
+    fireEvent.click(within(drawer).getByRole('button', { name: /添加授权/ }))
     await waitFor(() => expect(calls.filter((item) => item.init?.method === 'POST')).toHaveLength(1))
     const post = calls.find((item) => item.init?.method === 'POST')!
     expect(post.url).toBe('/api/admin/communities/' + COMMUNITY_B.id + '/staff')
     expect((post.init!.headers as Record<string, string>)['x-csrf-token']).toBe(CSRF_TOKEN)
     expect(JSON.parse(String(post.init!.body))).toEqual({ staffAccountId: row.id })
     expect(calls.some((item) => item.url === '/api/admin/staff' && item.init?.method === 'POST')).toBe(false)
-    await waitFor(() => expect(within(community).getByText(/王运营 · 运营员/)).toBeTruthy())
+    await waitFor(() => expect(within(community).getByText('王运营')).toBeTruthy())
+  })
+})
+
+describe('Community grid territory management', () => {
+  const GRID_1 = {
+    id: '123e4567-e89b-42d3-a456-4266141740c3',
+    username: 'grid.a',
+    displayName: '王网格',
+    role: 'grid_worker',
+    status: 'active',
+    communities: [] as { id: string; name: string }[],
+  }
+  const GRID_2 = {
+    id: '123e4567-e89b-42d3-a456-4266141740c4',
+    username: 'grid.b',
+    displayName: '李网格',
+    role: 'grid_worker',
+    status: 'active',
+    communities: [] as { id: string; name: string }[],
+  }
+
+  it('assigns then replaces the grid owner with the optimistic previous owner', async () => {
+    let staffItems = [GRID_1, GRID_2]
+    const calls = stubApi((url, init) => {
+      if (url === '/api/admin/communities') return json({ items: [COMMUNITY_A] })
+      if (url === '/api/admin/staff') return json({ items: staffItems })
+      if (
+        url === `/api/admin/communities/${COMMUNITY_A.id}/grid-worker` &&
+        init?.method === 'PUT'
+      ) {
+        const body = JSON.parse(String(init.body)) as {
+          staffAccountId: string
+          expectedStaffAccountId: string | null
+        }
+        staffItems = staffItems.map((person) => ({
+          ...person,
+          communities: person.id === body.staffAccountId ? [COMMUNITY_A] : [],
+        }))
+        return json({ staffAccountId: body.staffAccountId, communityId: COMMUNITY_A.id })
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+
+    renderPage(ADMIN_SESSION)
+    const community = (await screen.findByText('幸福社区')).closest('tr')!
+    fireEvent.click(within(community).getByRole('button', { name: '经营负责人' }))
+
+    let drawer = document.querySelector('.ant-drawer-open') as HTMLElement
+    expect(within(drawer).getByText('暂无经营网格员')).toBeTruthy()
+    await chooseOption(within(drawer).getByLabelText('经营网格员'), '王网格 · grid.a · 可分配')
+    fireEvent.click(within(drawer).getByRole('button', { name: '保存负责人' }))
+
+    await waitFor(() => expect(methodCalls(
+      calls,
+      `/api/admin/communities/${COMMUNITY_A.id}/grid-worker`,
+      'PUT',
+    )).toHaveLength(1))
+    const first = methodCalls(
+      calls,
+      `/api/admin/communities/${COMMUNITY_A.id}/grid-worker`,
+      'PUT',
+    )[0]!
+    expect((first.init!.headers as Record<string, string>)['x-csrf-token']).toBe(CSRF_TOKEN)
+    expect(JSON.parse(String(first.init!.body))).toEqual({
+      staffAccountId: GRID_1.id,
+      expectedStaffAccountId: null,
+    })
+    await waitFor(() => expect(openDrawers()).toBe(0))
+    expect(await screen.findByText('经营负责人已更新')).toBeTruthy()
+
+    fireEvent.click(within(community).getByRole('button', { name: '经营负责人' }))
+    drawer = document.querySelector('.ant-drawer-open') as HTMLElement
+    expect(within(drawer).getByText('王网格（grid.a）')).toBeTruthy()
+    await chooseOption(within(drawer).getByLabelText('经营网格员'), '李网格 · grid.b · 可分配')
+    fireEvent.click(within(drawer).getByRole('button', { name: '保存负责人' }))
+
+    const modal = await waitFor(() => {
+      const element = document.querySelector('.ant-modal-confirm')
+      expect(element).toBeTruthy()
+      return element as HTMLElement
+    })
+    expect(within(modal).getByText(/旧负责人将立即失去本片区访问权限/)).toBeTruthy()
+    fireEvent.click(within(modal).getByRole('button', { name: '确认更换' }))
+
+    await waitFor(() => expect(methodCalls(
+      calls,
+      `/api/admin/communities/${COMMUNITY_A.id}/grid-worker`,
+      'PUT',
+    )).toHaveLength(2))
+    const second = methodCalls(
+      calls,
+      `/api/admin/communities/${COMMUNITY_A.id}/grid-worker`,
+      'PUT',
+    )[1]!
+    expect(JSON.parse(String(second.init!.body))).toEqual({
+      staffAccountId: GRID_2.id,
+      expectedStaffAccountId: GRID_1.id,
+    })
+  })
+
+  it('unassigns a grid owner through the audited DELETE route', async () => {
+    let staffItems = [{ ...GRID_1, communities: [COMMUNITY_A] }]
+    const calls = stubApi((url, init) => {
+      if (url === '/api/admin/communities') return json({ items: [COMMUNITY_A] })
+      if (url === '/api/admin/staff') return json({ items: staffItems })
+      if (
+        url === `/api/admin/communities/${COMMUNITY_A.id}/staff/${GRID_1.id}` &&
+        init?.method === 'DELETE'
+      ) {
+        staffItems = [{ ...GRID_1, communities: [] }]
+        return new Response(null, { status: 204 })
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+
+    renderPage(ADMIN_SESSION)
+    const community = (await screen.findByText('幸福社区')).closest('tr')!
+    fireEvent.click(within(community).getByRole('button', { name: '经营负责人' }))
+    const drawer = document.querySelector('.ant-drawer-open') as HTMLElement
+    expect(within(drawer).getByText('王网格（grid.a）')).toBeTruthy()
+
+    fireEvent.click(within(drawer).getByRole('button', { name: '解除负责人' }))
+    const modal = await waitFor(() => {
+      const element = document.querySelector('.ant-modal-confirm')
+      expect(element).toBeTruthy()
+      return element as HTMLElement
+    })
+    fireEvent.click(within(modal).getByRole('button', { name: '解除负责人' }))
+
+    await waitFor(() => expect(methodCalls(
+      calls,
+      `/api/admin/communities/${COMMUNITY_A.id}/staff/${GRID_1.id}`,
+      'DELETE',
+    )).toHaveLength(1))
+    const call = methodCalls(
+      calls,
+      `/api/admin/communities/${COMMUNITY_A.id}/staff/${GRID_1.id}`,
+      'DELETE',
+    )[0]!
+    expect((call.init!.headers as Record<string, string>)['x-csrf-token']).toBe(CSRF_TOKEN)
+    expect(await screen.findByText('经营负责人已解除')).toBeTruthy()
+    await waitFor(() => expect(within(drawer).getByText('暂无经营网格员')).toBeTruthy())
+  })
+
+  it('removes one operator authorization without touching other communities', async () => {
+    const operator = {
+      id: '123e4567-e89b-42d3-a456-4266141740c5',
+      username: 'operator.a',
+      displayName: '王运营',
+      role: 'operator',
+      status: 'active',
+      communities: [COMMUNITY_A, COMMUNITY_B],
+    }
+    let staffItems = [operator]
+    const calls = stubApi((url, init) => {
+      if (url === '/api/admin/communities') return json({ items: [COMMUNITY_A] })
+      if (url === '/api/admin/staff') return json({ items: staffItems })
+      if (
+        url === `/api/admin/communities/${COMMUNITY_A.id}/staff/${operator.id}` &&
+        init?.method === 'DELETE'
+      ) {
+        staffItems = [{ ...operator, communities: [COMMUNITY_B] }]
+        return new Response(null, { status: 204 })
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+
+    renderPage(ADMIN_SESSION)
+    const community = (await screen.findByText('幸福社区')).closest('tr')!
+    fireEvent.click(within(community).getByRole('button', { name: '运营员授权' }))
+    const drawer = document.querySelector('.ant-drawer-open') as HTMLElement
+    expect(within(drawer).getByText('王运营')).toBeTruthy()
+
+    fireEvent.click(within(drawer).getByRole('button', { name: '解除' }))
+    const modal = await waitFor(() => {
+      const element = document.querySelector('.ant-modal-confirm')
+      expect(element).toBeTruthy()
+      return element as HTMLElement
+    })
+    fireEvent.click(within(modal).getByRole('button', { name: '解除授权' }))
+
+    await waitFor(() => expect(methodCalls(
+      calls,
+      `/api/admin/communities/${COMMUNITY_A.id}/staff/${operator.id}`,
+      'DELETE',
+    )).toHaveLength(1))
+    expect(await screen.findByText('运营员授权已解除')).toBeTruthy()
+    await waitFor(() => expect(within(drawer).getByText('暂无运营员授权')).toBeTruthy())
   })
 })

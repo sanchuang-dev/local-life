@@ -202,7 +202,12 @@ async function makeWorld(): Promise<World> {
       })
       .run()
     db.insert(staffCommunityAssignments)
-      .values({ staffAccountId: staffId, communityId, createdAt: now })
+      .values({
+        staffAccountId: staffId,
+        communityId,
+        assignmentKind: role === 'grid_worker' ? 'grid_territory' : 'operator_scope',
+        createdAt: now,
+      })
       .run()
     return { userId, staffId }
   }
@@ -2443,7 +2448,10 @@ async function secondAdminSession186(world: World): Promise<Session> {
     role: 'admin', status: 'active', createdAt: when, updatedAt: when,
   }).run()
   world.db.insert(staffCommunityAssignments).values({
-    staffAccountId: staffId, communityId: world.communityId, createdAt: when,
+    staffAccountId: staffId,
+    communityId: world.communityId,
+    assignmentKind: 'operator_scope',
+    createdAt: when,
   }).run()
   const state = await csrf(world.app)
   const response = await world.app.request('/auth/login', {

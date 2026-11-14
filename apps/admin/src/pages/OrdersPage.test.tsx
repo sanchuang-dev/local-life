@@ -584,7 +584,9 @@ describe('OrdersPage receipt evidence', () => {
     fireEvent.click(await screen.findByRole('button', { name: '详情' }))
 
     expect(await screen.findByText('收款凭据与业绩归属')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '记录凭据（不代表结算）' })).toBeTruthy()
+    expect(
+      await screen.findByRole('button', { name: '记录凭据（不代表结算）' }),
+    ).toBeTruthy()
     // The order is already selected: the old 搜索订单 → 再次选择订单 flow is gone.
     expect(screen.queryByPlaceholderText(/按商品名称/)).toBeNull()
     expect(screen.queryByRole('button', { name: '查找订单' })).toBeNull()
@@ -646,7 +648,9 @@ describe('OrdersPage receipt evidence', () => {
     fireEvent.click(await screen.findByRole('button', { name: '详情' }))
     await screen.findByText('收款凭据与业绩归属')
 
-    fireEvent.change(screen.getByLabelText('凭据编号'), { target: { value: 'BANK-4821' } })
+    fireEvent.change(await screen.findByLabelText('凭据编号'), {
+      target: { value: 'BANK-4821' },
+    })
     fireEvent.click(screen.getByRole('button', { name: '记录凭据（不代表结算）' }))
 
     await waitFor(() => expect(recordCall).toBeTruthy())

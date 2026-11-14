@@ -377,3 +377,99 @@
 .settlement-page-body .ledger-tabpanel > [hidden] {
   display: none;
 }
+
+/* --------------------------- 流水详情抽屉: flat sections ------------------- */
+
+.ledger-detail-drawer .ant-drawer-body {
+  padding: 20px 24px 24px;
+}
+
+.ledger-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* Amount, fact kind and current state lead; identifiers stay secondary. */
+.ledger-detail-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--ant-color-border-secondary, #e8f0ec);
+}
+
+.ledger-detail-amount {
+  margin: 2px 0 0 !important;
+  font-size: 28px !important;
+  line-height: 1.2 !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.ledger-detail-section {
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--ant-color-border-secondary, #e8f0ec);
+}
+
+.ledger-detail-section:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.ledger-detail-section h5 {
+  margin: 0 0 10px !important;
+  font-size: 14px !important;
+  line-height: 1.4 !important;
+}
+
+/* No bordered Descriptions and no card per field group. */
+.ledger-detail-section .ant-descriptions {
+  margin-top: 0;
+}
+
+.ledger-detail-section .ant-descriptions-item-label {
+  width: 112px;
+  color: var(--ant-color-text-description, #64748b);
+}
+
+.ledger-detail-section .ant-descriptions-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.ledger-detail-section .ledger-cell-mono {
+  display: inline-block;
+}
+
+.ledger-anomaly-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.ledger-anomaly-item {
+  padding: 10px 0;
+  border-top: 1px dashed var(--ant-color-border-secondary, #e8f0ec);
+}
+
+.ledger-anomaly-item:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.ledger-anomaly-note {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 700px) {
+  .ledger-detail-drawer .ant-drawer-body {
+    padding: 16px;
+  }
+
+  .ledger-detail-section .ant-descriptions-item-label {
+    width: 92px;
+  }
+}

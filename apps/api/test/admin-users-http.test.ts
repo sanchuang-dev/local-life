@@ -142,8 +142,18 @@ async function fixture() {
     },
   ]).run()
   db.insert(staffCommunityAssignments).values([
-    { staffAccountId: staffIds.operator, communityId: communityA, createdAt: date },
-    { staffAccountId: staffIds.grid, communityId: communityA, createdAt: date },
+    {
+      staffAccountId: staffIds.operator,
+      communityId: communityA,
+      assignmentKind: 'operator_scope',
+      createdAt: date,
+    },
+    {
+      staffAccountId: staffIds.grid,
+      communityId: communityA,
+      assignmentKind: 'grid_territory',
+      createdAt: date,
+    },
   ]).run()
 
   const tokens = {
@@ -652,6 +662,7 @@ test('scoped staff do not receive other-community relationships of otherwise vis
     f.db.insert(staffCommunityAssignments).values({
       staffAccountId: f.staffIds.operator,
       communityId: communityB,
+      assignmentKind: 'operator_scope',
       createdAt: date,
     }).run()
     const scoped = parseDetail(await f.detail(staffOperatorUser, 'grid'))

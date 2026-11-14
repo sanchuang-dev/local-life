@@ -142,6 +142,20 @@ export const staffAccounts = sqliteTable(
   (table) => [uniqueIndex('staff_username_uq').on(table.username)],
 )
 
+/**
+ * Staff-to-community relations with two deliberately different meanings:
+ *
+ * - `operator_scope`: an operator may manage several communities (many rows).
+ * - `grid_territory`: a grid worker owns at most ONE logical territory, and a
+ *   territory has at most ONE owner at a time. The partial unique indexes below
+ *   are the disk-level truth; routes also return a readable 409 before insert.
+ *
+ * Role is immutable in the current product, so the kind cannot drift through a
+ * supported API. Historical permissions, residents and orders are never moved
+ * when a territory row is deleted or reassigned.
+ */
+export type StaffAssignmentKind = 'operator_scope' | 'grid_territory'
+
 export const staffCommunityAssignments = sqliteTable(
   'staff_community_assignments',
   {
@@ -151,11 +165,20 @@ export const staffCommunityAssignments = sqliteTable(
     communityId: text('community_id')
       .notNull()
       .references(() => communities.id, { onDelete: 'cascade' }),
+    assignmentKind: text('assignment_kind').$type<StaffAssignmentKind>().notNull(),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.staffAccountId, table.communityId] }),
     index('staff_community_community_idx').on(table.communityId),
+    // A grid worker may own only one territory, regardless of row timing.
+    uniqueIndex('staff_community_grid_staff_uq')
+      .on(table.staffAccountId)
+      .where(sql`${table.assignmentKind} = 'grid_territory'`),
+    // A territory may have only one grid worker, regardless of row timing.
+    uniqueIndex('staff_community_grid_territory_uq')
+      .on(table.communityId)
+      .where(sql`${table.assignmentKind} = 'grid_territory'`),
   ],
 )
 
