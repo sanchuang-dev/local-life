@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
   AlertTriangle,
-  ArrowLeft,
   CircleHelp,
   Copy,
   MapPin,
@@ -128,7 +127,7 @@ function ActivityCountdown({ activity }: { activity: PublicActivityDetail }) {
   const numberBlock = (value: number, label: string) => (
     <span
       aria-label={label}
-      className="inline-flex h-[27px] min-w-[28px] items-center justify-center rounded-[5px] bg-[#154f2c] px-1 text-[16px] font-bold leading-none text-white shadow-[0_2px_4px_rgba(12,67,34,0.18)] tabular-nums"
+      className="inline-flex h-[27px] min-w-[28px] items-center justify-center rounded-sm bg-[#154f2c] px-1 text-[16px] font-bold leading-none text-white shadow-[0_2px_4px_rgba(12,67,34,0.18)] tabular-nums"
     >
       {twoDigits(value)}
     </span>
@@ -136,7 +135,7 @@ function ActivityCountdown({ activity }: { activity: PublicActivityDetail }) {
 
   return (
     <div className="relative z-[1] mx-3 -mt-2" role="timer" aria-label={phaseLabels[phase]}>
-      <div className="relative rounded-t-[12px] bg-gradient-to-b from-[#d8f0cc] via-[#e1f3d8]/85 to-transparent px-2.5 pb-5 pt-2.5 text-[#275942]">
+      <div className="relative rounded-t-xl bg-gradient-to-b from-[#d8f0cc] via-[#e1f3d8]/85 to-transparent px-2.5 pb-5 pt-2.5 text-[#275942]">
         <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11px] leading-4">
           <span className={phaseTones[phase]}>{phaseLabels[phase]}</span>
           <span className="font-medium text-[#375e40]">
@@ -182,7 +181,7 @@ function ActivityLoadNotice({
   if (state.status === 'loading') {
     return (
       <div className={wrapper} role="status" aria-live="polite">
-        <div className="rounded-t-[12px] bg-gradient-to-b from-[#d8f0cc] via-[#e1f3d8]/85 to-transparent px-3 pb-5 pt-3 text-[#275942]">
+        <div className="rounded-t-xl bg-gradient-to-b from-[#d8f0cc] via-[#e1f3d8]/85 to-transparent px-3 pb-5 pt-3 text-[#275942]">
           <div className="flex items-center justify-center gap-2 text-[12px] font-semibold">
             <span
               className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#126c38]/25 border-t-[#126c38]"
@@ -198,7 +197,7 @@ function ActivityLoadNotice({
   if (state.status === 'empty') {
     return (
       <div className={wrapper} role="status">
-        <div className="rounded-t-[12px] bg-gradient-to-b from-[#d8f0cc] via-[#e1f3d8]/85 to-transparent px-3 pb-5 pt-3 text-center text-[#275942]">
+        <div className="rounded-t-xl bg-gradient-to-b from-[#d8f0cc] via-[#e1f3d8]/85 to-transparent px-3 pb-5 pt-3 text-center text-[#275942]">
           <p className="text-[14px] font-bold">当前没有已发布活动</p>
           <p className="mt-1 text-[11px] leading-4 text-[#52786c]">
             有新活动发布后，可以在这里查看活动详情。
@@ -210,7 +209,7 @@ function ActivityLoadNotice({
 
   return (
     <div className={wrapper} role="alert">
-      <div className="rounded-t-[12px] border border-[#efd0b8] bg-[#fff7f0] px-3 pb-4 pt-3 text-[#7a4a2c]">
+      <div className="rounded-t-xl border border-[#efd0b8] bg-[#fff7f0] px-3 pb-4 pt-3 text-[#7a4a2c]">
         <p className="flex items-center gap-1.5 text-[13px] font-bold">
           <AlertTriangle size={15} aria-hidden="true" />
           活动信息加载失败
@@ -228,8 +227,6 @@ function ActivityLoadNotice({
     </div>
   )
 }
-
-const activityPath = '/community/activity/silver-neighborhood'
 
 const fallbackCopy = (value: string) => {
   const textarea = document.createElement('textarea')
@@ -254,14 +251,6 @@ export function SilverNeighborhoodCampaignPage() {
   const inviteParam = parseInviteParam(searchParams.get('invite'))
   const { state: activityState, retry: retryActivity } = usePublicActivity(requestedActivityId)
   const activity = activityState.status === 'ready' ? activityState.activity : null
-  // The resident root (`/`) is now the activity home; this page stays the full
-  // playbook sub-page reachable from old deep links and QR codes. The back link
-  // keeps the same real activity and invite parameters so both entries agree.
-  const homeParams = new URLSearchParams()
-  if (activity) homeParams.set('activityId', activity.id)
-  if (inviteParam.code) homeParams.set('invite', inviteParam.code)
-  const homeQuery = homeParams.toString()
-  const homeUrl = homeQuery ? `/?${homeQuery}` : '/'
   const auth = useResidentAuth()
   // One-off `?auth=success` / `?auth_error=code` markers, read once before the
   // page-level cleanup strips them from the address bar (#92).
@@ -396,16 +385,6 @@ export function SilverNeighborhoodCampaignPage() {
         authenticated={auth.session !== null}
         loading={auth.loading}
       />
-      <nav className="bg-[#eaf5e9] px-3 pt-2" aria-label="活动页导航">
-        <Link
-          to={homeUrl}
-          state={{ from: activityPath }}
-          className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-1 text-[13px] font-medium text-[#27725b] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
-        >
-          <ArrowLeft size={16} aria-hidden="true" />
-          返回活动首页
-        </Link>
-      </nav>
       <section className="relative overflow-hidden bg-[#eaf5e9]" aria-label="活动信息">
         <div className="relative">
           <img
@@ -423,24 +402,11 @@ export function SilverNeighborhoodCampaignPage() {
         <div className="relative -mt-px bg-gradient-to-b from-[#edf8e9] via-[#e8f5ec] to-[#d8eee5] px-4 pb-16 pt-0">
           {activity ? (
             <>
-              <div className="pt-3">
-                <h1 className="break-words text-[19px] font-bold leading-[1.35] tracking-tight text-[#1f4d3c]">
-                  {activity.title}
-                </h1>
-                <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] leading-5 text-[#4a6f61]">
-                  <span className="break-words">{activity.community.name}</span>
-                  <span aria-hidden="true">·</span>
-                  <span className="inline-flex min-w-0 items-center gap-1">
-                    <MapPin size={14} className="shrink-0" aria-hidden="true" />
-                    <span className="min-w-0 break-words">{activity.location}</span>
-                  </span>
-                </p>
-              </div>
-              <div className="mt-1 flex min-h-[48px] items-center justify-between gap-2">
-                <p className="text-[11px] leading-4 text-[#52786c]">
-                  {activity.ruleVersion === null
-                    ? '已发布公开规则'
-                    : `已发布 · 规则第 ${activity.ruleVersion} 版`}
+              <div className="flex min-h-[48px] items-center justify-between gap-3 pt-1">
+                <h1 className="sr-only">{activity.title}</h1>
+                <p className="flex min-w-0 items-center gap-1.5 text-[12px] leading-5 text-[#4a6f61]">
+                  <MapPin size={14} className="shrink-0" aria-hidden="true" />
+                  <span className="min-w-0 break-words">{activity.location}</span>
                 </p>
                 <button
                   type="button"
@@ -513,20 +479,20 @@ export function SilverNeighborhoodCampaignPage() {
               <button
                 type="button"
                 onClick={() => openSheet('checkin-reward')}
-                className="min-h-[44px] rounded-full px-3 text-[12px] font-bold text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+                className="min-h-[44px] rounded-lg px-3 text-[12px] font-bold text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
               >
                 奖励说明
               </button>
               <button
                 type="button"
                 onClick={() => openSheet('my-rewards')}
-                className="min-h-[44px] rounded-full bg-[#e8f6f0] px-3 text-[12px] font-bold text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+                className="min-h-[44px] rounded-lg bg-[#e8f6f0] px-3 text-[12px] font-bold text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
               >
                 我的奖励
               </button>
             </div>
           </div>
-          <div className="rounded-[20px] border border-slate-100 bg-white p-3 shadow-sm">
+          <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
             <p className="text-[14px] font-bold text-slate-800">三人有效签到</p>
             <p className="mt-1 text-[12px] leading-5 text-slate-500">
               只有现场核验通过的签到计入进度。
@@ -550,7 +516,7 @@ export function SilverNeighborhoodCampaignPage() {
       >
         {activity ? (
           <>
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-[14px] bg-[#eef7f2] p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#eef7f2] p-3">
               <p className="text-[13px] font-bold text-[#225b44]">已发布规则快照</p>
               <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-teal-700">
                 {activity.ruleVersion === null ? '未记录版本号' : `第 ${activity.ruleVersion} 版`}
@@ -563,7 +529,7 @@ export function SilverNeighborhoodCampaignPage() {
                 { label: '消费规则', text: activity.publicRules.purchase },
                 { label: '奖品领取', text: activity.publicRules.prizeClaim },
               ].map((rule, index) => (
-                <li key={rule.label} className="flex gap-3 rounded-[14px] bg-slate-50 p-3">
+                <li key={rule.label} className="flex gap-3 rounded-xl bg-slate-50 p-3">
                   <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-teal-700 text-[12px] font-bold text-white">
                     {index + 1}
                   </span>
@@ -575,7 +541,7 @@ export function SilverNeighborhoodCampaignPage() {
               ))}
             </ol>
             {activity.publicRules.notes ? (
-              <div className="mt-3 rounded-[14px] bg-[#fff7ec] p-3 text-[12px] leading-6 text-[#8a6132]">
+              <div className="mt-3 rounded-xl bg-[#fff7ec] p-3 text-[12px] leading-6 text-[#8a6132]">
                 <p className="font-bold">补充说明</p>
                 <p className="mt-1 break-words">{activity.publicRules.notes}</p>
               </div>
@@ -589,7 +555,7 @@ export function SilverNeighborhoodCampaignPage() {
             </p>
           </>
         ) : (
-          <p className="rounded-[14px] bg-slate-50 p-3 text-[13px] leading-6 text-slate-500">
+          <p className="rounded-xl bg-slate-50 p-3 text-[13px] leading-6 text-slate-500">
             尚未读取到已发布活动，暂无可展示的活动规则。请等待活动发布后重新打开页面。
           </p>
         )}
@@ -608,7 +574,7 @@ export function SilverNeighborhoodCampaignPage() {
                 <button
                   type="button"
                   onClick={handleSystemShare}
-                  className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-[13px] bg-teal-700 px-2 text-[13px] font-semibold text-white transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+                  className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-xl bg-teal-700 px-2 text-[13px] font-semibold text-white transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
                 >
                   <Share2 size={17} aria-hidden="true" />
                   {wechatShare.isWechat ? '微信内分享' : '转发给好友'}
@@ -616,7 +582,7 @@ export function SilverNeighborhoodCampaignPage() {
                 <button
                   type="button"
                   onClick={() => void handleCopyLink()}
-                  className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-[13px] border border-teal-200 bg-white px-2 text-[13px] font-semibold text-teal-700 transition-colors hover:bg-[#f2faf6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+                  className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-xl border border-teal-200 bg-white px-2 text-[13px] font-semibold text-teal-700 transition-colors hover:bg-[#f2faf6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
                 >
                   <Copy size={17} aria-hidden="true" />
                   复制链接
@@ -647,7 +613,7 @@ export function SilverNeighborhoodCampaignPage() {
         }
       >
         {shareUrl ? (
-          <div className="mx-auto w-full max-w-[300px] overflow-hidden rounded-[20px] border border-[#deebdf] bg-[#f4faf3] shadow-[0_9px_25px_rgba(26,88,62,0.08)]">
+          <div className="mx-auto w-full max-w-[300px] overflow-hidden rounded-2xl border border-[#deebdf] bg-[#f4faf3] shadow-[0_9px_25px_rgba(26,88,62,0.08)]">
             <img
               src={import.meta.env.BASE_URL + 'images/silver-neighborhood-hero.webp'}
               alt="银发社区欢乐季活动海报"
@@ -660,7 +626,7 @@ export function SilverNeighborhoodCampaignPage() {
                   {activity?.community.name ?? '本社区'} · 已有 {team?.seatsFilled ?? 0} / {team?.seatsTotal ?? 3} 位街坊
                 </p>
               </div>
-              <div className="mt-3 rounded-[14px] border border-[#deece1] bg-white px-3 py-3 text-center">
+              <div className="mt-3 rounded-xl border border-[#deece1] bg-white px-3 py-3 text-center">
                 <div className="relative mx-auto w-fit rounded-lg bg-white">
                   <QRCodeSVG
                     value={shareUrl}
@@ -695,7 +661,7 @@ export function SilverNeighborhoodCampaignPage() {
             </div>
           </div>
         ) : (
-          <p className="rounded-[14px] bg-slate-50 p-3 text-[13px] leading-6 text-slate-500">
+          <p className="rounded-xl bg-slate-50 p-3 text-[13px] leading-6 text-slate-500">
             当前没有可用的邀请码（团队可能已满员、已锁定或你尚未参与）。邀请入口已关闭，请刷新参与状态。
           </p>
         )}
@@ -707,13 +673,13 @@ export function SilverNeighborhoodCampaignPage() {
         eyebrow="签到任务 · 团队奖励"
         onClose={() => setActiveSheet(null)}
       >
-        <div className="rounded-[16px] bg-[#f2faf6] p-4">
+        <div className="rounded-2xl bg-[#f2faf6] p-4">
           <p className="text-[15px] font-bold text-slate-800">解锁条件</p>
           <p className="mt-1">
             三人团坐满 3 人，且三位团员各有一次经现场核验的有效签到后，团队解锁一份奖励。
           </p>
         </div>
-        <dl className="mt-3 divide-y divide-slate-100 rounded-[16px] border border-slate-100 bg-white px-4">
+        <dl className="mt-3 divide-y divide-slate-100 rounded-2xl border border-slate-100 bg-white px-4">
           {rewardReady?.reward?.reward ? (
             <>
               <div className="flex justify-between gap-4 py-3">
@@ -789,7 +755,7 @@ export function SilverNeighborhoodCampaignPage() {
         footer={
           <Link
             to="/me/rewards"
-            className="flex min-h-[48px] w-full items-center justify-center rounded-[14px] bg-teal-700 px-4 text-[14px] font-bold text-white"
+            className="flex min-h-[48px] w-full items-center justify-center rounded-xl bg-teal-700 px-4 text-[14px] font-bold text-white"
           >
             查看全部活动奖励
           </Link>
@@ -797,7 +763,7 @@ export function SilverNeighborhoodCampaignPage() {
       >
         {rewardReady?.reward ? (
           <div className="grid gap-3">
-            <div className="rounded-[16px] border border-slate-100 bg-white p-4">
+            <div className="rounded-2xl border border-slate-100 bg-white p-4">
               <div className="flex items-start justify-between gap-3">
                 <p className="min-w-0 break-words font-bold text-slate-800">
                   {rewardReady.reward.reward?.prizeName ?? '本活动团队奖励'}
@@ -814,7 +780,7 @@ export function SilverNeighborhoodCampaignPage() {
                 {rewardBucketDetail(rewardReady.reward)}
               </p>
               {rewardReady.reward.credential ? (
-                <p className="mt-2 rounded-[12px] bg-[#f4f9f6] px-3 py-2 font-mono text-[13px] font-semibold text-[#225c4c]">
+                <p className="mt-2 rounded-xl bg-[#f4f9f6] px-3 py-2 font-mono text-[13px] font-semibold text-[#225c4c]">
                   凭据 {rewardReady.reward.credential.maskedCode}
                 </p>
               ) : null}
@@ -830,7 +796,7 @@ export function SilverNeighborhoodCampaignPage() {
                 </p>
               ) : null}
             </div>
-            <div className="rounded-[16px] border border-slate-100 bg-white p-4">
+            <div className="rounded-2xl border border-slate-100 bg-white p-4">
               <div className="flex items-center justify-between gap-3">
                 <p className="font-bold text-slate-800">团队进度</p>
                 <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500">
@@ -844,7 +810,7 @@ export function SilverNeighborhoodCampaignPage() {
             </div>
           </div>
         ) : (
-          <div className="rounded-[16px] border border-slate-100 bg-white p-4">
+          <div className="rounded-2xl border border-slate-100 bg-white p-4">
             <p className="font-bold text-slate-800">本活动暂无奖励记录</p>
             <p className="mt-1 text-[12px] leading-5 text-slate-500">
               {rewardProgress.state.status === 'ready'

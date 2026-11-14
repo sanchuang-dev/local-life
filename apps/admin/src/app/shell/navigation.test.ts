@@ -37,17 +37,17 @@ describe('filterNavigation', () => {
     expect(groups[0]?.pages.map((page) => page.label)).toEqual([
       '管理员与权限',
       '系统信息',
-      '微信公众号',
-      '腾讯地图',
+      '第三方配置',
       '界面组件',
     ])
   })
 
-  it('matches the top-level workbench item separately', () => {
+  it('searches the workbench and the independently named reconciliation page', () => {
     const { showHome, groups } = filterNavigation('经营')
 
     expect(showHome).toBe(true)
-    expect(groups).toEqual([])
+    expect(groups.map((group) => group.key)).toEqual(['performance'])
+    expect(groups[0]?.pages.map((page) => page.key)).toEqual(['/reconciliation'])
   })
 
   it('trims the query and matches a label fragment', () => {
@@ -149,7 +149,7 @@ describe('platform user directory navigation', () => {
     const communities = findNavPage('/communities')
     expect(communities?.status).toBe('ready')
     expect(communities?.label).toBe('社区管理')
-    expect(communities?.description).toContain('后台账户')
+    expect(communities?.description).toContain('关联系统中已有')
     expect(communities?.description).not.toContain('居民列表')
     expect(activeMenuKey('/communities')).toBe('/communities')
     // The user directory is a sibling destination, not a tab inside 社区管理.
@@ -159,7 +159,7 @@ describe('platform user directory navigation', () => {
 
 describe('performance and reconciliation navigation', () => {
   it('marks both ledger pages as ready with no planned leftovers', () => {
-    for (const key of ['/performance', '/settlements']) {
+    for (const key of ['/performance', '/reconciliation', '/settlements']) {
       const page = findNavPage(key)
       expect(page, `${key} must exist in the navigation model`).toBeTruthy()
       expect(page?.status).toBe('ready')
@@ -168,6 +168,7 @@ describe('performance and reconciliation navigation', () => {
     }
     expect(groupForPage('/performance')?.label).toBe('业绩与对账')
     expect(groupForPage('/settlements')?.label).toBe('业绩与对账')
+    expect(groupForPage('/reconciliation')?.label).toBe('业绩与对账')
   })
 
   it('stops calling the ledger an unimplemented module', () => {
@@ -177,18 +178,22 @@ describe('performance and reconciliation navigation', () => {
     // page must not keep advertising a plan as if the page were still pending.
     expect(performance?.description).toContain('账面')
     expect(performance?.description).not.toContain('待建设')
-    expect(settlements?.description).toContain('对账批次')
-    expect(settlements?.description).toContain('CSV')
+    const reconciliation = findNavPage('/reconciliation')
+    expect(reconciliation?.description).toContain('对账批次')
+    expect(reconciliation?.description).toContain('CSV')
+    expect(settlements?.label).toBe('分成结算')
+    expect(settlements?.description).toContain('合同规则')
     // Nothing in this group may still render the shared 待建设 state.
     const plannedKeys = NAV_GROUPS.flatMap((group) => group.pages)
       .filter((page) => page.status === 'planned')
       .map((page) => page.key)
     expect(plannedKeys).not.toContain('/performance')
     expect(plannedKeys).not.toContain('/settlements')
+    expect(plannedKeys).not.toContain('/reconciliation')
   })
 
   it('hides the ledger pages from grid workers but keeps them for staff who can operate', () => {
-    for (const key of ['/performance', '/settlements']) {
+    for (const key of ['/performance', '/reconciliation', '/settlements']) {
       const page = findNavPage(key)
       expect(page).toBeTruthy()
       expect(isPageVisible(page!, 'grid_worker')).toBe(false)
@@ -209,49 +214,33 @@ describe('performance and reconciliation navigation', () => {
     )
     expect(operatorKeys).toContain('/performance')
     expect(operatorKeys).toContain('/settlements')
+    expect(operatorKeys).toContain('/reconciliation')
   })
 })
 
-describe('WeChat public-account navigation', () => {
-  it('registers /system/wechat as a ready admin-only page inside 系统管理', () => {
-    const page = findNavPage('/system/wechat')
-
-    expect(page).toBeTruthy()
+describe('unified third-party configuration navigation', () => {
+  it('has one real administrator-only entry for WeChat and Tencent Map', () => {
+    const page = findNavPage('/system/integrations')
     expect(page?.status).toBe('ready')
+    expect(page?.label).toBe('第三方配置')
     expect(page?.planned).toEqual([])
-    expect(page?.label).toBe('微信公众号')
+    expect(page?.description).toContain('微信公众号')
+    expect(page?.description).toContain('腾讯地图')
     expect(page?.roles).toEqual(['admin'])
-    // The description must state the real capability, not a vague placeholder.
-    expect(page?.description).toContain('加密保存')
-    expect(page?.description).toContain('测试连接')
-    expect(groupForPage('/system/wechat')?.label).toBe('系统管理')
-    expect(activeMenuKey('/system/wechat')).toBe('/system/wechat')
-  })
-
-  it('hides the WeChat settings from operators and grid workers', () => {
-    const page = findNavPage('/system/wechat')
-    expect(page).toBeTruthy()
-    expect(isPageVisible(page!, 'admin')).toBe(true)
-    expect(isPageVisible(page!, 'operator')).toBe(false)
-    expect(isPageVisible(page!, 'grid_worker')).toBe(false)
-    // No role means "not yet known"; the sidebar must not hide it early.
-    expect(isPageVisible(page!)).toBe(true)
-
-    const keysFor = (role: 'admin' | 'operator' | 'grid_worker') =>
-      filterNavigation('', role).groups.flatMap((group) => group.pages.map((item) => item.key))
-
-    expect(keysFor('admin')).toContain('/system/wechat')
-    expect(keysFor('operator')).not.toContain('/system/wechat')
-    expect(keysFor('grid_worker')).not.toContain('/system/wechat')
-
-    // Label search still respects the role filter.
-    expect(
-      filterNavigation('公众号', 'admin').groups.flatMap((group) =>
-        group.pages.map((item) => item.key),
-      ),
-    ).toContain('/system/wechat')
-    expect(filterNavigation('公众号', 'operator').groups).toEqual([])
-    expect(filterNavigation('公众号', 'grid_worker').groups).toEqual([])
+    expect(groupForPage('/system/integrations')?.label).toBe('系统管理')
+    expect(activeMenuKey('/system/integrations')).toBe('/system/integrations')
+    const pages = NAV_GROUPS.flatMap((group) => group.pages)
+    expect(pages.map((item) => item.key)).not.toContain('/system/wechat')
+    expect(pages.map((item) => item.key)).not.toContain('/system/tencent-map')
+    for (const role of ['operator', 'grid_worker'] as const) {
+      expect(isPageVisible(page!, role)).toBe(false)
+      expect(filterNavigation('', role).groups.flatMap((group) => group.pages.map((item) => item.key)))
+        .not.toContain('/system/integrations')
+    }
+    expect(filterNavigation('', 'admin').groups.flatMap((group) => group.pages.map((item) => item.key)))
+      .toContain('/system/integrations')
+    expect(filterNavigation('第三方', 'admin').groups[0]?.pages.map((item) => item.key))
+      .toContain('/system/integrations')
   })
 })
 
@@ -277,5 +266,18 @@ describe('activeMenuKey', () => {
   it('resolves the owning group for a page', () => {
     expect(groupForPage('/customers')?.label).toBe('客户与网格')
     expect(groupForPage('/')).toBeUndefined()
+  })
+})
+
+describe('system access boundary', () => {
+  it('offers the real access page only to platform admins', () => {
+    const page = findNavPage('/system/access')
+    expect(page?.status).toBe('ready')
+    expect(page?.roles).toEqual(['admin'])
+    expect(page?.planned).toEqual([])
+    expect(groupForPage('/system/access')?.label).toBe('系统管理')
+    expect(activeMenuKey('/system/access')).toBe('/system/access')
+    expect(filterNavigation('', 'admin').groups.flatMap((group) => group.pages.map((item) => item.key))).toContain('/system/access')
+    expect(filterNavigation('', 'operator').groups.flatMap((group) => group.pages.map((item) => item.key))).not.toContain('/system/access')
   })
 })

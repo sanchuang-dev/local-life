@@ -74,7 +74,7 @@ function TeamOptionChoice({
 }) {
   return (
     <label
-      className={`flex items-start gap-2.5 rounded-[12px] border px-3 py-2.5 transition-colors ${
+      className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 transition-colors ${
         checked
           ? 'border-teal-300 bg-[#eef7f2]'
           : 'border-slate-200 bg-white hover:border-teal-200'
@@ -323,10 +323,10 @@ export function LocalProductPage() {
       {state.status === 'error' ? (
         <section
           role="alert"
-          className="mt-4 rounded-[20px] border border-rose-100 bg-white px-5 py-8 text-center shadow-sm"
+          className="mt-4 rounded-2xl border border-rose-100 bg-white px-5 py-8 text-center shadow-sm"
         >
           <span
-            className="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-rose-50 text-rose-500"
+            className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-500"
             aria-hidden="true"
           >
             <AlertTriangle size={26} strokeWidth={1.6} />
@@ -364,7 +364,7 @@ export function LocalProductPage() {
 
       {product ? (
         <>
-          <article className="mt-4 overflow-hidden rounded-[20px] border border-slate-100 bg-white shadow-sm">
+          <article className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
             {product.imageUrl ? (
               <img
                 src={product.imageUrl}
@@ -412,7 +412,7 @@ export function LocalProductPage() {
           </article>
 
           {product.description ? (
-            <section className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+            <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
               <h2 className="text-[15px] font-semibold text-slate-800">商品说明</h2>
               <p className="mt-2 whitespace-pre-line break-words text-[12px] leading-6 text-slate-500">
                 {product.description}
@@ -421,7 +421,7 @@ export function LocalProductPage() {
           ) : null}
 
           <section
-            className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm"
+            className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
             aria-labelledby="local-register-heading"
           >
             <h2 id="local-register-heading" className="text-[15px] font-semibold text-slate-800">
@@ -431,7 +431,7 @@ export function LocalProductPage() {
               只登记办理意向，平台不收款、不代下单；工作人员会按登记信息联系你。
             </p>
 
-            <div className="mt-3 flex items-center justify-between gap-3 rounded-[14px] bg-[#f4f8f6] px-3.5 py-2.5">
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-[#f4f8f6] px-3.5 py-2.5">
               <span className="text-[12px] font-medium text-slate-600">数量</span>
               <div className="flex items-center gap-2">
                 <button
@@ -461,7 +461,7 @@ export function LocalProductPage() {
               </div>
             </div>
 
-            <div className="mt-3 rounded-[14px] bg-[#f4f8f6] px-3.5 py-3">
+            <div className="mt-3 rounded-xl bg-[#f4f8f6] px-3.5 py-3">
               <dl className="space-y-1.5">
                 {previewAmounts.map((line) => (
                   <div
@@ -491,7 +491,7 @@ export function LocalProductPage() {
             </div>
 
             {session && !registeredOrder ? (
-              <div className="mt-3 rounded-[14px] border border-slate-200 bg-[#f8faf9] px-3.5 py-3">
+              <div className="mt-3 rounded-xl border border-slate-200 bg-[#f8faf9] px-3.5 py-3">
                 <p className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-700">
                   <Ticket size={14} className="shrink-0 text-teal-700" aria-hidden="true" />
                   消费券（不使用 / 选一张）
@@ -544,7 +544,7 @@ export function LocalProductPage() {
                     <fieldset className="mt-2 space-y-2">
                       <legend className="sr-only">选择本单使用的消费券</legend>
                       <label
-                        className={`flex items-start gap-2.5 rounded-[12px] border px-3 py-2.5 transition-colors ${
+                        className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 transition-colors ${
                           selectedCouponId === null
                             ? 'border-teal-300 bg-[#eef7f2]'
                             : 'border-slate-200 bg-white hover:border-teal-200'
@@ -572,7 +572,7 @@ export function LocalProductPage() {
                       {couponOptions.map((option) => (
                         <label
                           key={option.coupon.id}
-                          className={`flex items-start gap-2.5 rounded-[12px] border px-3 py-2.5 transition-colors ${
+                          className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 transition-colors ${
                             selectedCouponId === option.coupon.id && option.usable
                               ? 'border-teal-300 bg-[#eef7f2]'
                               : 'border-slate-200 bg-white hover:border-teal-200'
@@ -626,7 +626,7 @@ export function LocalProductPage() {
               </div>
             ) : null}
 
-            <div className="mt-3 rounded-[14px] border border-slate-200 bg-[#f8faf9] px-3.5 py-3">
+            <div className="mt-3 rounded-xl border border-slate-200 bg-[#f8faf9] px-3.5 py-3">
               <p className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-700">
                 <UsersRound size={14} className="shrink-0 text-teal-700" aria-hidden="true" />
                 消费团归属
@@ -695,7 +695,7 @@ export function LocalProductPage() {
                       <p className="mt-1.5 text-[11px] leading-5 text-slate-500">
                         你当前只有一个符合条件的消费团，已自动选中；本单将计入该团，提交后不能转团。
                       </p>
-                      <div className="mt-2 flex items-start gap-2 rounded-[12px] border border-teal-200 bg-[#eef7f2] px-3 py-2.5">
+                      <div className="mt-2 flex items-start gap-2 rounded-xl border border-teal-200 bg-[#eef7f2] px-3 py-2.5">
                         <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-[#388b77]" aria-hidden="true" />
                         <div className="min-w-0">
                           <p className="break-words text-[12px] font-semibold leading-5 text-[#225c4c]">
@@ -731,7 +731,7 @@ export function LocalProductPage() {
                   ) : null}
 
                   {attempt ? (
-                    <div className="mt-2 rounded-[10px] border border-slate-200 bg-white px-2.5 py-2">
+                    <div className="mt-2 rounded-lg border border-slate-200 bg-white px-2.5 py-2">
                       <p className="flex items-start gap-1.5 text-[10px] leading-4 text-slate-500">
                         <LockKeyhole size={12} className="mt-0.5 shrink-0" aria-hidden="true" />
                         本次重试会沿用原消费团归属、消费券与幂等键，不会切换归属或重复占券。
@@ -771,13 +771,13 @@ export function LocalProductPage() {
               disabled={!session || inputsLocked}
               onChange={(event) => setNote(event.target.value)}
               placeholder="例如：希望周末到社区服务点自提"
-              className="mt-1.5 w-full rounded-[14px] border border-slate-200 px-3 py-2.5 text-[13px] leading-5 text-slate-700 outline-none focus-visible:border-teal-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 disabled:bg-slate-50"
+              className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-[13px] leading-5 text-slate-700 outline-none focus-visible:border-teal-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 disabled:bg-slate-50"
             />
 
             {registeredOrder ? (
               <div
                 role="status"
-                className="mt-3 rounded-[14px] border border-teal-200 bg-[#eef7f2] px-3.5 py-3"
+                className="mt-3 rounded-xl border border-teal-200 bg-[#eef7f2] px-3.5 py-3"
               >
                 <p className="flex items-center gap-1.5 text-[13px] font-semibold text-[#225c4c]">
                   <CheckCircle2 size={15} className="shrink-0" aria-hidden="true" />
@@ -821,7 +821,7 @@ export function LocalProductPage() {
             ) : null}
 
             {submitError ? (
-              <p role="alert" className="mt-3 break-words rounded-[12px] bg-rose-50 px-3 py-2.5 text-[12px] leading-5 text-rose-700">
+              <p role="alert" className="mt-3 break-words rounded-xl bg-rose-50 px-3 py-2.5 text-[12px] leading-5 text-rose-700">
                 {submitError}
               </p>
             ) : null}
@@ -849,7 +849,7 @@ export function LocalProductPage() {
             ) : null}
 
             {unavailableAction ? (
-              <div className="mt-3 rounded-[14px] border border-[#f2dcc0] bg-[#fff7ec] px-3.5 py-3">
+              <div className="mt-3 rounded-xl border border-[#f2dcc0] bg-[#fff7ec] px-3.5 py-3">
                 <p className="text-[12px] font-semibold text-[#8a6132]">{unavailableAction}</p>
                 <p className="mt-1 text-[11px] leading-5 text-[#8a6132]/90">
                   登记订单会写入你的居民账户，因此需要先登录；浏览商品不需要登录。

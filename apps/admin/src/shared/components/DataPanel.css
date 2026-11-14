@@ -10,6 +10,150 @@
   border-radius: 8px;
 }
 
+/*
+ * The panel owns a single toolbar / body / footer structure. The footer
+ * stays outside any Table or Spin scroller and includes the only paginator.
+ * Opt-in fill uses the available shell height, never viewport offset math.
+ */
+.data-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.data-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+.data-panel-footer {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  border-top: 1px solid #eef4f1;
+  padding: 12px 16px;
+}
+
+.data-panel-footer .ant-pagination {
+  margin: 0;
+}
+
+@media (min-width: 701px) and (min-height: 560px) {
+  .app-content > .page:has(.data-panel--fill) {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+
+  /* A long report's summary may exceed the viewport before its list begins.
+     Let the report page scroll while giving the nested DataPanel a real,
+     bounded body so the table and pinned footer remain usable. */
+  .app-content > .page.page--long-report {
+    height: auto;
+    min-height: 100%;
+  }
+
+  .app-content > .page:has(.data-panel--fill) > .page-stack {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  /* A list may sit inside .page-stack (activities) or directly inside
+     .page (users). Both layouts must give the panel a bounded flex height;
+     without this, its overflow:hidden clips rows and the pinned footer. */
+  .page-stack > .data-panel--fill,
+  .app-content > .page > .data-panel--fill {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  /* CRM's keep-alive tabs are nested in AntD Space wrappers. Every
+     intermediate element has to pass remaining height to the table. */
+  .page-stack > .crm-subview:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .crm-subview:not([hidden]) > .crm-list-layout {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .crm-list-layout > .ant-space-item:has(> .data-panel--fill) {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .crm-list-layout > .ant-space-item > .data-panel--fill {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .page--long-report .data-panel--fill {
+    flex: 0 0 auto;
+    height: min(65dvh, 640px);
+    min-height: 340px;
+  }
+
+  .data-panel--fill .data-panel-toolbar-row {
+    flex: 0 0 auto;
+  }
+
+  .data-panel--fill .data-panel-body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .data-panel--fill .data-panel-body > .ant-table-wrapper,
+  /* Ant Design 6 wraps Table in .ant-spin, not .ant-spin-nested-loading.
+     Every wrapper must be shrinkable, or rows clip beneath the footer. */
+  .data-panel--fill .data-panel-body > .ant-spin,
+  .data-panel--fill .data-panel-body .ant-table-wrapper > .ant-spin,
+  .data-panel--fill .data-panel-body .ant-table-wrapper .ant-spin-container,
+  .data-panel--fill .data-panel-body .ant-table-wrapper .ant-table,
+  .data-panel--fill .data-panel-body .ant-table-wrapper .ant-table-container {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .data-panel--fill .data-panel-body .ant-table-header {
+    flex: 0 0 auto;
+  }
+
+  .data-panel--fill .data-panel-body .ant-table-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto !important;
+  }
+
+  .data-panel--fill .data-panel-cards {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    align-content: start;
+  }
+}
+
+/* Keep native page scrolling on narrow or short screens: the tool/filter
+   chrome needs space and must not collapse the data viewport to nothing. */
+@media (max-width: 700px), (max-height: 559px) {
+  .data-panel--fill .ant-table-wrapper .ant-table-body {
+    max-height: none !important;
+    overflow-y: visible !important;
+  }
+}
+
 /* Filters and page-level actions share one row; actions stay at the right edge
    even when the filters wrap on narrow screens. */
 .panel-toolbar-row {
@@ -185,13 +329,11 @@
   padding: 12px;
 }
 
-.data-panel-pagination {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0 16px 16px;
-}
-
 @media (max-width: 700px) {
+  .data-panel-footer {
+    padding: 12px;
+  }
+
   .data-panel-toolbar-row {
     padding: 12px;
     align-items: stretch;

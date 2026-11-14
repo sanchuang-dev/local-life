@@ -1,3 +1,4 @@
+import { PageInfoAlert } from '../components/PageInfoHelp'
 import {
   Alert,
   App as AntdApp,
@@ -328,7 +329,6 @@ function CheckinConsole({ session }: { session: AuthenticatedSession }) {
       <PageHeader
         title="报名与核销"
         description="真实签到核验、团队奖励资格、奖品库存与预算、一次性核销凭据与追加式争议审计。奖励计划来自发布时冻结的规则版本。"
-        status={<Tag color="green">真实数据</Tag>}
       />
 
       <div className="page-stack">
@@ -964,7 +964,7 @@ function ExceptionPanel({
 
   return (
     <Space orientation="vertical" size={16} style={{ width: '100%' }}>
-      <Alert
+      <PageInfoAlert
         type="info"
         showIcon
         title="争议与撤销都是追加式记录"

@@ -37,7 +37,7 @@ import {
 import './wechat.css'
 
 /**
- * 系统管理 → 微信公众号 (#113 T4).
+ * 系统管理 → 第三方配置 → 微信公众号 (#113 T4).
  *
  * The page consumes the frozen admin contract only:
  *

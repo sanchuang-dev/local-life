@@ -308,6 +308,7 @@ describe('UsersPage real directory read', () => {
 
     expect(await screen.findByRole('heading', { name: '用户管理' })).toBeTruthy()
     expect(await screen.findByText('微信花花')).toBeTruthy()
+    expect(screen.getByRole('region', { name: '平台用户目录' }).className).toContain('data-panel--fill')
     expect(screen.getByText('本地：本地花花')).toBeTruthy()
     expect(screen.getByText('未命名用户')).toBeTruthy()
     // The server page/total is displayed, never a locally paginated copy.

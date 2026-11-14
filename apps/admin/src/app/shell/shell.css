@@ -247,6 +247,38 @@
   line-height: 1.4 !important;
 }
 
+/* One quiet, keyboard-accessible help icon beside the page title. */
+.page-info-trigger.ant-btn {
+  color: #81938b;
+  border-radius: 50%;
+  font-size: 15px;
+}
+.page-info-trigger.ant-btn:hover,
+.page-info-trigger.ant-btn:focus-visible {
+  color: #116d63;
+  background: #e8f6f0;
+}
+.page-info-tooltip-content {
+  max-height: min(60vh, 440px);
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.page-info-tooltip-entry + .page-info-tooltip-entry {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.22);
+}
+.page-info-tooltip-description {
+  margin-top: 3px;
+}
+.page-info-tooltip-content .ant-typography {
+  color: inherit;
+}
+.page-info-tooltip-description p {
+  margin: 2px 0;
+}
+
 .page-header-description {
   display: block;
   margin-top: 2px;

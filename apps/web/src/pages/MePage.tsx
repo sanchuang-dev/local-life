@@ -62,7 +62,6 @@ export function MePage() {
     ? auth.wechatProfile.nickname : null
   const avatarUrl = auth.wechatProfile?.available && auth.wechatProfile.authorized
     ? auth.wechatProfile.avatarUrl : null
-  const activityHref = activity ? '/?activityId=' + encodeURIComponent(activity.id) : '/'
 
   const communityState = residentCommunity.state
   const communityData = communityState.status === 'ready' ? communityState.data : null
@@ -86,7 +85,7 @@ export function MePage() {
   const services = [
     { key: 'orders', icon: ClipboardList, label: '我的订单', desc: '本地商品登记与处理进度', to: '/me/orders', tone: 'orange' },
     { key: 'rewards', icon: Gift, label: '我的奖励', desc: '领取、核销与奖励记录', to: '/me/rewards', tone: 'pink' },
-    { key: 'activity', icon: CalendarCheck2, label: '社区活动', desc: activity ? activity.title : '查看当前发布的活动', to: activityHref, tone: 'mint' },
+    { key: 'activity', icon: CalendarCheck2, label: '社区活动', desc: '查看社区活动列表', to: '/', tone: 'mint' },
   ]
 
   return (

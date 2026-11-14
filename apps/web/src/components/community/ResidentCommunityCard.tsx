@@ -209,7 +209,7 @@ export function ResidentCommunityCard({
 
       {data.status === 'unbound' && confirmHref && data.canConfirm ? (
         <>
-          <Link to={confirmHref} className={`${primaryButton} mt-3`}>
+          <Link to={confirmHref} state={{ from: '/me/community' }} className={`${primaryButton} mt-3`}>
             绑定为常驻社区
           </Link>
           <p className="mt-2 text-[11px] leading-5 text-[#5b6c67]">

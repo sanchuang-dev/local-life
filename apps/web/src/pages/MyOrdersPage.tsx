@@ -3,6 +3,8 @@ import { Link } from 'react-router'
 import { ClipboardList, RefreshCw } from 'lucide-react'
 import type { LocalOrderStatus, LocalOrderSummary } from '@sanchuang-dev/local-life-contracts'
 import { PageHeader } from '../components/PageHeader'
+import { ActivityArtwork } from '../components/activity/ActivityArtwork'
+import { EmptyState } from '../components/common/EmptyState'
 import { FilterChipRow } from '../components/crm/FilterChips'
 import {
   formatLocalDateTime,
@@ -37,11 +39,11 @@ function OrderRow({ order, from }: { order: LocalOrderSummary; from: string }) {
       <Link
         to={`/me/orders/${order.id}`}
         state={{ from }}
-        className="block rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+        className="block rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
       >
         <div className="flex items-start gap-3">
           <span
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[#eef7f2] text-[#388b77]"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#eef7f2] text-[#388b77]"
             aria-hidden="true"
           >
             <ClipboardList size={20} strokeWidth={1.8} />
@@ -111,7 +113,7 @@ export function MyOrdersPage() {
       />
 
       <section
-        className="mt-4 rounded-[18px] border border-teal-200/70 bg-[#eef7f2] px-3.5 py-3"
+        className="mt-4 rounded-2xl border border-teal-200/70 bg-[#eef7f2] px-3.5 py-3"
         aria-label="订单说明"
       >
         <p className="text-[12px] font-bold text-[#225c4c]">商品办理登记</p>
@@ -163,7 +165,7 @@ export function MyOrdersPage() {
       ) : null}
 
       {state.status === 'unauthenticated' ? (
-        <section className="mt-4 rounded-[18px] bg-white p-4">
+        <section className="mt-4 rounded-2xl bg-white p-4">
           <p className="text-[13px] font-medium text-slate-700">登录状态已失效，请重新登录。</p>
           <Link to={buildResidentLoginHref('/me/orders', { activityId: null, inviteCode: null, inviteInvalid: false })}
             className="mt-3 inline-flex min-h-[44px] items-center rounded-xl bg-teal-700 px-4 text-[13px] font-semibold text-white">
@@ -173,7 +175,7 @@ export function MyOrdersPage() {
       ) : null}
 
       {state.status === 'error' ? (
-        <section className="mt-4 rounded-[18px] border border-rose-100 bg-white p-4 shadow-sm">
+        <section className="mt-4 rounded-2xl border border-rose-100 bg-white p-4 shadow-sm">
           <p className="text-[13px] font-bold text-rose-700">我的订单读取失败</p>
           <p className="mt-1 break-words text-[12px] leading-5 text-slate-500">{state.message}</p>
           <button
@@ -188,33 +190,22 @@ export function MyOrdersPage() {
       ) : null}
 
       {state.status === 'empty' ? (
-        <section className="mt-4 rounded-[18px] border border-dashed border-slate-200 bg-white px-5 py-8 text-center">
-          <p className="text-[14px] font-semibold text-slate-700">
-            {status ? '当前筛选下没有订单' : '还没有登记过订单'}
-          </p>
-          <p className="mx-auto mt-1.5 max-w-[280px] text-[12px] leading-5 text-slate-400">
-            {status
-              ? '可以切换订单状态筛选，或选择「全部」查看已登记的全部订单。'
-              : '在「惠生活」的商品详情页可以登记订单、提交办理意向。'}
-          </p>
-          {status ? (
+        <EmptyState
+          layout="centered"
+          className="mt-4"
+          illustration={<ActivityArtwork variant="page" />}
+          title={status ? '当前筛选下没有订单' : '还没有登记过订单'}
+          description={status ? '可以切换订单状态筛选，或查看全部订单。' : '登记后的订单与处理进度将在这里显示。'}
+          action={status ? (
             <button
               type="button"
               onClick={() => setStatus('')}
-              className="mt-3 inline-flex min-h-[44px] items-center rounded-xl border border-slate-200 px-4 text-[13px] font-semibold text-slate-600"
+              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 px-4 text-[13px] font-semibold text-slate-600"
             >
               查看全部订单
             </button>
-          ) : (
-            <Link
-              to="/life"
-              state={{ from }}
-              className="mt-3 inline-flex min-h-[44px] items-center rounded-xl bg-teal-700 px-4 text-[13px] font-semibold text-white"
-            >
-              去惠生活看看本地商品
-            </Link>
-          )}
-        </section>
+          ) : undefined}
+        />
       ) : null}
 
       {state.status === 'ready' ? (

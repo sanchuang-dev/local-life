@@ -22,7 +22,7 @@ export function ServiceEntryGrid({ entries, onPending }: ServiceEntryGridProps) 
         const content = (
           <>
             <span
-              className={`flex h-[52px] w-[52px] items-center justify-center rounded-[18px] ${toneClasses[tone]}`}
+              className={`flex h-[52px] w-[52px] items-center justify-center rounded-2xl ${toneClasses[tone]}`}
               aria-hidden="true"
             >
               <Icon size={23} strokeWidth={1.65} />

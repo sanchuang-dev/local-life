@@ -36,10 +36,10 @@ export function CommunitySceneCards({ scenes }: CommunitySceneCardsProps) {
               key={id}
               to={to}
               state={{ from: '/community' }}
-              className="flex items-center gap-3.5 rounded-[20px] border border-slate-100 bg-white p-3.5 text-left shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+              className="flex items-center gap-3.5 rounded-2xl border border-slate-100 bg-white p-3.5 text-left shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
             >
               <span
-                className={`flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-[18px] ${style.cover}`}
+                className={`flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-2xl ${style.cover}`}
                 aria-hidden="true"
               >
                 <Icon size={32} strokeWidth={1.5} className={style.icon} />

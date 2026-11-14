@@ -1,3 +1,4 @@
+import { PageInfoAlert } from '../components/PageInfoHelp'
 import { Alert, App as AntdApp, Segmented, Space, Tag, Typography } from 'antd'
 import { useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader'
@@ -195,7 +196,6 @@ export function ComponentPreviewPage() {
       <PageHeader
         title="界面组件验收"
         description="DataPanel 通用数据面板的开发预览：行内筛选、可折叠条件、高级检索弹窗、服务端排序/分页契约、列配置、密度与表格/卡片视图。"
-        status={<Tag color="gold">开发预览</Tag>}
         extra={
           <Space size={8}>
             <Typography.Text type="secondary">组件状态</Typography.Text>
@@ -266,7 +266,7 @@ export function ComponentPreviewPage() {
           ]}
         />
 
-        <Alert
+        <PageInfoAlert
           type="info"
           showIcon
           title="本卡的能力边界"

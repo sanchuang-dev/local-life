@@ -29,7 +29,7 @@ export function HomePage() {
     <div className="pb-6">
       <HomeBanner banner={homeBanner} />
 
-      <section className="relative z-[1] mx-4 -mt-[49px] rounded-[20px] border border-slate-100 bg-white px-4 pb-5 pt-5 shadow-[0_12px_36px_rgba(15,52,44,0.08)]">
+      <section className="relative z-[1] mx-4 -mt-[49px] rounded-2xl border border-slate-100 bg-white px-4 pb-5 pt-5 shadow-[0_12px_36px_rgba(15,52,44,0.08)]">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-[16px] font-semibold text-slate-800">常用服务</h2>
           <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-medium text-slate-400">
@@ -45,7 +45,7 @@ export function HomePage() {
 
       <section className="mx-4 mt-7">
         <SectionHeading title="更多服务" note="示例配置" />
-        <div className="rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <ServiceEntryGrid entries={homeMoreServices} onPending={show} />
         </div>
       </section>
@@ -63,7 +63,7 @@ export function HomePage() {
 
       <HomeLifeProductSection />
 
-      <div className="mx-4 mt-7 flex gap-3 rounded-[16px] border border-dashed border-teal-300/70 bg-[#eef7f2] p-4 text-[#52786c]">
+      <div className="mx-4 mt-7 flex gap-3 rounded-2xl border border-dashed border-teal-300/70 bg-[#eef7f2] p-4 text-[#52786c]">
         <CircleHelp size={19} className="mt-0.5 shrink-0" aria-hidden="true" />
         <div>
           <p className="text-[12px] font-semibold">演示内容 · 未接入真实服务</p>

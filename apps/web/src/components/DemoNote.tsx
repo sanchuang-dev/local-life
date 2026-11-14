@@ -28,7 +28,7 @@ export function DemoNote({ children, tone = 'info' }: DemoNoteProps) {
   const { box, icon, Icon } = toneStyles[tone]
 
   return (
-    <div className={`mt-4 flex items-start gap-2.5 rounded-[16px] border px-3.5 py-3 text-[12px] leading-5 ${box}`}>
+    <div className={`mt-4 flex items-start gap-2.5 rounded-2xl border px-3.5 py-3 text-[12px] leading-5 ${box}`}>
       <Icon size={16} className={`mt-0.5 shrink-0 ${icon}`} aria-hidden="true" />
       <p className="min-w-0 flex-1">{children}</p>
     </div>

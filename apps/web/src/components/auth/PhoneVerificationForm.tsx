@@ -63,7 +63,7 @@ export function PhoneVerificationForm({
 
   if (!configured) {
     return (
-      <div className="mt-3 rounded-[14px] border border-dashed border-slate-200 bg-slate-50 p-3">
+      <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3">
         <p className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-600">
           <Smartphone size={14} aria-hidden="true" />
           手机号验证码登录
@@ -132,7 +132,7 @@ export function PhoneVerificationForm({
   }
 
   return (
-    <section className="mt-3 rounded-[16px] border border-slate-200 bg-white p-3.5">
+    <section className="mt-3 rounded-2xl border border-slate-200 bg-white p-3.5">
       <p className="flex items-center gap-1.5 text-[13px] font-semibold text-slate-700">
         <Smartphone size={15} className="text-[#388b77]" aria-hidden="true" />
         {title}
@@ -166,13 +166,13 @@ export function PhoneVerificationForm({
               setError(null)
             }}
             placeholder="例如 13800138000"
-            className="min-h-[44px] w-full rounded-[12px] border border-slate-200 bg-slate-50 px-3 text-[13px] text-slate-800 outline-none focus:border-teal-400 focus:bg-white disabled:opacity-60"
+            className="min-h-[44px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-[13px] text-slate-800 outline-none focus:border-teal-400 focus:bg-white disabled:opacity-60"
           />
           <button
             type="button"
             onClick={() => void sendCode()}
             disabled={busy || countdown > 0 || !normalized}
-            className="min-h-[44px] shrink-0 rounded-[12px] border border-teal-200 bg-white px-3 text-[12px] font-semibold text-teal-700 disabled:opacity-50"
+            className="min-h-[44px] shrink-0 rounded-xl border border-teal-200 bg-white px-3 text-[12px] font-semibold text-teal-700 disabled:opacity-50"
           >
             {countdown > 0 ? `${countdown} 秒后重试` : sentTo ? '重新获取' : '获取验证码'}
           </button>
@@ -197,7 +197,7 @@ export function PhoneVerificationForm({
                 setError(null)
               }}
               placeholder="000000"
-              className="mt-1 min-h-[44px] w-full rounded-[12px] border border-slate-200 bg-slate-50 px-3 text-[13px] tracking-[0.3em] text-slate-800 outline-none focus:border-teal-400 focus:bg-white disabled:opacity-60"
+              className="mt-1 min-h-[44px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-[13px] tracking-[0.3em] text-slate-800 outline-none focus:border-teal-400 focus:bg-white disabled:opacity-60"
             />
           </div>
         ) : null}

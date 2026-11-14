@@ -1,6 +1,22 @@
 @import "tailwindcss";
 
+@theme {
+  /* Compact H5 radius scale; Tailwind rounded-* and CSS semantic tokens agree. */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+  --radius-2xl: 10px;
+  --radius-3xl: 12px;
+}
+
 :root {
+  /* Semantic radii for components styled with plain CSS. */
+  --app-radius-sm: 4px;
+  --app-radius-control: 6px;
+  --app-radius-card: 10px;
+  --app-radius-panel: 12px;
+
   /* 52px tab target + 6px top padding + 8px bottom padding. The bottom safe
      area is added on top of this value wherever it is consumed. */
   --app-shell-nav-height: 66px;
@@ -144,7 +160,7 @@ select {
   padding: 8px 12px;
   overflow: visible;
   clip-path: none;
-  border-radius: 10px;
+  border-radius: var(--app-radius-control);
   background-color: #ffffff;
   color: #0f766e;
   font-size: 13px;

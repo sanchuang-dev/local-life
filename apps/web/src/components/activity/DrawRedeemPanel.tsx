@@ -60,7 +60,7 @@ export function DrawRedeemPanel({
   }
 
   return (
-    <section className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm"
+    <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
       aria-labelledby="draw-redeem-heading">
       <h2 id="draw-redeem-heading" className="flex items-center gap-2 text-[15px] font-semibold text-slate-800">
         <TicketCheck size={19} className="text-teal-700" />今日抽奖 · 奖品核销

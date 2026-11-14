@@ -103,7 +103,7 @@ function NewLeadView() {
     <div className="px-4 pb-8 pt-4">
       <div className="flex items-center gap-3">
         <span
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-[#e8f6f0] text-[#388b77]"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#e8f6f0] text-[#388b77]"
           aria-hidden="true"
         >
           <UserPlus size={21} strokeWidth={1.8} />
@@ -116,13 +116,13 @@ function NewLeadView() {
         </div>
       </div>
 
-      <div className="mt-4 flex items-start gap-2 rounded-[14px] border border-teal-200 bg-[#eef7f2] px-3.5 py-2.5 text-[11px] leading-5 text-[#52786c]">
+      <div className="mt-4 flex items-start gap-2 rounded-xl border border-teal-200 bg-[#eef7f2] px-3.5 py-2.5 text-[11px] leading-5 text-[#52786c]">
         <ShieldCheck size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
         <p>不要导入整社区居民名册，也不要收集身份证、银行卡等非必要敏感信息。</p>
       </div>
 
       <form className="mt-4" onSubmit={(event) => void submit(event)}>
-        <section className="rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm">
+        <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <PageSection title="联系人与社区" note="最小必要信息">
             <Field label="所属社区" htmlFor="new-lead-community" required>
               {communities.length === 1 ? (
@@ -183,7 +183,7 @@ function NewLeadView() {
           </PageSection>
         </section>
 
-        <section className="mt-4 rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm">
+        <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <PageSection title="线索来源" note="来源决定后续归属">
             <Field label="来源类型" htmlFor="new-lead-source" required>
               <select
@@ -243,14 +243,14 @@ function NewLeadView() {
             ) : null}
 
             {sourceType === 'grid_promotion' ? (
-              <p className="mt-2 rounded-[12px] bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
+              <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
                 推广负责人默认是你本人。
               </p>
             ) : null}
           </PageSection>
         </section>
 
-        <section className="mt-4 rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm">
+        <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <PageSection title="跟进计划" note="可稍后补充">
             <Field
               label="下次联系时间"

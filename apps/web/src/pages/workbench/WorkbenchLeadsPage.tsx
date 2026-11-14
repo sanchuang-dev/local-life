@@ -57,11 +57,11 @@ function LeadCard({ lead, from }: { lead: CrmLeadSummary; from: string }) {
     <Link
       to={`/workbench/leads/${lead.id}`}
       state={{ from }}
-      className="block rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+      className="block rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
     >
       <div className="flex items-start gap-3">
         <span
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[#e8f6f0] text-[#388b77]"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e8f6f0] text-[#388b77]"
           aria-hidden="true"
         >
           <UserRoundCheck size={20} strokeWidth={1.8} />
@@ -218,7 +218,7 @@ function LeadsView() {
     <div className="px-4 pb-7 pt-4">
       <StaffIdentityCard />
 
-      <div className="mt-4 flex items-center justify-between gap-2 rounded-[16px] bg-[#eef7f2] px-3.5 py-2.5">
+      <div className="mt-4 flex items-center justify-between gap-2 rounded-2xl bg-[#eef7f2] px-3.5 py-2.5">
         <p className="min-w-0 text-[12px] leading-5 text-[#52786c]">
           仅显示你负责的社区线索。
         </p>
@@ -247,7 +247,7 @@ function LeadsView() {
         </div>
       </div>
 
-      <section className="mt-4 rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm" aria-label="社区活动入口">
+      <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm" aria-label="社区活动入口">
         <h2 className="text-[14px] font-semibold text-slate-800">社区活动入口</h2>
         {publicActivities.state.status === 'loading' ? (
           <p className="mt-2 text-[12px] text-slate-500">正在读取已发布活动…</p>
@@ -260,7 +260,7 @@ function LeadsView() {
         ) : (
           <div className="mt-3 space-y-3">
             {visibleActivities.map((activity) => (
-              <div key={activity.id} className="rounded-[14px] bg-slate-50 p-3">
+              <div key={activity.id} className="rounded-xl bg-slate-50 p-3">
                 <p className="text-[13px] font-semibold text-slate-800">{activity.title}</p>
                 <p className="mt-1 text-[11px] text-slate-500">{activity.community.name}</p>
                 <div className="mt-2 flex flex-wrap gap-2">

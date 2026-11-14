@@ -32,10 +32,10 @@ export function HealthDevicesPage() {
         {demoHealthDevices.map(({ id, name, meta, icon: Icon, state, actionLabel, pendingNotice }) => (
           <article
             key={id}
-            className="flex items-center gap-3 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm"
+            className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
           >
             <span
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-[#e8f6f0] text-[#388b77]"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#e8f6f0] text-[#388b77]"
               aria-hidden="true"
             >
               <Icon size={22} strokeWidth={1.7} />
@@ -70,7 +70,7 @@ export function HealthDevicesPage() {
         添加家庭健康设备 · 演示
       </button>
 
-      <section className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+      <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <h2 className="text-[16px] font-semibold text-slate-800">可接入的设备类型</h2>
         <div className="mt-2.5 flex flex-wrap gap-1.5">
           {supportedHealthDevices.map((type) => (

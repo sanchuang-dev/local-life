@@ -24,7 +24,7 @@ export function LifeProductCard({
     <Link
       to={`/life/product/${product.id}`}
       state={from ? { from } : undefined}
-      className="group flex min-w-0 flex-col overflow-hidden rounded-[18px] border border-slate-100 bg-white shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+      className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
     >
       <span
         className={`flex aspect-[4/3] items-center justify-center ${toneStyles[product.tone]}`}
