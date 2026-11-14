@@ -113,7 +113,7 @@ export function ThirdPartySettingsPage() {
       <PageHeader
         title="第三方配置"
         description="统一管理外部服务的连接状态和配置。"
-        extra={<Button onClick={refreshStatus} loading={loading}>刷新状态</Button>}
+        extra={<Button aria-label="刷新状态" onClick={refreshStatus} loading={loading}>刷新状态</Button>}
       />
 
       <div className="third-party-settings-grid">
