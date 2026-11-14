@@ -9,6 +9,7 @@ import { ComponentPreviewPage } from '../pages/ComponentPreviewPage'
 import { CrmPage } from '../pages/CrmPage'
 import { DashboardPage } from '../pages/DashboardPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
+import { LedgerPage } from '../pages/LedgerPage'
 import { OrdersPage } from '../pages/OrdersPage'
 import { PerformancePage } from '../pages/PerformancePage'
 import { PlaceholderPage } from '../pages/PlaceholderPage'
@@ -57,6 +58,7 @@ export const routes: RouteObject[] = [
       { path: 'external-offers', element: <ExternalOffersPage /> },
       { path: 'orders', element: <OrdersPage /> },
       { path: 'performance', element: <PerformancePage /> },
+      { path: 'performance/ledger', element: <LedgerPage /> },
       { path: 'reconciliation', element: <ReconciliationPage /> },
       { path: 'settlements', element: <SettlementsPage /> },
       { path: 'communities', element: <CommunitiesRoute /> },

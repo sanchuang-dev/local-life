@@ -47,7 +47,10 @@ describe('filterNavigation', () => {
 
     expect(showHome).toBe(true)
     expect(groups.map((group) => group.key)).toEqual(['performance'])
-    expect(groups[0]?.pages.map((page) => page.key)).toEqual(['/reconciliation'])
+    expect(groups[0]?.pages.map((page) => page.key)).toEqual([
+      '/performance/ledger',
+      '/reconciliation',
+    ])
   })
 
   it('trims the query and matches a label fragment', () => {
@@ -158,8 +161,13 @@ describe('platform user directory navigation', () => {
 })
 
 describe('performance and reconciliation navigation', () => {
-  it('marks both ledger pages as ready with no planned leftovers', () => {
-    for (const key of ['/performance', '/reconciliation', '/settlements']) {
+  it('marks the overview, ledger, reconciliation and settlement pages as ready', () => {
+    for (const key of [
+      '/performance',
+      '/performance/ledger',
+      '/reconciliation',
+      '/settlements',
+    ]) {
       const page = findNavPage(key)
       expect(page, `${key} must exist in the navigation model`).toBeTruthy()
       expect(page?.status).toBe('ready')
@@ -167,17 +175,22 @@ describe('performance and reconciliation navigation', () => {
       expect(page?.roles).toEqual(['admin', 'operator'])
     }
     expect(groupForPage('/performance')?.label).toBe('业绩与对账')
+    expect(groupForPage('/performance/ledger')?.label).toBe('业绩与对账')
     expect(groupForPage('/settlements')?.label).toBe('业绩与对账')
     expect(groupForPage('/reconciliation')?.label).toBe('业绩与对账')
   })
 
   it('stops calling the ledger an unimplemented module', () => {
     const performance = findNavPage('/performance')
+    const ledger = findNavPage('/performance/ledger')
     const settlements = findNavPage('/settlements')
     // The old placeholder copy promised 「网格员业绩」「结算单导出」; shipping a real
     // page must not keep advertising a plan as if the page were still pending.
-    expect(performance?.description).toContain('账面')
+    expect(performance?.description).toContain('汇总')
     expect(performance?.description).not.toContain('待建设')
+    expect(ledger?.label).toBe('经营流水')
+    expect(ledger?.description).toContain('分页')
+    expect(ledger?.description).not.toContain('待建设')
     const reconciliation = findNavPage('/reconciliation')
     expect(reconciliation?.description).toContain('对账批次')
     expect(reconciliation?.description).toContain('CSV')
@@ -188,12 +201,18 @@ describe('performance and reconciliation navigation', () => {
       .filter((page) => page.status === 'planned')
       .map((page) => page.key)
     expect(plannedKeys).not.toContain('/performance')
+    expect(plannedKeys).not.toContain('/performance/ledger')
     expect(plannedKeys).not.toContain('/settlements')
     expect(plannedKeys).not.toContain('/reconciliation')
   })
 
   it('hides the ledger pages from grid workers but keeps them for staff who can operate', () => {
-    for (const key of ['/performance', '/reconciliation', '/settlements']) {
+    for (const key of [
+      '/performance',
+      '/performance/ledger',
+      '/reconciliation',
+      '/settlements',
+    ]) {
       const page = findNavPage(key)
       expect(page).toBeTruthy()
       expect(isPageVisible(page!, 'grid_worker')).toBe(false)
@@ -213,6 +232,7 @@ describe('performance and reconciliation navigation', () => {
       group.pages.map((page) => page.key),
     )
     expect(operatorKeys).toContain('/performance')
+    expect(operatorKeys).toContain('/performance/ledger')
     expect(operatorKeys).toContain('/settlements')
     expect(operatorKeys).toContain('/reconciliation')
   })
@@ -255,6 +275,7 @@ describe('activeMenuKey', () => {
     expect(activeMenuKey('/activities')).toBe('/activities')
     expect(activeMenuKey('/system/runtime')).toBe('/system/runtime')
     expect(activeMenuKey('/performance')).toBe('/performance')
+    expect(activeMenuKey('/performance/ledger')).toBe('/performance/ledger')
     expect(activeMenuKey('/settlements')).toBe('/settlements')
   })
 
