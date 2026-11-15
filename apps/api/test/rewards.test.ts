@@ -142,6 +142,7 @@ function createWorld(options: { plan?: ActivityRewardPlan | null } = {}): World 
     .values({
       staffAccountId: otherOperator.staffId,
       communityId: otherCommunityId,
+      assignmentKind: 'operator_scope',
       createdAt: OPEN,
     })
     .run()

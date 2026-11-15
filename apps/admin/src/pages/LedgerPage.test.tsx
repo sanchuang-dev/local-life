@@ -448,6 +448,32 @@ describe('LedgerPage list and detail', () => {
     })
   })
 
+  it('shortens a UUID source id in the list while preserving the full copyable value', async () => {
+    const fullId = '123e4567-e89b-42d3-a456-4266141740f7'
+    stubApi(
+      stubBaseline([
+        entry({
+          factKind: 'order_verified',
+          sourceSystem: 'crm_service_order',
+          sourceId: 'crm-order-1',
+          sourceDisplayNo: fullId,
+          verifiedAt: '2026-11-01T03:00:00.000Z',
+        }),
+      ]),
+    )
+
+    renderPage(ADMIN_SESSION)
+
+    expect(await screen.findByText(`${fullId.slice(0, 8)}…`)).toBeTruthy()
+    expect(screen.getByTitle(fullId)).toBeTruthy()
+    expect(screen.queryByText(fullId)).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: '详情' }))
+    const drawer = await screen.findByRole('dialog')
+    expect(within(drawer).getByText(fullId)).toBeTruthy()
+    expect(drawer.querySelectorAll('.ant-typography-copy').length).toBeGreaterThan(0)
+  })
+
   it('renders the entry drawer from the list row and its unresolved anomalies', async () => {
     stubApi(stubBaseline())
 
@@ -458,6 +484,11 @@ describe('LedgerPage list and detail', () => {
 
     const drawer = await screen.findByRole('dialog')
     expect(within(drawer).getByText('流水详情 · 登记金额')).toBeTruthy()
+    // Flat drawer: no nested card sections and no bordered Descriptions.
+    expect(drawer.querySelector('.local-section')).toBeNull()
+    expect(drawer.querySelector('.ant-descriptions-bordered')).toBeNull()
+    expect(drawer.querySelector('.ledger-detail-summary')).toBeTruthy()
+    expect(drawer.querySelector('.ledger-detail-amount')?.textContent).toContain('¥39.80')
     expect(within(drawer).getByText('ORD-20261101-0001')).toBeTruthy()
     expect(
       within(drawer).getByText(/账面登记毛额 · 待核定（本 MVP 无结算规则，不据此计算应付）/),
@@ -479,9 +510,7 @@ describe('LedgerPage list and detail', () => {
     expect(await within(drawer).findByText('流水详情 · 人工实收')).toBeTruthy()
     expect(within(drawer).getByText('转账凭据')).toBeTruthy()
     expect(within(drawer).getByText('转账流水尾号 4821')).toBeTruthy()
-    expect(
-      within(drawer).getByText('该笔流水没有未解决异常。异常是复核提示，不会修改流水本身。'),
-    ).toBeTruthy()
+    expect(within(drawer).getByText('无未解决异常')).toBeTruthy()
   })
 
   it('keeps explicit source syncing with CSRF and refreshes the list', async () => {

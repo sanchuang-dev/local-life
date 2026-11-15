@@ -577,6 +577,7 @@ test('community scope, ownership and client-supplied attribution are enforced se
     const admin = await staffSession(app, 'admin', ADMIN_PASSWORD)
     const communityA = await createCommunity(app, admin, '社区 A')
     const communityB = await createCommunity(app, admin, '社区 B')
+    const communityC = await createCommunity(app, admin, '社区 C')
     await createStaffAccount(app, admin, {
       username: 'grid-a1',
       displayName: '网格员 A1',
@@ -589,7 +590,7 @@ test('community scope, ownership and client-supplied attribution are enforced se
       displayName: '网格员 A2',
       password: SECOND_GRID_PASSWORD,
       role: 'grid_worker',
-      communityIds: [communityA],
+      communityIds: [communityC],
     })
     const gridA3 = await createStaffAccount(app, admin, {
       username: 'grid-b1',
@@ -712,7 +713,9 @@ test('community scope, ownership and client-supplied attribution are enforced se
     assert.equal(gridAdmin.status, 403)
 
     // Lists are scoped: grid sees only its own leads, operator sees assigned community.
-    const grid2Lead = await createLead(app, grid2, leadPayload(communityA, { contactName: '李叔叔' }))
+    // Grid workers no longer share a territory; the operator creates the second
+    // lead in community A so the operator/admin total still covers the community.
+    const grid2Lead = await createLead(app, operator, leadPayload(communityA, { contactName: '李叔叔' }))
     const gridList = await leadList(app, grid1)
     assert.deepEqual(
       gridList.items.map((item) => item.id),
@@ -883,13 +886,6 @@ test('transfer records from/to owner, operator and reason; confirmed order attri
       role: 'grid_worker',
       communityIds: [communityA],
     })
-    const grid2Id = await createStaffAccount(app, admin, {
-      username: 'transfer-grid2',
-      displayName: '转交网格员 2',
-      password: SECOND_GRID_PASSWORD,
-      role: 'grid_worker',
-      communityIds: [communityA],
-    })
     const outerGridId = await createStaffAccount(app, admin, {
       username: 'transfer-outer',
       displayName: '外社区网格员',
@@ -905,7 +901,6 @@ test('transfer records from/to owner, operator and reason; confirmed order attri
       communityIds: [communityA],
     })
     const grid1 = await staffSession(app, 'transfer-grid1', GRID_PASSWORD)
-    const grid2 = await staffSession(app, 'transfer-grid2', SECOND_GRID_PASSWORD)
     const operator = await staffSession(app, 'transfer-operator', OPERATOR_PASSWORD)
     const activityId = seedActivity(db, communityA, adminInfo.userId, '转交来源活动')
 
@@ -940,18 +935,18 @@ test('transfer records from/to owner, operator and reason; confirmed order attri
       session: grid1,
       body: {
         expectedUpdatedAt: lead.updatedAt,
-        toOwnerStaffId: grid2Id,
+        toOwnerStaffId: operatorId,
         reason: '居民要求换网格员',
       },
     })
     assert.equal(transResponse.status, 200)
     const transferred = (await transResponse.json()) as CrmLeadDetail
-    assert.equal(transferred.ownerStaff.id, grid2Id)
+    assert.equal(transferred.ownerStaff.id, operatorId)
     assert.equal(transferred.updatedAt !== lead.updatedAt, true)
 
     // F5: admin is an operator, never an attribution target.
     const adminTarget = await api(app, 'POST', `/crm/leads/${lead.id}/transfer`, {
-      session: grid2,
+      session: operator,
       body: {
         expectedUpdatedAt: transferred.updatedAt,
         toOwnerStaffId: adminInfo.staffId,
@@ -960,7 +955,7 @@ test('transfer records from/to owner, operator and reason; confirmed order attri
     })
     assert.equal(adminTarget.status, 400)
     assert.equal((await errorEnvelope(adminTarget)).error.code, 'invalid_request')
-    assert.equal((await leadDetail(app, grid2, lead.id)).ownerStaff.id, grid2Id)
+    assert.equal((await leadDetail(app, operator, lead.id)).ownerStaff.id, operatorId)
 
     const eventsResponse = await api(app, 'GET', `/crm/leads/${lead.id}/audit`, {
       session: operator,
@@ -970,14 +965,14 @@ test('transfer records from/to owner, operator and reason; confirmed order attri
     const transferEvent = events.items.find((item) => item.event === 'lead.transferred')
     assert.ok(transferEvent)
     assert.equal(transferEvent.fromOwnerStaff?.id, grid1Id)
-    assert.equal(transferEvent.toOwnerStaff?.id, grid2Id)
+    assert.equal(transferEvent.toOwnerStaff?.id, operatorId)
     assert.equal(transferEvent.note, '居民要求换网格员')
     assert.equal(transferEvent.actor?.displayName, '转交网格员 1')
 
     // Old owner loses access; order attribution does not move.
     const oldOwnerRead = await api(app, 'GET', `/crm/leads/${lead.id}`, { session: grid1 })
     assert.equal(oldOwnerRead.status, 403)
-    const newOwnerRead = await api(app, 'GET', `/crm/leads/${lead.id}`, { session: grid2 })
+    const newOwnerRead = await api(app, 'GET', `/crm/leads/${lead.id}`, { session: operator })
     assert.equal(newOwnerRead.status, 200)
     const orderAfterTransfer = await orderDetail(app, operator, order.id)
     assert.equal(orderAfterTransfer.attributedStaff.id, grid1Id)
@@ -1000,9 +995,9 @@ test('transfer records from/to owner, operator and reason; confirmed order attri
     assert.equal(confirmed.activationSource, CRM_ACTIVATION_SOURCE)
 
     // A later transfer can change the lead owner but must never move the confirmed order.
-    const afterConfirmLead = await leadDetail(app, grid2, lead.id)
+    const afterConfirmLead = await leadDetail(app, operator, lead.id)
     const secondTransfer = await api(app, 'POST', `/crm/leads/${lead.id}/transfer`, {
-      session: grid2,
+      session: operator,
       body: {
         expectedUpdatedAt: afterConfirmLead.updatedAt,
         toOwnerStaffId: grid1Id,
@@ -1035,6 +1030,7 @@ test('order state machine is strict, confirmed only comes from manual review, du
     const admin = await staffSession(app, 'admin', ADMIN_PASSWORD)
     const communityA = await createCommunity(app, admin, '业务社区 A')
     const communityB = await createCommunity(app, admin, '业务社区 B')
+    const communityC = await createCommunity(app, admin, '业务社区 C')
     await createStaffAccount(app, admin, {
       username: 'order-grid-b',
       displayName: '外社区网格员',
@@ -1058,10 +1054,10 @@ test('order state machine is strict, confirmed only comes from manual review, du
     })
     await createStaffAccount(app, admin, {
       username: 'order-outsider',
-      displayName: '同社区其他网格员',
+      displayName: '其他片区网格员',
       password: SECOND_GRID_PASSWORD,
       role: 'grid_worker',
-      communityIds: [communityA],
+      communityIds: [communityC],
     })
     const grid = await staffSession(app, 'order-grid', GRID_PASSWORD)
     const gridB = await staffSession(app, 'order-grid-b', 'Order-Grid-B-Password-123!')
@@ -1110,7 +1106,7 @@ test('order state machine is strict, confirmed only comes from manual review, du
     assert.equal(spoofedOrder.activationSource, null)
     assert.equal(spoofedOrder.confirmation, null)
 
-    // Same-community grid worker who neither created nor is attributed cannot read/write it.
+    // Grid worker from another territory who neither created nor is attributed cannot read/write it.
     for (const [method, path, body] of [
       ['GET', `/crm/orders/${order.id}`, undefined],
       ['GET', `/crm/orders/${order.id}/audit`, undefined],
@@ -1552,6 +1548,7 @@ test('lists filter and paginate on the server, with grid worker scope and 400 on
     const admin = await staffSession(app, 'admin', ADMIN_PASSWORD)
     const communityA = await createCommunity(app, admin, '分页社区 A')
     const communityB = await createCommunity(app, admin, '分页社区 B')
+    const communityC = await createCommunity(app, admin, '分页社区 C')
     const gridAId = await createStaffAccount(app, admin, {
       username: 'page-grid-a',
       displayName: '分页网格 A',
@@ -1564,7 +1561,7 @@ test('lists filter and paginate on the server, with grid worker scope and 400 on
       displayName: '分页网格 A2',
       password: SECOND_GRID_PASSWORD,
       role: 'grid_worker',
-      communityIds: [communityA],
+      communityIds: [communityC],
     })
     await createStaffAccount(app, admin, {
       username: 'page-grid-b',
@@ -1608,7 +1605,7 @@ test('lists filter and paginate on the server, with grid worker scope and 400 on
     const third = await createLead(
       app,
       gridA2,
-      leadPayload(communityA, {
+      leadPayload(communityC, {
         contactName: '关键字丙',
         contactPhone: '13900000003',
         sourceType: 'walk_in',
@@ -1677,14 +1674,14 @@ test('lists filter and paginate on the server, with grid worker scope and 400 on
     const byStatus = await leadList(app, admin, '?status=contacting')
     assert.equal(byStatus.total, 1)
 
-    // Grid worker list sees only own leads even inside the same community.
+    // Grid worker lists stay limited to leads they own in their own territory.
     const gridList = await leadList(app, gridA)
     assert.equal(gridList.total, 2)
     assert.equal(gridList.items.some((item) => item.id === third.id), false)
 
     // Operator sees the assigned community, not community B.
     const operatorList = await leadList(app, operator)
-    assert.equal(operatorList.total, 3)
+    assert.equal(operatorList.total, 2)
     const operatorCross = await api(app, 'GET', `/admin/crm/leads?communityId=${communityB}`, {
       session: operator,
     })
@@ -1759,7 +1756,7 @@ test('lists filter and paginate on the server, with grid worker scope and 400 on
       businessTypes: string[]
       orderStatuses: string[]
     }
-    assert.equal(adminBody.communities.length, 2)
+    assert.equal(adminBody.communities.length, 3)
     assert.ok(adminBody.staff.some((item) => item.id === gridAId))
     assert.deepEqual(adminBody.businessTypes, ['gd_mobile', 'gd_tv'])
     assert.equal(adminBody.orderStatuses.includes('confirmed'), true)
@@ -1800,14 +1797,7 @@ test('domain events and audit rows are append-only and never contain sensitive v
       role: 'grid_worker',
       communityIds: [communityId],
     })
-    const grid2Id = await createStaffAccount(app, admin, {
-      username: 'audit-grid2',
-      displayName: '审计网格员 2',
-      password: SECOND_GRID_PASSWORD,
-      role: 'grid_worker',
-      communityIds: [communityId],
-    })
-    await createStaffAccount(app, admin, {
+    const operatorId = await createStaffAccount(app, admin, {
       username: 'audit-operator',
       displayName: '审计运营',
       password: OPERATOR_PASSWORD,
@@ -1815,7 +1805,6 @@ test('domain events and audit rows are append-only and never contain sensitive v
       communityIds: [communityId],
     })
     const grid = await staffSession(app, 'audit-grid', GRID_PASSWORD)
-    const grid2 = await staffSession(app, 'audit-grid2', SECOND_GRID_PASSWORD)
     const operator = await staffSession(app, 'audit-operator', OPERATOR_PASSWORD)
     const activityId = seedActivity(db, communityId, adminInfo.userId, '审计活动')
 
@@ -1836,20 +1825,20 @@ test('domain events and audit rows are append-only and never contain sensitive v
       session: grid,
       body: {
         expectedUpdatedAt: latest.lead.updatedAt,
-        toOwnerStaffId: grid2Id,
+        toOwnerStaffId: operatorId,
         reason: '按小区重新分配',
       },
     })
     assert.equal(transfer.status, 200)
     const transferred = (await transfer.json()) as CrmLeadDetail
-    const order = await createOrder(app, grid2, {
+    const order = await createOrder(app, operator, {
       leadId: lead.id,
       orderNo: 'AUDIT-001',
       businessType: 'gd_mobile',
       contactPhone: '13712345678',
       evidenceRef: '核验截图 #42',
     })
-    const pending = await sendOrderToVerification(app, grid2, order.id)
+    const pending = await sendOrderToVerification(app, operator, order.id)
     const confirmed = await review(
       app,
       operator,
@@ -1884,7 +1873,7 @@ test('domain events and audit rows are append-only and never contain sensitive v
       orderEvents.map((event) => event.event),
       ['order.created', 'order.status_changed', 'order.status_changed', 'order.reviewed'],
     )
-    assert.equal(transferred.ownerStaff.id, grid2Id)
+    assert.equal(transferred.ownerStaff.id, operatorId)
     assert.equal(lead.createdByStaff.id, gridId)
 
     // Audit rows cover creation, follow-up, transfer, order creation and review.

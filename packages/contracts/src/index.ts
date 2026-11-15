@@ -255,9 +255,23 @@ export const createCommunityRequestSchema = z.strictObject({
   location: communityLocationSchema.optional(),
 })
 
-/** Add an existing scoped operator/grid worker to a community, never create a new identity. */
+/**
+ * Add an existing scoped operator or grid worker to a community, never create a
+ * new identity. For a grid worker this is an operating-territory appointment;
+ * replacement uses the dedicated atomic route.
+ */
 export const linkCommunityStaffRequestSchema = z.strictObject({
   staffAccountId: z.string().uuid(),
+})
+
+/**
+ * Territory replacement is optimistic: the caller states which owner it saw.
+ * A concurrent replacement therefore receives a 409 instead of silently
+ * overwriting the administrator who saved first.
+ */
+export const gridWorkerAssignmentRequestSchema = z.strictObject({
+  staffAccountId: z.string().uuid(),
+  expectedStaffAccountId: z.string().uuid().nullable(),
 })
 
 export const createStaffAccountRequestSchema = z.object({
@@ -270,6 +284,23 @@ export const createStaffAccountRequestSchema = z.object({
     z.string().uuid().optional(),
   ),
   communityIds: z.array(z.string().uuid()).min(1).max(20),
+}).superRefine((value, ctx) => {
+  if (new Set(value.communityIds).size !== value.communityIds.length) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'communityIds must not contain duplicates',
+      path: ['communityIds'],
+    })
+  }
+  // A grid worker owns exactly one logical territory. Operators may keep the
+  // existing multi-community authorization model.
+  if (value.role === 'grid_worker' && value.communityIds.length !== 1) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'a grid worker must own exactly one territory',
+      path: ['communityIds'],
+    })
+  }
 })
 
 export const authUserSchema = z.object({

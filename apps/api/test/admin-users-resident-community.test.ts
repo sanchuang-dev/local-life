@@ -124,7 +124,12 @@ async function fixture() {
     ])
     .run()
   db.insert(staffCommunityAssignments)
-    .values([{ staffAccountId: staffIds.operator, communityId: communityA, createdAt: NOW }])
+    .values([{
+      staffAccountId: staffIds.operator,
+      communityId: communityA,
+      assignmentKind: 'operator_scope',
+      createdAt: NOW,
+    }])
     .run()
 
   const tokens = { admin: 'rc-admin-token', operator: 'rc-operator-token' }
