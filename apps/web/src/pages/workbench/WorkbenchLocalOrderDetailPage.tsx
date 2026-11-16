@@ -318,7 +318,7 @@ function OrderContent({ order, onUpdated }: { order: LocalOrderDetail; onUpdated
         <h2 className="text-[16px] font-semibold text-slate-900">处理状态</h2>
         <p className="mt-1 text-[11px] leading-5 text-slate-400">
           {order.status === 'pending_review'
-            ? '待核验订单可由当前片区网格员电话核实；也可取消或标记未通过。'
+            ? '待核验订单请在上方完成电话核验；处理状态变更会写入订单时间线。'
             : '处理状态变更会写入订单时间线。'}
         </p>
 
@@ -326,7 +326,9 @@ function OrderContent({ order, onUpdated }: { order: LocalOrderDetail; onUpdated
           <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-500">
             {order.status === 'verified'
               ? '订单已核验通过，状态锁定，工作台不可再修改。'
-              : '当前状态为终态，不可再流转。'}
+              : order.status === 'pending_review'
+                ? '请在上方「电话核验」中完成核验通过或拒绝。'
+                : '当前状态为终态，不可再流转。'}
           </p>
         ) : (
           <div className="mt-3 flex flex-wrap gap-2">
