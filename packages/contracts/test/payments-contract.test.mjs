@@ -109,6 +109,24 @@ describe('payment amount and state contracts', () => {
     )
   })
 
+  it('keeps merchant order numbers within the WeChat out_trade_no limit', () => {
+    assert.equal(paymentIntentSchema.safeParse(intent()).success, true)
+    assert.equal(
+      paymentIntentSchema.safeParse(intent({ merchantOrderNo: 'PAY-' + 'A'.repeat(28) })).success,
+      true,
+    )
+    assert.equal(
+      paymentIntentSchema.safeParse(intent({ merchantOrderNo: 'PAY-' + 'A'.repeat(29) })).success,
+      false,
+      '33 characters exceeds out_trade_no',
+    )
+    assert.equal(
+      paymentIntentSchema.safeParse(intent({ merchantOrderNo: 'PAY 0001' })).success,
+      false,
+      'spaces are not channel-safe',
+    )
+  })
+
   it('requires terminal timestamps on a paid attempt and a provider transaction id', () => {
     const base = {
       id: '123e4567-e89b-42d3-a456-426614174005',

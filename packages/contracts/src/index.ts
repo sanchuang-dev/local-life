@@ -102,6 +102,17 @@ export const API_ERROR_CODES = {
    */
   orderIdempotencyConflict: 'order_idempotency_conflict',
   /**
+   * Payment intent creation (PAY-02). Refusals are explicit: an unavailable
+   * channel never falls back to a fake payment, and a conflicting idempotency
+   * key never overwrites the original intent.
+   */
+  paymentChannelUnavailable: 'payment_channel_unavailable',
+  paymentIdempotencyConflict: 'payment_idempotency_conflict',
+  paymentNotPayable: 'payment_not_payable',
+  paymentAlreadyPaid: 'payment_already_paid',
+  paymentActiveIntentConflict: 'payment_active_intent_conflict',
+  paymentZeroAmountUnavailable: 'payment_zero_amount_unavailable',
+  /**
    * Ledger (LL-MVP-008, Issue #64). Every one of these is a *refusal*: the ledger
    * prefers an explicit "cannot do that" over a silently corrected number.
    */

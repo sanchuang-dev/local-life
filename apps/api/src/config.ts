@@ -38,6 +38,12 @@ const environmentSchema = z
     WEB_BASE_URL: z.string().url().optional(),
     TRUSTED_ORIGINS: z.string().default(''),
     AUTH_DEV_ENABLED: z.enum(['true', 'false']).default('false'),
+    /**
+     * PAY-02 only creates intents for an explicitly enabled isolated Mock
+     * channel. It never executes a mock payment; PAY-04 owns that. Production
+     * must keep this false (validated below).
+     */
+    PAYMENT_MOCK_ENABLED: z.enum(['true', 'false']).default('false'),
     // CRMEB integration (Issue #63). The three credentials are optional as a
     // group: when they are absent the adapter reports `not_configured` instead
     // of faking a working shop. A partially supplied group is a deployment
@@ -110,6 +116,13 @@ const environmentSchema = z
         message: 'Development authentication must never be enabled in production',
       })
     }
+    if (value.NODE_ENV === 'production' && value.PAYMENT_MOCK_ENABLED === 'true') {
+      context.addIssue({
+        code: 'custom',
+        path: ['PAYMENT_MOCK_ENABLED'],
+        message: 'Mock payment intents must never be enabled in production',
+      })
+    }
   })
 
 /**
@@ -150,6 +163,8 @@ export interface ApiConfig {
   trustedOrigins: string[]
   webBaseUrl: string
   authDevEnabled: boolean
+  /** PAY-02 isolated Mock channel availability; false in production by validation. */
+  paymentMockEnabled: boolean
   crmeb?: {
     baseUrl: string
     appId: string
@@ -317,6 +332,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): ApiConfig {
     trustedOrigins,
     webBaseUrl,
     authDevEnabled: value.AUTH_DEV_ENABLED === 'true',
+    paymentMockEnabled: value.PAYMENT_MOCK_ENABLED === 'true',
     ...(value.CRMEB_BASE_URL && value.CRMEB_OUTAPI_APPID && value.CRMEB_OUTAPI_APPSECRET
       ? {
           crmeb: {

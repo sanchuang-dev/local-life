@@ -1,12 +1,12 @@
 import { z } from 'zod'
 
 /**
- * PAY-01 payment domain contracts.
+ * PAY-01/PAY-02 payment domain contracts.
  *
  * This module is the shared truth source for a payment intent, its channel
- * attempts and its append-only event trail. It deliberately does NOT define
- * routers, a channel gateway, order fulfilment, receipts, ledger projection or
- * refunds: those are PAY-02…PAY-11.
+ * attempts, its append-only event trail and the resident creation/query DTOs.
+ * It deliberately does NOT implement a channel gateway, order fulfilment,
+ * receipts, ledger projection or refunds: those are later payment cards.
  *
  * Three facts stay separate:
  * - `local_orders.verified` is a human business verification;
@@ -24,6 +24,12 @@ import { z } from 'zod'
  */
 
 export const PAYMENT_CENTS_MAX = Number.MAX_SAFE_INTEGER
+
+/** Resident-only payment routes. No payment status write route exists. */
+export const PAYMENT_ROUTES = {
+  createIntent: '/payments/intents',
+  myIntentDetail: '/payments/intents/:paymentIntentId',
+} as const
 
 /** Non-negative integer cents; rejects floats, negatives and overflow. */
 export const paymentCentsSchema = z
@@ -92,6 +98,16 @@ export const paymentEventSourceSchema = z.enum([
 export type PaymentEventSource = z.infer<typeof paymentEventSourceSchema>
 
 const merchantPartSchema = z.string().trim().min(1).max(64)
+/**
+ * WeChat JSAPI `out_trade_no` is 6-32 characters. Keep the shared contract at
+ * least as strict as the real channel so PAY-02 already produces a usable id.
+ */
+const merchantOrderNoSchema = z
+  .string()
+  .trim()
+  .min(6)
+  .max(32)
+  .regex(/^[A-Za-z0-9_-]+$/, 'merchant order number must be channel-safe')
 
 /**
  * Match the SQLite terminal_time CHECK constraints exactly. A terminal state
@@ -146,7 +162,7 @@ export const paymentIntentSchema = z
     channel: paymentChannelSchema.nullable(),
     /** Persistently distinguishes simulated money from real channel money. */
     simulated: z.boolean(),
-    merchantOrderNo: merchantPartSchema,
+    merchantOrderNo: merchantOrderNoSchema,
     merchantAppId: merchantPartSchema.nullable(),
     merchantId: merchantPartSchema.nullable(),
     grossAmountCents: paymentCentsSchema,
@@ -264,7 +280,7 @@ export const paymentEventSchema = z.strictObject({
 export type PaymentEvent = z.infer<typeof paymentEventSchema>
 
 /* -------------------------------------------------------------------------- */
-/* Base create/query DTOs for PAY-02 (no route is registered by this card)    */
+/* PAY-02 resident create/query DTOs and responses                          */
 /* -------------------------------------------------------------------------- */
 
 /**
@@ -280,7 +296,20 @@ export const createPaymentIntentRequestSchema = z.strictObject({
 })
 export type CreatePaymentIntentRequest = z.infer<typeof createPaymentIntentRequestSchema>
 
-/** Payment status changes are internal to trusted PAY-03 services, never a resident API DTO. */
+/** Create returns the existing intent with `created:false` on an idempotent retry. */
+export const paymentIntentCreateResponseSchema = z.strictObject({
+  created: z.boolean(),
+  intent: paymentIntentSchema,
+})
+export type PaymentIntentCreateResponse = z.infer<typeof paymentIntentCreateResponseSchema>
+
+/** Resident-owned detail: the intent plus its attempts; events stay internal. */
+export const paymentIntentDetailResponseSchema = z.strictObject({
+  intent: paymentIntentSchema,
+  attempts: z.array(paymentAttemptSchema),
+})
+export type PaymentIntentDetailResponse = z.infer<typeof paymentIntentDetailResponseSchema>
+
 export const paymentIntentListQuerySchema = z.strictObject({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
@@ -288,7 +317,7 @@ export const paymentIntentListQuerySchema = z.strictObject({
   communityId: z.string().uuid().optional(),
   status: paymentStatusSchema.optional(),
   channel: paymentChannelSchema.optional(),
-  merchantOrderNo: z.string().trim().min(1).max(64).optional(),
+  merchantOrderNo: merchantOrderNoSchema.optional(),
 })
 export type PaymentIntentListQuery = z.infer<typeof paymentIntentListQuerySchema>
 
