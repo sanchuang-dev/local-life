@@ -179,7 +179,12 @@ async function seedStaff(
     .run()
   for (const communityId of input.communityIds ?? []) {
     db.insert(staffCommunityAssignments)
-      .values({ staffAccountId: staffId, communityId, createdAt: now })
+      .values({
+        staffAccountId: staffId,
+        communityId,
+        assignmentKind: input.role === 'grid_worker' ? 'grid_territory' : 'operator_scope',
+        createdAt: now,
+      })
       .run()
   }
 }

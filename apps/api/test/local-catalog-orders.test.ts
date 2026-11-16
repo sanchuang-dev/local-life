@@ -20,6 +20,7 @@ import {
   LOCAL_ORDER_STATUS_TRANSITIONS,
   activityParticipationConfirmResponseSchema,
   activityParticipationStateSchema,
+  ledgerListResponseSchema,
   ledgerOverviewSchema,
   localOrderDetailSchema,
   localOrderEventListResponseSchema,
@@ -42,6 +43,8 @@ import {
   localOrderEvents,
   localOrders,
   localProducts,
+  residentPhoneIdentities,
+  residentProfiles,
   staffAccounts,
   users,
 } from '../src/db/schema.js'
@@ -363,6 +366,19 @@ async function verify(
   note = '已电话核实登记内容',
 ) {
   return api(app, 'POST', `/admin/local-orders/${order.id}/verify`, {
+    session,
+    body: { expectedUpdatedAt: order.updatedAt, decision, note },
+  })
+}
+
+async function verifyStaff(
+  app: App,
+  session: Session,
+  order: LocalOrderDetail,
+  decision: 'verify' | 'reject',
+  note = '已电话核实登记内容',
+) {
+  return api(app, 'POST', `/staff/local-orders/${order.id}/verify`, {
     session,
     body: { expectedUpdatedAt: order.updatedAt, decision, note },
   })
@@ -917,6 +933,7 @@ test('every local route rejects an anonymous caller and writes need CSRF + trust
       ['GET', `/local-orders/${sampleOrderId}`],
       ['GET', '/staff/local-orders'],
       ['GET', `/staff/local-orders/${sampleOrderId}`],
+      ['POST', `/staff/local-orders/${sampleOrderId}/verify`],
       ['GET', '/admin/catalog/products'],
       ['GET', `/admin/catalog/products/${product.id}`],
       ['GET', '/admin/local-orders'],
@@ -958,7 +975,7 @@ test('every local route rejects an anonymous caller and writes need CSRF + trust
   }
 })
 
-test('role boundaries: grid workers cannot manage the catalogue or verify orders', async () => {
+test('role boundaries: grid workers cannot manage the catalogue or use admin verification', async () => {
   const world = await localWorld()
   try {
     const { app, admin, grid, operator, resident, communityId } = world
@@ -983,7 +1000,8 @@ test('role boundaries: grid workers cannot manage the catalogue or verify orders
     })
     assert.equal(operatorProduct.status, 'off_shelf')
 
-    // grid_worker can handle an order but must never verify it
+    // A grid worker may handle the order. The admin endpoint stays closed to the
+    // role; the staff endpoint applies the narrower territory check instead.
     const registered = await orderFromRegister(await register(app, resident, { productId: product.id }),
     )
     const processing = await orderDetail(
@@ -991,10 +1009,29 @@ test('role boundaries: grid workers cannot manage the catalogue or verify orders
     )
     const pending = await orderDetail(await transition(app, grid, processing, 'pending_review'))
 
-    const gridVerify = await verify(app, grid, pending, 'verify')
-    assert.equal(gridVerify.status, 403, 'grid workers may not verify')
+    const gridAdminVerify = await verify(app, grid, pending, 'verify')
+    assert.equal(gridAdminVerify.status, 403, 'grid workers cannot use the admin endpoint')
 
-    const residentVerify = await api(app, 'POST', `/admin/local-orders/${pending.id}/verify`, {
+    const noCsrf = await api(app, 'POST', `/staff/local-orders/${pending.id}/verify`, {
+      session: grid,
+      csrf: false,
+      body: { expectedUpdatedAt: pending.updatedAt, decision: 'verify', note: '无 CSRF' },
+    })
+    assert.equal(noCsrf.status, 403)
+    const badOrigin = await api(app, 'POST', `/staff/local-orders/${pending.id}/verify`, {
+      session: grid,
+      origin: 'https://evil.example',
+      body: { expectedUpdatedAt: pending.updatedAt, decision: 'verify', note: '坏来源' },
+    })
+    assert.equal(badOrigin.status, 403)
+
+    const gridStaffVerify = await verifyStaff(app, grid, pending, 'verify')
+    assert.equal(gridStaffVerify.status, 200, 'the current territory worker may verify')
+    const verified = localOrderDetailSchema.parse(await gridStaffVerify.json())
+    assert.equal(verified.status, 'verified')
+    assert.equal(verified.verification?.note, '已电话核实登记内容')
+
+    const residentVerify = await api(app, 'POST', `/staff/local-orders/${pending.id}/verify`, {
       session: resident,
       body: { expectedUpdatedAt: pending.updatedAt, decision: 'verify', note: '居民自证' },
     })
@@ -2201,6 +2238,277 @@ test('staff recording on behalf can only attribute a team the target resident jo
       .from(localOrders)
       .all().length
     assert.equal(count, 2)
+  } finally {
+    world.sqlite.close()
+  }
+})
+
+/* -------------------------------------------------------------------------- */
+/* 10. Grid territory verification → community-effective performance          */
+/* -------------------------------------------------------------------------- */
+
+async function pendingOrderFor(
+  app: App,
+  grid: Session,
+  resident: ResidentSession,
+  productId: string,
+): Promise<LocalOrderDetail> {
+  const registered = await orderFromRegister(
+    await register(app, resident, { productId }),
+  )
+  const processing = await orderDetail(await transition(app, grid, registered, 'processing'))
+  return orderDetail(await transition(app, grid, processing, 'pending_review'))
+}
+
+async function ledgerOverviewFor(app: App, session: Session, communityId: string) {
+  const response = await api(
+    app,
+    'GET',
+    `${LEDGER_ROUTES.adminOverview}?communityId=${communityId}`,
+    { session },
+  )
+  assert.equal(response.status, 200)
+  return ledgerOverviewSchema.parse(await response.json())
+}
+
+function bucket(overview: ReturnType<typeof ledgerOverviewSchema.parse>, kind: string) {
+  return overview.buckets.find((item) => item.factKind === kind)
+}
+
+test('grid verification immediately creates community facts once, without manual sync', async () => {
+  const world = await localWorld()
+  try {
+    const { app, db, admin, grid, resident, communityId } = world
+    const product = await createOnShelfProduct(app, admin, {
+      communityId,
+      name: '社区有效业绩商品',
+      priceCents: 3980,
+    })
+    const order = await pendingOrderFor(app, grid, resident, product.id)
+    assert.equal(order.recordSource, 'resident')
+    assert.equal(order.createdByStaff, null, 'a resident order has no staff creator')
+    assert.equal(order.residentContact.phone, null, 'missing phone is reported as missing')
+    const contactNow = new Date()
+    db.insert(residentPhoneIdentities).values({
+      id: randomUUID(),
+      userId: world.resident.userId,
+      phone: '13800000000',
+      verifiedAt: contactNow,
+      createdAt: contactNow,
+      updatedAt: contactNow,
+    }).run()
+    db.insert(residentProfiles).values({
+      userId: world.resident.userId,
+      contactAddress: '幸福路 1 号',
+      createdAt: contactNow,
+      updatedAt: contactNow,
+    }).run()
+    const withContact = await orderDetail(
+      await api(app, 'GET', `/admin/local-orders/${order.id}`, { session: admin }),
+    )
+    assert.deepEqual(withContact.residentContact, {
+      phone: '13800000000',
+      address: '幸福路 1 号',
+    })
+
+    // No manual sync has happened: the ledger is still empty for this community.
+    const before = await ledgerOverviewFor(app, admin, communityId)
+    assert.equal(bucket(before, 'order_registered')?.entryCount, 0)
+    assert.equal(bucket(before, 'order_verified')?.entryCount, 0)
+
+    const verified = await verifyStaff(app, grid, order, 'verify', '电话联系居民确认订单')
+    assert.equal(verified.status, 200)
+    const detail = localOrderDetailSchema.parse(await verified.json())
+    assert.equal(detail.status, 'verified')
+    assert.equal(detail.verification?.verifiedBy?.displayName, '网格员小李')
+    assert.equal(detail.verification?.note, '电话联系居民确认订单')
+
+    // Same transaction projected registered + verified facts: no sync required.
+    const after = await ledgerOverviewFor(app, admin, communityId)
+    assert.equal(bucket(after, 'order_registered')?.entryCount, 1)
+    assert.equal(bucket(after, 'order_registered')?.grossAmountCents, 3980)
+    assert.equal(bucket(after, 'order_verified')?.entryCount, 1)
+    assert.equal(bucket(after, 'order_verified')?.grossAmountCents, 3980)
+    assert.equal(after.attributed.entryCount, 0, 'community performance does not require personal attribution')
+    assert.equal(after.pendingAttribution.entryCount, 2)
+    assert.equal(after.payment.receivedCents, 0, 'verification never invents payment')
+    assert.equal(after.reward.costCents, 0)
+
+    const entriesResponse = await api(
+      app,
+      'GET',
+      `${LEDGER_ROUTES.adminEntries}?communityId=${communityId}&keyword=${order.id}`,
+      { session: admin },
+    )
+    assert.equal(entriesResponse.status, 200)
+    const entries = ledgerListResponseSchema.parse(await entriesResponse.json())
+    assert.deepEqual(
+      entries.items.map((item) => item.factKind).sort(),
+      ['order_registered', 'order_verified'],
+    )
+    assert.equal(new Set(entries.items.map((item) => item.sourceId)).size, 1)
+    assert.equal(entries.items.every((item) => item.attribution.state === 'pending'), true)
+
+    // A retry is a 409 and cannot add a second effective fact.
+    const retry = await verifyStaff(app, grid, detail, 'verify', '重复核验')
+    assert.equal(retry.status, 409)
+    assert.equal(await errorCode(retry), API_ERROR_CODES.orderAlreadyVerified)
+    const afterRetry = await ledgerOverviewFor(app, admin, communityId)
+    assert.equal(bucket(afterRetry, 'order_verified')?.entryCount, 1)
+
+    // A later manual sync sees both facts as already present.
+    const sync = await api(app, 'POST', LEDGER_ROUTES.adminSync, {
+      session: admin,
+      body: {},
+    })
+    assert.equal(sync.status, 200)
+    const syncBody = (await sync.json()) as { sources: { localOrder: { created: number; skipped: number } } }
+    assert.equal(syncBody.sources.localOrder.created, 0)
+    assert.equal(syncBody.sources.localOrder.skipped, 2)
+    assert.equal(db.select().from(localOrders).all().length, 1)
+  } finally {
+    world.sqlite.close()
+  }
+})
+
+test('grid rejection records the reason and actor without creating performance', async () => {
+  const world = await localWorld()
+  try {
+    const { app, admin, grid, resident, communityId } = world
+    const product = await createOnShelfProduct(app, admin, { communityId })
+    const order = await pendingOrderFor(app, grid, resident, product.id)
+
+    const rejectedResponse = await verifyStaff(
+      app,
+      grid,
+      order,
+      'reject',
+      '电话联系不上居民，资料无法核实',
+    )
+    assert.equal(rejectedResponse.status, 200)
+    const rejected = localOrderDetailSchema.parse(await rejectedResponse.json())
+    assert.equal(rejected.status, 'rejected')
+    assert.equal(rejected.statusNote, '电话联系不上居民，资料无法核实')
+    const rejectionEvent = rejected.events.find((event) => event.event === 'order.rejected')
+    assert.ok(rejectionEvent)
+    assert.equal(rejectionEvent.actorStaff?.displayName, '网格员小李')
+    assert.equal(rejectionEvent.note, '电话联系不上居民，资料无法核实')
+    assert.notEqual(rejectionEvent.createdAt, '')
+
+    const overview = await ledgerOverviewFor(app, admin, communityId)
+    assert.equal(bucket(overview, 'order_verified')?.entryCount, 0)
+    assert.equal(overview.payment.receivedCents, 0)
+  } finally {
+    world.sqlite.close()
+  }
+})
+
+test('concurrent verification produces one effective fact', async () => {
+  const world = await localWorld()
+  try {
+    const { app, admin, grid, resident, communityId } = world
+    const product = await createOnShelfProduct(app, admin, { communityId })
+    const order = await pendingOrderFor(app, grid, resident, product.id)
+
+    const responses = await Promise.all([
+      verifyStaff(app, grid, order, 'verify', '并发核验 A'),
+      verifyStaff(app, grid, order, 'verify', '并发核验 B'),
+    ])
+    assert.deepEqual(responses.map((response) => response.status).sort(), [200, 409])
+
+    const overview = await ledgerOverviewFor(app, admin, communityId)
+    assert.equal(bucket(overview, 'order_verified')?.entryCount, 1)
+    assert.equal(bucket(overview, 'order_verified')?.grossAmountCents, product.priceCents)
+  } finally {
+    world.sqlite.close()
+  }
+})
+
+test('reassignment moves future verification rights but never historical facts or performance', async () => {
+  const world = await localWorld()
+  try {
+    const { app, db, admin, operator, grid, resident, communityId, gridId } = world
+    const communityB = await createCommunity(app, admin, '继任片区 B')
+    const newGridId = await createStaffAccount(app, admin, {
+      username: 'grid.new',
+      displayName: '网格员小李',
+      password: GRID_PASSWORD,
+      role: 'grid_worker',
+      communityIds: [communityB],
+    })
+    const newGrid = await staffSession(app, 'grid.new', GRID_PASSWORD)
+    const product = await createOnShelfProduct(app, admin, { communityId })
+
+    const first = await pendingOrderFor(app, grid, resident, product.id)
+    assert.equal((await verifyStaff(app, grid, first, 'verify', '首单核验')).status, 200)
+    const firstDetail = await orderDetail(
+      await api(app, 'GET', `/admin/local-orders/${first.id}`, { session: admin }),
+    )
+    assert.equal(firstDetail.status, 'verified')
+    const gridAUserId = db.select({ userId: staffAccounts.userId }).from(staffAccounts)
+      .where(eq(staffAccounts.id, gridId)).get()!.userId
+    assert.equal(firstDetail.verification?.verifiedBy?.id, gridAUserId)
+    const performanceBefore = await ledgerOverviewFor(app, admin, communityId)
+
+    const second = await pendingOrderFor(app, grid, resident, product.id)
+    assert.equal((await verifyStaff(app, newGrid, second, 'verify', '越区核验')).status, 403)
+
+    // B must be freed before its worker can take A.
+    assert.equal((await api(
+      app,
+      'DELETE',
+      `/admin/communities/${communityB}/staff/${newGridId}`,
+      { session: admin },
+    )).status, 204)
+    assert.equal((await api(
+      app,
+      'PUT',
+      `/admin/communities/${communityId}/grid-worker`,
+      {
+        session: admin,
+        body: { staffAccountId: newGridId, expectedStaffAccountId: gridId },
+      },
+    )).status, 200)
+
+    // Old owner lost the territory; new owner can verify future pending orders.
+    assert.equal((await verifyStaff(app, grid, second, 'verify', '调岗后旧人')).status, 403)
+    assert.equal((await verifyStaff(app, newGrid, second, 'verify', '调岗后新人')).status, 200)
+
+    const firstAfter = await orderDetail(
+      await api(app, 'GET', `/admin/local-orders/${first.id}`, { session: admin }),
+    )
+    assert.equal(firstAfter.verification?.verifiedBy?.id, gridAUserId)
+    assert.equal(firstAfter.community.id, communityId)
+    const performanceAfter = await ledgerOverviewFor(app, admin, communityId)
+    assert.equal(
+      bucket(performanceAfter, 'order_verified')?.entryCount,
+      (bucket(performanceBefore, 'order_verified')?.entryCount ?? 0) + 1,
+    )
+    assert.equal(bucket(performanceAfter, 'order_verified')?.grossAmountCents, product.priceCents * 2)
+
+    // No current grid worker: the order still belongs to the community and an
+    // authorized operator can verify it.
+    assert.equal((await api(
+      app,
+      'DELETE',
+      `/admin/communities/${communityId}/staff/${newGridId}`,
+      { session: admin },
+    )).status, 204)
+    const third = await pendingOrderFor(app, operator, resident, product.id)
+    assert.equal((await verifyStaff(app, newGrid, third, 'verify', '无人片区旧人')).status, 403)
+    assert.equal((await api(
+      app,
+      'POST',
+      `/admin/local-orders/${third.id}/verify`,
+      {
+        session: operator,
+        body: { expectedUpdatedAt: third.updatedAt, decision: 'verify', note: '无人片区运营核验' },
+      },
+    )).status, 200)
+
+    const finalOverview = await ledgerOverviewFor(app, admin, communityId)
+    assert.equal(bucket(finalOverview, 'order_verified')?.entryCount, 3)
+    assert.equal(finalOverview.payment.receivedCents, 0)
   } finally {
     world.sqlite.close()
   }

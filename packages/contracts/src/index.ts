@@ -255,9 +255,23 @@ export const createCommunityRequestSchema = z.strictObject({
   location: communityLocationSchema.optional(),
 })
 
-/** Add an existing scoped operator/grid worker to a community, never create a new identity. */
+/**
+ * Add an existing scoped operator or grid worker to a community, never create a
+ * new identity. For a grid worker this is an operating-territory appointment;
+ * replacement uses the dedicated atomic route.
+ */
 export const linkCommunityStaffRequestSchema = z.strictObject({
   staffAccountId: z.string().uuid(),
+})
+
+/**
+ * Territory replacement is optimistic: the caller states which owner it saw.
+ * A concurrent replacement therefore receives a 409 instead of silently
+ * overwriting the administrator who saved first.
+ */
+export const gridWorkerAssignmentRequestSchema = z.strictObject({
+  staffAccountId: z.string().uuid(),
+  expectedStaffAccountId: z.string().uuid().nullable(),
 })
 
 export const createStaffAccountRequestSchema = z.object({
@@ -270,6 +284,23 @@ export const createStaffAccountRequestSchema = z.object({
     z.string().uuid().optional(),
   ),
   communityIds: z.array(z.string().uuid()).min(1).max(20),
+}).superRefine((value, ctx) => {
+  if (new Set(value.communityIds).size !== value.communityIds.length) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'communityIds must not contain duplicates',
+      path: ['communityIds'],
+    })
+  }
+  // A grid worker owns exactly one logical territory. Operators may keep the
+  // existing multi-community authorization model.
+  if (value.role === 'grid_worker' && value.communityIds.length !== 1) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'a grid worker must own exactly one territory',
+      path: ['communityIds'],
+    })
+  }
 })
 
 export const authUserSchema = z.object({
@@ -1505,6 +1536,7 @@ export const LOCAL_ORDER_ROUTES = {
   staffOrders: '/staff/local-orders',
   staffOrderDetail: '/staff/local-orders/:localOrderId',
   staffOrderStatus: '/staff/local-orders/:localOrderId/status',
+  staffOrderVerify: '/staff/local-orders/:localOrderId/verify',
   /** Back office: admin/operator only. */
   adminOrders: '/admin/local-orders',
   adminOrderDetail: '/admin/local-orders/:localOrderId',
@@ -1774,12 +1806,22 @@ export const localOrderEventSchema = z.object({
 export type LocalOrderEvent = z.infer<typeof localOrderEventSchema>
 
 /**
- * Order detail. `verification` exists only after an operations review, and the
- * contract has no payment/activation field at all: `verified` is a manual fact
- * check by a human operator, never "已付款" or "已开通".
+ * Order detail. `verification` exists only after a staff review (the current
+ * territory grid worker, an operator or an admin), and the contract has no
+ * payment/activation field at all: `verified` is a manual fact check by a human,
+ * never "已付款" or "已开通".
  */
 export const localOrderDetailSchema = localOrderSummarySchema
   .extend({
+    /**
+     * Resident-supplied contact facts for the phone-verification workflow.
+     * The list intentionally carries no phone; only this scoped detail payload
+     * exposes the verified phone/address, and only to its owner or authorized staff.
+     */
+    residentContact: z.strictObject({
+      phone: z.string().regex(/^1\d{10}$/u).nullable(),
+      address: z.string().min(1).max(200).nullable(),
+    }),
     verification: z
       .object({
         verifiedBy: crmUserRefSchema.nullable(),
@@ -1878,8 +1920,9 @@ export type UpdateLocalOrderStatusRequest = z.infer<
 >
 
 /**
- * Operations verification. `verify` is the only path to `verified` and always
+ * Scoped staff verification. `verify` is the only path to `verified` and always
  * records the reviewer and a note; `reject` moves the order to `rejected`.
+ * The caller's current territory/assignment is re-checked server-side.
  * Re-verifying an already verified order is an explicit 409
  * `order_already_verified`, never a silent second success.
  */

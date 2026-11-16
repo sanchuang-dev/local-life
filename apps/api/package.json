@@ -12,7 +12,8 @@
     "test": "node --import tsx --test test/*.test.ts",
     "db:generate": "drizzle-kit generate",
     "bootstrap-admin": "tsx src/scripts/bootstrap-admin.ts",
-    "db:prepare": "tsx src/scripts/setup-db.ts"
+    "db:prepare": "tsx src/scripts/setup-db.ts",
+    "db:grid-territory:preflight": "tsx src/scripts/check-grid-territory-conflicts.ts"
   },
   "dependencies": {
     "@hono/node-server": "2.1.5",

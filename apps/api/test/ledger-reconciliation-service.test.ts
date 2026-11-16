@@ -108,7 +108,12 @@ function makeWorld(): World {
       .run()
     for (const scoped of scopedCommunityIds) {
       db.insert(staffCommunityAssignments)
-        .values({ staffAccountId: staffId, communityId: scoped, createdAt: DAY_START })
+        .values({
+          staffAccountId: staffId,
+          communityId: scoped,
+          assignmentKind: role === 'grid_worker' ? 'grid_territory' : 'operator_scope',
+          createdAt: DAY_START,
+        })
         .run()
     }
     return { userId, staffId }

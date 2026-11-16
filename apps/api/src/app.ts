@@ -25,6 +25,7 @@ import {
   tencentMapPickerConfigSchema,
   createStaffAccountRequestSchema,
   linkCommunityStaffRequestSchema,
+  gridWorkerAssignmentRequestSchema,
   healthResponseSchema,
   isActivityId,
   staffLoginRequestSchema,
@@ -264,6 +265,30 @@ function staffCommunities(db: AppDatabase, staffAccountId: string) {
     .innerJoin(communities, eq(staffCommunityAssignments.communityId, communities.id))
     .where(eq(staffCommunityAssignments.staffAccountId, staffAccountId))
     .all()
+}
+
+function assignmentKindFor(role: string): 'operator_scope' | 'grid_territory' {
+  return role === 'grid_worker' ? 'grid_territory' : 'operator_scope'
+}
+
+function gridTerritoryOfStaff(db: AppDatabase, staffAccountId: string) {
+  return db.select({ communityId: staffCommunityAssignments.communityId })
+    .from(staffCommunityAssignments)
+    .where(and(
+      eq(staffCommunityAssignments.staffAccountId, staffAccountId),
+      eq(staffCommunityAssignments.assignmentKind, 'grid_territory'),
+    ))
+    .get()
+}
+
+function gridTerritoryOfCommunity(db: AppDatabase, communityId: string) {
+  return db.select({ staffAccountId: staffCommunityAssignments.staffAccountId })
+    .from(staffCommunityAssignments)
+    .where(and(
+      eq(staffCommunityAssignments.communityId, communityId),
+      eq(staffCommunityAssignments.assignmentKind, 'grid_territory'),
+    ))
+    .get()
 }
 
 function sessionResponse(
@@ -1511,28 +1536,179 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
       )).get()
     if (existing) return fail(c, 409, API_ERROR_CODES.conflict, '该账户已关联此社区')
 
+    const assignmentKind = assignmentKindFor(member.role)
+    if (assignmentKind === 'grid_territory') {
+      const owned = gridTerritoryOfStaff(db, member.id)
+      if (owned) {
+        return fail(c, 409, API_ERROR_CODES.conflict, '该网格员已经营其他片区，请先解除原片区负责人')
+      }
+      if (gridTerritoryOfCommunity(db, communityId)) {
+        return fail(c, 409, API_ERROR_CODES.conflict, '该片区已有经营网格员，请先更换或解除')
+      }
+    }
+
     const now = new Date()
     try {
       db.transaction((tx) => {
         tx.insert(staffCommunityAssignments).values({
-          staffAccountId: member.id, communityId, createdAt: now,
+          staffAccountId: member.id, communityId, assignmentKind, createdAt: now,
         }).run()
         tx.insert(auditLogs).values({
           id: randomUUID(),
           actorUserId: session.userId,
           event: 'staff.community_assigned',
           targetId: member.id,
-          metadata: JSON.stringify({ communityId }),
+          metadata: JSON.stringify({ communityId, assignmentKind }),
           createdAt: now,
         }).run()
       })
     } catch (cause) {
       if (cause instanceof Error && /unique|primary key/i.test(cause.message)) {
-        return fail(c, 409, API_ERROR_CODES.conflict, '该账户已关联此社区')
+        return fail(c, 409, API_ERROR_CODES.conflict,
+          assignmentKind === 'grid_territory'
+            ? '该片区已有经营网格员，或该网格员已经营其他片区'
+            : '该账户已关联此社区')
       }
       throw cause
     }
     return c.json({ staffAccountId: member.id, communityId }, 201)
+  })
+
+  /**
+   * Atomically appoint or replace a territory's grid worker.
+   *
+   * Deletion of the previous row and insertion of the new one happen in one
+   * IMMEDIATE transaction, so concurrent admins cannot leave a territory with
+   * two owners or a worker owning two territories. Historical residents and
+   * orders are untouched; only the current operating responsibility moves.
+   */
+  app.put('/admin/communities/:communityId/grid-worker', async (c) => {
+    const session = c.get('authSession')
+    if (!session?.staff) return fail(c, 401, API_ERROR_CODES.unauthorized, '请先登录管理后台')
+    if (session.staff.role !== 'admin') {
+      return fail(c, 403, API_ERROR_CODES.forbidden, '只有管理员可以分配经营网格员')
+    }
+    if (!validCsrf(c, config, session)) return fail(c, 403, API_ERROR_CODES.forbidden, 'CSRF 校验失败')
+    const communityId = c.req.param('communityId')
+    const body = bodySchemaError(await c.req.json().catch(() => null), gridWorkerAssignmentRequestSchema)
+    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '负责人信息不正确')
+    if (!db.select({ id: communities.id }).from(communities)
+      .where(eq(communities.id, communityId)).get()) {
+      return fail(c, 404, API_ERROR_CODES.notFound, '社区不存在')
+    }
+    const member = db.select({ id: staffAccounts.id, role: staffAccounts.role, status: staffAccounts.status })
+      .from(staffAccounts).where(eq(staffAccounts.id, body.staffAccountId)).get()
+    if (!member) return fail(c, 404, API_ERROR_CODES.notFound, '后台账户不存在')
+    if (member.role !== 'grid_worker') {
+      return fail(c, 400, API_ERROR_CODES.invalidRequest, '只能把网格员分配为片区负责人')
+    }
+    if (member.status !== 'active') return fail(c, 409, API_ERROR_CODES.conflict, '不能分配已停用的账户')
+
+    const targetTerritory = gridTerritoryOfStaff(db, member.id)
+    if (targetTerritory && targetTerritory.communityId !== communityId) {
+      return fail(c, 409, API_ERROR_CODES.conflict, '该网格员已经营其他片区，请先解除原片区负责人')
+    }
+    const now = new Date()
+    let conflict: 'stale' | 'already' | null = null
+    try {
+      db.transaction((tx) => {
+        // Re-read inside the IMMEDIATE transaction: another administrator may
+        // have changed this territory after the caller rendered the drawer.
+        const current = tx.select({ staffAccountId: staffCommunityAssignments.staffAccountId })
+          .from(staffCommunityAssignments)
+          .where(and(
+            eq(staffCommunityAssignments.communityId, communityId),
+            eq(staffCommunityAssignments.assignmentKind, 'grid_territory'),
+          )).get()
+        const currentId = current?.staffAccountId ?? null
+        if (currentId === member.id) {
+          conflict = 'already'
+          return
+        }
+        if (currentId !== body.expectedStaffAccountId) {
+          conflict = 'stale'
+          return
+        }
+        if (current) {
+          tx.delete(staffCommunityAssignments).where(and(
+            eq(staffCommunityAssignments.staffAccountId, current.staffAccountId),
+            eq(staffCommunityAssignments.communityId, communityId),
+            eq(staffCommunityAssignments.assignmentKind, 'grid_territory'),
+          )).run()
+        }
+        tx.insert(staffCommunityAssignments).values({
+          staffAccountId: member.id,
+          communityId,
+          assignmentKind: 'grid_territory',
+          createdAt: now,
+        }).run()
+        tx.insert(auditLogs).values({
+          id: randomUUID(),
+          actorUserId: session.userId,
+          event: 'staff.grid_territory_reassigned',
+          targetId: member.id,
+          metadata: JSON.stringify({
+            communityId,
+            previousStaffAccountId: currentId,
+          }),
+          createdAt: now,
+        }).run()
+      }, { behavior: 'immediate' })
+    } catch (cause) {
+      if (cause instanceof Error && /unique|primary key/i.test(cause.message)) {
+        return fail(c, 409, API_ERROR_CODES.conflict, '该片区或该网格员已经有经营归属，请刷新后重试')
+      }
+      throw cause
+    }
+    if (conflict === 'already') {
+      return fail(c, 409, API_ERROR_CODES.conflict, '该网格员已是本片区负责人')
+    }
+    if (conflict === 'stale') {
+      return fail(c, 409, API_ERROR_CODES.conflict, '片区负责人已被其他管理员更新，请刷新后重试')
+    }
+    return c.json({ staffAccountId: member.id, communityId })
+  })
+
+  /**
+   * Remove one assignment. For a grid worker this frees the territory and
+   * revokes access on the next request; communities, residents and orders stay.
+   */
+  app.delete('/admin/communities/:communityId/staff/:staffAccountId', async (c) => {
+    const session = c.get('authSession')
+    if (!session?.staff) return fail(c, 401, API_ERROR_CODES.unauthorized, '请先登录管理后台')
+    if (session.staff.role !== 'admin') {
+      return fail(c, 403, API_ERROR_CODES.forbidden, '只有管理员可以解除社区人员')
+    }
+    if (!validCsrf(c, config, session)) return fail(c, 403, API_ERROR_CODES.forbidden, 'CSRF 校验失败')
+    const communityId = c.req.param('communityId')
+    const staffAccountId = c.req.param('staffAccountId')
+    const assignment = db.select({ assignmentKind: staffCommunityAssignments.assignmentKind })
+      .from(staffCommunityAssignments)
+      .where(and(
+        eq(staffCommunityAssignments.staffAccountId, staffAccountId),
+        eq(staffCommunityAssignments.communityId, communityId),
+      )).get()
+    if (!assignment) return fail(c, 404, API_ERROR_CODES.notFound, '未找到该社区人员关联')
+
+    const now = new Date()
+    db.transaction((tx) => {
+      tx.delete(staffCommunityAssignments).where(and(
+        eq(staffCommunityAssignments.staffAccountId, staffAccountId),
+        eq(staffCommunityAssignments.communityId, communityId),
+      )).run()
+      tx.insert(auditLogs).values({
+        id: randomUUID(),
+        actorUserId: session.userId,
+        event: 'staff.community_unassigned',
+        targetId: staffAccountId,
+        metadata: JSON.stringify({
+          communityId,
+          assignmentKind: assignment.assignmentKind,
+        }),
+        createdAt: now,
+      }).run()
+    }, { behavior: 'immediate' })
+    return c.body(null, 204)
   })
 
   app.post('/admin/staff', async (c) => {
@@ -1553,6 +1729,17 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     }
     if (db.select().from(staffAccounts).where(eq(staffAccounts.username, body.username.toLowerCase())).get()) {
       return fail(c, 409, API_ERROR_CODES.conflict, '登录账号已存在')
+    }
+
+    const assignmentKind = assignmentKindFor(body.role)
+    if (assignmentKind === 'grid_territory') {
+      const [communityId] = body.communityIds
+      if (!communityId) {
+        return fail(c, 400, API_ERROR_CODES.invalidRequest, '网格员必须且只能经营一个片区')
+      }
+      if (gridTerritoryOfCommunity(db, communityId)) {
+        return fail(c, 409, API_ERROR_CODES.conflict, '该片区已有经营网格员，请先更换或解除')
+      }
     }
 
     const existingUser = body.userId
@@ -1604,6 +1791,7 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
           .values(body.communityIds.map((communityId) => ({
             staffAccountId: staffId,
             communityId,
+            assignmentKind,
             createdAt: now,
           })))
           .run()
@@ -1620,6 +1808,9 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
       })
     } catch (error) {
       if (error instanceof Error && /unique/i.test(error.message)) {
+        if (assignmentKind === 'grid_territory' && /staff_community_assignments/i.test(error.message)) {
+          return fail(c, 409, API_ERROR_CODES.conflict, '该片区已有经营网格员，请先刷新后重试')
+        }
         return fail(c, 409, API_ERROR_CODES.conflict, '登录账号已存在')
       }
       throw error

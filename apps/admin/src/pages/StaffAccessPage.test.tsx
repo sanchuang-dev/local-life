@@ -238,7 +238,7 @@ describe('StaffAccessPage account creation in system settings', () => {
     fireEvent.submit(document.getElementById('ll-create-backoffice-account-form')!)
 
     expect(await screen.findByText('请选择角色')).toBeTruthy()
-    expect(await screen.findByText('请选择至少一个负责社区')).toBeTruthy()
+    expect(await screen.findByText('请选择负责社区 / 片区')).toBeTruthy()
     expect(postCalls(calls, '/api/admin/staff')).toEqual([])
     expect(openDrawers()).toBe(1)
   })

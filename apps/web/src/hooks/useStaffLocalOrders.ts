@@ -4,11 +4,13 @@ import type {
   LocalOrderStatus,
   LocalOrderSummary,
   LocalOrderTransitionStatus,
+  LocalOrderVerifyRequest,
 } from '@sanchuang-dev/local-life-contracts'
 import {
   getStaffLocalOrder,
   listStaffLocalOrders,
   updateStaffLocalOrderStatus,
+  verifyStaffLocalOrder,
 } from '../services/localOrders'
 import { describeLocalError, isLocalApiError } from '../services/localApi'
 
@@ -194,4 +196,31 @@ export function useStaffOrderTransition(csrfToken: string | null) {
   )
 
   return { busy, transition }
+}
+
+/**
+ * POST `/staff/local-orders/:id/verify` for the current order.
+ *
+ * It is a separate hook from the ordinary status transition: the server applies
+ * a narrower territory check and records the verifier/reason. The workspace
+ * must reload the detail after success so the verification and ledger state are
+ * the server's, not a client guess.
+ */
+export function useStaffOrderVerification(csrfToken: string | null) {
+  const [busy, setBusy] = useState(false)
+
+  const verify = useCallback(
+    async (order: LocalOrderDetail, request: LocalOrderVerifyRequest) => {
+      if (!csrfToken) throw new Error('登录状态已失效，请重新登录')
+      setBusy(true)
+      try {
+        return await verifyStaffLocalOrder(csrfToken, order.id, request)
+      } finally {
+        setBusy(false)
+      }
+    },
+    [csrfToken],
+  )
+
+  return { busy, verify }
 }

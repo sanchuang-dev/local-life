@@ -74,6 +74,18 @@ describe('admin route table user directory split', () => {
     expect(screen.queryByText('社区居民')).toBeNull()
   })
 
+  it('keeps performance overview and ledger as two independent real routes', () => {
+    const root = routes.find((route) => route.path === '/')
+    const children = root?.children ?? []
+    const overview = children.find((route) => route.path === 'performance')
+    const ledger = children.find((route) => route.path === 'performance/ledger')
+    expect(overview?.element).toBeTruthy()
+    expect(ledger?.element).toBeTruthy()
+    expect(overview?.element).not.toBe(ledger?.element)
+    expect(findNavPage('/performance')?.label).toBe('业绩总览')
+    expect(findNavPage('/performance/ledger')?.label).toBe('经营流水')
+  })
+
   it('keeps reconciliation and settlement as two independent real routes', () => {
     const root = routes.find((route) => route.path === '/')
     const children = root?.children ?? []
