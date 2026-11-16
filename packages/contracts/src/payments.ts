@@ -94,6 +94,43 @@ export type PaymentEventSource = z.infer<typeof paymentEventSourceSchema>
 const merchantPartSchema = z.string().trim().min(1).max(64)
 
 /**
+ * Match the SQLite terminal_time CHECK constraints exactly. A terminal state
+ * owns one timestamp; the other terminal timestamps must be null. Failure
+ * details are meaningful only in the failed state.
+ */
+function terminalFactIssues(
+  status: PaymentStatus,
+  timestamps: { paid: string | null; closed: string | null; failed: string | null },
+  failure: { code: string | null; message: string | null },
+  paidField: 'paidAt' | 'confirmedAt',
+): Array<{ path: string[]; message: string }> {
+  const issues: Array<{ path: string[]; message: string }> = []
+  const fields = [
+    { state: 'paid', field: paidField, value: timestamps.paid },
+    { state: 'closed', field: 'closedAt', value: timestamps.closed },
+    { state: 'failed', field: 'failedAt', value: timestamps.failed },
+  ] as const
+
+  for (const field of fields) {
+    if ((status === field.state) !== (field.value !== null)) {
+      issues.push({
+        path: [field.field],
+        message: `${field.field} must be set exactly when status is ${field.state}`,
+      })
+    }
+  }
+  if (status !== 'failed') {
+    if (failure.code !== null) {
+      issues.push({ path: ['failureCode'], message: 'failureCode requires failed status' })
+    }
+    if (failure.message !== null) {
+      issues.push({ path: ['failureMessage'], message: 'failureMessage requires failed status' })
+    }
+  }
+  return issues
+}
+
+/**
  * One payment intent for a local order. Multiple intents per order are legal
  * (a closed/failed attempt may be retried), but the database allows at most one
  * `paid` intent for an order.
@@ -161,14 +198,13 @@ export const paymentIntentSchema = z
         ctx.addIssue({ code: 'custom', message: 'channel payment requires positive net payable', path: ['netPayableCents'] })
       }
     }
-    if (value.status === 'paid' && value.paidAt === null) {
-      ctx.addIssue({ code: 'custom', message: 'paid requires paidAt', path: ['paidAt'] })
-    }
-    if (value.status === 'closed' && value.closedAt === null) {
-      ctx.addIssue({ code: 'custom', message: 'closed requires closedAt', path: ['closedAt'] })
-    }
-    if (value.status === 'failed' && value.failedAt === null) {
-      ctx.addIssue({ code: 'custom', message: 'failed requires failedAt', path: ['failedAt'] })
+    for (const issue of terminalFactIssues(
+      value.status,
+      { paid: value.paidAt, closed: value.closedAt, failed: value.failedAt },
+      { code: value.failureCode, message: value.failureMessage },
+      'paidAt',
+    )) {
+      ctx.addIssue({ code: 'custom', ...issue })
     }
   })
 export type PaymentIntent = z.infer<typeof paymentIntentSchema>
@@ -190,18 +226,20 @@ export const paymentAttemptSchema = z
     failureMessage: z.string().trim().min(1).max(500).nullable(),
   })
   .superRefine((value, ctx) => {
-    if (value.status === 'paid' && (value.confirmedAt === null || value.providerTransactionId === null)) {
+    for (const issue of terminalFactIssues(
+      value.status,
+      { paid: value.confirmedAt, closed: value.closedAt, failed: value.failedAt },
+      { code: value.failureCode, message: value.failureMessage },
+      'confirmedAt',
+    )) {
+      ctx.addIssue({ code: 'custom', ...issue })
+    }
+    if (value.status === 'paid' && value.providerTransactionId === null) {
       ctx.addIssue({
         code: 'custom',
-        message: 'paid attempt requires confirmedAt and providerTransactionId',
-        path: ['status'],
+        message: 'paid attempt requires providerTransactionId',
+        path: ['providerTransactionId'],
       })
-    }
-    if (value.status === 'closed' && value.closedAt === null) {
-      ctx.addIssue({ code: 'custom', message: 'closed requires closedAt', path: ['closedAt'] })
-    }
-    if (value.status === 'failed' && value.failedAt === null) {
-      ctx.addIssue({ code: 'custom', message: 'failed requires failedAt', path: ['failedAt'] })
     }
   })
 export type PaymentAttempt = z.infer<typeof paymentAttemptSchema>
@@ -242,13 +280,7 @@ export const createPaymentIntentRequestSchema = z.strictObject({
 })
 export type CreatePaymentIntentRequest = z.infer<typeof createPaymentIntentRequestSchema>
 
-export const updatePaymentStatusRequestSchema = z.strictObject({
-  expectedUpdatedAt: z.string().datetime({ offset: true }),
-  status: paymentStatusSchema,
-  note: z.string().trim().max(500).optional(),
-})
-export type UpdatePaymentStatusRequest = z.infer<typeof updatePaymentStatusRequestSchema>
-
+/** Payment status changes are internal to trusted PAY-03 services, never a resident API DTO. */
 export const paymentIntentListQuerySchema = z.strictObject({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
