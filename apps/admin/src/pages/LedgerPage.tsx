@@ -360,7 +360,7 @@ function LedgerConsole({ session }: { session: AuthenticatedSession }) {
   const filterDefinitions: readonly PanelFilter<LedgerFilters>[] = [
     { key: 'range', label: '业务日期', kind: 'dateRange', format: 'YYYY-MM-DD' },
     { key: 'communityId', label: '社区', kind: 'select', options: communityOptions },
-    { key: 'staffId', label: '业绩归属网格员', kind: 'select', options: staffOptions },
+    { key: 'staffId', label: '历史人员归属', kind: 'select', options: staffOptions },
     { key: 'factKind', label: '事实类型', kind: 'select', options: FACT_KIND_OPTIONS },
     { key: 'sourceSystem', label: '来源系统', kind: 'select', options: SOURCE_SYSTEM_OPTIONS },
     {
@@ -429,7 +429,7 @@ function LedgerConsole({ session }: { session: AuthenticatedSession }) {
     },
     {
       key: 'attribution',
-      title: '业绩归属',
+      title: '历史人员归属',
       render: (_value: unknown, row: LedgerEntry) => (
         <Space orientation="vertical" size={2}>
           {row.attribution.state === 'attributed' ? (
@@ -477,7 +477,7 @@ function LedgerConsole({ session }: { session: AuthenticatedSession }) {
     <div className="page">
       <PageHeader
         title="经营流水"
-        description="按社区、业绩归属、事实类型与异常筛选服务端分页流水；每笔都保留来源、凭据、归属和对账状态。"
+        description="按社区、历史人员归属、事实类型与异常筛选服务端分页流水；每笔都保留来源、凭据、归属和对账状态。"
         extra={
           <Space wrap>
             <Button onClick={syncSources} loading={syncing}>同步来源事实</Button>
@@ -496,7 +496,7 @@ function LedgerConsole({ session }: { session: AuthenticatedSession }) {
               <li>六类事实不合并：登记金额与已核验业绩常描述同一笔业务，不提供合计金额。</li>
               <li>人工实收只统计带凭据的线下收款；冲正单独成行，不减记实收。</li>
               <li>归属只取来源事实上明确存在的网格员，其余记为「待归属」；历史人员归属不影响社区有效业绩统计。</li>
-              <li>来源事实需由运营人员显式「同步来源事实」，本页不做自动实时同步。</li>
+              <li>本地订单核验通过后会自动生成社区有效业绩；「同步来源事实」仅用于历史回填及 CRM、奖励等尚未自动同步的来源。</li>
               <li>活动维度筛选尚无服务端字段，本轮不提供。</li>
             </ul>
           }
@@ -626,7 +626,7 @@ function LedgerConsole({ session }: { session: AuthenticatedSession }) {
             <section className="ledger-detail-section" aria-label="归属与凭据">
               <Typography.Title level={5}>归属与凭据</Typography.Title>
               <Descriptions size="small" column={1} colon={false}>
-                <Descriptions.Item label="业绩归属">
+                <Descriptions.Item label="历史人员归属">
                   <span>
                     {LEDGER_ATTRIBUTION_STATE_LABELS[entry.attribution.state]}
                     {entry.attribution.staffId ? ` · ${staffName(entry.attribution.staffId)}` : ''}

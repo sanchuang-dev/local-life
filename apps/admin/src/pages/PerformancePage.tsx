@@ -207,7 +207,8 @@ function PerformanceConsole({ session }: { session: AuthenticatedSession }) {
               <li>归属只取来源事实上明确存在的网格员，待归属不计入任何人的业绩。</li>
               <li>社区有效业绩按订单原始的 communityId 汇总，不依赖个人归属；人员归属只用于历史核查。</li>
               <li>结算规则未配置，金额均为账面登记毛额（{SETTLEMENT_AMOUNT_STATUS_LABELS.pending_rule}），不据此计算应付或分账。</li>
-              <li>「重读总览」只重新读取服务端投影；新订单核验后需先「同步来源事实」，本页不做自动实时同步。</li>
+              <li>本地订单核验通过后会自动生成社区有效业绩；「同步来源事实」仅用于历史回填及 CRM、奖励等尚未自动同步的来源。</li>
+              <li>「重读总览」只重新读取服务端投影，不触发来源同步。</li>
             </ul>
           }
         />
@@ -271,13 +272,13 @@ function PerformanceConsole({ session }: { session: AuthenticatedSession }) {
             />
           </label>
           <label className="ledger-filter-field">
-            <span>业绩归属</span>
+            <span>历史人员归属</span>
             <Select
               allowClear
               showSearch
               optionFilterProp="label"
-              aria-label="业绩归属"
-              placeholder="全部网格员"
+              aria-label="历史人员归属"
+              placeholder="全部人员（历史归属）"
               value={scope.staffId}
               options={staffOptions}
               onChange={(value?: string) =>
@@ -295,6 +296,10 @@ function PerformanceConsole({ session }: { session: AuthenticatedSession }) {
             </Button>
           ) : null}
         </div>
+        <Typography.Text type="secondary" className="ledger-filter-hint">
+          「历史人员归属」只筛选已确认个人归属的流水，会排除尚未确认个人归属的本地订单；
+          查看社区有效业绩请清空此项。
+        </Typography.Text>
 
         {error ? (
           <Alert
@@ -470,7 +475,7 @@ function LedgerReport({
       </div>
       {overview.totals.entryCount === 0 ? (
         <Typography.Paragraph className="ledger-report-empty-note" type="secondary">
-          当前范围暂无经营流水。完成订单核验等业务后，请先点击「同步来源事实」再查看。
+          当前范围暂无经营流水。新订单核验通过后会自动计入；历史订单或 CRM、奖励来源可点击「同步来源事实」回填。
         </Typography.Paragraph>
       ) : null}
       <Typography.Text className="ledger-report-asof" type="secondary">

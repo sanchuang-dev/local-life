@@ -132,7 +132,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         key: '/performance',
         label: '业绩总览',
         description:
-          '按社区、业务日期与业绩归属汇总登记金额、已核验业绩、人工实收与冲正、奖励成本与冲正；不计算应付或分账。',
+          '按社区、业务日期与历史人员归属汇总登记金额、已核验业绩、人工实收与冲正、奖励成本与冲正；不计算应付或分账。',
         status: 'ready',
         planned: [],
         roles: ['admin', 'operator'],
@@ -141,7 +141,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         key: '/performance/ledger',
         label: '经营流水',
         description:
-          '服务端分页查询经营流水：事实类型、来源、未解决异常、凭据、业绩归属与对账状态逐笔可查。',
+          '服务端分页查询经营流水：事实类型、来源、未解决异常、凭据、历史人员归属与对账状态逐笔可查。',
         status: 'ready',
         planned: [],
         roles: ['admin', 'operator'],
