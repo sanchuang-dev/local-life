@@ -47,7 +47,7 @@ function uuid(): string {
   return randomUUID()
 }
 
-function seedWorld(db: AppDatabase): World {
+function seedWorld(db: AppDatabase): Omit<World, 'sqlite'> {
   const communityA = uuid()
   const communityB = uuid()
   const residentA = uuid()
@@ -136,7 +136,6 @@ function seedWorld(db: AppDatabase): World {
   }).run()
   return {
     db,
-    sqlite: null as never,
     communityA,
     communityB,
     residentA,
