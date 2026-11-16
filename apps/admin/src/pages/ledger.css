@@ -329,6 +329,8 @@
 
 /* Input constraints (for example the 80-character keyword limit) stay visible. */
 .ledger-filter-hint {
+  display: block;
+  margin-top: -4px;
   font-size: 12px;
   line-height: 1.5;
   color: var(--ant-color-text-description, #64748b);
