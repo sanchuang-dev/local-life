@@ -73,9 +73,13 @@ export function StaffAccessPage({ session }: Props) {
     { key: 'name', title: '显示名称', render: (_, person) => person.displayName || '—' },
     { key: 'role', title: '角色', render: (_, person) =>
       <Tag color={person.role === 'grid_worker' ? 'blue' : 'green'}>{STAFF_ROLE_LABELS[person.role]}</Tag> },
-    { key: 'scope', title: '社区授权', render: (_, person) => person.role === 'admin'
+    { key: 'scope', title: '社区 / 片区', render: (_, person) => person.role === 'admin'
       ? <Typography.Text type="secondary">全局管理</Typography.Text>
-      : person.communities.length ? person.communities.map((item) => item.name).join('、') : '未分配' },
+      : person.role === 'grid_worker'
+        ? person.communities.length
+          ? `经营片区：${person.communities.map((item) => item.name).join('、')}`
+          : '未分配片区'
+        : person.communities.length ? person.communities.map((item) => item.name).join('、') : '未授权' },
     { key: 'status', title: '状态', render: (_, person) =>
       <Tag color={person.status === 'active' ? 'success' : 'default'}>
         {person.status === 'active' ? '正常' : '停用'}
@@ -200,13 +204,29 @@ export function StaffAccessPage({ session }: Props) {
               { value: 'grid_worker', label: '网格员' }, { value: 'operator', label: '运营员' },
             ]}/>
           </Form.Item>
-          <Form.Item name="communityIds" label="初始授权社区"
-            rules={[{ required: true, type: 'array', min: 1, message: '请选择至少一个负责社区' }]}>
-            <Select mode="multiple" allowClear placeholder="选择一个或多个社区"
-              options={communities.map((item) => ({ value: item.id, label: item.name }))}/>
+          <Form.Item
+            name="communityIds"
+            label="负责社区 / 片区"
+            rules={[
+              { required: true, type: 'array', min: 1, message: '请选择负责社区 / 片区' },
+              {
+                validator: async (_rule, value: string[] | undefined) => {
+                  if (form.getFieldValue('role') === 'grid_worker' && value?.length !== 1) {
+                    throw new Error('网格员必须且只能负责一个片区')
+                  }
+                },
+              },
+            ]}
+          >
+            <Select
+              mode="multiple"
+              allowClear
+              placeholder="选择负责社区 / 片区"
+              options={communities.map((item) => ({ value: item.id, label: item.name }))}
+            />
           </Form.Item>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            以后需要追加社区，可到「社区管理」中关联已有账号。角色与状态目前只读，不提供未经服务端支持的编辑操作。
+            运营员可选择多个社区；网格员只能负责一个片区，且一个片区只能有一名经营网格员。角色与状态目前只读。
           </Typography.Text>
         </Form>
       </Drawer>
@@ -217,7 +237,13 @@ export function StaffAccessPage({ session }: Props) {
           <Typography.Text>登录账号：{detail.username}</Typography.Text>
           <Typography.Text>角色：{STAFF_ROLE_LABELS[detail.role]}</Typography.Text>
           <Typography.Text>状态：{detail.status === 'active' ? '正常' : '已停用'}</Typography.Text>
-          <Typography.Text>授权社区：{detail.role === 'admin' ? '全局管理' : detail.communities.map((c) => c.name).join('、') || '未分配'}</Typography.Text>
+          <Typography.Text>
+            {detail.role === 'admin'
+              ? '授权范围：全局管理'
+              : detail.role === 'grid_worker'
+                ? `经营片区：${detail.communities.map((c) => c.name).join('、') || '未分配'}`
+                : `授权社区：${detail.communities.map((c) => c.name).join('、') || '未授权'}`}
+          </Typography.Text>
         </Space>}
       </Drawer>
     </div>
