@@ -143,6 +143,7 @@ function makeWorld(): World {
 }
 
 interface EntryInput {
+  entryId?: string
   factKind: LedgerFactKind
   sourceSystem: LedgerSourceSystem
   sourceId?: string
@@ -166,7 +167,7 @@ interface EntryInput {
  * is a real contract violation, not a fixture bug.
  */
 function insertEntry(world: World, input: EntryInput): string {
-  const id = randomUUID()
+  const id = input.entryId ?? randomUUID()
   const attributedStaffId = input.attributedStaffId ?? null
   const isPayment =
     input.factKind === 'payment_received' || input.factKind === 'payment_reversed'
@@ -952,6 +953,29 @@ test('maskPhoneNumbers only masks plausible mainland mobiles', () => {
   assert.equal(maskPhoneNumbers('电话13800138000请回拨'), '电话138****8000请回拨')
   assert.equal(maskPhoneNumbers('编号 2026110813800'), '编号 2026110813800')
   assert.equal(maskPhoneNumbers('138001380001'), '138001380001')
+})
+
+test('CSV preserves immutable UUID keys even when digits resemble a mobile number', () => {
+  const world = makeWorld()
+  try {
+    const entryId = '59add573-1286-4739-898b-14252574588c'
+    insertEntry(world, {
+      entryId,
+      factKind: 'order_registered',
+      sourceSystem: 'local_order',
+      communityId: world.communityId,
+      amountCents: 1_234,
+    })
+    const csv = buildReconciliationCsv(world.db, {
+      actor: adminActor(world),
+      periodFrom: '2026-11-01',
+      periodTo: '2026-11-07',
+      now: new Date('2026-11-09T02:00:00.000Z'),
+    })
+    assert.equal(parseCsv(csv.body)[1]?.[0], entryId)
+  } finally {
+    world.cleanup()
+  }
 })
 
 test('CSV rows, batch page entries and entry_count/total_cents tell one story (文档 §10)', () => {
