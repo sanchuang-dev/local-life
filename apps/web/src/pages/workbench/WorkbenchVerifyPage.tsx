@@ -107,7 +107,7 @@ function VerifyView() {
     <div className="px-4 pb-8 pt-4">
       <div className="flex items-start gap-3">
         <span
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#e8f6f0] text-[#388b77]"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#e8f6f0] text-[#388b77]"
           aria-hidden="true"
         >
           <ScanLine size={24} strokeWidth={1.7} />
@@ -125,7 +125,7 @@ function VerifyView() {
       </div>
 
       {session ? (
-        <p className="mt-2 rounded-[14px] bg-[#fff7ec] px-3.5 py-2.5 text-[11px] leading-5 text-[#8a6132]">
+        <p className="mt-2 rounded-xl bg-[#fff7ec] px-3.5 py-2.5 text-[11px] leading-5 text-[#8a6132]">
           当前身份：{staffRoleLabels[session.staff.role]}，可核销社区：
           {session.staff.communities.map((item) => item.name).join('、') || '未分配社区'}。
           {session.staff.role === 'grid_worker'
@@ -134,12 +134,12 @@ function VerifyView() {
         </p>
       ) : null}
 
-      <div className="mt-4 grid grid-cols-3 rounded-[14px] bg-slate-100 p-1">
+      <div className="mt-4 grid grid-cols-3 rounded-xl bg-slate-100 p-1">
         <button
           type="button"
           aria-pressed={tab === 'redeem'}
           onClick={() => setTab('redeem')}
-          className={`min-h-11 rounded-[11px] px-3 text-[13px] font-bold transition ${
+          className={`min-h-11 rounded-lg px-3 text-[13px] font-bold transition ${
             tab === 'redeem' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500'
           }`}
         >
@@ -149,7 +149,7 @@ function VerifyView() {
           type="button"
           aria-pressed={tab === 'checkins'}
           onClick={() => setTab('checkins')}
-          className={`min-h-11 rounded-[11px] px-3 text-[13px] font-bold transition ${
+          className={`min-h-11 rounded-lg px-3 text-[13px] font-bold transition ${
             tab === 'checkins' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500'
           }`}
         >
@@ -159,7 +159,7 @@ function VerifyView() {
           type="button"
           aria-pressed={tab === 'draw'}
           onClick={() => setTab('draw')}
-          className={`min-h-11 rounded-[11px] px-2 text-[12px] font-bold transition ${
+          className={`min-h-11 rounded-lg px-2 text-[12px] font-bold transition ${
             tab === 'draw' ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500'
           }`}
         >
@@ -262,7 +262,7 @@ function RedeemPanel({ onRedeemed }: { onRedeemed: (result: RewardRedeemResponse
 
   return (
     <section className="mt-4">
-      <div className="rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <p className="flex items-center gap-1.5 text-[15px] font-semibold text-slate-800">
           <TicketCheck size={17} className="shrink-0 text-teal-700" aria-hidden="true" />
           输入居民凭据码
@@ -329,7 +329,7 @@ function RedeemPanel({ onRedeemed }: { onRedeemed: (result: RewardRedeemResponse
             <StatusNotice tone="success">
               {result.redeemed ? '核销成功，奖品已交付。' : '该凭据此前已核销，本次未重复发放。'}
             </StatusNotice>
-            <dl className="divide-y divide-slate-100 rounded-[14px] border border-slate-100 bg-white px-3.5">
+            <dl className="divide-y divide-slate-100 rounded-xl border border-slate-100 bg-white px-3.5">
               <InfoRow label="奖品" value={`${result.grant.prizeName} × ${result.grant.quantity}`} />
               <InfoRow
                 label="领取人"
@@ -431,7 +431,7 @@ function CheckinPanel({
                     type="button"
                     aria-pressed={selected}
                     onClick={() => onSelectActivity(activity.id)}
-                    className={`w-full rounded-[16px] border px-3.5 py-3 text-left transition-colors ${
+                    className={`w-full rounded-2xl border px-3.5 py-3 text-left transition-colors ${
                       selected
                         ? 'border-teal-500 bg-[#f2f9f5]'
                         : 'border-slate-100 bg-white hover:border-teal-200'
@@ -518,7 +518,7 @@ function Stat({ label, value, tone }: { label: string; value: number; tone: 'tea
         ? 'border-[#f2dcc0] bg-[#fffaf2] text-[#8a6132]'
         : 'border-slate-100 bg-white text-slate-700'
   return (
-    <div className={`rounded-[14px] border px-2 py-2.5 text-center ${toneClass}`}>
+    <div className={`rounded-xl border px-2 py-2.5 text-center ${toneClass}`}>
       <p className="text-[18px] font-semibold leading-none">{value}</p>
       <p className="mt-1 text-[11px] font-medium">{label}</p>
     </div>
@@ -578,7 +578,7 @@ function CheckinRow({
   const reasonValid = reason.trim().length >= 2
 
   return (
-    <li className="rounded-[16px] border border-slate-100 bg-white p-3.5 shadow-sm">
+    <li className="rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-[14px] font-semibold text-slate-800">
@@ -604,7 +604,7 @@ function CheckinRow({
       </div>
 
       {revoked ? (
-        <p className="mt-2 rounded-[10px] bg-rose-50 px-2.5 py-2 text-[11px] leading-[18px] text-rose-700">
+        <p className="mt-2 rounded-lg bg-rose-50 px-2.5 py-2 text-[11px] leading-[18px] text-rose-700">
           撤销原因：{checkin.revokeReason ?? '未填写'}
         </p>
       ) : null}
@@ -651,7 +651,7 @@ function CheckinRow({
       ) : null}
 
       {revoking ? (
-        <div className="mt-2.5 rounded-[12px] bg-slate-50 p-3">
+        <div className="mt-2.5 rounded-xl bg-slate-50 p-3">
           <Field label="撤销原因" htmlFor={`revoke-${checkin.id}`} required hint="2-200 字，会写入审计记录。">
             <input
               id={`revoke-${checkin.id}`}

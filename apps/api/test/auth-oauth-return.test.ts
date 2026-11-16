@@ -77,11 +77,25 @@ function oauthContext(
 function countingProvider(openid = 'wechat-openid-1') {
   const calls: string[] = []
   const fetcher: typeof fetch = async (input) => {
-    calls.push(String(input))
-    return new Response(JSON.stringify({ openid, unionid: 'wechat-union-1' }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    })
+    const url = new URL(String(input))
+    calls.push(url.pathname)
+    if (url.pathname === '/sns/oauth2/access_token') {
+      return Response.json({
+        access_token: 'return-profile-token',
+        openid,
+        unionid: 'wechat-union-1',
+      })
+    }
+    if (url.pathname === '/sns/userinfo') {
+      return Response.json({
+        openid,
+        unionid: 'wechat-union-1',
+        nickname: '回跳测试居民',
+        headimgurl: 'https://wx.example.test/avatar/return',
+        privilege: [],
+      })
+    }
+    throw new Error(`unexpected provider request: ${url.pathname}`)
   }
   return { fetcher, calls }
 }
@@ -149,7 +163,7 @@ test('WeChat login returns to the activity invite link and never auto-joins it',
     assert.equal(authorizeUrl.origin + authorizeUrl.pathname, 'https://open.weixin.qq.com/connect/oauth2/authorize')
     const state = authorizeUrl.searchParams.get('state')
     assert.ok(state)
-    assert.equal(authorizeUrl.searchParams.get('scope'), 'snsapi_base')
+    assert.equal(authorizeUrl.searchParams.get('scope'), 'snsapi_userinfo')
     assert.equal(authorizeUrl.searchParams.get('appid'), TEST_APP_ID)
     assert.equal(authorizeUrl.searchParams.get('redirect_uri'), WECHAT_RETURN_URI)
 
@@ -188,7 +202,7 @@ test('WeChat login returns to the activity invite link and never auto-joins it',
     // Both attempt cookies are burned together with the state.
     assert.equal(cookieValue(callback, 'll_oauth_nonce'), '')
     assert.equal(cookieValue(callback, 'll_oauth_return'), '')
-    assert.equal(provider.calls.length, 1)
+    assert.equal(provider.calls.length, 2)
 
     const session = await context.app.request('/auth/session', {
       headers: { cookie: cookiePair(callback, 'll_session') },
@@ -325,7 +339,7 @@ test('a consumed state cannot be replayed and the second callback gets no sessio
       { headers: { cookie: cookies } },
     )
     assert.ok(hasSessionCookie(first))
-    assert.equal(provider.calls.length, 1)
+    assert.equal(provider.calls.length, 2)
 
     const replay = await context.app.request(
       `/auth/wechat/callback?state=${state}&code=oauth-code`,
@@ -337,7 +351,7 @@ test('a consumed state cannot be replayed and the second callback gets no sessio
     )
     assert.equal(hasSessionCookie(replay), false)
     // The provider is never asked twice for the same code.
-    assert.equal(provider.calls.length, 1)
+    assert.equal(provider.calls.length, 2)
     assert.equal(context.db.select().from(users).all().length, 1)
     assert.equal(context.db.select().from(activityParticipations).all().length, 0)
   } finally {

@@ -11,16 +11,27 @@ import type { ThemeConfig } from 'antd'
 export const adminTheme: ThemeConfig = {
   token: {
     colorPrimary: '#116d63',
-    // Info keeps Ant Design's blue so Alert/Tag/Message feedback is clearly
-    // distinct from Success; both background/border/text shades are derived
-    // from these two tokens by the theme algorithm — no per-component CSS
-    // overrides such as `.ant-alert-info` are allowed to re-skin them.
+    // Ant Design 6 derives a muddy gray (#a3adaa) as colorPrimaryBg from
+    // this dark teal. That alias also feeds Select/Pagination selected options,
+    // date pickers and other active controls. Keep one consistent mint scale
+    // here rather than patching individual component popup styles.
+    colorPrimaryBg: '#e8f6f0',
+    colorPrimaryBgHover: '#d6eee4',
+    colorPrimaryBorder: '#b4ddce',
+    colorPrimaryBorderHover: '#8bc9b5',
+    // Info stays blue; Success is a distinct, readable green rather than
+    // reusing brand teal. All status components consume this same palette.
     colorInfo: '#1677ff',
     colorLink: '#116d63',
-    // Success stays on the Local Life teal family so status feedback matches
-    // the brand; Warning/Error keep Ant Design defaults (gold/red), which are
-    // already unambiguous against Primary/Info/Success.
-    colorSuccess: '#138b79',
+    // Ant Design 6 generates a muddy gray-green colorSuccessBg for a dark
+    // custom green (#187d4d). Pin the semantic surface scale centrally so
+    // filled Tags, Alerts and other status components remain legible.
+    // Warning/Error continue to use Ant Design's semantic defaults.
+    colorSuccess: '#187d4d',
+    colorSuccessBg: '#e9f8ee',
+    colorSuccessBgHover: '#d5f0df',
+    colorSuccessBorder: '#a6dcba',
+    colorSuccessBorderHover: '#83c9a0',
     colorText: '#1f2937',
     colorTextSecondary: '#64748b',
     colorTextDescription: '#64748b',

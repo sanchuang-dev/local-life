@@ -155,6 +155,12 @@ function calledUrls(calls: FetchCall[]): string[] {
   return calls.map((call) => call.url)
 }
 
+/** Actions beyond the current lifecycle step stay available from the menu. */
+async function chooseMoreAction(label: string) {
+  fireEvent.click(screen.getByRole('button', { name: '更多操作' }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: label }))
+}
+
 beforeEach(() => {
   Object.defineProperty(window, 'innerWidth', {
     configurable: true,
@@ -180,6 +186,12 @@ describe('ActivitiesPage real data rendering', () => {
     renderPage(ADMIN_SESSION)
 
     expect(await screen.findByText('银发社区欢乐季')).toBeTruthy()
+    // The primary create action belongs to the DataPanel toolbar, not PageHeader.
+    const activityPanel = screen.getByRole('region', { name: '活动列表' })
+    expect(activityPanel.classList.contains('data-panel--fill')).toBe(true)
+    const create = within(activityPanel).getByRole('button', { name: /新建活动/ })
+    expect(create.closest('.data-panel-tools')).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: /新建活动/ })).toHaveLength(1)
     expect(screen.getByText('幸福社区')).toBeTruthy()
     expect(screen.getByText('已发布')).toBeTruthy()
     expect(screen.getByText('v2')).toBeTruthy()
@@ -296,6 +308,51 @@ describe('ActivitiesPage real data rendering', () => {
   })
 })
 
+describe('ActivitiesPage compact action column', () => {
+  it.each([
+    { status: 'draft', primary: '发布', secondary: false },
+    { status: 'published', primary: '暂停', secondary: true },
+    { status: 'paused', primary: '恢复', secondary: true },
+    { status: 'ended', primary: null, secondary: false },
+  ] as const)('shows only applicable actions for $status', async ({ status, primary, secondary }) => {
+    stubApi((url) => {
+      if (url.startsWith('/api/admin/communities')) return json({ items: [COMMUNITY_A] })
+      if (url.startsWith('/api/admin/activities?')) {
+        return json({ items: [summary({ status })], total: 1, page: 1, pageSize: 20 })
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+    renderPage(ADMIN_SESSION)
+    await screen.findByText('银发社区欢乐季')
+    const active = screen.getByRole('button', { name: status === 'ended' ? '查看' : '编辑' })
+    expect(active).toBeTruthy()
+    for (const label of ['发布', '暂停', '恢复']) {
+      expect(Boolean(screen.queryByRole('button', { name: label }))).toBe(label === primary)
+    }
+    expect(screen.queryByRole('button', { name: '结束' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '更多操作' }))
+    expect(await screen.findByRole('menuitem', { name: '规则版本' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: '今日抽奖' })).toBeTruthy()
+    expect(screen.getByRole('menuitem', { name: '审计' })).toBeTruthy()
+    expect(Boolean(screen.queryByRole('menuitem', { name: '结束' }))).toBe(secondary)
+  })
+
+  it('keeps irreversible end behind the original confirmation, not a direct request', async () => {
+    const calls = stubApi((url) => {
+      if (url.startsWith('/api/admin/communities')) return json({ items: [COMMUNITY_A] })
+      if (url.startsWith('/api/admin/activities?')) {
+        return json({ items: [summary()], total: 1, page: 1, pageSize: 20 })
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+    renderPage(ADMIN_SESSION)
+    await screen.findByText('银发社区欢乐季')
+    await chooseMoreAction('结束')
+    expect(await screen.findByText('结束后活动不可恢复，居民端将显示「已结束」。')).toBeTruthy()
+    expect(calls.filter(({ init }) => init?.method === 'POST')).toHaveLength(0)
+  })
+})
+
 describe('ActivitiesPage read-only drawers', () => {
   it('renders the frozen rule versions with no edit or delete control', async () => {
     const version: ActivityRuleVersion = {
@@ -327,7 +384,7 @@ describe('ActivitiesPage read-only drawers', () => {
     renderPage(ADMIN_SESSION)
     expect(await screen.findByText('银发社区欢乐季')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: '规则版本' }))
+    await chooseMoreAction('规则版本')
 
     expect(await screen.findByText('只读快照，不可编辑或删除')).toBeTruthy()
     // Scope to the real Ant Design drawer section, not the list behind it.
@@ -367,7 +424,7 @@ describe('ActivitiesPage read-only drawers', () => {
     renderPage(ADMIN_SESSION)
     expect(await screen.findByText('银发社区欢乐季')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: '审计' }))
+    await chooseMoreAction('审计')
 
     expect(await screen.findByText('发布活动')).toBeTruthy()
     expect(screen.getByText('操作者：测试管理员')).toBeTruthy()
@@ -484,7 +541,7 @@ describe('ActivitiesPage audit timeline deprecations', () => {
 
     renderPage(ADMIN_SESSION)
     expect(await screen.findByText('银发社区欢乐季')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '审计' }))
+    await chooseMoreAction('审计')
     expect(await screen.findByText('发布活动')).toBeTruthy()
 
     const messages = errorSpy.mock.calls.map((call) => call.map(String).join(' '))
@@ -638,7 +695,7 @@ describe('ActivitiesPage reward plan form (LL-MVP-006)', () => {
 
     renderPage(ADMIN_SESSION)
     expect(await screen.findByText('银发社区欢乐季')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '规则版本' }))
+    await chooseMoreAction('规则版本')
 
     expect(await screen.findByText('只读快照，不可编辑或删除')).toBeTruthy()
     expect(screen.getByText(/10 斤装东北大米/)).toBeTruthy()
@@ -948,7 +1005,7 @@ describe('ActivitiesPage purchase reward plan form (LL-PUR-002)', () => {
 
     renderPage(ADMIN_SESSION)
     expect(await screen.findByText('银发社区欢乐季')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '规则版本' }))
+    await chooseMoreAction('规则版本')
 
     expect(await screen.findByText('只读快照，不可编辑或删除')).toBeTruthy()
     expect(screen.getByText(/团队实付门槛 ¥200\.00 · 每人券面额 ¥20\.00/)).toBeTruthy()

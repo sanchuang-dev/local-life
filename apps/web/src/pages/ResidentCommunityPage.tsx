@@ -55,7 +55,7 @@ export function ResidentCommunityPage() {
         />
       </div>
 
-      <section className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+      <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <p className="flex items-center gap-1.5 text-[12px] font-semibold text-slate-700">
           <MapPin size={14} className="text-[#388b77]" aria-hidden="true" />
           浏览其他社区
@@ -63,13 +63,13 @@ export function ResidentCommunityPage() {
         <p className="mt-1.5 text-[12px] leading-5 text-slate-500">{BROWSE_ONLY_NOTICE}</p>
         <Link
           to="/"
-          className="mt-3 inline-flex min-h-[44px] items-center justify-center rounded-[12px] border border-teal-200 bg-white px-4 text-[12px] font-semibold text-teal-700"
+          className="mt-3 inline-flex min-h-[44px] items-center justify-center rounded-xl border border-teal-200 bg-white px-4 text-[12px] font-semibold text-teal-700"
         >
           去社区首页浏览
         </Link>
       </section>
 
-      <p className="mt-4 flex items-start gap-1.5 rounded-[14px] bg-white p-3.5 text-[11px] leading-5 text-slate-400 shadow-sm">
+      <p className="mt-4 flex items-start gap-1.5 rounded-xl bg-white p-3.5 text-[11px] leading-5 text-slate-400 shadow-sm">
         <ShieldCheck size={14} className="mt-0.5 shrink-0" aria-hidden="true" />
         <span className="min-w-0">
           {PERMANENT_BINDING_NOTICE} 如需纠正录入错误或处理身份纠纷，请联系社区工作人员登记核查。

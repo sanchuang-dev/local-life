@@ -1,3 +1,4 @@
+import { PageInfoAlert } from '../components/PageInfoHelp'
 import {
   Alert,
   App as AntdApp,
@@ -421,7 +422,7 @@ export function DrawPoolDrawer({ open, activity, session, onClose }: DrawPoolDra
           </Space>
         ) : null}
 
-        <Alert
+        <PageInfoAlert inline
           type="info"
           showIcon
           title="这里只配置真实奖品池"

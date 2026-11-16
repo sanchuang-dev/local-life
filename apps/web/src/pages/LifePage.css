@@ -15,15 +15,18 @@
   min-height: 206px;
   padding: 24px 19px 45px;
   overflow: hidden;
-  background: radial-gradient(circle at 82% 7%, rgba(180, 242, 186, .31), transparent 35%), linear-gradient(112deg, #117b6c 0%, #169884 56%, #65b898 100%);
-  color: #fff;
+  background-color: #edf9f3;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  color: #214d3c;
 }
 .life-market__hero-content { position: relative; z-index: 1; width: 100%; }
 .life-market__eyebrow {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: #c9f1de;
+  color: #3b8265;
   font-size: 11px;
   font-weight: 650;
   letter-spacing: .09em;
@@ -35,16 +38,16 @@
   letter-spacing: -.045em;
   font-weight: 800;
 }
-.life-market__hero p { margin: 8px 0 0; color: #e7faf0; font-size: 13px; line-height: 1.65; }
+.life-market__hero p { margin: 8px 0 0; color: #537564; font-size: 13px; line-height: 1.65; }
 .life-market__hero-tabs {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   margin-top: 18px;
   padding: 4px;
-  border: 1px solid rgba(255,255,255,.18);
+  border: 1px solid rgba(49, 128, 93, .12);
   border-radius: 999px;
-  background: rgba(12, 90, 77, .36);
+  background: rgba(255, 255, 255, .72);
 }
 .life-market__hero-tabs span,
 .life-market__hero-tabs a {
@@ -60,37 +63,21 @@
   line-height: 1.35;
   text-decoration: none;
 }
-.life-market__hero-tabs span { background: #fff; color: #137968; }
-.life-market__hero-tabs a { color: #f3fff9; }
-.life-market__hero-decoration { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
-.life-market__hero-orbit { position: absolute; display: block; border: 1px solid rgba(255,255,255,.19); border-radius: 50%; }
-.life-market__hero-orbit--one { width: 230px; height: 230px; right: -100px; top: -95px; }
-.life-market__hero-orbit--two { width: 160px; height: 160px; right: -26px; top: 55px; }
-.life-market__hero-bag {
-  position: absolute;
-  top: 41px;
-  right: 27px;
-  display: grid;
-  width: 109px;
-  height: 109px;
-  place-items: center;
-  transform: rotate(-9deg);
-  border: 1px solid rgba(255,255,255,.26);
-  border-radius: 29px;
-  background: linear-gradient(135deg, rgba(255,255,255,.23), rgba(255,255,255,.08));
-  box-shadow: 0 16px 24px rgba(0, 68, 54, .15), inset 0 1px 1px rgba(255,255,255,.28);
-  color: #f3ffe9;
-}
+.life-market__hero-tabs span { background: #218b68; color: #fff; }
+.life-market__hero-tabs a { color: #2c7657; }
+/* Keep the real shortcut row in view after its initial position scrolls past.
+   The H5 shell uses document scrolling, so CSS sticky needs no JS listener. */
 .life-market__shortcuts {
-  position: relative;
-  z-index: 2;
+  position: sticky;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  z-index: 20;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 1px;
   margin: -22px 12px 0;
   padding: 17px 4px 13px;
   border: 1px solid #fff;
-  border-radius: 22px;
+  border-radius: var(--app-radius-panel);
   background: #fff;
   box-shadow: 0 10px 25px rgba(33, 88, 66, .09);
 }
@@ -105,7 +92,7 @@
   gap: 9px;
   padding: 3px 1px;
   border: none;
-  border-radius: 14px;
+  border-radius: var(--app-radius-control);
   background: transparent;
   color: #365146;
   font: inherit;
@@ -124,7 +111,7 @@
   height: 45px;
   flex: none;
   place-items: center;
-  border-radius: 15px;
+  border-radius: var(--app-radius-control);
 }
 .life-market__shortcut-icon--green { background: #e6f6e9; color: #3f9b65; }
 .life-market__shortcut-icon--coral { background: #fff0ed; color: #df8971; }
@@ -135,7 +122,7 @@
   margin: 14px 16px 0;
   padding: 12px 14px;
   border: 1px solid #edddc6;
-  border-radius: 13px;
+  border-radius: var(--app-radius-card);
   background: #fff9f0;
   color: #906a3e;
   font-size: 12px;
@@ -161,16 +148,17 @@
   overflow: hidden;
   padding: 15px 13px 14px;
   border: 1px solid rgba(255,255,255,.88);
-  border-radius: 23px;
+  border-radius: var(--app-radius-panel);
   box-shadow: 0 8px 22px rgba(56, 105, 67, .045);
-  scroll-margin-top: 14px;
+  /* Account for the sticky shortcuts when jumpTo() scrolls a shelf into view. */
+  scroll-margin-top: calc(134px + env(safe-area-inset-top, 0px));
 }
 .life-shelf-card--local { background: linear-gradient(160deg, #eef8e9, #f9fcf3); }
 .life-shelf-card--offers { background: linear-gradient(155deg, #fff2eb, #fffbf5); }
 .life-shelf-card--deals { background: linear-gradient(155deg, #eaf4f9, #fbfdf9); }
 .life-shelf-card--expanded { grid-column: 1 / -1; min-height: 0; background: #fff; }
 .life-shelf-card__header { display: flex; align-items: flex-start; gap: 7px; }
-.life-shelf-card__icon { display: grid; width: 34px; height: 34px; flex: none; place-items: center; border-radius: 12px; background: rgba(255,255,255,.7); }
+.life-shelf-card__icon { display: grid; width: 34px; height: 34px; flex: none; place-items: center; border-radius: var(--app-radius-control); background: rgba(255,255,255,.7); }
 .life-shelf-card--local .life-shelf-card__icon { color: #378c59; }
 .life-shelf-card--offers .life-shelf-card__icon { color: #d97d58; }
 .life-shelf-card--deals .life-shelf-card__icon { color: #5b8fae; }
@@ -205,7 +193,7 @@
   margin-top: auto;
   padding: 8px 7px;
   border: 1px solid rgba(41,126,88,.24);
-  border-radius: 12px;
+  border-radius: var(--app-radius-card);
   background: #fff;
   color: #27865a;
   font: inherit;
@@ -234,8 +222,8 @@
 .life-market__order-kicker { display: inline-flex; align-items: center; gap: 4px; width: fit-content; padding: 4px 7px; border-radius: 999px; background: rgba(255,255,255,.68); font-size: 10px; color: #ba8751; font-weight: 700; }
 .life-market__order-title { margin-top: 12px; color: #56402d; font-size: 17px; line-height: 1.35; font-weight: 770; }
 .life-market__order-subtitle { margin-top: 6px; color: #94836d; font-size: 11px; line-height: 1.6; }
-.life-market__order-illustration { display: grid; align-self: center; place-items: center; width: 94px; height: 79px; margin: 12px 0 4px; color: #d4ab7c; border-radius: 30px; background: rgba(255,255,255,.51); }
-.life-market__order-action { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 39px; margin-top: auto; padding: 7px 6px; border-radius: 12px; background: #e5aa71; color: #fff; font-size: 11px; font-weight: 750; }
+.life-market__order-illustration { display: grid; align-self: center; place-items: center; width: 94px; height: 79px; margin: 12px 0 4px; color: #d4ab7c; border-radius: var(--app-radius-panel); background: rgba(255,255,255,.51); }
+.life-market__order-action { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 39px; margin-top: auto; padding: 7px 6px; border-radius: var(--app-radius-card); background: #e5aa71; color: #fff; font-size: 11px; font-weight: 750; }
 
 .life-market__offer {
   display: flex;
@@ -243,7 +231,7 @@
   flex-direction: column;
   padding: 13px;
   border: 1px solid #f1eee9;
-  border-radius: 16px;
+  border-radius: var(--app-radius-card);
   background: #fffaf7;
 }
 .life-market__offer-tag {
@@ -272,8 +260,6 @@
 .life-market a:focus-visible, .life-market button:focus-visible { outline: 2px solid #126e58; outline-offset: 3px; }
 @media (max-width: 360px) {
   .life-market__hero { padding-inline: 15px; }
-  .life-market__hero-bag { width: 88px; height: 88px; right: 14px; top: 47px; }
-  .life-market__hero-bag svg { width: 55px; }
   .life-market__shortcuts { margin-inline: 7px; padding-inline: 1px; }
   .life-market__shortcuts a, .life-market__shortcuts button { font-size: 10px; }
   .life-market__shortcut-icon { width: 40px; height: 40px; }

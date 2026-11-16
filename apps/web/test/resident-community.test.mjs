@@ -327,8 +327,14 @@ test('the browse picker never becomes a confirmation target', () => {
   // The approved compact home no longer repeats the location notice here.
   // Browse-only wording remains in the selector; location never confirms residence.
   assert.doesNotMatch(discovery, /\{LOCATION_NOT_PROOF_NOTICE\}/)
-  assert.match(discovery, /选择社区\s*<\/button>/)
-  assert.match(discovery, /id="home-community-title" className="sr-only">选择社区/)
+  assert.match(discovery, /查看社区\s*<\/button>/)
+  assert.match(discovery, /绑定常驻社区<\/Link>/)
+  assert.match(discovery, /id="home-community-title" className="sr-only">社区操作/)
+  assert.match(discovery, /className="community-home__locate-pill"/)
+  assert.doesNotMatch(discovery, /community-home__current/)
+  const chooserActions = discovery.split('className="community-home__actions">')[1]?.split('</div>')[0]
+  assert.ok(chooserActions)
+  assert.doesNotMatch(chooserActions, /onClick=\{startLocation\}/)
 })
 
 test('no resident page offers a switch, unbind or rebind control', () => {

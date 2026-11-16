@@ -22,6 +22,7 @@ import {
   communities,
   residentCommunityAssignments,
   residentPhoneIdentities,
+  residentProfiles,
   sessions,
   staffAccounts,
   staffCommunityAssignments,
@@ -181,9 +182,15 @@ async function fixture() {
       userId: wechatPhoneUser,
       appId: TEST_APP_ID,
       openId: 'openid-authorized-a',
+      unionId: 'unionid-authorized-a',
       nickname: '微信阿花',
       avatarUrl: 'https://wx.example/authorized.png',
+      sex: 2,
+      country: '中国',
+      province: '浙江省',
+      city: '杭州市',
       profileAuthorizedAt: at(30),
+      profileUpdatedAt: at(90),
       createdAt: date,
     },
     {
@@ -254,6 +261,24 @@ async function fixture() {
       verifiedAt: at(81),
       createdAt: date,
       updatedAt: date,
+    },
+  ]).run()
+
+  // #257 resident-entered contact addresses. A row may exist with a null
+  // address (resident opened the profile but has not filled it in), and a
+  // resident may have no row at all (never opened it) — both are 未填写.
+  db.insert(residentProfiles).values([
+    {
+      userId: wechatPhoneUser,
+      contactAddress: '杭州市西湖区文三路 100 号 3 幢 501 室',
+      createdAt: at(110),
+      updatedAt: at(110),
+    },
+    {
+      userId: phoneOnlyUser,
+      contactAddress: null,
+      createdAt: at(111),
+      updatedAt: at(111),
     },
   ]).run()
 
@@ -344,6 +369,7 @@ async function fixture() {
       'staff_community_assignments',
       'wechat_identities',
       'resident_phone_identities',
+      'resident_profiles',
       'sessions',
     ]
     return Object.fromEntries(
@@ -650,6 +676,17 @@ test('detail exposes identity, consent, resident membership and staff authority 
     assert.equal(multi.staffRole, null)
     assert.equal(multi.staffAccount, null)
     assert.equal(multi.maskedPhone, null)
+    assert.equal(multi.wechatLinkedUnionId, false)
+    // A consented profile that predates #256 still yields the profile object,
+    // with every extra field explicitly null instead of an invented value.
+    assert.deepEqual(multi.wechatProfile, {
+      sex: null,
+      country: null,
+      province: null,
+      city: null,
+      updatedAt: null,
+    })
+    assert.deepEqual(multi.contact, { visibility: 'full', phone: null, address: null })
     assert.deepEqual(
       multi.residentCommunities.map((community) => community.id),
       [communityA, communityB],
@@ -659,12 +696,26 @@ test('detail exposes identity, consent, resident membership and staff authority 
     const wechatPhone = parseDetail(await f.detail(wechatPhoneUser))
     assert.deepEqual(wechatPhone.identityMethods, ['wechat', 'phone'])
     assert.equal(wechatPhone.maskedPhone, '138****8000')
+    assert.equal(wechatPhone.wechatLinkedUnionId, true)
+    assert.deepEqual(wechatPhone.wechatProfile, {
+      sex: 'female',
+      country: '中国',
+      province: '浙江省',
+      city: '杭州市',
+      updatedAt: at(90).toISOString(),
+    })
+    assert.deepEqual(wechatPhone.contact, {
+      visibility: 'full',
+      phone: '13800138000',
+      address: '杭州市西湖区文三路 100 号 3 幢 501 室',
+    })
 
     const unconsented = parseDetail(await f.detail(unconsentedUser))
     assert.equal(unconsented.displayName, '普通居民')
     assert.equal(unconsented.wechatNickname, null)
     assert.equal(unconsented.wechatAvatarUrl, null)
     assert.equal(unconsented.wechatProfileAuthorizedAt, null)
+    assert.equal(unconsented.wechatProfile, null)
     assert.equal(unconsented.wechatLinkedIdentityCount, 1)
 
     // An explicitly authorized profile of another public account is never shown
@@ -674,16 +725,27 @@ test('detail exposes identity, consent, resident membership and staff authority 
     assert.equal(otherApp.wechatNickname, null)
     assert.equal(otherApp.wechatAvatarUrl, null)
     assert.equal(otherApp.wechatProfileAuthorizedAt, null)
+    assert.equal(otherApp.wechatProfile, null)
     assert.equal(otherApp.wechatLinkedIdentityCount, 1)
 
     const phoneOnly = parseDetail(await f.detail(phoneOnlyUser))
     assert.deepEqual(phoneOnly.identityMethods, ['phone'])
     assert.equal(phoneOnly.maskedPhone, '139****9000')
     assert.equal(phoneOnly.wechatLinkedIdentityCount, 0)
+    assert.equal(phoneOnly.wechatLinkedUnionId, false)
+    // A profile row with a null address is 未填写, not a masked value.
+    assert.deepEqual(phoneOnly.contact, {
+      visibility: 'full',
+      phone: '13900139000',
+      address: null,
+    })
 
     const bare = parseDetail(await f.detail(bareUser))
     assert.deepEqual(bare.identityMethods, [])
     assert.equal(bare.maskedPhone, null)
+    assert.equal(bare.wechatLinkedUnionId, false)
+    assert.equal(bare.wechatProfile, null)
+    assert.deepEqual(bare.contact, { visibility: 'full', phone: null, address: null })
     assert.equal(bare.staffAccount, null)
     assert.equal(bare.displayName, '开发登录用户')
 
@@ -703,19 +765,32 @@ test('detail exposes identity, consent, resident membership and staff authority 
   }
 })
 
-test('no sensitive identifier or credential is exposed by list or detail', async () => {
+test('no sensitive identifier or credential is exposed, and complete contact stays administrator-only', async () => {
   const f = await fixture()
   try {
     const listRaw = (await f.list({ pageSize: '100' })).raw
     const detailRaw = (await f.detail(multiCommunityUser)).raw
     const phoneDetailRaw = (await f.detail(wechatPhoneUser)).raw
-    for (const raw of [listRaw, detailRaw, phoneDetailRaw]) {
+    const scopedListRaw = (await f.list({ pageSize: '100' }, 'operator')).raw
+    const scopedPhoneRaw = (await f.detail(wechatPhoneUser, 'operator')).raw
+    const gridPhoneRaw = (await f.detail(wechatPhoneUser, 'grid')).raw
+
+    // No device ever receives provider identifiers, credentials, or a full
+    // contact value outside an administrator's detail read.
+    for (const raw of [
+      listRaw,
+      detailRaw,
+      scopedListRaw,
+      scopedPhoneRaw,
+      gridPhoneRaw,
+    ]) {
       for (const fragment of [
         'openid-unassigned',
         'openid-authorized-a',
         'openid-multi-new',
         'openid-other-app',
         'openid',
+        'unionid-authorized-a',
         'unionid',
         'test-only-unused-password-hash',
         'passwordHash',
@@ -726,16 +801,51 @@ test('no sensitive identifier or credential is exposed by list or detail', async
         'll_session',
         '13800138000',
         '13900139000',
+        '文三路',
       ]) {
         assert.equal(raw.includes(fragment), false, `response leaked ${fragment}`)
       }
     }
+
+    // The administrator's detail read is the only place the complete phone and
+    // the resident-entered address appear; identifiers still never do.
+    for (const fragment of [
+      'openid-unassigned',
+      'openid-authorized-a',
+      'openid-multi-new',
+      'openid-other-app',
+      'openid',
+      'unionid-authorized-a',
+      'unionid',
+      'test-only-unused-password-hash',
+      'passwordHash',
+      'password_hash',
+      'tokenHash',
+      'admin-directory-token',
+      'll_session',
+    ]) {
+      assert.equal(phoneDetailRaw.includes(fragment), false, `admin detail leaked ${fragment}`)
+    }
+    assert.ok(phoneDetailRaw.includes('"phone":"13800138000"'))
+    assert.ok(phoneDetailRaw.includes('文三路'))
+
     const parsed = JSON.parse(detailRaw) as Record<string, unknown>
     for (const forbidden of ['openId', 'unionId', 'phone', 'passwordHash', 'tokenHash']) {
       assert.equal(forbidden in parsed, false, `detail key ${forbidden} must not exist`)
     }
     assert.equal((parsed.maskedPhone as unknown), null)
-    assert.ok(phoneDetailRaw.includes('138****8000'))
+
+    const scopedParsed = JSON.parse(scopedPhoneRaw) as Record<string, unknown>
+    assert.equal(scopedParsed.maskedPhone, '138****8000')
+    assert.deepEqual(scopedParsed.contact, {
+      visibility: 'masked',
+      phone: null,
+      address: null,
+    })
+    assert.deepEqual(
+      (JSON.parse(gridPhoneRaw) as Record<string, unknown>).contact,
+      { visibility: 'masked', phone: null, address: null },
+    )
   } finally {
     await f.close()
   }

@@ -28,7 +28,7 @@ export function CommunityActivityPage() {
           <ArrowLeft size={16} aria-hidden="true" />
           {backLabel}
         </Link>
-        <div className="mt-6 rounded-[18px] border border-dashed border-slate-200 bg-white px-4 py-12 text-center">
+        <div className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-12 text-center">
           <p className="text-[14px] font-semibold text-slate-500">活动不存在</p>
           <p className="mt-2 text-[11px] leading-5 text-slate-400">
             该活动可能已下线，或链接有误。
@@ -64,7 +64,7 @@ export function CommunityActivityPage() {
         subtitle={subtitle}
       />
 
-      <article className="mt-4 overflow-hidden rounded-[20px] border border-slate-100 bg-white shadow-sm">
+      <article className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
         <div
           className="flex h-32 items-center justify-center bg-gradient-to-br from-[#e3f2ea] to-[#c9e7d9]"
           aria-hidden="true"
@@ -98,7 +98,7 @@ export function CommunityActivityPage() {
       </article>
 
       {programme ? (
-        <section className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+        <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <h2 className="text-[16px] font-semibold text-slate-800">节目单</h2>
           <ol className="mt-2 divide-y divide-slate-100">
             {programme.map((item) => (
@@ -112,7 +112,7 @@ export function CommunityActivityPage() {
       ) : null}
 
       {signInNotice || reminderNotice ? (
-        <section className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+        <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <h2 className="text-[16px] font-semibold text-slate-800">参与与提醒</h2>
           {signInNotice ? (
             <button

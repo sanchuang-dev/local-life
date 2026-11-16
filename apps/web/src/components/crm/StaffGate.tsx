@@ -45,10 +45,10 @@ export function StaffIdentityCard() {
   }
 
   return (
-    <div className="rounded-[18px] border border-slate-100 bg-white px-4 py-3.5 shadow-sm">
+    <div className="rounded-2xl border border-slate-100 bg-white px-4 py-3.5 shadow-sm">
       <div className="flex items-start gap-3">
         <span
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[#e8f6f0] text-[#388b77]"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#e8f6f0] text-[#388b77]"
           aria-hidden="true"
         >
           <ShieldCheck size={20} strokeWidth={1.8} />

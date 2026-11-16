@@ -1,3 +1,4 @@
+import { PageInfoAlert } from '../components/PageInfoHelp'
 import {
   Alert,
   App as AntdApp,
@@ -552,11 +553,10 @@ function PerformanceConsole({ session }: { session: AuthenticatedSession }) {
   ]
 
   return (
-    <div className="page">
+    <div className="page page--long-report">
       <PageHeader
         title="业绩看板"
         description="统一经营流水的账面登记口径：登记金额、已核验业绩、人工实收与冲正、奖励成本与冲正分列呈现。本 MVP 没有结算规则，页面只报账面登记毛额，不计算应付、分账或打款。"
-        status={<Tag color="green">真实数据</Tag>}
         extra={
           <Space wrap>
             <Button onClick={syncSources} loading={syncing}>同步来源事实</Button>
@@ -566,9 +566,9 @@ function PerformanceConsole({ session }: { session: AuthenticatedSession }) {
       />
 
       <div className="page-stack">
-        <Alert type="info" showIcon title="数据更新方式" description="经营台账读取已投影的真实订单、CRM 和奖励事实。来源发生变化后，请由运营人员点击「同步来源事实」再核对和锁定批次；当前不提供自动实时同步。" />
+        <PageInfoAlert type="info" showIcon title="数据更新方式" description="经营台账读取已投影的真实订单、CRM 和奖励事实。来源发生变化后，请由运营人员点击「同步来源事实」再核对和锁定批次；当前不提供自动实时同步。" />
         {!isAdmin ? (
-          <Alert
+          <PageInfoAlert
             type="info"
             showIcon
             title="运营员视图"

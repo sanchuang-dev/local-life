@@ -57,7 +57,7 @@ export function CommunityCulturePage() {
       </div>
 
       {visible.length === 0 ? (
-        <div className="mt-4 rounded-[18px] border border-dashed border-slate-200 bg-white px-4 py-10 text-center">
+        <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center">
           <p className="text-[13px] font-semibold text-slate-500">该门类暂无排期</p>
           <p className="mt-1.5 text-[11px] leading-5 text-slate-400">
             演示数据尚未提供「{category}」课程，其余门类将分批开放。
@@ -68,11 +68,11 @@ export function CommunityCulturePage() {
           {visible.map(({ id, title, schedule, organiser, status, statusTone, icon: Icon }) => (
             <article
               key={id}
-              className="rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm"
+              className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
             >
               <div className="flex items-start gap-3">
                 <span
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-[#e8f6f0] text-[#388b77]"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#e8f6f0] text-[#388b77]"
                   aria-hidden="true"
                 >
                   <Icon size={22} strokeWidth={1.7} />

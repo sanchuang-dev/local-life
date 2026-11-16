@@ -53,6 +53,11 @@ function Fixture({
   readonly = false,
   inlineLimit = 3,
   rejectAdvanced = false,
+  compact = false,
+  fill = false,
+  paginated = true,
+  defaults = false,
+  withDanger = false,
 }: {
   id?: string
   withCards?: boolean
@@ -63,6 +68,11 @@ function Fixture({
   readonly?: boolean
   inlineLimit?: number
   rejectAdvanced?: boolean
+  compact?: boolean
+  fill?: boolean
+  paginated?: boolean
+  defaults?: boolean
+  withDanger?: boolean
 }) {
   const [query, setQuery] = useState<PanelQuery<Filters, SortKey>>({
     filters: FILTERS,
@@ -91,12 +101,18 @@ function Fixture({
         readonly
           ? undefined
           : (row) => [
-              { key: 'view', label: '查看', onClick: selected },
-              ...(row.id === 'b'
+              { key: 'view', label: '查看', primary: compact ? true : undefined, onClick: selected },
+              ...(compact || withDanger ? [
+                { key: 'audit', label: '审计', onClick: selected },
+                { key: 'end', label: '结束', danger: true, onClick: selected },
+                { key: 'disabled', label: '不可用', disabled: true, onClick: selected },
+              ] : row.id === 'b'
                 ? [{ key: 'disabled', label: '编辑', disabled: true, onClick: selected }]
                 : []),
             ]
       }
+      {...(!defaults ? { rowActionMode: compact ? 'compact' as const : 'expanded' as const, fillRemainingHeight: fill } : {})}
+      pagination={paginated}
       onRefresh={refreshed}
     />
   )
@@ -224,6 +240,114 @@ describe('DataPanel controlled query contract', () => {
 
     fireEvent.click(screen.getAllByRole('button', { name: /查\s*看/ })[0])
     expect(selected).toHaveBeenCalledWith(ROWS[0])
+  })
+
+  it('defaults to the activity-standard compact actions and fills the viewport for paged lists', async () => {
+    render(<Fixture defaults withCards={false} withDanger />)
+    const panel = screen.getByRole('region', { name: '演示数据' })
+    expect(panel.classList.contains('data-panel--fill')).toBe(true)
+    expect(panel.querySelector('.ant-table-body')).toBeTruthy()
+    expect(panel.querySelector('footer.data-panel-footer')).toBeTruthy()
+    const row = screen.getAllByRole('row')[1]
+    expect(within(row).getByRole('button', { name: '查看' })).toBeTruthy()
+    expect(within(row).getByRole('button', { name: '审计' })).toBeTruthy()
+    expect(within(row).queryByRole('button', { name: '结束' })).toBeNull()
+    fireEvent.click(within(row).getByRole('button', { name: '更多操作' }))
+    const menu = await screen.findByRole('menu')
+    expect(within(menu).getByRole('menuitem', { name: '结束' }).className).toContain('danger')
+    fireEvent.click(within(menu).getByRole('menuitem', { name: '结束' }))
+    expect(selected).toHaveBeenCalledWith(ROWS[0])
+  })
+
+  it('defaults to natural height for unpaginated panels; composite pages can opt out', () => {
+    const first = render(<Fixture defaults paginated={false} />)
+    expect(screen.getByRole('region', { name: '演示数据' }).classList.contains('data-panel--fill')).toBe(false)
+    first.unmount()
+    render(<Fixture fill={false} compact={false} />)
+    const panel = screen.getByRole('region', { name: '演示数据' })
+    expect(panel.classList.contains('data-panel--fill')).toBe(false)
+    expect(panel.querySelector('.data-panel-compact-actions')).toBeNull()
+    expect(within(panel).queryByRole('button', { name: '更多操作' })).toBeNull()
+  })
+
+  it('compact table actions remain one row and expose a keyboard-accessible overflow menu', async () => {
+    render(<Fixture compact withCards={false} />)
+    const row = screen.getAllByRole('row')[1]
+    const controls = within(row).getByRole('button', { name: '更多操作' })
+    const actionGroup = controls.closest('.data-panel-compact-actions')
+    expect(actionGroup).toBeTruthy()
+    expect(actionGroup?.querySelector('.ant-space-item')?.textContent).toContain('查看')
+    expect(within(row).queryByRole('button', { name: '结束' })).toBeNull()
+
+    fireEvent.click(controls)
+    const menu = await screen.findByRole('menu')
+    expect(within(menu).getByRole('menuitem', { name: '审计' })).toBeTruthy()
+    expect(within(menu).getByRole('menuitem', { name: '结束' }).className).toContain('danger')
+    const disabled = within(menu).getByRole('menuitem', { name: '不可用' })
+    expect(disabled.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(within(menu).getByRole('menuitem', { name: '审计' }))
+    expect(selected).toHaveBeenCalledWith(ROWS[0])
+  })
+
+  it('compact cards use the same primary/overflow actions', async () => {
+    render(<Fixture compact />)
+    fireEvent.click(screen.getByText('卡片'))
+    const first = screen.getAllByRole('listitem').find((item) => item.classList.contains('data-panel-card'))
+    expect(first).toBeTruthy()
+    expect(within(first!).getByRole('button', { name: '查看' })).toBeTruthy()
+    fireEvent.click(within(first!).getByRole('button', { name: '更多操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: '审计' }))
+    expect(selected).toHaveBeenCalledWith(ROWS[0])
+  })
+
+  it('has one pinned Footer that contains the paginator in table and card views', () => {
+    render(<Fixture fill />)
+    const panel = screen.getByRole('region', { name: '演示数据' })
+    expect(panel.classList.contains('data-panel--fill')).toBe(true)
+
+    const body = panel.querySelector('.data-panel-body')
+    const footer = panel.querySelector('footer.data-panel-footer')
+    expect(body?.parentElement).toBe(panel)
+    expect(footer?.parentElement).toBe(panel)
+    expect(panel.lastElementChild).toBe(footer)
+    expect(footer?.querySelectorAll('.ant-pagination')).toHaveLength(1)
+    expect(body?.querySelector('.ant-pagination')).toBeNull()
+    expect(panel.querySelector('.ant-table-pagination')).toBeNull()
+    const tableBody = body?.querySelector<HTMLElement>('.ant-table-body')
+    expect(tableBody).toBeTruthy()
+    expect(tableBody?.style.maxHeight).toBe('100%')
+
+    const pageTwo = footer?.querySelector('li[title="2"]')
+    expect(pageTwo).toBeTruthy()
+    fireEvent.click(pageTwo!)
+    expect(changes.mock.lastCall?.[0]).toMatchObject({ page: 2, pageSize: 20 })
+
+    fireEvent.click(screen.getByText('卡片'))
+    expect(panel.querySelector('.data-panel-footer')).toBe(footer)
+    expect(footer?.querySelectorAll('.ant-pagination')).toHaveLength(1)
+    expect(panel.querySelector('.data-panel-body .data-panel-cards')).toBeTruthy()
+    expect(body?.querySelector('.ant-pagination')).toBeNull()
+    expect(panel.lastElementChild).toBe(footer)
+  })
+
+  it('omits Footer when paging is disabled or no records exist', () => {
+    const first = render(<Fixture withCards={false} paginated={false} />)
+    expect(screen.getByRole('region', { name: '演示数据' }).querySelector('.data-panel-footer')).toBeNull()
+    first.unmount()
+
+    const second = render(<Fixture withCards={false} total={0} rows={[]} />)
+    expect(screen.getByRole('region', { name: '演示数据' }).querySelector('.data-panel-footer')).toBeNull()
+    second.unmount()
+
+    render(<Fixture withCards={false} error={new Error('offline')} />)
+    expect(screen.getByRole('region', { name: '演示数据' }).querySelector('.data-panel-footer')).toBeNull()
+  })
+
+  it('ordinary panels keep their natural table height', () => {
+    render(<Fixture />)
+    const panel = screen.getByRole('region', { name: '演示数据' })
+    expect(panel.classList.contains('data-panel--fill')).toBe(false)
+    expect(panel.querySelector('.ant-table-body')).toBeNull()
   })
 
   it('isolates column visibility/order/density/view between panels', async () => {

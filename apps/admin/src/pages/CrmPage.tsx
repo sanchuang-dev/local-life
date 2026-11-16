@@ -1,3 +1,4 @@
+import { PageInfoAlert, PageInfoScope } from '../components/PageInfoHelp'
 import {
   Alert,
   App as AntdApp,
@@ -277,7 +278,6 @@ function CrmConsole({ session }: { session: AuthenticatedSession }) {
       <PageHeader
         title="客户与业务单"
         description="按授权社区与网格员查询客户线索、跟进与广电业务受理单；人工核验后才记为有效成交。"
-        status={<Tag color="green">真实数据</Tag>}
         subnav={
           <Tabs
             activeKey={tab}
@@ -292,7 +292,7 @@ function CrmConsole({ session }: { session: AuthenticatedSession }) {
 
       <div className="page-stack">
         {role === 'operator' ? (
-          <Alert
+          <PageInfoAlert
             type="info"
             showIcon
             title="运营员视图"
@@ -328,7 +328,7 @@ function CrmConsole({ session }: { session: AuthenticatedSession }) {
             aria-label="客户线索"
             hidden={tab !== 'leads'}
           >
-            <LeadPanel session={session} filterOptions={filterOptions} />
+            <PageInfoScope active={tab === 'leads'}><LeadPanel session={session} filterOptions={filterOptions} /></PageInfoScope>
           </div>
         ) : null}
         {mountedTabs.has('orders') ? (
@@ -339,7 +339,7 @@ function CrmConsole({ session }: { session: AuthenticatedSession }) {
             aria-label="业务受理单"
             hidden={tab !== 'orders'}
           >
-            <OrderPanel session={session} filterOptions={filterOptions} />
+            <PageInfoScope active={tab === 'orders'}><OrderPanel session={session} filterOptions={filterOptions} /></PageInfoScope>
           </div>
         ) : null}
       </div>
@@ -563,7 +563,7 @@ function LeadPanel({ filterOptions }: PanelOptionsProps) {
   }
 
   return (
-    <Space orientation="vertical" size={12} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={12} className="crm-list-layout" style={{ width: '100%' }}>
       <DataPanel<CrmLeadSummary, LeadFilters, CrmSortKey>
         id="crm-leads"
         label="客户线索列表"
@@ -1043,7 +1043,7 @@ function OrderPanel({ session, filterOptions }: PanelOptionsProps) {
   const canReview = detail?.status === 'pending_verification'
 
   return (
-    <Space orientation="vertical" size={12} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={12} className="crm-list-layout" style={{ width: '100%' }}>
       <DataPanel<CrmOrderSummary, OrderFilters, CrmSortKey>
         id="crm-orders"
         label="业务受理单列表"
@@ -1260,7 +1260,7 @@ function OrderPanel({ session, filterOptions }: PanelOptionsProps) {
                 </Space>
               </section>
             ) : (
-              <Alert
+              <PageInfoAlert inline
                 type="info"
                 showIcon
                 title="当前状态不可审核"

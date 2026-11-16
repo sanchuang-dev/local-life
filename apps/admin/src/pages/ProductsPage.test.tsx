@@ -320,7 +320,8 @@ describe('ProductsPage editing', () => {
     renderPage(ADMIN_SESSION)
 
     expect(await screen.findByText('社区助农蔬菜包')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '下架' }))
+    fireEvent.click(screen.getByRole('button', { name: '更多操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: '下架' }))
 
     expect((await screen.findAllByText('下架该商品？')).length).toBeGreaterThan(0)
     expect(screen.getByText(/已登记订单的价格快照不受影响/)).toBeTruthy()
@@ -349,7 +350,8 @@ describe('ProductsPage editing', () => {
 
     renderPage(ADMIN_SESSION)
 
-    fireEvent.click(await screen.findByRole('button', { name: '下架' }))
+    fireEvent.click(await screen.findByRole('button', { name: '更多操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: '下架' }))
     fireEvent.click(await screen.findByRole('button', { name: '确认下架' }))
 
     expect(await screen.findByText('操作未成功')).toBeTruthy()

@@ -1,118 +1,43 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Alert,
-  App as AntdApp,
-  Button,
-  Card,
-  Drawer,
-  Form,
-  Input,
-  Select,
-  Space,
-  Table,
-  Tag,
-  Typography,
+  Alert, App as AntdApp, Button, Drawer, Form, Input, Select, Space, Tag, Typography,
 } from 'antd'
 import { EnvironmentOutlined, PlusOutlined, UserAddOutlined } from '@ant-design/icons'
-import type { ColumnsType } from 'antd/es/table'
 import type { CommunityLocation } from '@sanchuang-dev/local-life-contracts'
 import type { AuthenticatedSession } from '../services/auth'
+import {
+  adminRequest, listManagedCommunities, listManagedStaff, STAFF_ROLE_LABELS,
+  type ManagedCommunity, type ManagedStaff,
+} from '../services/community-admin'
 import { PageHeader } from '../components/PageHeader'
 import { TencentLocationPicker } from '../components/TencentLocationPicker'
+import {
+  DataPanel, type PanelColumn, type PanelQuery,
+} from '../shared/components/DataPanel'
 import './communities.css'
 
-interface Community {
-  id: string
-  name: string
-  address?: string | null
-  latitudeGcj02?: number | null
-  longitudeGcj02?: number | null
-}
+interface Props { session: AuthenticatedSession }
+interface CommunityFilters { keyword: string }
+interface CommunityFormValues { name: string }
+const CREATE_FORM_ID = 'll-create-community-form'
 
-interface StaffAccount {
-  id: string
-  username: string
-  displayName: string | null
-  role: 'admin' | 'operator' | 'grid_worker'
-  status: 'active' | 'disabled'
-  communities: Community[]
-}
-
-interface CommunitiesPageProps {
-  session: AuthenticatedSession
-}
-
-interface CommunityFormValues {
-  name: string
-}
-
-interface StaffFormValues {
-  username: string
-  displayName: string
-  password: string
-  role: 'operator' | 'grid_worker'
-  userId?: string
-  communityIds: string[]
-}
-
-const ROLE_LABELS = {
-  admin: '管理员',
-  operator: '运营员',
-  grid_worker: '网格员',
-} as const
-
-const COMMUNITY_FORM_ID = 'll-ui-007-create-community-form'
-const STAFF_FORM_ID = 'll-ui-007-create-staff-form'
-
-async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    credentials: 'include',
-    ...init,
-    headers: {
-      ...(init?.body ? { 'content-type': 'application/json' } : {}),
-      ...init?.headers,
-    },
-  })
-  const payload: unknown = await response.json().catch(() => null)
-  if (!response.ok) {
-    const message =
-      typeof payload === 'object' &&
-      payload !== null &&
-      'error' in payload &&
-      typeof payload.error === 'object' &&
-      payload.error !== null &&
-      'message' in payload.error
-        ? String(payload.error.message)
-        : `请求失败（HTTP ${response.status}）`
-    throw new Error(message)
-  }
-  return payload as T
-}
-
-/**
- * `/communities` is the community-management page only (#154 LL-USER-002).
- *
- * It keeps the real capabilities that already lived here: creating communities,
- * setting the service-point location on the Tencent map, creating back-office
- * accounts and authorizing them for communities. The duplicated resident table
- * was removed; resident membership is a property of a platform account and is
- * rendered by the independent `/users` directory, not by a second roster here.
- */
-export function CommunitiesPage({ session }: CommunitiesPageProps) {
-  const { modal, message } = AntdApp.useApp()
-  const [communityForm] = Form.useForm<CommunityFormValues>()
-  const [staffForm] = Form.useForm<StaffFormValues>()
-  const [communities, setCommunities] = useState<Community[]>([])
-  const [staff, setStaff] = useState<StaffAccount[]>([])
-  const [selectedCommunityId, setSelectedCommunityId] = useState<string | undefined>(
-    session.staff.communities[0]?.id,
-  )
+export function CommunitiesPage({ session }: Props) {
+  const { message, modal } = AntdApp.useApp()
+  const isAdmin = session.staff.role === 'admin'
+  const [communities, setCommunities] = useState<ManagedCommunity[]>([])
+  const [staff, setStaff] = useState<ManagedStaff[]>([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [communityDrawerOpen, setCommunityDrawerOpen] = useState(false)
-  const [staffDrawerOpen, setStaffDrawerOpen] = useState(false)
-  const [communityError, setCommunityError] = useState<string | null>(null)
+  const refreshSequence = useRef(0)
+  const [query, setQuery] = useState<PanelQuery<CommunityFilters, 'name'>>({
+    filters: { keyword: '' }, page: 1, pageSize: 20,
+  })
+  const [communityForm] = Form.useForm<CommunityFormValues>()
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
+  const createButtonRef = useRef<HTMLButtonElement>(null)
   const [draftLocation, setDraftLocation] = useState<CommunityLocation | null>(null)
   const [mapPicker, setMapPicker] = useState<{
     key: string
@@ -123,118 +48,110 @@ export function CommunitiesPage({ session }: CommunitiesPageProps) {
   } | null>(null)
   const [mapLoading, setMapLoading] = useState(false)
   const [locationSaving, setLocationSaving] = useState(false)
-  const [staffError, setStaffError] = useState<string | null>(null)
-  // Ref-guarded so a fast double click can never fire the same POST twice,
-  // even before React flushes the disabled/loading state to the button.
-  const savingRef = useRef(false)
-  const communityButtonRef = useRef<HTMLButtonElement>(null)
-  const staffButtonRef = useRef<HTMLButtonElement>(null)
-  const isAdmin = session.staff.role === 'admin'
+  const [linkCommunity, setLinkCommunity] = useState<ManagedCommunity | null>(null)
+  const [linkStaffId, setLinkStaffId] = useState<string | undefined>()
+  const [linkSaving, setLinkSaving] = useState(false)
+  const [linkError, setLinkError] = useState<string | null>(null)
 
-  /**
-   * Re-reads only the community list. Keeping the current selection when it is
-   * still valid means creating a community never moves the operator's context.
-   */
-  async function refreshCommunities() {
-    const result = await apiRequest<{ items: Community[] }>('/api/admin/communities')
-    setCommunities(result.items)
-    setSelectedCommunityId((previous) => {
-      if (previous && result.items.some((item) => item.id === previous)) return previous
-      return result.items[0]?.id
-    })
-  }
-
-  async function refreshStaff() {
-    const result = await apiRequest<{ items: StaffAccount[] }>('/api/admin/staff')
-    setStaff(result.items)
-  }
-
-  async function loadData() {
+  const refresh = useCallback(async () => {
+    const sequence = ++refreshSequence.current
     setLoading(true)
     setError(null)
     try {
-      await refreshCommunities()
-      if (isAdmin) await refreshStaff()
+      const [scope, accounts] = await Promise.all([
+        listManagedCommunities(),
+        isAdmin ? listManagedStaff() : Promise.resolve({ items: [] as ManagedStaff[] }),
+      ])
+      // The account may have changed role while an older request was pending.
+      if (sequence !== refreshSequence.current) return
+      setCommunities(scope.items)
+      setStaff(accounts.items)
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '无法读取账户和社区信息')
+      if (sequence === refreshSequence.current) {
+        setError(cause instanceof Error ? cause.message : '社区资料读取失败')
+      }
     } finally {
-      setLoading(false)
+      if (sequence === refreshSequence.current) setLoading(false)
     }
-  }
-
+  }, [isAdmin])
   useEffect(() => {
-    void loadData()
-    // This screen loads once per authenticated staff session.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    void refresh()
+    return () => { refreshSequence.current += 1 }
+  }, [refresh])
 
-  function changeCommunity(communityId: string) {
-    setSelectedCommunityId(communityId)
-  }
+  const filtered = useMemo(() => {
+    const keyword = query.filters.keyword.trim().toLowerCase()
+    const result = communities.filter((item) =>
+      !keyword || [item.name, item.address ?? ''].some((value) => value.toLowerCase().includes(keyword)))
+    return query.sort?.order === 'desc' ? [...result].sort((a, b) => b.name.localeCompare(a.name, 'zh')) :
+      [...result].sort((a, b) => a.name.localeCompare(b.name, 'zh'))
+  }, [communities, query.filters.keyword, query.sort?.order])
+  const rows = filtered.slice((query.page - 1) * query.pageSize, query.page * query.pageSize)
+  const relatedStaff = (communityId: string) => staff.filter((account) =>
+    account.role !== 'admin' && account.communities.some((community) => community.id === communityId))
 
-  function openCommunityDrawer() {
-    setCommunityError(null)
-    setDraftLocation(null)
-    setCommunityDrawerOpen(true)
-  }
+  const columns: PanelColumn<ManagedCommunity, 'name'>[] = [
+    { key: 'name', title: '社区名称', dataIndex: 'name', sortKey: 'name', render: (name: string) => <strong>{name}</strong> },
+    {
+      key: 'address', title: '服务点位置',
+      render: (_, community) => community.address || <Typography.Text type="secondary">尚未设置</Typography.Text>,
+    },
+    {
+      key: 'staff', title: '关联工作人员',
+      render: (_, community) => isAdmin ? (
+        <Space size={4} wrap>
+          {relatedStaff(community.id).length
+            ? relatedStaff(community.id).map((person) =>
+              <Tag key={person.id} bordered={false}>
+                {person.displayName || person.username} · {STAFF_ROLE_LABELS[person.role]}
+              </Tag>)
+            : <Typography.Text type="secondary">未关联</Typography.Text>}
+        </Space>
+      ) : <Typography.Text type="secondary">仅管理员可查看</Typography.Text>,
+    },
+  ]
 
-  async function openMapPicker(mode: 'create' | 'update') {
+  const openPicker = async (mode: 'create' | 'update', community?: ManagedCommunity) => {
     if (mapLoading) return
-    const selectedCommunity =
-      mode === 'update' ? communities.find((item) => item.id === selectedCommunityId) : null
-    if (mode === 'update' && !selectedCommunity) return
     setMapLoading(true)
     try {
-      const config = await apiRequest<{ available: boolean; key?: string; appName?: string }>(
+      const config = await adminRequest<{ available: boolean; key?: string; appName?: string }>(
         '/api/admin/map-picker-config',
       )
       if (!config.available || !config.key || !config.appName) {
-        throw new Error('请先到「系统管理 → 腾讯地图」保存并启用 Key')
+        throw new Error('请先在「系统管理 → 第三方配置」设置并启用腾讯地图 Key')
       }
-      const initialLocation =
-        mode === 'create'
-          ? (draftLocation ?? undefined)
-          : selectedCommunity?.latitudeGcj02 != null && selectedCommunity.longitudeGcj02 != null
-            ? {
-                address: selectedCommunity.address || selectedCommunity.name,
-                latitude: selectedCommunity.latitudeGcj02,
-                longitude: selectedCommunity.longitudeGcj02,
-              }
-            : undefined
+      const currentLocation = community?.latitudeGcj02 != null && community.longitudeGcj02 != null
+        ? {
+          address: community.address || community.name,
+          latitude: community.latitudeGcj02, longitude: community.longitudeGcj02,
+        } : undefined
       setMapPicker({
-        key: config.key,
-        appName: config.appName,
-        mode,
-        ...(selectedCommunity ? { communityId: selectedCommunity.id } : {}),
-        ...(initialLocation ? { initialLocation } : {}),
+        key: config.key, appName: config.appName, mode,
+        ...(community ? { communityId: community.id } : {}),
+        ...(mode === 'create' && draftLocation ? { initialLocation: draftLocation } : {}),
+        ...(mode === 'update' && currentLocation ? { initialLocation: currentLocation } : {}),
       })
     } catch (cause) {
-      message.error(cause instanceof Error ? cause.message : '无法打开腾讯地图')
+      message.error(cause instanceof Error ? cause.message : '无法打开地图选点')
     } finally {
       setMapLoading(false)
     }
   }
-
-  async function acceptMapLocation(location: CommunityLocation) {
+  const acceptMapLocation = async (location: CommunityLocation) => {
     const target = mapPicker
     setMapPicker(null)
     if (!target) return
-    if (target.mode === 'create') {
-      setDraftLocation(location)
-      return
-    }
+    if (target.mode === 'create') { setDraftLocation(location); return }
     if (!target.communityId) return
     setLocationSaving(true)
     try {
-      await apiRequest(
-        `/api/admin/communities/${encodeURIComponent(target.communityId)}/location`,
-        {
-          method: 'PATCH',
-          headers: { 'x-csrf-token': session.csrfToken },
-          body: JSON.stringify(location),
-        },
-      )
-      await refreshCommunities()
+      await adminRequest(`/api/admin/communities/${encodeURIComponent(target.communityId)}/location`, {
+        method: 'PATCH', headers: { 'x-csrf-token': session.csrfToken },
+        body: JSON.stringify(location),
+      })
+      const result = await listManagedCommunities()
+      setCommunities(result.items)
       message.success('社区位置已保存')
     } catch (cause) {
       message.error(cause instanceof Error ? cause.message : '社区位置保存失败')
@@ -243,473 +160,157 @@ export function CommunitiesPage({ session }: CommunitiesPageProps) {
     }
   }
 
-  function openStaffDrawer() {
-    setStaffError(null)
-    setStaffDrawerOpen(true)
-  }
-
-  /**
-   * A form counts as dirty once any registered field holds typed content, even
-   * if the user never blurred it (rc-field-form marks touched on change, but
-   * values are the ground truth for "would closing lose input?").
-   */
-  function hasDraftValues(values: object): boolean {
-    return Object.values(values).some((value) => {
-      if (Array.isArray(value)) return value.length > 0
-      return typeof value === 'string' && value.trim().length > 0
-    })
-  }
-
-  /**
-   * Dirty-guarded close shared by the X button, mask click and 取消: only a
-   * form with real edits asks for confirmation, so a clean close never nags
-   * and an accidental click can never silently drop typed input. Closing
-   * never submits; submission only happens through the footer submit button.
-   */
-  function requestCloseCommunityDrawer() {
+  const closeCreate = () => {
     if (savingRef.current) return
-    if (
-      !draftLocation &&
-      !communityForm.isFieldsTouched() &&
-      !hasDraftValues(communityForm.getFieldsValue())
-    ) {
-      setCommunityDrawerOpen(false)
+    const discard = () => {
+      communityForm.resetFields()
+      setDraftLocation(null)
+      setCreateError(null)
+      setCreateOpen(false)
+    }
+    if (!draftLocation && !communityForm.isFieldsTouched() && !communityForm.getFieldValue('name')) {
+      discard()
       return
     }
     modal.confirm({
       title: '放弃已填写的社区信息？',
-      content: '抽屉关闭后，本次填写的内容将被清空，且不会创建社区。',
-      okText: '放弃并关闭',
-      cancelText: '继续填写',
-      onOk: () => {
-        communityForm.resetFields()
-        setDraftLocation(null)
-        setCommunityError(null)
-        setCommunityDrawerOpen(false)
-      },
+      content: '本次填写的资料将被清空，不会创建社区。',
+      okText: '放弃并关闭', cancelText: '继续填写', onOk: discard,
     })
   }
-
-  function requestCloseStaffDrawer() {
-    if (savingRef.current) return
-    if (!staffForm.isFieldsTouched() && !hasDraftValues(staffForm.getFieldsValue())) {
-      setStaffDrawerOpen(false)
-      return
-    }
-    modal.confirm({
-      title: '放弃已填写的账户信息？',
-      content: '抽屉关闭后，本次填写的内容将被清空，且不会创建后台账户。',
-      okText: '放弃并关闭',
-      cancelText: '继续填写',
-      onOk: () => {
-        staffForm.resetFields()
-        setStaffError(null)
-        setStaffDrawerOpen(false)
-      },
-    })
-  }
-
-  async function createCommunity(values: CommunityFormValues) {
+  const createCommunity = async (values: CommunityFormValues) => {
     if (savingRef.current) return
     savingRef.current = true
     setSaving(true)
-    setCommunityError(null)
+    setCreateError(null)
     try {
-      await apiRequest<Community>('/api/admin/communities', {
-        method: 'POST',
-        headers: { 'x-csrf-token': session.csrfToken },
-        body: JSON.stringify({ ...values, ...(draftLocation ? { location: draftLocation } : {}) }),
+      await adminRequest('/api/admin/communities', {
+        method: 'POST', headers: { 'x-csrf-token': session.csrfToken },
+        body: JSON.stringify({ name: values.name, ...(draftLocation ? { location: draftLocation } : {}) }),
       })
+      communityForm.resetFields()
+      setDraftLocation(null)
+      setCreateOpen(false)
+      message.success('社区已创建')
+      await refresh()
     } catch (cause) {
-      // 失败：提示留在抽屉内，输入保留，操作者可以修正后重试。
-      setCommunityError(cause instanceof Error ? cause.message : '创建社区失败')
-      return
+      setCreateError(cause instanceof Error ? cause.message : '创建社区失败，请重试')
     } finally {
       savingRef.current = false
       setSaving(false)
     }
-    communityForm.resetFields()
-    setDraftLocation(null)
-    setCommunityDrawerOpen(false)
-    message.success('社区已创建')
-    try {
-      await refreshCommunities()
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? `社区已创建，但列表刷新失败：${cause.message}`
-          : '社区已创建，但列表刷新失败，请手动刷新',
-      )
-    }
   }
 
-  async function createStaff(values: StaffFormValues) {
-    if (savingRef.current) return
-    savingRef.current = true
-    setSaving(true)
-    setStaffError(null)
+  const openLink = (community: ManagedCommunity) => {
+    setLinkCommunity(community)
+    setLinkStaffId(undefined)
+    setLinkError(null)
+  }
+  const availableStaff = staff.filter((person) =>
+    person.role !== 'admin' && person.status === 'active' &&
+    !person.communities.some((item) => item.id === linkCommunity?.id))
+  const linkExistingStaff = async () => {
+    if (!linkCommunity || !linkStaffId || linkSaving) return
+    setLinkSaving(true)
+    setLinkError(null)
     try {
-      await apiRequest<StaffAccount>('/api/admin/staff', {
-        method: 'POST',
-        headers: { 'x-csrf-token': session.csrfToken },
-        body: JSON.stringify(values),
+      await adminRequest(`/api/admin/communities/${encodeURIComponent(linkCommunity.id)}/staff`, {
+        method: 'POST', headers: { 'x-csrf-token': session.csrfToken },
+        body: JSON.stringify({ staffAccountId: linkStaffId }),
       })
+      const result = await listManagedStaff()
+      setStaff(result.items)
+      setLinkCommunity(null)
+      message.success('社区关联已建立')
     } catch (cause) {
-      setStaffError(cause instanceof Error ? cause.message : '创建后台账户失败')
-      return
+      setLinkError(cause instanceof Error ? cause.message : '关联失败，请重试')
     } finally {
-      savingRef.current = false
-      setSaving(false)
-    }
-    staffForm.resetFields()
-    setStaffDrawerOpen(false)
-    message.success('后台账户已创建')
-    try {
-      await refreshStaff()
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? `后台账户已创建，但列表刷新失败：${cause.message}`
-          : '后台账户已创建，但列表刷新失败，请手动刷新',
-      )
+      setLinkSaving(false)
     }
   }
-
-  const staffColumns: ColumnsType<StaffAccount> = [
-    { title: '登录账号', dataIndex: 'username', key: 'username' },
-    {
-      title: '姓名',
-      dataIndex: 'displayName',
-      key: 'displayName',
-      render: (value: string | null) => value || '—',
-    },
-    {
-      title: '角色',
-      dataIndex: 'role',
-      key: 'role',
-      render: (role: StaffAccount['role']) => (
-        <Tag color={role === 'grid_worker' ? 'blue' : 'green'}>{ROLE_LABELS[role]}</Tag>
-      ),
-    },
-    {
-      title: '负责社区',
-      dataIndex: 'communities',
-      key: 'communities',
-      render: (items: Community[]) => items.map((item) => item.name).join('、'),
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      render: (status: StaffAccount['status']) => (
-        <Tag color={status === 'active' ? 'success' : 'default'}>
-          {status === 'active' ? '正常' : '已停用'}
-        </Tag>
-      ),
-    },
-  ]
 
   return (
     <div className="page">
-      <PageHeader
-        title="社区管理"
-        description="创建社区、设置服务点位置，并创建/授权后台账户。居民社区归属统一在「用户管理」中查看，本页不再展示第二套居民名单。"
-        extra={
-          <Button onClick={() => void loadData()} loading={loading}>
-            刷新
-          </Button>
-        }
-      />
-
-      <Space direction="vertical" size={16} style={{ width: '100%' }}>
-        {error && <Alert type="error" showIcon message={error} />}
-        <Card
-          size="small"
-          title="社区范围"
-          extra={
-            isAdmin ? (
-              <Space wrap className="communities-page-actions">
-                <Button
-                  ref={communityButtonRef}
-                  type="primary"
-                  size="small"
-                  icon={<PlusOutlined />}
-                  onClick={openCommunityDrawer}
-                >
-                  新建社区
-                </Button>
-                <Button
-                  ref={staffButtonRef}
-                  size="small"
-                  icon={<UserAddOutlined />}
-                  onClick={openStaffDrawer}
-                  disabled={communities.length === 0}
-                  title={communities.length === 0 ? '请先创建社区，再分配后台账户' : undefined}
-                >
-                  新增账户
-                </Button>
-              </Space>
-            ) : undefined
-          }
-        >
-          <Space wrap>
-            <Typography.Text type="secondary">当前账户可访问的社区：</Typography.Text>
-            <Select
-              style={{ minWidth: 220 }}
-              value={selectedCommunityId}
-              placeholder="选择社区"
-              options={communities.map((item) => ({ value: item.id, label: item.name }))}
-              onChange={changeCommunity}
-            />
-            {isAdmin && selectedCommunityId && (
-              <Button
-                size="small"
-                icon={<EnvironmentOutlined />}
-                onClick={() => {
-                  void openMapPicker('update')
-                }}
-                loading={mapLoading || locationSaving}
-              >
-                {communities.find((item) => item.id === selectedCommunityId)?.latitudeGcj02 == null
-                  ? '设置社区位置'
-                  : '修改社区位置'}
-              </Button>
-            )}
-            <Tag color={isAdmin ? 'green' : 'blue'}>{ROLE_LABELS[session.staff.role]}</Tag>
-            {!isAdmin && (
-              <Typography.Text type="secondary">
-                仅显示管理员分配给你的社区范围。
-              </Typography.Text>
-            )}
+      <PageHeader title="社区管理" description="社区、服务点与关联工作人员" />
+      {error && <Alert type="error" showIcon title="读取社区失败" description={error} />}
+      <DataPanel<ManagedCommunity, CommunityFilters, 'name'>
+        id="communities" label="社区列表" rowKey={(item) => item.id}
+        query={query} onQueryChange={setQuery} initialFilters={{ keyword: '' }}
+        data={{ rows, total: filtered.length, loading, ...(error ? { error: new Error(error) } : {}) }}
+        filters={[{ key: 'keyword', label: '关键词', kind: 'text', placeholder: '搜索社区名称 / 地址', width: 260 }]}
+        columns={columns} onRefresh={() => void refresh()}
+        toolbarExtra={isAdmin ? (
+          <Button ref={createButtonRef} type="primary" icon={<PlusOutlined/>}
+            onClick={() => { setCreateError(null); setCreateOpen(true) }}>新建社区</Button>
+        ) : undefined}
+        rowActions={isAdmin ? (community) => [
+          { key: 'location', label: '设置位置', onClick: () => { void openPicker('update', community) }, disabled: mapLoading || locationSaving },
+          { key: 'staff', label: '关联人员', onClick: () => openLink(community) },
+        ] : undefined}
+        renderCard={(community) => (
+          <Space orientation="vertical" size={4}>
+            <Typography.Text strong>{community.name}</Typography.Text>
+            <Typography.Text type="secondary">{community.address || '尚未设置服务点'}</Typography.Text>
+            <Typography.Text type="secondary">
+              {isAdmin ? `已关联 ${relatedStaff(community.id).length} 位工作人员` : '已授权社区'}
+            </Typography.Text>
           </Space>
-          {communities.find((item) => item.id === selectedCommunityId)?.address && (
-            <Typography.Paragraph type="secondary" style={{ margin: '8px 0 0' }}>
-              社区服务点：
-              {communities.find((item) => item.id === selectedCommunityId)?.address}
-            </Typography.Paragraph>
-          )}
-        </Card>
-
-        {isAdmin && (
-          <Card size="small" title="后台账户">
-            <Table
-              rowKey="id"
-              size="small"
-              loading={loading}
-              columns={staffColumns}
-              dataSource={staff}
-              pagination={{ pageSize: 8 }}
-              scroll={{ x: 680 }}
-              locale={{ emptyText: '尚未创建后台账户' }}
-            />
-          </Card>
         )}
-
-        {isAdmin && (
-          <Drawer
-            title="新建社区"
-            size={400}
-            open={communityDrawerOpen}
-            onClose={requestCloseCommunityDrawer}
-            rootClassName="communities-drawer"
-            afterOpenChange={(open) => {
-              // 焦点回到触发按钮；preventScroll 保证关闭抽屉不会把页面拉回顶部。
-              if (!open) communityButtonRef.current?.focus({ preventScroll: true })
-            }}
-            footer={
-              <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <Button onClick={requestCloseCommunityDrawer} disabled={saving}>
-                  取消
-                </Button>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  form={COMMUNITY_FORM_ID}
-                  loading={saving}
-                >
-                  创建社区
-                </Button>
-              </Space>
-            }
-          >
-            <Form<CommunityFormValues>
-              id={COMMUNITY_FORM_ID}
-              form={communityForm}
-              layout="vertical"
-              onFinish={createCommunity}
-            >
-              {communityError && (
-                <Alert
-                  style={{ marginBottom: 16 }}
-                  type="error"
-                  showIcon
-                  message="创建社区失败"
-                  description={communityError}
-                />
-              )}
-              <Form.Item
-                name="name"
-                label="社区名称"
-                rules={[
-                  { required: true, whitespace: true, message: '请填写社区名称' },
-                  {
-                    // The API trims before enforcing 2-60, so validate the trimmed value.
-                    validator: async (_rule, value: string | undefined) => {
-                      const trimmed = (value ?? '').trim()
-                      if (trimmed.length < 2 || trimmed.length > 60) {
-                        throw new Error('社区名称长度需为 2-60 个字符')
-                      }
-                    },
-                  },
-                ]}
-              >
-                <Input placeholder="例如：幸福社区" maxLength={60} autoFocus />
-              </Form.Item>
-              <Form.Item label="社区服务点位置（可稍后补录）">
-                <Space direction="vertical" style={{ width: '100%' }}>
-                  <Button
-                    icon={<EnvironmentOutlined />}
-                    onClick={() => {
-                      void openMapPicker('create')
-                    }}
-                    loading={mapLoading}
-                  >
-                    在腾讯地图上选点
-                  </Button>
-                  {draftLocation && (
-                    <Alert
-                      type="success"
-                      showIcon
-                      message="已选择位置"
-                      description={draftLocation.address}
-                    />
-                  )}
-                </Space>
-              </Form.Item>
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                创建后可分配运营员或网格员，社区位置也可随时修改；不会因此改变居民归属。
-              </Typography.Text>
-            </Form>
-          </Drawer>
-        )}
-
-        <TencentLocationPicker
-          open={mapPicker !== null}
-          apiKey={mapPicker?.key ?? ''}
-          appName={mapPicker?.appName ?? ''}
-          initialLocation={mapPicker?.initialLocation}
-          onCancel={() => setMapPicker(null)}
-          onSelect={(location) => {
-            void acceptMapLocation(location)
+      />
+      {isAdmin && <>
+        <Drawer title="新建社区" size={420} open={createOpen} rootClassName="communities-drawer"
+          onClose={closeCreate} afterOpenChange={(open) => {
+            if (!open) createButtonRef.current?.focus({ preventScroll: true })
           }}
-        />
-
-        {isAdmin && (
-          <Drawer
-            title="新增后台账户（运营员 / 网格员）"
-            size={560}
-            open={staffDrawerOpen}
-            onClose={requestCloseStaffDrawer}
-            rootClassName="communities-drawer"
-            afterOpenChange={(open) => {
-              if (!open) staffButtonRef.current?.focus({ preventScroll: true })
-            }}
-            footer={
-              <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <Button onClick={requestCloseStaffDrawer} disabled={saving}>
-                  取消
-                </Button>
-                <Button type="primary" htmlType="submit" form={STAFF_FORM_ID} loading={saving}>
-                  创建账户
-                </Button>
+          footer={<Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button onClick={closeCreate} disabled={saving}>取消</Button>
+            <Button type="primary" loading={saving} htmlType="submit" form={CREATE_FORM_ID}>创建社区</Button>
+          </Space>}>
+          <Form form={communityForm} id={CREATE_FORM_ID} layout="vertical" onFinish={createCommunity}>
+            {createError && <Alert type="error" showIcon title="创建社区失败" description={createError} style={{ marginBottom: 16 }}/>}
+            <Form.Item name="name" label="社区名称" rules={[
+              { required: true, message: '请填写社区名称' },
+              { validator: async (_rule, value: string | undefined) => {
+                const name = (value ?? '').trim()
+                if (name.length < 2 || name.length > 60) throw new Error('社区名称长度需为 2-60 个字符')
+              } },
+            ]}>
+              <Input placeholder="例如：幸福社区" maxLength={60} autoFocus/>
+            </Form.Item>
+            <Form.Item label="社区服务点位置（可稍后补录）">
+              <Space orientation="vertical">
+                <Button icon={<EnvironmentOutlined/>} loading={mapLoading}
+                  onClick={() => { void openPicker('create') }}>在腾讯地图上选点</Button>
+                {draftLocation && <Tag color="success">已选择：{draftLocation.address}</Tag>}
               </Space>
-            }
-          >
-            <Form<StaffFormValues>
-              id={STAFF_FORM_ID}
-              form={staffForm}
-              layout="vertical"
-              onFinish={createStaff}
-            >
-              {staffError && (
-                <Alert
-                  style={{ marginBottom: 16 }}
-                  type="error"
-                  showIcon
-                  message="创建后台账户失败"
-                  description={staffError}
-                />
-              )}
-              <Form.Item
-                name="username"
-                label="登录账号"
-                normalize={(value: string) => value?.trim()}
-                rules={[
-                  { required: true, message: '请填写登录账号' },
-                  {
-                    pattern: /^[a-zA-Z0-9._-]{3,32}$/,
-                    message: '3-32 位字母、数字、点、下划线或短横线',
-                  },
-                ]}
-              >
-                <Input placeholder="3-32 位字母、数字、点、下划线或短横线" autoFocus />
-              </Form.Item>
-              <Form.Item
-                name="displayName"
-                label="姓名 / 显示名称"
-                rules={[
-                  { required: true, whitespace: true, message: '请填写姓名' },
-                  { min: 1, max: 40, message: '姓名长度需为 1-40 个字符' },
-                ]}
-              >
-                <Input placeholder="工作人员姓名" />
-              </Form.Item>
-              <Form.Item
-                name="password"
-                label="初始密码"
-                rules={[
-                  { required: true, message: '请填写初始密码' },
-                  { min: 12, max: 128, message: '初始密码长度需为 12-128 位' },
-                ]}
-              >
-                <Input.Password placeholder="至少 12 位，创建后请安全告知本人" />
-              </Form.Item>
-              <Form.Item
-                name="userId"
-                normalize={(value: string) => value?.trim() || undefined}
-                label="关联已有居民账户（可选）"
-                tooltip="填写已完成微信授权的居民平台用户 ID，可让居民身份与网格员/运营员身份属于同一平台账户。"
-                rules={[{ pattern: /^[0-9a-f-]{36}$/i, message: '请输入完整的平台用户 UUID' }]}
-              >
-                <Input placeholder="留空则创建独立后台账户" />
-              </Form.Item>
-              <Form.Item name="role" label="角色" rules={[{ required: true, message: '请选择角色' }]}>
-                <Select
-                  options={[
-                    { value: 'grid_worker', label: '网格员' },
-                    { value: 'operator', label: '运营员' },
-                  ]}
-                  placeholder="选择角色"
-                />
-              </Form.Item>
-              <Form.Item
-                name="communityIds"
-                label="负责社区"
-                rules={[
-                  { required: true, type: 'array', min: 1, message: '请选择至少一个负责社区' },
-                ]}
-              >
-                <Select
-                  mode="multiple"
-                  allowClear
-                  placeholder="选择一个或多个社区"
-                  options={communities.map((item) => ({ value: item.id, label: item.name }))}
-                />
-              </Form.Item>
-            </Form>
-          </Drawer>
-        )}
-      </Space>
+            </Form.Item>
+          </Form>
+        </Drawer>
+        <Drawer title={linkCommunity ? `关联工作人员 · ${linkCommunity.name}` : '关联工作人员'}
+          open={linkCommunity !== null} size={440} rootClassName="communities-drawer"
+          onClose={() => { if (!linkSaving) setLinkCommunity(null) }}
+          footer={<Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button onClick={() => setLinkCommunity(null)} disabled={linkSaving}>取消</Button>
+            <Button type="primary" icon={<UserAddOutlined/>} disabled={!linkStaffId || linkSaving}
+              loading={linkSaving} onClick={() => { void linkExistingStaff() }}>建立关联</Button>
+          </Space>}>
+          {linkError && <Alert type="error" showIcon title="关联失败" description={linkError} style={{ marginBottom: 16 }}/>}
+          <Typography.Paragraph type="secondary">
+            从系统管理中已创建的运营员或网格员选择。平台管理员拥有全局权限，无需关联。
+          </Typography.Paragraph>
+          <Select style={{ width: '100%' }} placeholder="选择已有工作人员"
+            showSearch optionFilterProp="label" value={linkStaffId} onChange={setLinkStaffId}
+            options={availableStaff.map((person) => ({
+              value: person.id,
+              label: `${person.displayName || person.username} · ${STAFF_ROLE_LABELS[person.role]} · ${person.username}`,
+            }))}
+            notFoundContent="暂无可关联账号，请先到「系统管理 → 管理员与权限」创建"/>
+        </Drawer>
+      </>}
+      <TencentLocationPicker open={mapPicker !== null} apiKey={mapPicker?.key ?? ''}
+        appName={mapPicker?.appName ?? ''} initialLocation={mapPicker?.initialLocation}
+        onCancel={() => setMapPicker(null)}
+        onSelect={(location) => { void acceptMapLocation(location) }}/>
     </div>
   )
 }

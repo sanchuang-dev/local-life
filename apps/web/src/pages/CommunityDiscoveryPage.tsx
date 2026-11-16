@@ -12,7 +12,7 @@ import {
   type PublicCommunity,
 } from '@sanchuang-dev/local-life-contracts'
 import {
-  CalendarDays, CalendarX, ChevronRight,
+  CalendarDays, ChevronRight,
   CircleAlert, LocateFixed, MapPin, Search, X,
 } from 'lucide-react'
 import { CommunityLocationError, createCommunityLocationRequester } from '../lib/communityGeolocation'
@@ -21,12 +21,14 @@ import type { Gcj02Point } from '../lib/communityCoordinates'
 import { activityDetailHref, SELECTED_COMMUNITY_KEY } from '../lib/communityHomeRoute'
 import {
   BROWSE_ONLY_NOTICE,
+  canOfferConfirmation,
   residentCommunityConfirmHrefWithContext,
 } from '../lib/residentCommunity'
-import { ResidentCommunityCard } from '../components/community/ResidentCommunityCard'
 import { useResidentAuth } from '../hooks/useResidentAuth'
 import { useResidentCommunity } from '../hooks/useResidentCommunity'
 import { buildResidentLoginHref } from '../components/auth/residentLogin'
+import { ActivityArtwork } from '../components/activity/ActivityArtwork'
+import { EmptyState } from '../components/common/EmptyState'
 
 type AsyncList<T> = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; items: T[] }
 
@@ -95,6 +97,9 @@ export function CommunityDiscoveryPage() {
     authLoading: auth.loading,
   })
   const residentStatus = residentCommunity.state.status === 'ready' ? residentCommunity.state.data : null
+  // Permanent residence is server-owned, including when the current browse choice conflicts.
+  // Never derive this banner or the binding CTA from the browsing community.
+  const boundCommunityName = residentStatus?.binding?.community.name ?? null
   // Only an explicit logged-out visitor gets the login-first path; a session
   // failure must never be presented as "please log in".
   const needsLogin = !auth.loading && auth.sessionStatus === 'unauthenticated'
@@ -129,6 +134,8 @@ export function CommunityDiscoveryPage() {
   const community = directory.status === 'ready'
     ? directory.items.find((item) => item.id === selectedId) ?? null
     : null
+  // Effects depend on the stable public-directory ID, not a changing row object.
+  const browsingCommunityId = community?.id ?? null
   const nearby = directory.status === 'ready' && locationStatus === 'success'
     ? directory.items.filter((item) => item.nearby)
     : []
@@ -143,13 +150,13 @@ export function CommunityDiscoveryPage() {
   }, [directory, selectedId])
 
   useEffect(() => {
-    if (!selectedId || !community) {
+    if (!browsingCommunityId) {
       setActivities({ status: 'ready', items: [] })
       return
     }
     const controller = new AbortController()
     setActivities({ status: 'loading' })
-    const url = `/api${ACTIVITY_ROUTES.publicList}?communityId=${encodeURIComponent(selectedId)}&limit=50`
+    const url = `/api${ACTIVITY_ROUTES.publicList}?communityId=${encodeURIComponent(browsingCommunityId)}&limit=50`
     fetch(url, { credentials: 'same-origin', cache: 'no-store', signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error(await readableError(response, '活动加载失败'))
@@ -165,7 +172,7 @@ export function CommunityDiscoveryPage() {
         })
       })
     return () => controller.abort()
-  }, [selectedId, community?.id, activityToken])
+  }, [browsingCommunityId, activityToken])
 
   useEffect(() => {
     if (!sheetOpen || !search.trim()) {
@@ -295,6 +302,10 @@ export function CommunityDiscoveryPage() {
         inviteInvalid: new URLSearchParams(routeSearch).get('inviteInvalid') === '1',
       })
     : null
+  const canBeginBinding = needsLogin || (residentStatus !== null && canOfferConfirmation(residentStatus))
+  const bindingHref = community && canBeginBinding
+    ? needsLogin ? loginHref : confirmReturnTo
+    : null
 
   return (
     <div className="community-home">
@@ -307,7 +318,14 @@ export function CommunityDiscoveryPage() {
         />
         <div className="community-home__banner-title">
           <h1>本地生活</h1>
-          <p>社区活动与便民服务</p>
+          <p>
+            {boundCommunityName ? (
+              <>
+                <MapPin size={14} aria-hidden="true" />
+                <span>{boundCommunityName}</span>
+              </>
+            ) : '社区活动与便民服务'}
+          </p>
         </div>
         <button type="button" className="community-home__locate-pill"
           onClick={startLocation} disabled={locationStatus === 'locating'}>
@@ -320,17 +338,23 @@ export function CommunityDiscoveryPage() {
 
       <div className="community-home__body">
         <section className="community-home__chooser" aria-labelledby="home-community-title">
-          <h2 id="home-community-title" className="sr-only">选择社区</h2>
+          <h2 id="home-community-title" className="sr-only">社区操作</h2>
           <div className="community-home__actions">
-            <button type="button" className={primary} disabled={locationStatus === 'locating'}
-              onClick={startLocation}>
-              <LocateFixed size={18} aria-hidden="true" />
-              {locationStatus === 'locating' ? '定位中…'
-                : locationStatus === 'success' ? '重新定位' : '定位附近社区'}
-            </button>
+            {!boundCommunityName ? (
+              bindingHref ? (
+                <Link to={bindingHref} state={{ from: '/' }} className={primary}>绑定常驻社区</Link>
+              ) : canBeginBinding && !community ? (
+                <button type="button" className={primary}
+                  onClick={(e) => openSheet(null, e.currentTarget)}>
+                  绑定常驻社区
+                </button>
+              ) : (
+                <button type="button" className={primary} disabled>绑定常驻社区</button>
+              )
+            ) : null}
             <button type="button" className={secondary}
               onClick={(e) => openSheet(null, e.currentTarget)}>
-              选择社区
+              查看社区
             </button>
           </div>
 
@@ -344,16 +368,7 @@ export function CommunityDiscoveryPage() {
             </div>
           )}
 
-          {community ? (
-            <div className="community-home__current">
-              <span className="community-home__current-icon" aria-hidden="true"><MapPin size={20} /></span>
-              <div>
-                <span>当前浏览社区</span>
-                <strong>{community.name}</strong>
-                <small>{community.address || '社区服务点地址暂未录入'}</small>
-              </div>
-            </div>
-          ) : locationStatus === 'success' && nearby.length > 0 ? (
+          {!community && locationStatus === 'success' && nearby.length > 0 ? (
             <div className="community-home__nearby" aria-label="附近社区推荐">
               {nearby.slice(0, 2).map((item) => (
                 <button key={item.id} type="button"
@@ -374,13 +389,11 @@ export function CommunityDiscoveryPage() {
           </div>
 
           {!community ? (
-            <div className="community-home__activity-empty">
-              <span className="community-home__empty-icon" aria-hidden="true"><CalendarDays size={27}/></span>
-              <div>
-                <h3>选择社区后查看活动</h3>
-                <p>选择想浏览的社区，看看那里正在发生什么。</p>
-              </div>
-            </div>
+            <EmptyState
+              title="选择社区后查看活动"
+              description="选择想浏览的社区，看看那里正在发生什么。"
+              illustration={<ActivityArtwork variant="empty" />}
+            />
           ) : activities.status === 'loading' ? (
             <p className="community-home__status" role="status">正在读取已发布活动…</p>
           ) : activities.status === 'error' ? (
@@ -389,21 +402,17 @@ export function CommunityDiscoveryPage() {
               <button type="button" onClick={() => refreshActivities((n) => n + 1)}>重新读取活动</button>
             </div>
           ) : activities.items.length === 0 ? (
-            <div className="community-home__activity-empty">
-              <span className="community-home__empty-icon" aria-hidden="true"><CalendarX size={27}/></span>
-              <div>
-                <h3>这个社区暂无已发布活动</h3>
-                <p>可以稍后再来，或者看看其他社区。</p>
-                <button type="button" onClick={(e) => openSheet(null, e.currentTarget)}>选择其他社区</button>
-              </div>
-            </div>
+            <EmptyState
+              title="这个社区暂无已发布活动"
+              description="可以稍后再来，或者看看其他社区。"
+              illustration={<ActivityArtwork variant="empty" />}
+              action={<button type="button" className="min-h-11" onClick={(e) => openSheet(null, e.currentTarget)}>选择其他社区</button>}
+            />
           ) : (
             <div className="community-home__activity-list">
               {activities.items.map((activity) => (
                 <Link key={activity.id} to={activityDetailHref(activity.id)} className="community-home__activity-card">
-                  <span className="community-home__thumbnail" aria-hidden="true">
-                    <CalendarDays size={38} strokeWidth={1.35} />
-                  </span>
+                  <ActivityArtwork />
                   <span className="community-home__activity-info">
                     <span className="community-home__activity-top">
                       <span className="community-home__status-tag">{activityStatus(activity)}</span>
@@ -426,19 +435,6 @@ export function CommunityDiscoveryPage() {
           )}
         </section>
 
-        {community && (
-          <div className="community-home__residence">
-            <ResidentCommunityCard
-              state={residentCommunity.state}
-              onReload={residentCommunity.reload}
-              browsingCommunity={{ id: community.id, name: community.name }}
-              confirmHref={residentStatus?.canConfirm ? confirmReturnTo : null}
-              loginHref={needsLogin ? loginHref : null}
-              chooseCommunityHref="/"
-            />
-          </div>
-        )}
-
         <p className="community-home__footnote">社区与活动信息以实际发布为准</p>
       </div>
 
@@ -446,7 +442,7 @@ export function CommunityDiscoveryPage() {
         <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center" role="presentation">
           <div className="absolute inset-0 bg-[#09201a]/45" onClick={closeSheet} aria-hidden="true"/>
           <section ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="community-sheet-heading"
-            className="relative z-10 flex max-h-[90dvh] w-full max-w-[480px] flex-col overflow-hidden rounded-t-[24px] bg-[#f5f7f7] shadow-xl sm:max-h-[85dvh] sm:rounded-[24px]">
+            className="relative z-10 flex max-h-[90dvh] w-full max-w-[480px] flex-col overflow-hidden rounded-t-3xl bg-[#f5f7f7] shadow-xl sm:max-h-[85dvh] sm:rounded-3xl">
             <div className="flex justify-center pt-2 sm:hidden"><span className="h-1.5 w-10 rounded-full bg-[#d6e3de]"/></div>
             <div className="flex items-center justify-between px-5 pb-3 pt-3">
               <h2 id="community-sheet-heading" className="text-[20px] font-bold">选择要浏览的社区</h2>

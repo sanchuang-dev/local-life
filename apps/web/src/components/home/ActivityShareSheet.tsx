@@ -112,7 +112,7 @@ export function ActivityShareSheet({
               <button
                 type="button"
                 onClick={() => void handleSystemShare()}
-                className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-[13px] bg-teal-700 px-2 text-[13px] font-semibold text-white transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+                className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-xl bg-teal-700 px-2 text-[13px] font-semibold text-white transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
               >
                 <Share2 size={17} aria-hidden="true" />
                 {wechatShare.isWechat ? '微信内分享' : '转发给好友'}
@@ -120,7 +120,7 @@ export function ActivityShareSheet({
               <button
                 type="button"
                 onClick={() => void handleCopyLink()}
-                className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-[13px] border border-teal-200 bg-white px-2 text-[13px] font-semibold text-teal-700 transition-colors hover:bg-[#f2faf6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+                className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-xl border border-teal-200 bg-white px-2 text-[13px] font-semibold text-teal-700 transition-colors hover:bg-[#f2faf6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
               >
                 <Copy size={17} aria-hidden="true" />
                 复制链接
@@ -159,7 +159,7 @@ export function ActivityShareSheet({
       }
     >
       {shareUrl ? (
-        <div className="mx-auto w-full max-w-[300px] overflow-hidden rounded-[20px] border border-[#deebdf] bg-[#f4faf3] shadow-[0_9px_25px_rgba(26,88,62,0.08)]">
+        <div className="mx-auto w-full max-w-[300px] overflow-hidden rounded-2xl border border-[#deebdf] bg-[#f4faf3] shadow-[0_9px_25px_rgba(26,88,62,0.08)]">
           <div className="px-3 pb-3 pt-3">
             <div className="text-center">
               <p className="text-[17px] font-bold leading-6 text-[#176149]">还差你，三人成团领好礼</p>
@@ -167,7 +167,7 @@ export function ActivityShareSheet({
                 {activity?.community.name ?? '本社区'} · 已有 {seatsFilled ?? 0} / {seatsTotal ?? 3} 位街坊
               </p>
             </div>
-            <div className="mt-3 rounded-[14px] border border-[#deece1] bg-white px-3 py-3 text-center">
+            <div className="mt-3 rounded-xl border border-[#deece1] bg-white px-3 py-3 text-center">
               <div className="relative mx-auto w-fit rounded-lg bg-white">
                 <QRCodeSVG
                   value={shareUrl}
@@ -189,7 +189,7 @@ export function ActivityShareSheet({
           </div>
         </div>
       ) : (
-        <p className="rounded-[14px] bg-slate-50 p-3 text-[13px] leading-6 text-slate-500">
+        <p className="rounded-xl bg-slate-50 p-3 text-[13px] leading-6 text-slate-500">
           当前没有可用的邀请码（团队可能已满员、已锁定或你尚未参与）。邀请入口已关闭，请刷新参与状态。
         </p>
       )}

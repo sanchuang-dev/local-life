@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { App as AntdApp, ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import { adminTheme } from '../app/theme'
@@ -131,9 +131,8 @@ describe('CommunitiesPage management surface', () => {
 
     expect(await screen.findByRole('heading', { name: '社区管理' })).toBeTruthy()
     expect(await screen.findByRole('button', { name: /新建社区/ })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /新增账户/ })).toBeTruthy()
-    expect(screen.getByText('社区范围')).toBeTruthy()
-    expect(screen.getByText('后台账户')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /新增账户/ })).toBeNull()
+    expect(await screen.findByRole('region', { name: '社区列表' })).toBeTruthy()
     // The old page's second resident roster and its search box are gone.
     expect(screen.queryByText('社区居民')).toBeNull()
     expect(screen.queryByRole('searchbox', { name: '搜索居民' })).toBeNull()
@@ -141,6 +140,50 @@ describe('CommunitiesPage management surface', () => {
     expect(screen.queryByPlaceholderText('例如：幸福社区')).toBeNull()
     expect(screen.queryByPlaceholderText('工作人员姓名')).toBeNull()
     expect(openDrawers()).toBe(0)
+  })
+
+  it('re-fetches the authorized staff directory when a session switches from operator to admin', async () => {
+    const calls = stubBaseline()
+    const view = renderPage(OPERATOR_SESSION)
+    await screen.findByRole('region', { name: '社区列表' })
+    expect(getCalls(calls, '/api/admin/staff')).toEqual([])
+
+    view.rerender(
+      <ConfigProvider locale={zhCN} theme={adminTheme}>
+        <AntdApp><CommunitiesPage session={ADMIN_SESSION} /></AntdApp>
+      </ConfigProvider>,
+    )
+    await waitFor(() => expect(getCalls(calls, '/api/admin/staff')).toHaveLength(1))
+    expect(await screen.findByRole('button', { name: /新建社区/ })).toBeTruthy()
+  })
+
+  it('ignores a late admin-scoped response after changing to an operator session', async () => {
+    let resolveAdmin!: (response: Response) => void
+    const delayedAdminDirectory = new Promise<Response>((resolve) => { resolveAdmin = resolve })
+    let communityReads = 0
+    const calls = stubApi((url) => {
+      if (url === '/api/admin/communities') {
+        communityReads += 1
+        return json({ items: communityReads === 1 ? [COMMUNITY_A] : [COMMUNITY_B] })
+      }
+      if (url === '/api/admin/staff') return delayedAdminDirectory
+      throw new Error('unexpected fetch: ' + url)
+    })
+
+    const view = renderPage(ADMIN_SESSION)
+    await waitFor(() => expect(getCalls(calls, '/api/admin/staff')).toHaveLength(1))
+    view.rerender(
+      <ConfigProvider locale={zhCN} theme={adminTheme}>
+        <AntdApp><CommunitiesPage session={OPERATOR_SESSION} /></AntdApp>
+      </ConfigProvider>,
+    )
+    expect(await screen.findByText('阳光社区')).toBeTruthy()
+    expect(screen.queryByText('幸福社区')).toBeNull()
+
+    await act(async () => { resolveAdmin(json({ items: [] })) })
+    expect(screen.getByText('阳光社区')).toBeTruthy()
+    expect(screen.queryByText('幸福社区')).toBeNull()
+    expect(getCalls(calls, '/api/admin/staff')).toHaveLength(1)
   })
 
   it('lists real staff accounts with their community authorizations', async () => {
@@ -158,10 +201,8 @@ describe('CommunitiesPage management surface', () => {
     })
     renderPage(ADMIN_SESSION)
 
-    expect(await screen.findByText('grid.b')).toBeTruthy()
-    expect(screen.getByText('王小网')).toBeTruthy()
-    expect(screen.getByText('幸福社区、阳光社区')).toBeTruthy()
-    expect(screen.getByText('正常')).toBeTruthy()
+    expect(await screen.findByText('王小网 · 网格员')).toBeTruthy()
+    expect(screen.queryByText('后台账户')).toBeNull()
   })
 
   it('never shows create entries or write surfaces to a non-admin operator', async () => {
@@ -170,7 +211,7 @@ describe('CommunitiesPage management surface', () => {
 
     expect(await screen.findByRole('heading', { name: '社区管理' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /新建社区/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: /新增账户/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /关联人员/ })).toBeNull()
     // No admin-only surface is even mounted, so no admin write request can happen.
     expect(document.querySelector('.ant-drawer')).toBeNull()
     expect(screen.queryByPlaceholderText('例如：幸福社区')).toBeNull()
@@ -202,7 +243,7 @@ describe('CommunitiesPage create-community drawer', () => {
 
     const input = await screen.findByPlaceholderText('例如：幸福社区')
     fireEvent.change(input, { target: { value: '阳光社区' } })
-    fireEvent.submit(document.getElementById('ll-ui-007-create-community-form')!)
+    fireEvent.submit(document.getElementById('ll-create-community-form')!)
 
     await waitFor(() => expect(postCalls(calls, '/api/admin/communities')).toHaveLength(1))
     const call = postCalls(calls, '/api/admin/communities')[0]
@@ -213,7 +254,7 @@ describe('CommunitiesPage create-community drawer', () => {
     // Drawer closes and only the community list is genuinely re-read.
     await waitFor(() => expect(openDrawers()).toBe(0))
     await waitFor(() => expect(getCalls(calls, '/api/admin/communities')).toHaveLength(2))
-    expect(getCalls(calls, '/api/admin/staff')).toHaveLength(1)
+    expect(getCalls(calls, '/api/admin/staff')).toHaveLength(2)
     // Focus returns to the trigger button for keyboard operators.
     await waitFor(() => expect(document.activeElement).toBe(trigger))
   })
@@ -232,7 +273,7 @@ describe('CommunitiesPage create-community drawer', () => {
     fireEvent.click(await screen.findByRole('button', { name: /新建社区/ }))
     const input = (await screen.findByPlaceholderText('例如：幸福社区')) as HTMLInputElement
     fireEvent.change(input, { target: { value: '幸福社区' } })
-    fireEvent.submit(document.getElementById('ll-ui-007-create-community-form')!)
+    fireEvent.submit(document.getElementById('ll-create-community-form')!)
 
     expect(await screen.findByText('社区名称已存在')).toBeTruthy()
     expect(screen.getByText('创建社区失败')).toBeTruthy()
@@ -247,7 +288,7 @@ describe('CommunitiesPage create-community drawer', () => {
     fireEvent.click(await screen.findByRole('button', { name: /新建社区/ }))
     const input = await screen.findByPlaceholderText('例如：幸福社区')
     fireEvent.change(input, { target: { value: 'x' } })
-    fireEvent.submit(document.getElementById('ll-ui-007-create-community-form')!)
+    fireEvent.submit(document.getElementById('ll-create-community-form')!)
 
     expect(await screen.findByText('社区名称长度需为 2-60 个字符')).toBeTruthy()
     expect(postCalls(calls, '/api/admin/communities')).toEqual([])
@@ -328,123 +369,39 @@ describe('CommunitiesPage create-community drawer', () => {
   })
 })
 
-describe('CommunitiesPage create-staff drawer', () => {
-  function stubStaffCreate(onCreated?: (body: Record<string, unknown>) => void) {
-    let created = false
-    const staffRow = {
+
+describe('Community association with an existing account', () => {
+  it('links an already-created operator without creating a second account', async () => {
+    let linked = false
+    const row = {
       id: '123e4567-e89b-42d3-a456-4266141740c3',
-      username: 'grid.b',
-      displayName: '王小网',
-      role: 'grid_worker',
-      status: 'active',
-      communities: [COMMUNITY_A],
+      username: 'operator.a', displayName: '王运营', role: 'operator',
+      status: 'active', communities: [COMMUNITY_A],
     }
     const calls = stubApi((url, init) => {
-      if (url === '/api/admin/staff' && init?.method === 'POST') {
-        created = true
-        onCreated?.(JSON.parse(String(init.body)) as Record<string, unknown>)
-        return json(staffRow, 201)
+      if (url === '/api/admin/communities') return json({ items: [COMMUNITY_A, COMMUNITY_B] })
+      if (url === '/api/admin/staff') return json({ items: [
+        { ...row, communities: linked ? [COMMUNITY_A, COMMUNITY_B] : [COMMUNITY_A] },
+      ] })
+      if (url === '/api/admin/communities/' + COMMUNITY_B.id + '/staff' && init?.method === 'POST') {
+        linked = true
+        return json({ communityId: COMMUNITY_B.id, staffAccountId: row.id }, 201)
       }
-      if (url === '/api/admin/communities') return json({ items: [COMMUNITY_A] })
-      if (url === '/api/admin/staff') return json({ items: created ? [staffRow] : [] })
-      throw new Error(`unexpected fetch: ${url}`)
+      throw new Error('unexpected fetch: ' + url)
     })
-    return calls
-  }
-
-  function drawerBody(): HTMLElement {
-    const body = document.querySelector<HTMLElement>('.ant-drawer-body')
-    if (!body) throw new Error('no open drawer body')
-    return body
-  }
-
-  async function fillStaffForm(overrides?: { skipRoleAndCommunity?: boolean }) {
-    const body = drawerBody()
-    fireEvent.change(
-      await within(body).findByPlaceholderText('3-32 位字母、数字、点、下划线或短横线'),
-      {
-        target: { value: 'grid.b' },
-      },
-    )
-    fireEvent.change(within(body).getByPlaceholderText('工作人员姓名'), {
-      target: { value: '王小网' },
-    })
-    fireEvent.change(within(body).getByPlaceholderText('至少 12 位，创建后请安全告知本人'), {
-      target: { value: 'a-very-long-initial-password' },
-    })
-    if (overrides?.skipRoleAndCommunity) return
-    const comboboxes = within(body).getAllByRole('combobox')
-    await chooseOption(comboboxes[0], '网格员')
-    await chooseOption(within(drawerBody()).getAllByRole('combobox')[1], '幸福社区')
-  }
-
-  it('creates a grid worker with role and community assignment through the real API', async () => {
-    let submitted: Record<string, unknown> | undefined
-    const calls = stubStaffCreate((body) => {
-      submitted = body
-    })
-
     renderPage(ADMIN_SESSION)
-    fireEvent.click(await screen.findByRole('button', { name: /新增账户/ }))
-    await fillStaffForm()
-
-    fireEvent.submit(document.getElementById('ll-ui-007-create-staff-form')!)
-
-    await waitFor(() => expect(postCalls(calls, '/api/admin/staff')).toHaveLength(1))
-    const call = postCalls(calls, '/api/admin/staff')[0]
-    expect(call.init).toBeTruthy()
-    expect((call.init!.headers as Record<string, string>)['x-csrf-token']).toBe(CSRF_TOKEN)
-    expect(submitted).toMatchObject({
-      username: 'grid.b',
-      displayName: '王小网',
-      role: 'grid_worker',
-      communityIds: [COMMUNITY_A.id],
-    })
-
-    // Only the account list is refreshed; the community list is not re-read.
-    await waitFor(() => expect(openDrawers()).toBe(0))
-    await waitFor(() => expect(getCalls(calls, '/api/admin/staff')).toHaveLength(2))
-    expect(getCalls(calls, '/api/admin/communities')).toHaveLength(1)
-  })
-
-  it('keeps entered values when creating the account fails', async () => {
-    stubApi((url, init) => {
-      if (url === '/api/admin/staff' && init?.method === 'POST') {
-        return json({ error: { code: 'conflict', message: '登录账号已被占用' } }, 409)
-      }
-      if (url === '/api/admin/communities') return json({ items: [COMMUNITY_A] })
-      if (url === '/api/admin/staff') return json({ items: [] })
-      throw new Error(`unexpected fetch: ${url}`)
-    })
-
-    renderPage(ADMIN_SESSION)
-    fireEvent.click(await screen.findByRole('button', { name: /新增账户/ }))
-    await fillStaffForm()
-
-    fireEvent.submit(document.getElementById('ll-ui-007-create-staff-form')!)
-
-    expect(await screen.findByText('登录账号已被占用')).toBeTruthy()
-    expect(screen.getByText('创建后台账户失败')).toBeTruthy()
-    expect(openDrawers()).toBe(1)
-    expect(
-      (
-        within(drawerBody()).getByPlaceholderText(
-          '3-32 位字母、数字、点、下划线或短横线',
-        ) as HTMLInputElement
-      ).value,
-    ).toBe('grid.b')
-  })
-
-  it('requires role and community assignment before any POST happens', async () => {
-    const calls = stubBaseline()
-    renderPage(ADMIN_SESSION)
-    fireEvent.click(await screen.findByRole('button', { name: /新增账户/ }))
-    await fillStaffForm({ skipRoleAndCommunity: true })
-    fireEvent.submit(document.getElementById('ll-ui-007-create-staff-form')!)
-
-    expect(await screen.findByText('请选择角色')).toBeTruthy()
-    expect(await screen.findByText('请选择至少一个负责社区')).toBeTruthy()
-    expect(postCalls(calls, '/api/admin/staff')).toEqual([])
-    expect(openDrawers()).toBe(1)
+    const community = (await screen.findByText('阳光社区')).closest('tr')!
+    fireEvent.click(within(community).getByRole('button', { name: '关联人员' }))
+    const drawer = document.querySelector('.ant-drawer-open') as HTMLElement
+    expect(drawer).toBeTruthy()
+    await chooseOption(within(drawer).getByRole('combobox'), '王运营 · 运营员 · operator.a')
+    fireEvent.click(within(drawer).getByRole('button', { name: /建立关联/ }))
+    await waitFor(() => expect(calls.filter((item) => item.init?.method === 'POST')).toHaveLength(1))
+    const post = calls.find((item) => item.init?.method === 'POST')!
+    expect(post.url).toBe('/api/admin/communities/' + COMMUNITY_B.id + '/staff')
+    expect((post.init!.headers as Record<string, string>)['x-csrf-token']).toBe(CSRF_TOKEN)
+    expect(JSON.parse(String(post.init!.body))).toEqual({ staffAccountId: row.id })
+    expect(calls.some((item) => item.url === '/api/admin/staff' && item.init?.method === 'POST')).toBe(false)
+    await waitFor(() => expect(within(community).getByText(/王运营 · 运营员/)).toBeTruthy())
   })
 })

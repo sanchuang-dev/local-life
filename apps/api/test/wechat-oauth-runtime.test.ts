@@ -96,10 +96,26 @@ function createProvider(): Provider {
       fail = false
       return new Response('provider down', { status: 502 })
     }
-    return new Response(JSON.stringify({ openid: openId, unionid: 'wechat-union-shared' }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    })
+    if (url.pathname === '/sns/oauth2/access_token') {
+      return Response.json({
+        access_token: 'wechat-profile-access',
+        openid: openId,
+        unionid: 'wechat-union-shared',
+      })
+    }
+    if (url.pathname === '/sns/userinfo') {
+      return Response.json({
+        openid: openId,
+        nickname: 'Runtime 微信用户',
+        sex: 1,
+        province: '广东',
+        city: '广州',
+        country: '中国',
+        headimgurl: 'https://wx.example.test/avatar/runtime',
+        privilege: [],
+      })
+    }
+    throw new Error('unexpected provider request: ' + url.pathname)
   }) as typeof fetch
   return {
     fetcher,
@@ -322,7 +338,7 @@ test('the seeded database row drives /auth/methods, start and callback, and star
       authorize.searchParams.get('redirect_uri'),
       `${ORIGIN}/api/auth/wechat/callback`,
     )
-    assert.equal(authorize.searchParams.get('scope'), 'snsapi_base')
+    assert.equal(authorize.searchParams.get('scope'), 'snsapi_userinfo')
 
     // The attempt is bound to the exact provider version.
     assert.equal(harness.db.select().from(oauthStates).all().length, 1)
@@ -332,13 +348,17 @@ test('the seeded database row drives /auth/methods, start and callback, and star
     assert.equal(callback.status, 302)
     assert.equal(new URL(callback.headers.get('location')!).search, '?auth=success')
 
-    // The provider call used the row's AppID + decrypted secret, and the token
-    // exchange itself is the only place the secret can appear.
-    assert.equal(harness.provider.calls.length, 1)
+    // The token exchange uses the pinned AppID + decrypted secret. The second
+    // call is snsapi_userinfo and carries only the short-lived profile token.
+    assert.equal(harness.provider.calls.length, 2)
     const tokenCall = harness.provider.calls[0]!
     assert.equal(tokenCall.searchParams.get('appid'), TEST_APP_ID)
     assert.equal(tokenCall.searchParams.get('secret'), TEST_APP_SECRET)
     assert.equal(tokenCall.searchParams.get('grant_type'), 'authorization_code')
+    const profileCall = harness.provider.calls[1]!
+    assert.equal(profileCall.pathname, '/sns/userinfo')
+    assert.equal(profileCall.searchParams.get('openid'), 'wechat-openid-shared')
+    assert.equal(profileCall.searchParams.has('secret'), false)
 
     assert.ok(cookiePair(callback, 'll_session'))
     assert.equal(harness.db.select().from(users).all().length, 1)
@@ -349,7 +369,7 @@ test('the seeded database row drives /auth/methods, start and callback, and star
     // Replay is still rejected: the state was consumed exactly once.
     const replay = await finishLogin(harness.app, start)
     assert.equal(redirectError(replay), 'wechat_state_invalid')
-    assert.equal(harness.provider.calls.length, 1)
+    assert.equal(harness.provider.calls.length, 2)
     assert.equal(await sessionCount(harness.app, callback), 1)
   } finally {
     harness.sqlite.close()
@@ -466,7 +486,10 @@ test('an in-flight callback completes with the version it started with, after a 
     // at WeChat and, worse, could map the code to the wrong account.
     const callbackA = await finishLogin(harness.app, startA, { code: 'code-from-a' })
     assert.equal(new URL(callbackA.headers.get('location')!).search, '?auth=success')
-    const callA = harness.provider.calls[0]!
+    const callA = harness.provider.calls.find(
+      (url) => url.pathname === '/sns/oauth2/access_token' && url.searchParams.get('code') === 'code-from-a',
+    )
+    assert.ok(callA)
     assert.equal(callA.searchParams.get('appid'), TEST_APP_ID)
     assert.equal(callA.searchParams.get('secret'), TEST_APP_SECRET)
     assert.equal(callA.searchParams.get('code'), 'code-from-a')
@@ -481,7 +504,10 @@ test('an in-flight callback completes with the version it started with, after a 
     assert.equal(new URL(startB.headers.get('location')!).searchParams.get('appid'), TEST_APP_ID_B)
     const callbackB = await finishLogin(harness.app, startB, { code: 'code-from-b' })
     assert.equal(new URL(callbackB.headers.get('location')!).search, '?auth=success')
-    const callB = harness.provider.calls[1]!
+    const callB = harness.provider.calls.find(
+      (url) => url.pathname === '/sns/oauth2/access_token' && url.searchParams.get('code') === 'code-from-b',
+    )
+    assert.ok(callB)
     assert.equal(callB.searchParams.get('appid'), TEST_APP_ID_B)
     assert.equal(callB.searchParams.get('secret'), TEST_APP_SECRET_B)
 
@@ -594,12 +620,12 @@ test('state replay, wrong nonce and expiry are still rejected before any provide
     // Correct nonce then succeeds exactly once.
     const success = await finishLogin(harness.app, start)
     assert.equal(new URL(success.headers.get('location')!).search, '?auth=success')
-    assert.equal(harness.provider.calls.length, 1)
+    assert.equal(harness.provider.calls.length, 2)
 
     // Replay of the consumed state.
     const replay = await finishLogin(harness.app, start)
     assert.equal(redirectError(replay), 'wechat_state_invalid')
-    assert.equal(harness.provider.calls.length, 1)
+    assert.equal(harness.provider.calls.length, 2)
 
     // Expired attempt.
     const expired = await beginLogin(harness.app)
@@ -609,7 +635,7 @@ test('state replay, wrong nonce and expiry are still rejected before any provide
       .run()
     const expiredCallback = await finishLogin(harness.app, expired)
     assert.equal(redirectError(expiredCallback), 'wechat_state_invalid')
-    assert.equal(harness.provider.calls.length, 1)
+    assert.equal(harness.provider.calls.length, 2)
   } finally {
     harness.sqlite.close()
   }

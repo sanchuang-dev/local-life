@@ -63,10 +63,10 @@ export function WorkbenchLoginPage() {
 
   return (
     <div className="px-4 pb-8 pt-4">
-      <section className="rounded-[22px] border border-slate-100 bg-white p-5 shadow-sm">
+      <section className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
         <div className="flex items-center gap-3">
           <span
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#e8f6f0] text-[#388b77]"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#e8f6f0] text-[#388b77]"
             aria-hidden="true"
           >
             <Wifi size={24} strokeWidth={1.7} />
@@ -151,7 +151,7 @@ export function WorkbenchLoginPage() {
         </form>
       </section>
 
-      <div className="mt-4 rounded-[16px] border border-[#f2dcc0] bg-[#fff7ec] px-3.5 py-3 text-[11px] leading-5 text-[#8a6132]">
+      <div className="mt-4 rounded-2xl border border-[#f2dcc0] bg-[#fff7ec] px-3.5 py-3 text-[11px] leading-5 text-[#8a6132]">
         没有账号或忘记密码，请联系社区运营负责人。工作台不会收集居民通讯录，也不导入未经告知的居民名单。
       </div>
     </div>

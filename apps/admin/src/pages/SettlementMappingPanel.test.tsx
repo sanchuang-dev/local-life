@@ -727,8 +727,8 @@ describe('SettlementMappingPanel · 页面口径', () => {
     renderPage()
 
     // The default view is 经营对账 and nothing mapping-related is requested yet.
-    expect(await screen.findByRole('tab', { name: '经营对账' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('tab', { name: '分成结算单' }))
+    expect(await screen.findByRole('tab', { name: '候选看板' })).toBeTruthy()
+    expect(screen.queryByRole('tab', { name: '经营对账' })).toBeNull()
 
     expect(await screen.findByRole('tab', { name: '商户映射' })).toBeTruthy()
     expect(screen.getByRole('tab', { name: '候选看板' })).toBeTruthy()

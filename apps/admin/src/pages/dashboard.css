@@ -1,0 +1,43 @@
+/* Operations dashboard: shared business metrics plus source-backed charts. */
+.dashboard-page .dashboard-body{display:flex;flex-direction:column;gap:22px;padding-bottom:24px;}
+.dashboard-section__heading{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:12px;}
+.dashboard-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;}
+.dashboard-metric{display:flex;flex-direction:column;align-items:stretch;gap:12px;min-height:148px;padding:17px 19px;text-align:left;border:1px solid #e3eae7;border-radius:10px;background:#fff;cursor:pointer;transition:border-color .16s,box-shadow .16s;}
+.dashboard-metric:hover{border-color:#b4d8c9;background:#fafdff;box-shadow:0 6px 18px rgba(41,95,73,.05);}
+.dashboard-metric:focus-visible{outline:2px solid #1c866c;outline-offset:3px;}
+.dashboard-metric--focus{border-color:#c7e2d6;background:#f6fcf9;}
+.dashboard-metric__top{display:flex;align-items:center;justify-content:space-between;gap:8px;color:#647b70;font-size:13px;}
+.dashboard-metric__icon{display:grid;place-items:center;width:29px;height:29px;border-radius:8px;background:#e8f6ee;color:#238466;font-size:15px;}
+.dashboard-metric__value{color:#1d4636;font-size:31px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;}
+.dashboard-metric__detail{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;color:#89988f;font-size:12px;}
+.dashboard-metric__detail .anticon{color:#5f9782;}
+@media(max-width:1050px){.dashboard-metrics{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:760px){.dashboard-metrics{gap:10px;}.dashboard-metric{padding:15px;min-height:135px;}}
+@media(max-width:370px){.dashboard-metrics{grid-template-columns:1fr;}}
+
+/* Charts: scoped server facts only, no illustrative or interpolated data. */
+.dashboard-charts{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:14px;}
+.dashboard-chart-panel{display:flex;flex-direction:column;min-width:0;min-height:326px;padding:21px 23px 13px;border:1px solid #e3eae7;border-radius:10px;background:#fff;}
+.dashboard-chart-panel__heading{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:19px;}
+.dashboard-chart-panel__heading h3{margin:0;color:#213a32;font-size:16px;font-weight:650;}
+.dashboard-chart-panel__heading p{margin:5px 0 0;color:#8b9991;font-size:12px;}
+.dashboard-chart-legend{display:flex;align-items:center;flex-wrap:wrap;gap:15px;color:#6f8178;font-size:12px;white-space:nowrap;}
+.dashboard-chart-legend span{display:flex;align-items:center;gap:6px;}
+.dashboard-chart-legend span::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:#208367;}
+.dashboard-chart-legend__reversed::before{background:#d29a41!important;}
+.dashboard-trend-svg{display:block;width:100%;max-height:245px;overflow:visible;}
+.dashboard-chart-state{display:flex;flex:1;min-height:212px;align-items:center;justify-content:center;color:#94a29a;font-size:13px;border:1px dashed #e8efea;border-radius:8px;background:#fbfdfc;}
+.dashboard-chart-note{margin:auto 0 0;padding-top:12px;color:#95a49a;font-size:11px;line-height:1.65;}
+.dashboard-composition{display:flex;flex:1;flex-direction:column;justify-content:center;gap:20px;padding:3px 0 15px;}
+.dashboard-composition__row{display:flex;align-items:center;gap:11px;min-width:0;}
+.dashboard-composition__label{flex:0 0 62px;color:#72857a;font-size:12px;white-space:nowrap;}
+.dashboard-composition__track{flex:1;height:9px;overflow:hidden;border-radius:5px;background:#eff3f0;}
+.dashboard-composition__bar{height:100%;min-width:0;border-radius:5px;background:#408b75;transition:width .2s ease;}
+.dashboard-composition__bar--order_verified{background:#69a893;}
+.dashboard-composition__bar--payment_received{background:#208367;}
+.dashboard-composition__bar--payment_reversed{background:#dba74c;}
+.dashboard-composition__bar--reward_cost{background:#809aa8;}
+.dashboard-composition__bar--reward_reversed{background:#bdc5ca;}
+.dashboard-composition__row strong{flex:0 0 34px;text-align:right;font-size:12px;font-weight:600;color:#385849;font-variant-numeric:tabular-nums;}
+@media(max-width:1120px){.dashboard-charts{grid-template-columns:1fr;}}
+@media(max-width:760px){.dashboard-chart-panel{padding:17px 15px 12px;min-height:290px;}.dashboard-chart-legend{gap:9px;}.dashboard-composition{gap:16px;}}

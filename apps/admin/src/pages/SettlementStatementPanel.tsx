@@ -1,3 +1,4 @@
+import { PageInfoAlert } from '../components/PageInfoHelp'
 import {
   Alert,
   App as AntdApp,
@@ -573,7 +574,7 @@ export function SettlementStatementPanel() {
 
   return (
     <section aria-label="结算单">
-      <Alert
+      <PageInfoAlert
         type="info"
         showIcon
         title="结算单是快照 · 生成草案 ≠ 锁定 ≠ 付款"
@@ -717,7 +718,7 @@ export function SettlementStatementPanel() {
         confirmLoading={creating}
         destroyOnHidden
       >
-        <Alert
+        <PageInfoAlert inline
           type="info"
           showIcon
           title="草案不是锁定，也不是付款"
@@ -881,7 +882,7 @@ export function SettlementStatementPanel() {
           ) : null}
 
           {actionKind === 'review' ? (
-            <Alert
+            <PageInfoAlert inline
               type="info"
               showIcon
               title="复核只是人工确认快照内容，不锁定、不代表已付款"
@@ -1291,7 +1292,7 @@ function PerformanceList({ rows }: { rows: SettlementStatementPerformance[] }) {
   }
   return (
     <Space orientation="vertical" size={12} style={{ width: '100%' }}>
-      <Alert
+      <PageInfoAlert
         type="info"
         showIcon
         title="已确认业绩不含金额，不是应付给个人的佣金"
@@ -1650,7 +1651,7 @@ function PaymentTab({
 
   return (
     <Space orientation="vertical" size={12} style={{ width: '100%' }}>
-      <Alert
+      <PageInfoAlert
         type="info"
         showIcon
         title="登记付款凭据 ≠ 复核核销"
@@ -1759,7 +1760,7 @@ function PaymentTab({
           </section>
 
           {!isAdmin ? (
-            <Alert
+            <PageInfoAlert
               type="info"
               showIcon
               title="运营员只读"
@@ -1920,7 +1921,7 @@ function PaymentTab({
               ) : null}
 
               {actionKind === 'verify' ? (
-                <Alert
+                <PageInfoAlert inline
                   type="info"
                   showIcon
                   title="核验会改变这条凭据的付款状态并计入核销统计"

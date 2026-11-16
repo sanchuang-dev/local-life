@@ -59,9 +59,9 @@ apps/admin/src/
 - **查询状态归页面所有**。`DataPanel` 接收受控 `query`（filters / page / pageSize / sort），只回传变更意图；页面决定是否请求、如何处理服务端分页与错误。面板自身不发请求，也不缓存业务数据。
 - 筛选：`text` / `select` / `status` / `numberRange` / `dateRange` 五种；前 `inlineFilterLimit` 个常规条件固定在行内，其余常规条件折叠到「更多条件」，标记 `advanced` 的条件只出现在「高级检索」弹窗。弹窗提交被页面拒绝（`onQueryChange` 返回 `false`）时保持打开并给出提示；取消不应用草稿。
 - 日期区间只传 `YYYY-MM-DD` 字符串（`{ start?, end? }`），由页面/API 定义时区与开闭区间语义；组件不自行猜测。
-- 排序与分页：点击表头只发出 `sort` 意图并回到第 1 页，不在本地重排当前页；分页大小变化回到第 1 页。`pagination=false` 用于完整的小数据集。
-- 表格/卡片：同一 `rows` 两种视图；卡片视图需要页面提供 `renderCard`。所有行操作由页面注入，组件不写业务实体。
-- **业务列表优先复用 DataPanel**：页面级主要创建动作放 `PageHeader.extra`；列表相关的导入/导出/下载模板等自定义按钮通过已有 `toolbarExtra` 插槽注入；刷新使用 `onRefresh`，编辑/上下架等动作使用 `rowActions`。这些扩展能力已经开放，不应为了添加业务按钮重复搭建 `Table + Toolbar + Pagination`。
+- 排序与分页：点击表头只发出 sort 意图并回到第 1 页，不在本地重排当前页；分页大小变化回到第 1 页。表格/卡片共用 DataPanel 内独立 Footer 的分页器，Header 工具栏与 Body 内容区保持独立；全部有分页的 DataPanel 默认填满所在工作区（fillRemainingHeight 默认等于 pagination），Body 内部滚动、Footer 沉底，包括活动、用户、订单、商品、精选优惠、CRM 双标签、业绩明细及组件验收。CRM 的标签容器透传弹性高度；业绩长报表在上方内容超出视口时由工作区自然滚动，并为明细保留可用的滚动高度。pagination=false 用于完整的小数据集，此时不显示 Footer，默认不填满。
+- 表格/卡片：同一 `rows` 两种视图；卡片视图需要页面提供 `renderCard`。行操作由页面注入，组件不写业务实体。默认 rowActionMode=compact：明确标记 primary=true 的操作始终在行内；未标记时自动展示前两项普通操作，危险操作默认归入键盘可访问的「更多操作」菜单。特殊列表可设置 rowActionMode=expanded，业务状态切换和二次确认仍由页面负责。
+- **业务列表优先复用 DataPanel**：列表级主要创建动作和导入/导出/下载模板等操作放进 `toolbarExtra`；纯页面级、非列表操作才使用 `PageHeader.extra`；刷新使用 `onRefresh`，编辑/上下架等动作使用 `rowActions`。这些扩展能力已经开放，不应为了添加业务按钮重复搭建 `Table + Toolbar + Pagination`。
 - 若 API 当前只提供完整列表而不支持分页/查询，页面负责筛选和切片并向受控 `PanelQuery` 回传结果；不得伪装成服务端查询或让 `DataPanel` 私自抓取/缓存业务数据。
 - 列设置：显示/隐藏、上下移动、表格密度（紧凑/标准/宽松）、视图模式按 `id` 隔离保存在 `localStorage` 的 `ll:data-panel-prefs`（版本化、白名单、上限 30 面板/60 列）。新增列默认显示；至少保留一列；`hideable=false` 的列不可隐藏。
 - 状态：加载中不显示「暂无数据」；失败态提供 `errorTitle`/`message` 与「重试」；空态区分「无匹配筛选」与页码过期，后者提供「回到第一页」。筛选摘要不写入 URL（LL-UI-003）。
@@ -72,7 +72,7 @@ apps/admin/src/
 - `App.tsx` 在渲染任何受保护路由前通过 `/api/auth/session` 恢复会话；未认证/无后台身份时显示真实登录表单，不渲染 AppShell。
 - `app/auth-context.tsx` 将经过服务端验证的 `session`、注销状态与错误传入 `AppShell` 和路由组件；顶部显示实际用户/角色，退出调用 `/api/auth/logout`，成功后清空工作页签并切回登录表单。
 - 导航仍由 React Router 的 location 决定当前页。 `/communities` 对应 #58 的 `UsersPage`，管理员可管理社区与工作人员；网格员只读被授予社区及居民。服务器再次强制 401/403，菜单隐藏绝不替代后端鉴权。
-- `/users` 旧链接重定向到 `/communities`，但仍需要有效后台会话。开发中的 DataPanel 验收页也只允许已经登录的后台用户访问。
+- `/users` 为独立的用户目录；`/communities` 只维护社区、服务点及已有工作人员关联；`/system/access` 是仅管理员可进入的真实后台账号 DataPanel，创建账号仍使用原有受控 API，关联社区通过管理员专用、CSRF 保护且有审计的接口。开发中的 DataPanel 验收页也只允许已经登录的后台用户访问。
 - `/system/runtime` 收纳真实 API 诊断，经营工作台不再放大量工程调试说明，也没有虚构成交/业绩数据。
 - #58 微信网页 OAuth 的真实公众号回调仍待取得授权的微信环境验证；本地测试和 CI 不得冒充微信生产验收。
 
@@ -86,3 +86,15 @@ apps/admin/src/
 - `pnpm install --frozen-lockfile`、`pnpm check`（Oxlint + typecheck + Admin/API 测试 + 全部构建）。
 - Admin 组件/交互测试：`vitest run`（jsdom + Testing Library），覆盖导航模型、页签状态、折叠/抽屉与 DataPanel 契约。
 - 真实浏览器证据：`docs/engineering/evidence/ll-ui-001/`（1440 / 1024 / 768 / 767）与 `docs/engineering/evidence/ll-ui-002/`；截图不替代维护者实测。
+
+## 第三方配置入口
+
+系统管理仅显示 `/system/integrations`「第三方配置」，以两张卡片展示微信公众号和腾讯地图的真实服务端状态，管理员可在同页抽屉中打开原有受控配置界面。保持 `/system/wechat` 和 `/system/tencent-map` 路由供既有深链兼容，但不重复出现在菜单中。卡片只读取服务端状态，不复制密钥表单或管理权限；保存、验证、切换、停用仍走原 API 与 CSRF/确认机制，关闭配置抽屉后重新查询状态。
+
+## 对账与结算的独立导航
+
+运营后台在「业绩与对账」下分别使用 `/reconciliation`（经营对账批次、差异、冻结明细 CSV）和 `/settlements`（分成结算）。结算页的六个子视图（候选看板、主体目录、商户映射、合同规则、服务端试算、结算单）放置于顶部白色 `PageHeader.subnav`，下方为业务内容；子视图首次选择才挂载，返回时保留页面状态。进入结算页不请求对账批次，进入对账页不请求结算候选；两页均不凭空推断已付款、应付或可分账金额。
+
+## 页面说明与状态提示
+
+后台使用共享 `PageInfoProvider` 与 `PageInfoAlert`，将纯说明性的蓝色信息框汇总到 `PageHeader` 标题旁的一个问号 Tooltip，供悬停、点击和键盘操作查看。复合页面中，只有当前激活子页的说明参与汇总；被弹窗遮罩挡住的操作说明同时保留弹窗内的紧凑问号。禁止把「真实数据」「已验证身份」「开发预览」等自我声明作为页面状态 Tag。真实错误、警告、审批结果及权限限制必须保持可见，不得被折叠为说明性 Tooltip。

@@ -1,6 +1,7 @@
 import {
   ArrowDownOutlined,
   ArrowUpOutlined,
+  MoreOutlined,
   ReloadOutlined,
   SearchOutlined,
   SettingOutlined,
@@ -10,6 +11,7 @@ import {
   Button,
   Checkbox,
   DatePicker,
+  Dropdown,
   Empty,
   Form,
   Input,
@@ -104,6 +106,8 @@ export interface PanelAction<Row> {
   onClick: (row: Row) => void
   disabled?: boolean
   danger?: boolean
+  /** Override the default primary-action selection for this row operation. */
+  primary?: boolean
 }
 
 export interface DataPanelProps<
@@ -127,6 +131,8 @@ export interface DataPanelProps<
   onRefresh?: () => void
   renderCard?: (row: Row) => ReactNode
   rowActions?: (row: Row) => readonly PanelAction<Row>[]
+  /** Compact by default. Expanded mode is reserved for specialized lists. */
+  rowActionMode?: 'expanded' | 'compact'
   toolbarExtra?: ReactNode
   emptyText?: ReactNode
   /** Page-owned copy for a failed read; the retry action stays on the panel. */
@@ -134,6 +140,8 @@ export interface DataPanelProps<
   pageSizeOptions?: number[]
   /** Disable paging for complete, small datasets such as a registry list. */
   pagination?: boolean
+  /** Fill the workspace by default for paged lists; composite pages can opt out. */
+  fillRemainingHeight?: boolean
 }
 
 interface DateRangeControlProps {
@@ -171,6 +179,61 @@ function DateRangeControl({
   )
 }
 
+/**
+ * Shared row-action projection, used by both table cells and responsive cards.
+ * Compact mode keeps explicit primaries, otherwise the first two ordinary
+ * actions. Destructive actions stay in the keyboard-accessible overflow unless
+ * explicitly marked primary. No domain action is removed or reinterpreted.
+ */
+function RowActionControls<Row extends object>({
+  row, actions, compact,
+}: {
+  row: Row
+  actions: readonly PanelAction<Row>[]
+  compact: boolean
+}) {
+  const hasExplicitPrimary = actions.some((action) => action.primary === true)
+  const isVisible = (action: PanelAction<Row>, index: number) =>
+    action.primary === true ||
+    (action.primary !== false && !hasExplicitPrimary && index < 2 && !action.danger)
+  const visible = compact ? actions.filter(isVisible) : actions
+  const overflow = compact ? actions.filter((action, index) => !isVisible(action, index)) : []
+
+  return (
+    <Space size={0} wrap={!compact} className={compact ? 'data-panel-compact-actions' : undefined}>
+      {visible.map((action) => (
+        <Button
+          key={action.key}
+          type="link"
+          size="small"
+          danger={action.danger}
+          disabled={action.disabled}
+          onClick={() => action.onClick(row)}
+        >
+          {action.label}
+        </Button>
+      ))}
+      {overflow.length > 0 && (
+        <Dropdown
+          trigger={['click']}
+          placement="bottomRight"
+          menu={{
+            items: overflow.map((action) => ({
+              key: action.key,
+              label: action.label,
+              danger: action.danger,
+              disabled: action.disabled,
+              onClick: () => action.onClick(row),
+            })),
+          }}
+        >
+          <Button type="text" size="small" aria-label="更多操作" icon={<MoreOutlined/>}/>
+        </Dropdown>
+      )}
+    </Space>
+  )
+}
+
 function filtersEqual(left: object, right: object): boolean {
   return JSON.stringify(left) === JSON.stringify(right)
 }
@@ -193,11 +256,13 @@ export function DataPanel<
   onRefresh,
   renderCard,
   rowActions,
+  rowActionMode = 'compact',
   toolbarExtra,
   emptyText,
   errorTitle = '数据加载失败',
   pageSizeOptions = [10, 20, 50],
   pagination = true,
+  fillRemainingHeight = pagination,
 }: DataPanelProps<Row, Filters, SortKey>) {
   // AntD's deep NamePath type cannot prove a runtime schema key is a generic
   // recursive path. Form instances stay unparameterized; the public PanelFilter
@@ -314,27 +379,14 @@ export function DataPanel<
       title: '操作',
       key: '__panel_actions',
       fixed: 'right',
-      width: 140,
+      width: rowActionMode === 'compact' ? 164 : 140,
       render: (_value, row) => (
-        <Space size={0} wrap>
-          {rowActions(row).map((action) => (
-            <Button
-              key={action.key}
-              type="link"
-              size="small"
-              danger={action.danger}
-              disabled={action.disabled}
-              onClick={() => action.onClick(row)}
-            >
-              {action.label}
-            </Button>
-          ))}
-        </Space>
+        <RowActionControls row={row} actions={rowActions(row)} compact={rowActionMode === 'compact'}/>
       ),
     })
   }
 
-  const onTableChange: TableProps<Row>['onChange'] = (pageState, _tableFilters, sorter, extra) => {
+  const onTableChange: TableProps<Row>['onChange'] = (_pageState, _tableFilters, sorter, extra) => {
     if (extra.action === 'sort') {
       const selected = Array.isArray(sorter) ? sorter[0] : sorter
       const column = columns.find((item) => item.key === selected?.columnKey)
@@ -347,15 +399,6 @@ export function DataPanel<
           : undefined
       // All ordering is server-side; never rearrange the current page locally.
       onQueryChange({ ...query, page: 1, sort })
-      return
-    }
-    if (extra.action === 'paginate') {
-      const size = pageState.pageSize ?? query.pageSize
-      onQueryChange({
-        ...query,
-        page: size === query.pageSize ? (pageState.current ?? 1) : 1,
-        pageSize: size,
-      })
     }
   }
 
@@ -507,7 +550,7 @@ export function DataPanel<
     )
 
   return (
-    <section className="panel-surface data-panel" aria-label={label}>
+    <section className={'panel-surface data-panel' + (fillRemainingHeight ? ' data-panel--fill' : '')} aria-label={label}>
       <div className="panel-toolbar-row data-panel-toolbar-row">
         <Form<Filters>
           form={quickForm}
@@ -643,93 +686,76 @@ export function DataPanel<
           </Form>
         </Modal>
 
-      {error ? (
-        <div className="panel-feedback">
-          <Alert
-            type="error"
-            showIcon
-            title={errorTitle}
-            description={error.message}
-            action={
-              onRefresh ? (
-                <Button size="small" onClick={onRefresh}>
-                  重试
-                </Button>
-              ) : undefined
+      <div className="data-panel-body">
+        {error ? (
+          <div className="panel-feedback">
+            <Alert
+              type="error"
+              showIcon
+              title={errorTitle}
+              description={error.message}
+              action={
+                onRefresh ? (
+                  <Button size="small" onClick={onRefresh}>
+                    重试
+                  </Button>
+                ) : undefined
+              }
+            />
+          </div>
+        ) : prefs.view === 'card' && renderCard ? (
+          <Spin spinning={loading}>
+            <div className="data-panel-cards" role="list" aria-label="数据卡片">
+              {rows.length === 0 && !loading
+                ? empty
+                : rows.map((row) => (
+                    <div key={rowKey(row)} className="data-panel-card" role="listitem">
+                      {renderCard(row)}
+                      {rowActions ? (
+                        <RowActionControls
+                          row={row}
+                          actions={rowActions(row)}
+                          compact={rowActionMode === 'compact'}
+                        />
+                      ) : null}
+                    </div>
+                  ))}
+            </div>
+          </Spin>
+        ) : (
+          <Table<Row>
+            rowKey={rowKey}
+            columns={activeColumns}
+            dataSource={rows}
+            loading={loading}
+            size={prefs.density}
+            locale={{ emptyText: loading ? null : empty }}
+            scroll={{ x: 'max-content', ...(fillRemainingHeight ? { y: '100%' } : {}) }}
+            pagination={false}
+            onChange={onTableChange}
+          />
+        )}
+      </div>
+
+      {pagination && !error && total > 0 ? (
+        <footer className="data-panel-footer" aria-label="数据分页">
+          <Pagination
+            current={query.page}
+            pageSize={query.pageSize}
+            total={total}
+            pageSizeOptions={pageSizeOptions}
+            showSizeChanger
+            showTotal={(amount) => `共 ${amount} 条`}
+            onChange={(page, size) =>
+              onQueryChange({
+                ...query,
+                page: size === query.pageSize ? page : 1,
+                pageSize: size,
+              })
             }
           />
-        </div>
-      ) : prefs.view === 'card' && renderCard ? (
-        <Spin spinning={loading}>
-          <div className="data-panel-cards" role="list" aria-label="数据卡片">
-            {rows.length === 0 && !loading
-              ? empty
-              : rows.map((row) => (
-                  <div key={rowKey(row)} className="data-panel-card" role="listitem">
-                    {renderCard(row)}
-                    {rowActions ? (
-                      <Space size={4} wrap>
-                        {rowActions(row).map((action) => (
-                          <Button
-                            key={action.key}
-                            type="link"
-                            size="small"
-                            danger={action.danger}
-                            disabled={action.disabled}
-                            onClick={() => action.onClick(row)}
-                          >
-                            {action.label}
-                          </Button>
-                        ))}
-                      </Space>
-                    ) : null}
-                  </div>
-                ))}
-          </div>
-          {pagination && total > 0 ? (
-            <div className="data-panel-pagination">
-              <Pagination
-                current={query.page}
-                pageSize={query.pageSize}
-                total={total}
-                pageSizeOptions={pageSizeOptions}
-                showSizeChanger
-                showTotal={(amount) => `共 ${amount} 条`}
-                onChange={(page, size) =>
-                  onQueryChange({
-                    ...query,
-                    page: size === query.pageSize ? page : 1,
-                    pageSize: size,
-                  })
-                }
-              />
-            </div>
-          ) : null}
-        </Spin>
-      ) : (
-        <Table<Row>
-          rowKey={rowKey}
-          columns={activeColumns}
-          dataSource={rows}
-          loading={loading}
-          size={prefs.density}
-          locale={{ emptyText: loading ? null : empty }}
-          scroll={{ x: 'max-content' }}
-          pagination={
-            pagination
-              ? {
-                  current: query.page,
-                  pageSize: query.pageSize,
-                  total,
-                  pageSizeOptions,
-                  showSizeChanger: true,
-                  showTotal: (amount) => `共 ${amount} 条`,
-                }
-              : false
-          }
-          onChange={onTableChange}
-        />
-      )}
+        </footer>
+      ) : null}
     </section>
   )
 }

@@ -1,3 +1,4 @@
+import { PageInfoAlert } from '../components/PageInfoHelp'
 import {
   Alert,
   App as AntdApp,
@@ -248,7 +249,7 @@ export function SettlementPartyPanel() {
 
   return (
     <section aria-label="结算主体目录">
-      <Alert
+      <PageInfoAlert
         type="info"
         showIcon
         title="主体目录 · 只登记真实法人主体"

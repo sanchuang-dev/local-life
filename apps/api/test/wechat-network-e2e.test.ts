@@ -86,7 +86,24 @@ test('real TCP admin HTTP, credential switch, in-flight OAuth and SQLite backup 
       oauthRequests.push({ appId, secret })
       assert.equal(appId, APP_A, 'in-flight OAuth must stay bound to its initial AppID')
       assert.equal(secret, SECRET_A, 'in-flight OAuth must not use the new secret')
-      return Response.json({ openid: 'fake-old-provider-openid' })
+      return Response.json({
+        access_token: 'fake-oauth-profile-token',
+        openid: 'fake-old-provider-openid',
+      })
+    }
+    if (url.pathname === '/sns/userinfo') {
+      assert.equal(url.searchParams.get('access_token'), 'fake-oauth-profile-token')
+      assert.equal(url.searchParams.get('openid'), 'fake-old-provider-openid')
+      return Response.json({
+        openid: 'fake-old-provider-openid',
+        nickname: 'Network 微信用户',
+        sex: 1,
+        province: '广东',
+        city: '广州',
+        country: '中国',
+        headimgurl: 'https://wx.example.test/avatar/network',
+        privilege: [],
+      })
     }
     throw new Error('unexpected external network request')
   }) as typeof fetch

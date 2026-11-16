@@ -86,7 +86,7 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       {
         key: '/communities',
         label: '社区管理',
-        description: '创建社区、设置服务点位置，并创建/授权运营员与网格员后台账户。',
+        description: '创建社区、维护服务点位置，并关联系统中已有的运营员和网格员。',
         status: 'ready',
         planned: [],
       },
@@ -138,10 +138,17 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         roles: ['admin', 'operator'],
       },
       {
+        key: '/reconciliation',
+        label: '经营对账',
+        description: '按业务日期间创建并锁定对账批次、核对差异与锁后补录，导出带审计的账面明细 CSV。',
+        status: 'ready',
+        planned: [],
+        roles: ['admin', 'operator'],
+      },
+      {
         key: '/settlements',
-        label: '对账结算',
-        description:
-          '按业务日期间创建并锁定对账批次、核对差异与锁后补录，导出带审计的账面明细 CSV。',
+        label: '分成结算',
+        description: '候选看板、主体目录、商户映射、合同规则、服务端试算与结算单。',
         status: 'ready',
         planned: [],
         roles: ['admin', 'operator'],
@@ -156,9 +163,10 @@ export const NAV_GROUPS: readonly NavGroup[] = [
       {
         key: '/system/access',
         label: '管理员与权限',
-        description: '管理员、运营员、网格员账号及社区范围；依赖 #58 身份与权限能力。',
-        status: 'planned',
-        planned: ['账号管理', '角色与社区范围', '操作审计'],
+        description: '管理后台账号、角色与社区授权。新建账户在这里，已有账号可在社区管理中关联。',
+        status: 'ready',
+        planned: [],
+        roles: ['admin'],
       },
       {
         key: '/system/runtime',
@@ -168,18 +176,9 @@ export const NAV_GROUPS: readonly NavGroup[] = [
         planned: [],
       },
       {
-        key: '/system/wechat',
-        label: '微信公众号',
-        description:
-          '加密保存公众号 AppID/AppSecret，真实测试连接后启用或切换微信 OAuth 运行时配置。',
-        status: 'ready',
-        planned: [],
-        roles: ['admin'],
-      },
-      {
-        key: '/system/tencent-map',
-        label: '腾讯地图',
-        description: '管理员维护社区地图选点 Key，保存后即时生效。',
+        key: '/system/integrations',
+        label: '第三方配置',
+        description: '统一管理微信公众号与腾讯地图的配置、连接状态和服务凭证。',
         status: 'ready',
         planned: [],
         roles: ['admin'],

@@ -35,7 +35,7 @@ export function PageHeader({
 
       <div className={`flex items-center gap-3 ${backTo && backLabel ? 'mt-1' : ''}`}>
         <span
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#e8f6f0] text-[#388b77]"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#e8f6f0] text-[#388b77]"
           aria-hidden="true"
         >
           <Icon size={24} strokeWidth={1.7} />

@@ -35,7 +35,7 @@ export function HealthAssistantPage() {
 
       <section
         aria-label="演示对话记录"
-        className="mt-4 rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm"
+        className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
       >
         <div className="mb-3 flex items-center justify-between gap-2">
           <h2 className="text-[13px] font-semibold text-slate-700">演示对话记录</h2>
@@ -53,7 +53,7 @@ export function HealthAssistantPage() {
                 className={`flex ${isVisitor ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[86%] rounded-[16px] px-3.5 py-2.5 text-[12px] leading-5 ${
+                  className={`max-w-[86%] rounded-2xl px-3.5 py-2.5 text-[12px] leading-5 ${
                     isVisitor
                       ? 'rounded-br-md bg-teal-700 text-white'
                       : 'rounded-bl-md bg-slate-100 text-slate-600'
@@ -92,7 +92,7 @@ export function HealthAssistantPage() {
 
       <form
         onSubmit={handleSubmit}
-        className="mt-4 rounded-[18px] border border-slate-100 bg-white p-3 shadow-sm"
+        className="mt-4 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm"
       >
         <label htmlFor="assistant-input" className="sr-only">
           向社区助手提问

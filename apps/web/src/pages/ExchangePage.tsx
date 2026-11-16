@@ -60,7 +60,7 @@ export function ExchangePage() {
       </div>
 
       {visible.length === 0 ? (
-        <div className="mt-4 rounded-[18px] border border-dashed border-slate-200 bg-white px-4 py-10 text-center">
+        <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center">
           <p className="text-[13px] font-semibold text-slate-500">该分类暂无内容</p>
           <p className="mt-1.5 text-[11px] leading-5 text-slate-400">
             演示数据暂未提供「{filter}」商品，可切换其它分类查看。

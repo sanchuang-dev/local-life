@@ -1,3 +1,4 @@
+import { PageInfoAlert } from '../components/PageInfoHelp'
 import { useEffect, useState } from 'react'
 import {
   Alert,
@@ -178,7 +179,7 @@ function TencentMapConsole({ session }: { session: AuthenticatedSession }) {
                   { key: 'source', label: '配置来源', children: '管理后台数据库' },
                 ]}
               />
-              <Alert
+              <PageInfoAlert
                 type="info"
                 showIcon
                 title="保存不等于已验证"

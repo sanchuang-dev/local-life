@@ -20,7 +20,7 @@ export function CommunityNoticePage() {
           <ArrowLeft size={16} aria-hidden="true" />
           {backLabel}
         </Link>
-        <div className="mt-6 rounded-[18px] border border-dashed border-slate-200 bg-white px-4 py-12 text-center">
+        <div className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-12 text-center">
           <p className="text-[14px] font-semibold text-slate-500">消息不存在</p>
           <p className="mt-2 text-[11px] leading-5 text-slate-400">
             该消息可能已下线，或链接有误。
@@ -48,7 +48,7 @@ export function CommunityNoticePage() {
         subtitle={`${notice.time} · ${notice.source}`}
       />
 
-      <article className="mt-4 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+      <article className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <span
           className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${
             notice.tone === 'warn'
@@ -59,7 +59,7 @@ export function CommunityNoticePage() {
           {notice.tag}
         </span>
         <p className="mt-3 text-[13px] leading-6 text-slate-600">{notice.summary}</p>
-        <p className="mt-3 rounded-[14px] bg-slate-50 px-3.5 py-3 text-[12px] leading-5 text-slate-500">
+        <p className="mt-3 rounded-xl bg-slate-50 px-3.5 py-3 text-[12px] leading-5 text-slate-500">
           {notice.detailNote}
         </p>
       </article>
@@ -72,7 +72,7 @@ export function CommunityNoticePage() {
 
       <section className="mt-6">
         <h2 className="mb-3 text-[16px] font-semibold tracking-tight text-slate-900">其他消息</h2>
-        <div className="overflow-hidden rounded-[18px] border border-slate-100 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
           {others.map((item, index) => (
             <Link
               key={item.id}

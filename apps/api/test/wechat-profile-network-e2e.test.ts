@@ -51,7 +51,7 @@ function redirectLocation(response: Response): URL {
   return new URL(value)
 }
 
-test('real HTTP + SQLite keep base login and resident-consented WeChat profile authorization separate', async () => {
+test('real HTTP + SQLite keep first-login WeChat profile authorization atomic and legacy refresh isolated', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'local-life-wechat-profile-'))
   const databasePath = join(directory, 'profile.sqlite')
   const { db, sqlite } = createDatabase(databasePath, migrationsFolder)
@@ -71,7 +71,7 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
       return Response.json({
         access_token:
           code === 'login-code'
-            ? 'base-only-access-token'
+            ? 'login-profile-access-token'
             : code === 'userinfo-error-code'
               ? 'profile-error-token'
               : code === 'userinfo-mismatch-code'
@@ -99,12 +99,11 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
         openid: accessToken === 'profile-mismatch-token' ? OTHER_OPENID : url.searchParams.get('openid'),
         nickname: '街坊的微信昵称',
         headimgurl: 'https://thirdwx.qlogo.cn/mmopen/profile-avatar.png',
-        // These unrelated fields deliberately exist at the provider boundary.
-        // The application must ignore them and persist only nickname/avatar/time.
         sex: 1,
         province: '广东',
         city: '韶关',
         country: '中国',
+        privilege: ['network-profile'],
       })
     }
     throw new Error('unexpected WeChat provider request: ' + url.pathname)
@@ -126,12 +125,12 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
   const base = 'http://127.0.0.1:' + address.port
 
   try {
-    // Default resident login continues to request only snsapi_base. It creates
-    // the existing identity/session but never calls the profile endpoint.
+    // #256: normal resident login itself requests snsapi_userinfo and persists
+    // the profile before it creates the session.
     const loginStart = await fetch(base + API_ROUTES.authWechatStart, { redirect: 'manual' })
     assert.equal(loginStart.status, 302)
     const loginAuthorize = redirectLocation(loginStart)
-    assert.equal(loginAuthorize.searchParams.get('scope'), 'snsapi_base')
+    assert.equal(loginAuthorize.searchParams.get('scope'), 'snsapi_userinfo')
     const loginState = loginAuthorize.searchParams.get('state')
     assert.ok(loginState)
     const loginStateRow = db.select().from(oauthStates)
@@ -145,7 +144,7 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
     )
     assert.equal(loginCallback.status, 302)
     assert.equal(redirectLocation(loginCallback).searchParams.get('auth'), 'success')
-    assert.equal(userInfoCalls.length, 0)
+    assert.equal(userInfoCalls.length, 1)
 
     const sessionCookie = cookiePair(loginCallback, 'll_session')
     const csrfCookie = cookiePair(loginCallback, 'll_csrf')
@@ -158,13 +157,23 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
     assert.ok(resident)
     db.update(users).set({ displayName: '居民自己设置的平台昵称' }).where(eq(users.id, resident.id)).run()
 
-    // Reading profile status is passive: no implicit userinfo request.
+    // Reading profile status is passive: the only userinfo call so far is the
+    // one that completed the login itself.
     const beforeStatus = await fetch(base + API_ROUTES.authWechatProfile, {
       headers: { cookie: cookieHeader(sessionCookie, csrfCookie) },
     })
     assert.equal(beforeStatus.status, 200)
-    assert.deepEqual(await beforeStatus.json(), { available: true, authorized: false })
-    assert.equal(userInfoCalls.length, 0)
+    const beforeStatusBody = (await beforeStatus.json()) as {
+      available: boolean
+      authorized?: boolean
+      nickname?: string | null
+      avatarUrl?: string | null
+    }
+    assert.equal(beforeStatusBody.available, true)
+    assert.equal(beforeStatusBody.authorized, true)
+    assert.equal(beforeStatusBody.nickname, '街坊的微信昵称')
+    assert.equal(beforeStatusBody.avatarUrl, 'https://thirdwx.qlogo.cn/mmopen/profile-avatar.png')
+    assert.equal(userInfoCalls.length, 1)
 
     const unauthenticatedStart = await fetch(base + API_ROUTES.authWechatProfileStart, {
       method: 'POST',
@@ -224,9 +233,9 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
     assert.equal(redirectLocation(profileCallback).searchParams.get('wechat_profile'), 'success')
     assert.equal(tokenCalls.at(-1)?.appId, TEST_APP_ID)
     assert.equal(tokenCalls.at(-1)?.secret, TEST_APP_SECRET)
-    assert.equal(userInfoCalls.length, 1)
-    assert.equal(userInfoCalls[0]?.openId, PROFILE_OPENID)
-    assert.equal(userInfoCalls[0]?.accessToken, PROFILE_ACCESS_TOKEN)
+    assert.equal(userInfoCalls.length, 2)
+    assert.equal(userInfoCalls[1]?.openId, PROFILE_OPENID)
+    assert.equal(userInfoCalls[1]?.accessToken, PROFILE_ACCESS_TOKEN)
     assert.equal(db.select().from(sessions).all().length, sessionCountBefore)
     assert.equal(profileCallback.headers.getSetCookie().some((header) => header.startsWith('ll_session=')), false)
 
@@ -239,7 +248,13 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
       .get()
     assert.equal(savedIdentity?.nickname, '街坊的微信昵称')
     assert.equal(savedIdentity?.avatarUrl, 'https://thirdwx.qlogo.cn/mmopen/profile-avatar.png')
+    assert.equal(savedIdentity?.sex, 1)
+    assert.equal(savedIdentity?.province, '广东')
+    assert.equal(savedIdentity?.city, '韶关')
+    assert.equal(savedIdentity?.country, '中国')
+    assert.deepEqual(JSON.parse(savedIdentity?.privilegeJson ?? 'null'), ['network-profile'])
     assert.ok(savedIdentity?.profileAuthorizedAt instanceof Date)
+    assert.ok(savedIdentity?.profileUpdatedAt instanceof Date)
     assert.equal(
       db.select({ displayName: users.displayName }).from(users).where(eq(users.id, resident.id)).get()?.displayName,
       '居民自己设置的平台昵称',
@@ -256,7 +271,7 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
     assert.match(afterStatusText, /街坊的微信昵称/)
     assert.match(afterStatusText, /thirdwx\.qlogo\.cn/)
     assert.doesNotMatch(afterStatusText, /openid|access_token|secret|fake-profile-access-token/i)
-    assert.equal(userInfoCalls.length, 1)
+    assert.equal(userInfoCalls.length, 2)
 
     // A different OpenID already owned by another platform user is refused
     // before sns/userinfo. It neither updates nor merges that other identity.
@@ -301,7 +316,7 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
       },
     )
     assert.equal(redirectLocation(mismatchCallback).searchParams.get('wechat_profile'), 'identity_mismatch')
-    assert.equal(userInfoCalls.length, 1)
+    assert.equal(userInfoCalls.length, 2)
     const otherIdentity = db.select().from(wechatIdentities).where(eq(wechatIdentities.userId, otherUserId)).get()
     assert.equal(otherIdentity?.nickname, null)
     assert.equal(otherIdentity?.profileAuthorizedAt, null)
@@ -328,7 +343,7 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
       },
     )
     assert.equal(redirectLocation(unboundCallback).searchParams.get('wechat_profile'), 'identity_mismatch')
-    assert.equal(userInfoCalls.length, 1)
+    assert.equal(userInfoCalls.length, 2)
     assert.equal(
       db.select().from(wechatIdentities).where(eq(wechatIdentities.openId, 'openid-never-bound')).get(),
       undefined,
@@ -432,7 +447,7 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
     assert.equal(cancelCallback.headers.getSetCookie().some((header) => header.startsWith('ll_session=')), false)
     assert.ok(db.select().from(oauthStates)
       .where(eq(oauthStates.stateHash, hashToken(cancelState))).get()?.consumedAt)
-    assert.equal(userInfoCalls.length, 3)
+    assert.equal(userInfoCalls.length, 4)
     const unchangedAfterCancel = db.select().from(wechatIdentities)
       .where(and(
         eq(wechatIdentities.userId, resident.id),
@@ -535,7 +550,7 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
       },
     )
     assert.equal(redirectLocation(replayCallback).searchParams.get('wechat_profile'), 'state_invalid')
-    assert.equal(userInfoCalls.length, 3)
+    assert.equal(userInfoCalls.length, 4)
 
     const finalStatus = await fetch(base + API_ROUTES.authWechatProfile, {
       headers: { cookie: cookieHeader(sessionCookie, csrfCookie) },
@@ -544,15 +559,21 @@ test('real HTTP + SQLite keep base login and resident-consented WeChat profile a
     assert.equal(finalStatus.status, 200)
     assert.doesNotMatch(finalStatusText, /openid|access_token|secret/i)
 
-    // The pre-existing identity mapping still owns its OpenID; this feature
-    // adds no token/Secret storage and does not persist sex/region/location.
+    // The pre-existing identity mapping still owns its OpenID. Public profile
+    // fields are durable, while location and OAuth credentials remain absent.
     const identityColumns = sqlite.prepare('PRAGMA table_info(wechat_identities)').all() as Array<{ name: string }>
-    assert.equal(identityColumns.some((column) => ['sex', 'province', 'city', 'country', 'location'].includes(column.name)), false)
+    const identityColumnNames = identityColumns.map((column) => column.name)
+    for (const expected of ['sex', 'province', 'city', 'country', 'privilege_json', 'profile_updated_at']) {
+      assert.ok(identityColumnNames.includes(expected), `missing profile column ${expected}`)
+    }
+    for (const forbidden of ['location', 'access_token', 'refresh_token', 'oauth_code']) {
+      assert.equal(identityColumnNames.includes(forbidden), false)
+    }
     const databaseBytes = readFileSync(databasePath)
     assert.equal(databaseBytes.includes(Buffer.from(TEST_APP_SECRET)), false)
     assert.equal(databaseBytes.includes(Buffer.from(TEST_APP_SECRET_B)), false)
     assert.equal(databaseBytes.includes(Buffer.from(PROFILE_ACCESS_TOKEN)), false)
-    assert.equal(databaseBytes.includes(Buffer.from('base-only-access-token')), false)
+    assert.equal(databaseBytes.includes(Buffer.from('login-profile-access-token')), false)
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()))
     sqlite.close()

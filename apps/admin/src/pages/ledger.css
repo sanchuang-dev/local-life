@@ -179,9 +179,8 @@
 /* ---------------------- 分成结算单: tabs, KPI, 阻塞原因 -------------------- */
 
 /*
- * The two page tabs keep both panels mounted once visited (the reconciliation
- * view keeps its drafts and the candidate view keeps its list), but the hidden
- * one must not leave a gap in the `.page-stack` column flex layout.
+ * Settlement subviews keep visited panels mounted. Reconciliation has its
+ * own route and cannot leak batch state into settlement panels.
  */
 .ledger-tabpanel {
   display: flex;
@@ -267,4 +266,12 @@
   font-size: 12px;
   line-height: 1.6;
   color: var(--ant-color-text-description, #64748b);
+}
+
+/* Settlement tabs occupy the white PageHeader; selected subpage sits below. */
+.settlement-page-body {
+  padding-top: 16px;
+}
+.settlement-page-body .ledger-tabpanel > [hidden] {
+  display: none;
 }

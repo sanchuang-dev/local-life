@@ -12,10 +12,10 @@ type GdFeatureCardProps = {
  */
 export function GdFeatureCard({ entries }: GdFeatureCardProps) {
   return (
-    <article className="rounded-[20px] border border-teal-100/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,52,44,0.05)]">
+    <article className="rounded-2xl border border-teal-100/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,52,44,0.05)]">
       <div className="flex items-center gap-3">
         <span
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-[#e8f6f0] text-[#388b77]"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#e8f6f0] text-[#388b77]"
           aria-hidden="true"
         >
           <Tv size={22} strokeWidth={1.7} />

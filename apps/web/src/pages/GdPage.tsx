@@ -21,7 +21,7 @@ export function GdPage() {
 
       <div className="mt-1 flex items-center gap-3">
         <span
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#e8f6f0] text-[#388b77]"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#e8f6f0] text-[#388b77]"
           aria-hidden="true"
         >
           <Tv size={24} strokeWidth={1.7} />
@@ -32,7 +32,7 @@ export function GdPage() {
         </div>
       </div>
 
-      <div className="mt-4 flex items-start gap-2.5 rounded-[16px] bg-[#fff7ec] px-3.5 py-3 text-[12px] leading-5 text-[#8a6132]">
+      <div className="mt-4 flex items-start gap-2.5 rounded-2xl bg-[#fff7ec] px-3.5 py-3 text-[12px] leading-5 text-[#8a6132]">
         <Info size={16} className="mt-0.5 shrink-0 text-[#b97b3e]" aria-hidden="true" />
         <p>
           <span className="mr-1 rounded-full bg-white/80 px-1.5 py-0.5 text-[10px] font-semibold text-[#a96b2f]">
@@ -50,13 +50,13 @@ export function GdPage() {
               key={id}
               type="button"
               onClick={() => show(pendingNotice)}
-              className="relative flex h-full flex-col rounded-[18px] border border-slate-100 bg-white p-4 text-left shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+              className="relative flex h-full flex-col rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
             >
               <span className="absolute right-3 top-3 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
                 待接入
               </span>
               <span
-                className="flex h-11 w-11 items-center justify-center rounded-[15px] bg-[#fff3e6] text-[#c6925c]"
+                className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#fff3e6] text-[#c6925c]"
                 aria-hidden="true"
               >
                 <Icon size={22} strokeWidth={1.7} />
@@ -68,10 +68,10 @@ export function GdPage() {
         </div>
       </section>
 
-      <article className="mt-6 rounded-[20px] border border-slate-100 bg-white p-4 shadow-sm">
+      <article className="mt-6 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <div className="flex items-center gap-3">
           <span
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-[#e8f6f0] text-[#388b77]"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#e8f6f0] text-[#388b77]"
             aria-hidden="true"
           >
             <House size={21} strokeWidth={1.7} />
@@ -105,7 +105,7 @@ export function GdPage() {
 
       <section className="mt-6">
         <h2 className="mb-3 text-[17px] font-semibold tracking-tight text-slate-900">我的服务</h2>
-        <div className="overflow-hidden rounded-[18px] border border-slate-100 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
           {gdMyServices.map(({ id, label, meta, icon: Icon, pendingNotice }, index) => (
             <button
               key={id}
@@ -131,7 +131,7 @@ export function GdPage() {
         </div>
       </section>
 
-      <section className="mt-6 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+      <section className="mt-6 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <h2 className="text-[16px] font-semibold text-slate-800">社区广播联动</h2>
         <p className="mt-2 text-[12px] leading-6 text-slate-500">
           社区广播承担公共触达；规划中由小程序提供广播文字回看与后续服务，音频重听尚未接入。公共广播不作为商业广告渠道。
@@ -158,7 +158,7 @@ export function GdPage() {
         </p>
       </section>
 
-      <div className="mt-6 flex gap-3 rounded-[16px] border border-dashed border-teal-300/70 bg-[#eef7f2] p-4 text-[#52786c]">
+      <div className="mt-6 flex gap-3 rounded-2xl border border-dashed border-teal-300/70 bg-[#eef7f2] p-4 text-[#52786c]">
         <CircleHelp size={19} className="mt-0.5 shrink-0" aria-hidden="true" />
         <div>
           <p className="text-[12px] font-semibold">仅作界面展示</p>

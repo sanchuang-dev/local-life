@@ -1,3 +1,4 @@
+import { PageInfoAlert } from './PageInfoHelp'
 import {
   Alert,
   Button,
@@ -264,7 +265,7 @@ export function PaymentEvidencePanel({
               {evidence.blockingReasons.length > 0 ? (
                 <Alert type="warning" showIcon title="仍需处理"
                   description={evidence.blockingReasons.join('；')} />
-              ) : <Alert type="info" showIcon title="凭据和归属已有记录"
+              ) : <PageInfoAlert inline type="info" showIcon title="凭据和归属已有记录"
                   description="仍须依据合同、实际银行证据和后续结算审核决定是否可付款，本页不计算应付款。" />}
               {evidence.payment ? (
                 <Descriptions size="small" bordered column={{ xs: 1, md: 2 }}>

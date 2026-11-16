@@ -98,7 +98,7 @@ function LocalOrdersView() {
         </button>
       </div>
 
-      <p className="mt-2 rounded-[14px] bg-[#fff7ec] px-3.5 py-2.5 text-[11px] leading-5 text-[#8a6132]">
+      <p className="mt-2 rounded-xl bg-[#fff7ec] px-3.5 py-2.5 text-[11px] leading-5 text-[#8a6132]">
         仅显示你负责社区的登记订单。人工核验由运营人员完成。
       </p>
 
@@ -138,7 +138,7 @@ function LocalOrdersView() {
           state.forbidden ? (
             <section
               role="alert"
-              className="rounded-[18px] border border-rose-100 bg-white px-4 py-4 shadow-sm"
+              className="rounded-2xl border border-rose-100 bg-white px-4 py-4 shadow-sm"
             >
               <p className="text-[14px] font-semibold text-rose-700">没有权限查看社区订单</p>
               <p className="mt-1 break-words text-[12px] leading-5 text-slate-500">
@@ -177,11 +177,11 @@ function LocalOrdersView() {
                 key={order.id}
                 to={`/workbench/local-orders/${order.id}`}
                 state={{ from }}
-                className="block rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+                className="block rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
               >
                 <div className="flex items-start gap-3">
                   <span
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[#eef7f2] text-[#388b77]"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#eef7f2] text-[#388b77]"
                     aria-hidden="true"
                   >
                     <PackageSearch size={20} strokeWidth={1.8} />

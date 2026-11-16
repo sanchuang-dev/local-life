@@ -63,7 +63,7 @@ function RetryLine({
   onRetry: () => void
 }) {
   return (
-    <div role="alert" className="mt-3 rounded-[14px] border border-[#efd0b8] bg-[#fff7f0] px-3 py-2.5 text-[#7a4a2c]">
+    <div role="alert" className="mt-3 rounded-xl border border-[#efd0b8] bg-[#fff7f0] px-3 py-2.5 text-[#7a4a2c]">
       <p className="flex items-center gap-1.5 text-[12px] font-bold">
         <AlertTriangle size={14} className="shrink-0" aria-hidden="true" />
         {title}
@@ -146,7 +146,7 @@ export function PurchaseRewardCard({
         </Link>
       </div>
 
-      <div className="rounded-[20px] border border-slate-100 bg-white p-3 shadow-sm">
+      <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1 rounded-full bg-[#fff7ec] px-2.5 py-1 text-[11px] font-bold text-[#8a6132]">
             独立消费任务
@@ -163,7 +163,7 @@ export function PurchaseRewardCard({
         </p>
 
         {notice ? (
-          <p className="mt-2 rounded-[12px] bg-[#fff7ec] px-3 py-2 text-[11px] leading-5 text-[#8a6132]">
+          <p className="mt-2 rounded-xl bg-[#fff7ec] px-3 py-2 text-[11px] leading-5 text-[#8a6132]">
             {notice}
           </p>
         ) : null}
@@ -171,7 +171,7 @@ export function PurchaseRewardCard({
         {auth.loading || progress.state.status === 'idle' || progress.state.status === 'loading' ? (
           <LoadingLine text={auth.loading ? '正在读取登录状态…' : '正在读取消费团进度…'} />
         ) : progress.state.status === 'unauthenticated' ? (
-          <div className="mt-3 rounded-[14px] border border-teal-200 bg-[#f4faf6] px-3 py-3">
+          <div className="mt-3 rounded-xl border border-teal-200 bg-[#f4faf6] px-3 py-3">
             <p className="text-[12px] font-semibold text-[#225c4c]">
               登录后查看你的消费团进度与本人消费券。
             </p>
@@ -195,7 +195,7 @@ export function PurchaseRewardCard({
             onRetry={progress.reload}
           />
         ) : summary === null ? (
-          <p className="mt-3 rounded-[14px] bg-slate-50 px-3 py-3 text-[12px] leading-5 text-slate-500">
+          <p className="mt-3 rounded-xl bg-slate-50 px-3 py-3 text-[12px] leading-5 text-slate-500">
             本活动未配置消费奖励计划，不会生成消费券或消费团奖励。
           </p>
         ) : (
@@ -237,7 +237,7 @@ export function PurchaseRewardCard({
               </p>
             </div>
 
-            <div className="mt-3 rounded-[14px] border border-slate-100 bg-[#f8faf9] p-2.5">
+            <div className="mt-3 rounded-xl border border-slate-100 bg-[#f8faf9] p-2.5">
               <p className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600">
                 <Users size={13} aria-hidden="true" />
                 成员有效实付
@@ -294,7 +294,7 @@ export function PurchaseRewardCard({
               <>
                 {grantText ? (
                   <p
-                    className={`mt-3 flex items-start gap-1.5 rounded-[12px] px-3 py-2.5 text-[11px] leading-5 ${
+                    className={`mt-3 flex items-start gap-1.5 rounded-xl px-3 py-2.5 text-[11px] leading-5 ${
                       grantIsWarning
                         ? 'bg-[#fff7ec] text-[#8a6132]'
                         : 'bg-[#eef7f2] text-[#225c4c]'
@@ -309,7 +309,7 @@ export function PurchaseRewardCard({
                   </p>
                 ) : null}
                 {teamCoupon && couponView ? (
-                  <div className="mt-2 rounded-[14px] border border-[#dcebe2] bg-[#f4faf6] px-3 py-2.5">
+                  <div className="mt-2 rounded-xl border border-[#dcebe2] bg-[#f4faf6] px-3 py-2.5">
                     <div className="flex items-center justify-between gap-2">
                       <span className="flex items-center gap-1.5 text-[12px] font-bold text-[#225c4c]">
                         <Ticket size={14} aria-hidden="true" />
@@ -335,7 +335,7 @@ export function PurchaseRewardCard({
 
             <Link
               to={localCatalogHref(activity.id)}
-              className="mt-3 flex min-h-[48px] items-center justify-center gap-1.5 rounded-[14px] bg-teal-700 px-4 text-[13px] font-bold text-white transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+              className="mt-3 flex min-h-[48px] items-center justify-center gap-1.5 rounded-xl bg-teal-700 px-4 text-[13px] font-bold text-white transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
             >
               <ShoppingBasket size={16} aria-hidden="true" />
               去本地好物登记订单

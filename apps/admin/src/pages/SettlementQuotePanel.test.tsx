@@ -427,8 +427,8 @@ describe('SettlementQuotePanel · 口径与挂载', () => {
     ])
     renderPage()
 
-    expect(await screen.findByRole('tab', { name: '经营对账' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('tab', { name: '分成结算单' }))
+    expect(await screen.findByRole('tab', { name: '候选看板' })).toBeTruthy()
+    expect(screen.queryByRole('tab', { name: '经营对账' })).toBeNull()
     expect(await screen.findByRole('tab', { name: '服务端试算' })).toBeTruthy()
     expect(screen.getByRole('tab', { name: '候选看板' })).toBeTruthy()
     expect(callsTo(calls, QUOTES_ROUTE)).toHaveLength(0)

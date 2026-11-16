@@ -23,7 +23,7 @@ export function LocalProductCard({
       to={localProductHref(product.id, activityId)}
       state={{ from: activityId ? `/life?activityId=${activityId}` : '/life' }}
       aria-label={`${product.name}，${formatLocalPriceCents(product.priceCents)}，查看本地商品详情`}
-      className="group flex min-w-0 flex-col overflow-hidden rounded-[18px] border border-slate-100 bg-white shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+      className="group flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
     >
       {product.imageUrl ? (
         <img
@@ -75,7 +75,7 @@ export function LocalProductSkeletons() {
       {[0, 1, 2, 3].map((item) => (
         <div
           key={item}
-          className="h-[196px] animate-pulse rounded-[18px] border border-slate-100 bg-white"
+          className="h-[196px] animate-pulse rounded-2xl border border-slate-100 bg-white"
         />
       ))}
     </div>
@@ -95,7 +95,7 @@ export function LocalCatalogError({
   return (
     <section
       role="alert"
-      className="rounded-[18px] border border-rose-100 bg-white px-4 py-4 shadow-sm"
+      className="rounded-2xl border border-rose-100 bg-white px-4 py-4 shadow-sm"
     >
       <p className="flex items-center gap-1.5 text-[13px] font-bold text-rose-700">
         <AlertTriangle size={15} className="shrink-0" aria-hidden="true" />

@@ -23,8 +23,8 @@ PORT = 18081
 
 
 def main_cli() -> None:
-    if len(sys.argv) != 2 or sys.argv[1] not in ("check", "register", "restart"):
-        raise SystemExit("Usage: register-bt-node.py check|register|restart")
+    if len(sys.argv) != 2 or sys.argv[1] not in ("check", "register", "restart", "stop", "start"):
+        raise SystemExit("Usage: register-bt-node.py check|register|restart|stop|start")
     mode = sys.argv[1]
     model = main()
     existing = model.get_project_find(NAME)
@@ -88,11 +88,13 @@ def main_cli() -> None:
     req.project_name = NAME
     if mode == "restart":
         result = model.restart_project(req)
+    elif mode == "stop":
+        result = model.stop_project(req)
     else:
         result = model.start_project(req)
     if not isinstance(result, dict) or not result.get("status", False):
-        raise SystemExit("BT Node project failed to start: " + str(result)[:300])
-    print("BT_NODE_PROJECT_START_SUCCESS=yes")
+        raise SystemExit("BT Node project " + mode + " failed: " + str(result)[:300])
+    print("BT_NODE_PROJECT_ACTION_SUCCESS=" + mode)
     print("BT_NODE_PROJECT_NAME=" + NAME)
 
 

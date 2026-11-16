@@ -1094,7 +1094,8 @@ test('a phone owned by another account is strictly rejected: no merge, no attrib
     assert.equal(conflict?.actorUserId, wechatUserId)
     assert.equal(conflict?.targetId, wechatUserId)
 
-    // An account that already owns a phone cannot silently switch phones.
+    // #257: proving control of a new free phone replaces the current resident's
+    // identity in place. Platform userId and attribution never move.
     const otherPhone = '13900139000'
     advanceSeconds(context, PHONE_OTP_RESEND_COOLDOWN_SECONDS + 1)
     assert.equal((await requestOtp(context, otherPhone, 'bind')).response.status, 202)
@@ -1104,12 +1105,19 @@ test('a phone owned by another account is strictly rejected: no merge, no attrib
       lastCode(context, otherPhone),
       phoneSession,
     )
-    assert.equal(switchAttempt.status, 409)
+    assert.equal(switchAttempt.status, 200)
+    const switchBody = await readJson<{ alreadyBound: boolean; maskedPhone: string }>(switchAttempt)
+    assert.equal(switchBody.alreadyBound, false)
+    assert.equal(switchBody.maskedPhone, '139****9000')
+    const switched = context.db.select().from(residentPhoneIdentities)
+      .where(eq(residentPhoneIdentities.userId, phoneUserId)).get()
+    assert.equal(switched?.phone, otherPhone)
+    assert.equal(context.db.select().from(residentPhoneIdentities).all().length, 1)
+    assert.equal(attributionOf(context.db, phoneUserId).participations[0]?.id, phoneAttribution.participationId)
     assert.equal(
-      (await readJson<{ error: { code: string } }>(switchAttempt)).error.code,
-      'phone_already_bound',
+      context.db.select().from(auditLogs).where(eq(auditLogs.event, 'phone.identity.replaced')).all().length,
+      1,
     )
-    assert.equal(context.db.select().from(residentPhoneIdentities).get()?.phone, '13800138000')
   } finally {
     context.sqlite.close()
   }

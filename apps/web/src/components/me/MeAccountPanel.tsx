@@ -1,49 +1,37 @@
-import { useState } from 'react'
 import { ChevronRight, LogOut, ShieldCheck, Smartphone } from 'lucide-react'
 import { Link } from 'react-router'
-import { PhoneVerificationForm } from '../auth/PhoneVerificationForm'
 import { staffRoleLabels } from '../crm/crmLabels'
 import type { useResidentAuth } from '../../hooks/useResidentAuth'
 
-/** Keeps account binding and logout controls independent from the Me page layout. */
-export function MeAccountPanel({ auth }: { auth: ReturnType<typeof useResidentAuth> }) {
-  const [showBindForm, setShowBindForm] = useState(false)
+/** Keeps account summaries and logout controls independent from the Me page layout. */
+export function MeAccountPanel({
+  auth,
+  onEditProfile,
+}: {
+  auth: ReturnType<typeof useResidentAuth>
+  onEditProfile: () => void
+}) {
   const phoneDescription = auth.phoneStatus?.maskedPhone
     ? '已绑定 ' + auth.phoneStatus.maskedPhone
     : !auth.phoneStatus ? '手机号状态暂不可读取'
       : !auth.phoneStatus.configured ? '短信服务未启用'
-      : '尚未绑定手机号'
+        : '尚未绑定手机号'
 
   return (
     <section className="me-redesign__panel me-redesign__account" aria-labelledby="me-account">
       <h2 id="me-account" className="me-redesign__section-title">账户与服务</h2>
-      {auth.session && (
-        <>
-          <div className="me-redesign__account-row">
-            <span className="me-redesign__account-icon"><Smartphone size={20} aria-hidden="true" /></span>
-            <div className="me-redesign__account-copy">
-              <strong>手机号</strong>
-              <small>{phoneDescription}</small>
-            </div>
-            {!auth.phoneStatus?.maskedPhone && auth.phoneStatus?.configured && !showBindForm && (
-              <button type="button" onClick={() => setShowBindForm(true)} className="me-redesign__mini-action">绑定</button>
-            )}
+      {auth.session && !auth.session.staff && (
+        <div className="me-redesign__account-row">
+          <span className="me-redesign__account-icon"><Smartphone size={20} aria-hidden="true" /></span>
+          <div className="me-redesign__account-copy">
+            <strong>手机号</strong>
+            <small>{phoneDescription}</small>
           </div>
-          {showBindForm && auth.phoneStatus?.configured && !auth.phoneStatus.maskedPhone && (
-            <div className="me-redesign__phone-form">
-              <PhoneVerificationForm purpose="bind" configured={true} title="绑定手机号"
-                description="通过验证码确认本人手机号，不自动合并其他账户。"
-                submitLabel="确认绑定"
-                onRequestCode={(phone) => auth.requestPhoneCode(phone, 'bind')}
-                onSubmit={(phone, code) => auth.bindPhone(phone, code).then(() => undefined)}
-                onSuccess={() => setShowBindForm(false)} />
-              <button type="button" onClick={() => setShowBindForm(false)}>取消</button>
-            </div>
-          )}
-          {auth.error && <p role="alert" className="me-redesign__error">{auth.error}</p>}
-          {auth.loading && <p role="status" className="me-redesign__loading">正在读取账户状态…</p>}
-        </>
+          <button type="button" onClick={onEditProfile} className="me-redesign__mini-action">管理</button>
+        </div>
       )}
+      {auth.error && <p role="alert" className="me-redesign__error">{auth.error}</p>}
+      {auth.loading && <p role="status" className="me-redesign__loading">正在读取账户状态…</p>}
 
       <Link className="me-redesign__account-row me-redesign__account-link" to="/workbench" state={{ from: '/me' }}>
         <span className="me-redesign__account-icon"><ShieldCheck size={20} aria-hidden="true" /></span>

@@ -486,8 +486,8 @@ function isUniqueViolation(error: unknown): boolean {
  *
  * - the phone already belongs to this user: idempotent refresh;
  * - the phone belongs to another user: hard 409, no merge, no attribution move;
- * - this user already owns a different phone: hard 409 (replacement is a
- *   separate audited operation, not implemented here);
+ * - this user already owns a different phone: the newly verified number replaces
+ *   it in place; the platform userId and all attribution remain unchanged;
  * - otherwise insert the mapping. Participation/reward rows are never touched:
  *   they stay keyed by the platform UUID, so binding cannot rewrite history.
  */
@@ -536,16 +536,39 @@ export function bindVerifiedPhone(
     .where(eq(residentPhoneIdentities.userId, input.userId))
     .get()
   if (owned) {
-    recordPhoneAudit(db, 'phone.identity.conflict', {
+    try {
+      const replaced = db.update(residentPhoneIdentities)
+        .set({
+          phone: input.phone,
+          verifiedAt: current,
+          updatedAt: current,
+        })
+        .where(eq(residentPhoneIdentities.id, owned.id))
+        .run()
+      if (replaced.changes !== 1) {
+        throw new Error('verified phone identity disappeared during replacement')
+      }
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        recordPhoneAudit(db, 'phone.identity.conflict', {
+          actorUserId: input.userId,
+          targetId: input.userId,
+          metadata: { purpose: 'bind', outcome: 'replacement_phone_in_use' },
+        })
+        throw new PhoneOtpError(
+          409,
+          API_ERROR_CODES.phoneInUse,
+          '该手机号已绑定其他居民账户，暂不支持自助合并，请联系社区运营人员',
+        )
+      }
+      throw error
+    }
+    recordPhoneAudit(db, 'phone.identity.replaced', {
       actorUserId: input.userId,
       targetId: input.userId,
-      metadata: { purpose: 'bind', outcome: 'account_already_has_phone' },
+      metadata: { purpose: 'bind', outcome: 'replaced' },
     })
-    throw new PhoneOtpError(
-      409,
-      API_ERROR_CODES.phoneAlreadyBound,
-      '当前账户已绑定其他手机号，暂不支持自助更换',
-    )
+    return { alreadyBound: false, maskedPhone: maskMainlandPhone(input.phone) }
   }
 
   try {

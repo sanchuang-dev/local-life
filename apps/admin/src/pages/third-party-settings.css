@@ -1,0 +1,119 @@
+.third-party-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding-top: 16px;
+}
+
+.third-party-service-card {
+  min-width: 0;
+}
+
+.third-party-service-card .ant-card-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 238px;
+  gap: 20px;
+  padding: 22px;
+}
+
+.third-party-service-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.third-party-service-heading .ant-tag {
+  flex-shrink: 0;
+  margin-inline-start: auto;
+  margin-inline-end: 0;
+}
+
+.third-party-service-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 10px;
+  font-size: 19px;
+}
+
+.third-party-service-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.third-party-service-title h4.ant-typography {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.third-party-service-content {
+  flex: 1;
+}
+
+.third-party-service-facts {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.third-party-service-facts > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.third-party-service-facts dt {
+  flex: 0 0 auto;
+  color: #84968b;
+}
+
+.third-party-service-facts dd {
+  margin: 0;
+  min-width: 0;
+  color: inherit;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.third-party-service-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 15px;
+  border-top: 1px solid #eef4f1;
+}
+
+.third-party-configuration-drawer .ant-drawer-body {
+  padding: 14px 18px 28px;
+}
+
+.third-party-configuration-drawer .page {
+  padding: 0;
+}
+
+.third-party-configuration-drawer .page-header {
+  position: static;
+}
+
+@media (max-width: 860px) {
+  .third-party-settings-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+}
+
+@media (max-width: 600px) {
+  .third-party-service-card .ant-card-body {
+    min-height: 210px;
+    padding: 16px;
+  }
+  .third-party-configuration-drawer .ant-drawer-body {
+    padding: 10px 12px 20px;
+  }
+}

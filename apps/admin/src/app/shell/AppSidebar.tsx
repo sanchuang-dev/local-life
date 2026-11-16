@@ -167,7 +167,7 @@ export function AppSidebar({ activeKey, onNavigate, variant = 'sider' }: AppSide
         </div>
       )}
 
-      <nav aria-label="主导航">
+      <nav className="app-sidebar-nav" aria-label="主导航">
         {items.length === 0 ? (
           <Empty
             className="app-sidebar-empty"

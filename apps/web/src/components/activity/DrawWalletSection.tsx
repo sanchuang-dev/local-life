@@ -19,7 +19,7 @@ export function DrawWalletSection({ entries }: { entries: DrawWalletEntry[] }) {
           const credential = attempt.credential
           const status = credential?.status
           return (
-            <li key={attempt.id} className="rounded-[18px] border border-teal-100 bg-white p-4 shadow-sm">
+            <li key={attempt.id} className="rounded-2xl border border-teal-100 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between gap-2">
                 <p className="min-w-0 break-words text-[13px] font-semibold text-slate-800">{activityTitle}</p>
                 <span className="shrink-0 rounded-full bg-[#e8f6f0] px-2.5 py-1 text-[11px] font-bold text-teal-700">
@@ -44,7 +44,7 @@ export function DrawWalletSection({ entries }: { entries: DrawWalletEntry[] }) {
                 </div>
               </div>
               {credential?.code && status === 'active' ? (
-                <div className="mt-3 rounded-[12px] bg-[#eef8f1] px-3 py-3">
+                <div className="mt-3 rounded-xl bg-[#eef8f1] px-3 py-3">
                   <p className="flex items-center gap-1.5 text-[11px] font-medium text-teal-700"><Ticket size={14} />核销凭据</p>
                   <p className="mt-1 break-all font-mono text-[16px] font-bold tracking-wider text-[#145333]">{credential.code}</p>
                   <p className="mt-1 text-[11px] text-slate-600">到现场出示此码，由工作人员核验并核销。勿公开分享。</p>
@@ -58,7 +58,7 @@ export function DrawWalletSection({ entries }: { entries: DrawWalletEntry[] }) {
               <Link
                 to={'/community/activity/silver-neighborhood?activityId=' + encodeURIComponent(activityId)}
                 state={{ from: '/me/rewards' }}
-                className="mt-3 flex min-h-[44px] items-center justify-center rounded-[12px] bg-[#f2f7f4] px-3 text-[13px] font-semibold text-teal-700"
+                className="mt-3 flex min-h-[44px] items-center justify-center rounded-xl bg-[#f2f7f4] px-3 text-[13px] font-semibold text-teal-700"
               >
                 查看活动与抽奖记录
               </Link>

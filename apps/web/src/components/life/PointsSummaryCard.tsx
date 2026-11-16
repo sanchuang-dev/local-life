@@ -8,7 +8,7 @@ import { lifePoints } from '../../mocks/life'
  */
 export function PointsSummaryCard({ from }: { from?: string }) {
   return (
-    <article className="rounded-[20px] border border-[#e8d2a8] bg-[#fff7ec] p-4">
+    <article className="rounded-2xl border border-[#e8d2a8] bg-[#fff7ec] p-4">
       <div className="flex items-end justify-between gap-3">
         <div className="min-w-0">
           <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#a96b2f]">

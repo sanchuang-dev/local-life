@@ -14,14 +14,14 @@ describe('PageHeader', () => {
       <PageHeader
         title="经营工作台"
         description="只读概览"
-        status={<span>真实数据</span>}
+        status={<span>已锁定</span>}
         extra={<button type="button">导出</button>}
       />,
     )
 
     expect(screen.getByRole('heading', { name: '经营工作台' })).toBeTruthy()
     expect(screen.getByText('只读概览')).toBeTruthy()
-    expect(screen.getByText('真实数据')).toBeTruthy()
+    expect(screen.getByText('已锁定')).toBeTruthy()
     expect(screen.getByRole('button', { name: '导出' })).toBeTruthy()
     expect(container.querySelector('.page-header-subnav')).toBeNull()
     expect(container.querySelector('header')?.className).toBe('page-header')

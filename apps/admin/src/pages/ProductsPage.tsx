@@ -1,3 +1,4 @@
+import { PageInfoAlert } from '../components/PageInfoHelp'
 import { PlusOutlined } from '@ant-design/icons'
 import {
   Alert,
@@ -473,22 +474,11 @@ function ProductConsole({ session }: { session: AuthenticatedSession }) {
       <PageHeader
         title="商品管理"
         description="维护本社区本地商品：创建、编辑、上架与下架。居民 H5「惠生活」读取同一份上架目录，价格以整数分保存并在居民登记订单时冻结快照。"
-        status={<Tag color="green">真实数据</Tag>}
-        extra={
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            disabled={createDisabled}
-            onClick={openCreate}
-          >
-            新建商品
-          </Button>
-        }
       />
 
       <div className="page-stack">
         {!isAdmin ? (
-          <Alert
+          <PageInfoAlert
             type="info"
             showIcon
             title="运营员视图"
@@ -538,6 +528,16 @@ function ProductConsole({ session }: { session: AuthenticatedSession }) {
           filters={filters}
           columns={columns}
           onRefresh={refreshList}
+          toolbarExtra={
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              disabled={createDisabled}
+              onClick={openCreate}
+            >
+              新建商品
+            </Button>
+          }
           errorTitle={listErrorTitle(listError)}
           emptyText={
             <div className="local-empty">

@@ -38,7 +38,7 @@ export function CommunityBroadcastPage() {
       </DemoNote>
 
       {emergencyBroadcast ? (
-        <article className="mt-4 rounded-[18px] border border-[#f2dcc0] bg-[#fff7ec] p-4">
+        <article className="mt-4 rounded-2xl border border-[#f2dcc0] bg-[#fff7ec] p-4">
           <div className="flex items-center justify-between gap-2">
             <span className="inline-flex items-center gap-1 rounded-full bg-[#fbe3dc] px-2 py-0.5 text-[11px] font-semibold text-[#9b3a2e]">
               <ShieldAlert size={13} aria-hidden="true" />
@@ -83,14 +83,14 @@ export function CommunityBroadcastPage() {
       </div>
 
       {visible.length === 0 ? (
-        <div className="mt-4 rounded-[18px] border border-dashed border-slate-200 bg-white px-4 py-10 text-center">
+        <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center">
           <p className="text-[13px] font-semibold text-slate-500">暂无历史广播记录</p>
           <p className="mt-1.5 text-[11px] leading-5 text-slate-400">
             演示数据只提供当前广播与今日广播，历史广播待接入。
           </p>
         </div>
       ) : (
-        <div className="mt-4 overflow-hidden rounded-[18px] border border-slate-100 bg-white shadow-sm">
+        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
           {visible.map((item, index) => {
             const Icon = item.icon
             const expanded = expandedId === item.id
@@ -130,7 +130,7 @@ export function CommunityBroadcastPage() {
 
                 {expanded ? (
                   <div className="px-4 pb-4">
-                    <dl className="divide-y divide-slate-100 rounded-[14px] bg-slate-50/70 px-3.5 py-1">
+                    <dl className="divide-y divide-slate-100 rounded-xl bg-slate-50/70 px-3.5 py-1">
                       <div className="flex items-center justify-between gap-3 py-2.5">
                         <dt className="text-[11px] text-slate-400">广播类别</dt>
                         <dd className="text-right text-[12px] font-medium text-slate-600">{item.kind}</dd>
@@ -147,7 +147,7 @@ export function CommunityBroadcastPage() {
                       </div>
                     </dl>
                     <p className="mt-2.5 text-[11px] leading-5 text-slate-500">{item.summary}</p>
-                    <div className="mt-2.5 flex items-center gap-2 rounded-[12px] bg-slate-50 px-3 py-2 text-[11px] text-slate-400">
+                    <div className="mt-2.5 flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-[11px] text-slate-400">
                       <Info size={14} className="shrink-0" aria-hidden="true" />
                       无音频资源，暂不能重听；文字信息以上述内容为准。
                     </div>

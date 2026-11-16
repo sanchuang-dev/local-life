@@ -1,3 +1,4 @@
+import { PageInfoAlert } from '../components/PageInfoHelp'
 import { useCallback, useEffect, useState } from 'react'
 import {
   Alert, App as AntdApp, Button, Form, Input, InputNumber, Modal,
@@ -248,10 +249,9 @@ export function ExternalOffersPage() {
 
   return (
     <div className="page">
-      <PageHeader title="精选优惠" description="编辑第三方活动链接；本站不发券、不代下单，也不保证第三方优惠可领取。"
-        extra={<Button type="primary" onClick={openCreate}>新增优惠活动</Button>} />
+      <PageHeader title="精选优惠" description="编辑第三方活动链接；本站不发券、不代下单，也不保证第三方优惠可领取。" />
       <div className="page-stack">
-        <Alert type="info" showIcon message="新增活动默认下架"
+        <PageInfoAlert type="info" showIcon message="新增活动默认下架"
           description="请在目标手机与微信内核验链接、活动名称和有效期，再明确启用。普通 H5 链接不能保证自动打开小程序或 App。" />
         <DataPanel<ExternalOffer, OfferFilters, OfferSortKey>
           id="external-offers"
@@ -271,6 +271,7 @@ export function ExternalOffersPage() {
           emptyText={rows.length === 0 ? '暂无第三方优惠。请先新增并核实真实链接。' : undefined}
           toolbarExtra={
             <Space wrap>
+              <Button type="primary" onClick={openCreate}>新增优惠活动</Button>
               <Button onClick={downloadExternalOffersTemplate}>下载Excel模板</Button>
               <Button onClick={() => { setPreview(null); setImportOpen(true) }}>Excel批量导入</Button>
             </Space>

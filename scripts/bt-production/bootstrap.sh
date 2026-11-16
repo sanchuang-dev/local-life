@@ -57,6 +57,8 @@ fi
 ln -s "$config" "$tmp/api/.env"
 mv "$tmp" "$release"
 trap - EXIT
+# Incoming archives are root-only (0700); www must run from its accessible release cwd.
+cd "$release/api"
 runuser -u www -- "$node" -e 'const D=require(process.argv[1]); const x=new D(":memory:"); x.close()' "$release/api/node_modules/better-sqlite3"
 runuser -u www -- env DATABASE_PATH="$db" bash -c '
 set -euo pipefail

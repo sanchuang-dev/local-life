@@ -6,6 +6,7 @@ import {
   eq,
   exists,
   inArray,
+  isNotNull,
   notInArray,
   or,
   sql,
@@ -34,9 +35,11 @@ import {
   residentCommunityAssignments,
   residentCommunityBindings,
   residentPhoneIdentities,
+  residentProfiles,
   staffAccounts,
   staffCommunityAssignments,
   users,
+  wechatIdentities,
   wechatOauthConfigs,
 } from '../db/schema.js'
 import { getResidentCommunityStatus } from '../resident-community/service.js'
@@ -56,6 +59,12 @@ import { getResidentCommunityStatus } from '../resident-community/service.js'
  * community membership or a staff authorization on that community. An account
  * with no such link is administrator-only. A direct detail id is filtered by
  * the same condition, so it cannot be used to probe accounts outside scope.
+ *
+ * #258 detail PII: only an administrator receives the complete verified phone
+ * and the resident-entered contact address (`contact.visibility === 'full'`).
+ * Community-scoped staff keep the existing masked phone and receive neither the
+ * full number nor the address; no caller ever receives an OpenID/unionid value,
+ * token, cookie or password hash.
  */
 
 export class UserDirectoryError extends Error {
@@ -648,7 +657,8 @@ export function getUserDirectory(
   userId: string,
 ): UserDirectoryDetail {
   const visible = visibleAccountCondition(db, actor)
-  const row = directoryQuery(db, activeWechatAppId(db))
+  const appId = activeWechatAppId(db)
+  const row = directoryQuery(db, appId)
     .where(visible ? and(eq(users.id, userId), visible) : eq(users.id, userId))
     .get()
   // Out-of-scope and non-existent accounts share the same 404: a detail id
@@ -674,10 +684,76 @@ export function getUserDirectory(
           status: row.staffStatus,
           communities: staffCommunitiesOf(db, row.staffAccountId, allowedCommunityIds),
         }
+
+  // #256: only the currently active public account's consented profile is read,
+  // ordered exactly like the list projection so detail and list never disagree.
+  const wechatProfile =
+    appId === null
+      ? null
+      : db
+          .select({
+            sex: wechatIdentities.sex,
+            country: wechatIdentities.country,
+            province: wechatIdentities.province,
+            city: wechatIdentities.city,
+            profileUpdatedAt: wechatIdentities.profileUpdatedAt,
+          })
+          .from(wechatIdentities)
+          .where(and(
+            eq(wechatIdentities.userId, userId),
+            eq(wechatIdentities.appId, appId),
+            isNotNull(wechatIdentities.profileAuthorizedAt),
+          ))
+          .orderBy(desc(wechatIdentities.profileAuthorizedAt), asc(wechatIdentities.id))
+          .get() ?? null
+  const linkedUnionId = db
+    .select({ id: wechatIdentities.id })
+    .from(wechatIdentities)
+    .where(and(eq(wechatIdentities.userId, userId), isNotNull(wechatIdentities.unionId)))
+    .get()
+
+  // #257: resident-entered contact address. The resident's profile row and phone
+  // identity are separate facts; neither is merged into the other.
+  const canSeeFullContact = actor.role === 'admin'
+  const contactAddress = canSeeFullContact
+    ? db
+        .select({ contactAddress: residentProfiles.contactAddress })
+        .from(residentProfiles)
+        .where(eq(residentProfiles.userId, userId))
+        .get()?.contactAddress ?? null
+    : null
+
   return userDirectoryDetailSchema.parse({
     ...entry,
     wechatLinkedIdentityCount: row.wechatIdentityCount,
+    wechatLinkedUnionId: linkedUnionId !== undefined,
+    // Historic rows report `null` per field instead of inventing a region or
+    // gender; the provider's numeric code is normalized once, here.
+    wechatProfile:
+      wechatProfile === null
+        ? null
+        : {
+            sex:
+              wechatProfile.sex === null
+                ? null
+                : wechatProfile.sex === 1
+                  ? 'male'
+                  : wechatProfile.sex === 2
+                    ? 'female'
+                    : 'unknown',
+            country: wechatProfile.country,
+            province: wechatProfile.province,
+            city: wechatProfile.city,
+            updatedAt: wechatProfile.profileUpdatedAt?.toISOString() ?? null,
+          },
     maskedPhone: phone ? maskDirectoryPhone(phone.phone) : null,
+    contact: {
+      visibility: canSeeFullContact ? 'full' : 'masked',
+      // A scoped caller receives neither the complete number nor the address;
+      // the masked phone on the entry stays the only phone-shaped data.
+      phone: canSeeFullContact ? phone?.phone ?? null : null,
+      address: contactAddress,
+    },
     staffAccount,
   })
 }

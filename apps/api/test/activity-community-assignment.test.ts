@@ -102,11 +102,29 @@ function cookieValue(response: Response, name: string): string {
 function countingProvider(openid = 'wechat-openid-123') {
   const calls: string[] = []
   const fetcher: typeof fetch = async (input) => {
-    calls.push(String(input))
-    return new Response(JSON.stringify({ openid, unionid: 'wechat-union-123' }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    })
+    const url = new URL(String(input))
+    calls.push(url.pathname)
+    if (url.pathname === '/sns/oauth2/access_token') {
+      return Response.json({
+        access_token: 'community-profile-access',
+        openid,
+        unionid: 'wechat-union-123',
+      })
+    }
+    if (url.pathname === '/sns/userinfo') {
+      return Response.json({
+        openid,
+        unionid: 'wechat-union-123',
+        nickname: '社区测试居民',
+        sex: 1,
+        province: '广东',
+        city: '韶关',
+        country: '中国',
+        headimgurl: 'https://wx.example.test/avatar/community',
+        privilege: [],
+      })
+    }
+    throw new Error(`unexpected provider request: ${url.pathname}`)
   }
   return { fetcher, calls }
 }

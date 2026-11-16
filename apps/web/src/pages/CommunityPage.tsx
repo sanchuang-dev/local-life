@@ -42,7 +42,7 @@ export function CommunityPage() {
         legacy 社区 hub lists demo entries and must never offer a switch, unbind or
         rebind affordance, nor imply that browsing changes the permanent community.
       */}
-      <div className="mt-3 rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm">
+      <div className="mt-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <p className="text-[13px] font-semibold text-slate-800">常驻社区</p>
         <div className="mt-1">
           <ResidentCommunityStrip state={residentCommunity.state} onReload={residentCommunity.reload} />
@@ -61,7 +61,7 @@ export function CommunityPage() {
         <div className="grid grid-cols-2 gap-3">
           {communityEntries.map(({ id, label, badge, icon: Icon, tone, to, pendingNotice }) => {
             const className =
-              'relative flex min-h-[96px] flex-col items-start rounded-[18px] border border-slate-100 bg-white p-4 text-left shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600'
+              'relative flex min-h-[96px] flex-col items-start rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600'
             const content = (
               <>
                 {badge ? (
@@ -70,7 +70,7 @@ export function CommunityPage() {
                   </span>
                 ) : null}
                 <span
-                  className={`flex h-11 w-11 items-center justify-center rounded-[15px] ${toneStyles[tone]}`}
+                  className={`flex h-11 w-11 items-center justify-center rounded-xl ${toneStyles[tone]}`}
                   aria-hidden="true"
                 >
                   <Icon size={22} strokeWidth={1.7} />
@@ -111,11 +111,11 @@ export function CommunityPage() {
         <div className="grid gap-3">
           {communityActivityList.map(({ id, title, meta, icon: Icon, tone, tags, to, pendingNotice }) => {
             const className =
-              'flex w-full items-center gap-3 rounded-[18px] border border-slate-100 bg-white p-4 text-left shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600'
+              'flex w-full items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 text-left shadow-sm transition-colors hover:border-teal-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600'
             const content = (
               <>
                 <span
-                  className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-[16px] ${toneStyles[tone]}`}
+                  className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${toneStyles[tone]}`}
                   aria-hidden="true"
                 >
                   <Icon size={24} strokeWidth={1.6} />
@@ -162,7 +162,7 @@ export function CommunityPage() {
 
       <section className="mt-6">
         <h2 className="mb-3 text-[17px] font-semibold tracking-tight text-slate-900">社区通知</h2>
-        <div className="overflow-hidden rounded-[18px] border border-slate-100 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
           {communityNotices.map((notice, index) => {
             const Icon = notice.icon
             return (

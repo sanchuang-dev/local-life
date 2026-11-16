@@ -62,7 +62,7 @@ export function HealthLecturePage() {
       </div>
 
       {visible.length === 0 ? (
-        <div className="mt-4 rounded-[18px] border border-dashed border-slate-200 bg-white px-4 py-10 text-center">
+        <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-10 text-center">
           <p className="text-[13px] font-semibold text-slate-500">该分类暂无内容</p>
           <p className="mt-1.5 text-[11px] leading-5 text-slate-400">
             演示数据暂未提供「{filter}」内容，可切换其它分类查看。
@@ -86,11 +86,11 @@ export function HealthLecturePage() {
             }) => (
               <article
                 key={id}
-                className="rounded-[18px] border border-slate-100 bg-white p-4 shadow-sm"
+                className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
               >
                 <div className="flex items-start gap-3">
                   <span
-                    className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-[16px] ${toneStyles[tone]}`}
+                    className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl ${toneStyles[tone]}`}
                     aria-hidden="true"
                   >
                     <Icon size={25} strokeWidth={1.6} />
@@ -132,7 +132,7 @@ export function HealthLecturePage() {
                 ) : null}
 
                 {summary ? (
-                  <p className="mt-3 rounded-[12px] bg-[#fff7ec] px-3 py-2 text-[11px] leading-5 text-[#8a6132]">
+                  <p className="mt-3 rounded-xl bg-[#fff7ec] px-3 py-2 text-[11px] leading-5 text-[#8a6132]">
                     {summary}
                   </p>
                 ) : null}
