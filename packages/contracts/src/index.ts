@@ -2346,6 +2346,7 @@ export * from './user-directory.js'
 export * from './resident-community.js'
 export * from './resident-profile.js'
 export * from './draw.js'
+export * from './payments.js'
 
 /* -------------------------------------------------------------------------- */
 /* Phone (SMS one-time code) resident identity (#93 LL-H5-002)                 */
