@@ -31,7 +31,7 @@
   - `paid / closed / failed` 为终态，禁止回退。
 - `kind='channel'` 必须有 mock/wechat_jsapi 渠道、净应付 > 0，且 mock 必须 `simulated=1`、wechat 必须 `simulated=0`。
 - `kind='zero_amount'` 必须无渠道、非模拟、净应付 0、状态为 `paid` 且有 `paid_at`。
-- `paid/closed/failed` 必须各自有 `paid_at/closed_at/failed_at`；失败原因只在 failed 状态存在。
+- `paid/closed/failed` 必须各自有 `paid_at/closed_at/failed_at`，其余终态时间列必须为空；非 failed 状态禁止失败原因。共享 Zod 校验与 SQLite CHECK 保持同一双向约束。
 
 ### `payment_attempts`
 
@@ -56,11 +56,12 @@ PAY-02 可以依赖本卡：
 - 创建支付意图前先读本地订单快照，写入的 gross/discount/net 必须与数据库订单一致，否则触发器拒绝。
 - 用 `paymentIntentSchema` / `paymentAttemptSchema` / `paymentEventSchema` 作为响应 DTO，不要在路由层复制字段。
 - 用 `PAYMENT_STATUS_TRANSITIONS` / `canTransitionPaymentStatus` 做服务层判断；数据库触发器仍是最终边界。
+- **PAY-02 只允许居民创建/读取支付单，不开放支付状态修改路由。** 不提供客户端可直接提交 `paid/closed/failed` 的更新 DTO；PAY-03 的可信服务端确认独占状态写入，不能用客户端 JS 回调或手工请求声明成功。
 - 渠道交易号写入 attempt，重复回调/查单依赖 `payment_attempts_provider_txn_uq`、`payment_events_dedupe_uq` 与 `payment_intents_one_paid_per_order_uq`。
 
 未来退款卡应新增独立表引用 `payment_intents.id`，不得把 `paid` 改成 `refunded`，也不得改写历史事件。
 
 ## 4. 验证
 
-- `packages/contracts/test/payments-contract.test.mjs`：状态机、整数分/负数/浮点/溢出、金额守恒、渠道/模拟/零元、paid attempt 时间与交易号。
+- `packages/contracts/test/payments-contract.test.mjs`：状态机、整数分/负数/浮点/溢出、金额守恒、渠道/模拟/零元、支付意图与尝试的终态时间戳双向一致性、失败原因禁用规则，以及 paid attempt 交易号要求。
 - `apps/api/test/payments-db.test.ts`：真实 SQLite 新库、历史库升级、金额/归属/唯一性/状态转换/事件追加式/跨意图引用负例，并确认旧订单、Ledger 行与锁定批次不丢失。
