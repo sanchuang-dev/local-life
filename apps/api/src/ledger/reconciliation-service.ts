@@ -206,8 +206,8 @@ export function maskPhoneNumbers(value: string): string {
 }
 
 /** RFC 4180 cell: quote only when needed, double the quotes. */
-function csvCell(value: string): string {
-  const masked = maskPhoneNumbers(value)
+function csvCell(value: string, maskPhone = true): string {
+  const masked = maskPhone ? maskPhoneNumbers(value) : value
   // Quoting CSV is not sufficient to stop Excel interpreting formula cells.
   // Prefix a text marker even when whitespace/control characters precede it.
   const safe = /^[\u0000-\u0020]*[=+\-@]/u.test(masked) ? `'${masked}` : masked
@@ -1303,7 +1303,9 @@ export function buildReconciliationCsv(
       entry.batchNo ?? '',
       anomalyText,
     ]
-    lines.push(cells.map((cell) => csvCell(cell)).join(','))
+    // Column 0 is an immutable UUID, not a free-text field. Masking incidental
+    // phone-like digits in it corrupts the reconciliation join key.
+    lines.push(cells.map((cell, index) => csvCell(cell, index !== 0)).join(','))
   }
 
   const body = `\uFEFF${lines.join('\r\n')}\r\n`
