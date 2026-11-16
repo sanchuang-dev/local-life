@@ -299,11 +299,42 @@ describe('PerformancePage report', () => {
     expect(document.body.textContent).not.toContain('174.20')
     expect(screen.queryByText('合计金额')).toBeNull()
 
+    // The old filter is explicitly historical attribution, not the territory metric.
+    expect(screen.getByText(/「历史人员归属」只筛选已确认个人归属的流水/)).toBeTruthy()
+    expect(screen.getByText(/本地订单核验通过后会自动生成社区有效业绩/)).toBeTruthy()
     // The summary never turns into a list or an order/receipt form.
     expect(screen.queryByText('经营流水明细')).toBeNull()
     expect(screen.queryByText('订单实收凭据与业绩归属')).toBeNull()
     expectNoLedgerListRequests(calls)
     expect(overviewUrls(calls).length).toBe(1)
+  })
+
+  it('keeps community performance visible while explaining the historical attribution filter', async () => {
+    stubApi([
+      ['/api/admin/crm/filter-options', () => json(FILTER_OPTIONS)],
+      [
+        '/api/admin/ledger/overview',
+        (url) => json(url.includes('staffId=') ? emptyOverview() : overview()),
+      ],
+    ])
+
+    renderPage(ADMIN_SESSION)
+    expect(await screen.findByText('登记金额')).toBeTruthy()
+    expect(
+      document.querySelector('[data-fact-kind="order_verified"]')?.textContent,
+    ).toContain('39.80')
+    expect(screen.getByText(/「历史人员归属」只筛选已确认个人归属的流水/)).toBeTruthy()
+
+    await chooseOption(screen.getByLabelText('历史人员归属'), '网格员甲（网格员）')
+    await waitFor(() => {
+      expect(
+        document.querySelector('[data-fact-kind="order_verified"]')?.textContent,
+      ).toContain('0.00')
+    })
+    // Zero under the personal-attribution filter is not presented as "the
+    // community has no performance"; the hint points to the community scope.
+    expect(screen.getByText(/会排除尚未确认个人归属的本地订单/)).toBeTruthy()
+    expect(document.body.textContent).not.toMatch(/该社区没有(任何)?有效业绩/)
   })
 
   it('states the report instant, its time zone and that the server aggregated it', async () => {
@@ -433,7 +464,7 @@ describe('PerformancePage filters', () => {
       expect(overviewUrls(calls).at(-1)).toContain(`communityId=${COMMUNITY_A.id}`)
     })
 
-    await chooseOption(screen.getByLabelText('业绩归属'), '网格员甲（网格员）')
+    await chooseOption(screen.getByLabelText('历史人员归属'), '网格员甲（网格员）')
     await waitFor(() => {
       expect(overviewUrls(calls).at(-1)).toContain(`staffId=${GRID_ID}`)
     })
@@ -461,7 +492,7 @@ describe('PerformancePage filters', () => {
 
     renderPage(OPERATOR_SESSION)
     await screen.findByText('登记金额')
-    await chooseOption(screen.getByLabelText('业绩归属'), '网格员甲（网格员）')
+    await chooseOption(screen.getByLabelText('历史人员归属'), '网格员甲（网格员）')
     await waitFor(() => expect(overviewUrls(calls).at(-1)).toContain(`staffId=${GRID_ID}`))
 
     fireEvent.click(await screen.findByRole('button', { name: '重置筛选' }))
@@ -493,7 +524,7 @@ describe('PerformancePage filters', () => {
     await screen.findByText('登记金额')
 
     await chooseOption(screen.getByLabelText('社区'), '幸福社区')
-    await chooseOption(screen.getByLabelText('业绩归属'), '网格员甲（网格员）')
+    await chooseOption(screen.getByLabelText('历史人员归属'), '网格员甲（网格员）')
     await pickDateRange('2026-11-01', '2026-11-07')
     await waitFor(
       () => {

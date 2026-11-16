@@ -24,8 +24,8 @@ export const localOrderStatusLabels: Record<LocalOrderStatus, string> = {
 export const localOrderStatusDescriptions: Record<LocalOrderStatus, string> = {
   registered: '办理意向已登记，等待工作人员处理。本平台不收款。',
   processing: '工作人员正在处理你登记的办理意向。',
-  pending_review: '等待运营人员人工核验登记信息。',
-  verified: '运营人员已人工核验订单事实；这不代表收款或业务办理已完成。',
+  pending_review: '等待当前片区网格员或运营人员电话核验登记信息。',
+  verified: '订单事实已由片区网格员或运营人员人工核验；这不代表收款、业务办理或结算已完成。',
   cancelled: '该订单已取消。',
   rejected: '该订单未通过，原因见订单详情。',
 }
@@ -60,10 +60,10 @@ export type LocalOrderTransitionAction = {
 /**
  * Workbench handling actions for one order.
  *
- * `verified` is filtered out by construction: it is absent from
- * `localOrderTransitionStatusSchema`, so the only way to reach it is the back
- * office's manual-verification endpoint. The H5 must never offer a button labelled
- * 「核验通过」 or 「完成」 here.
+ * `verified` is filtered out of ordinary transitions by construction: it is
+ * absent from `localOrderTransitionStatusSchema`. The H5 offers the dedicated
+ * verification form (including for the current territory grid worker), but this
+ * transition list must never smuggle `verified` in as a normal status update.
  */
 export function localOrderTransitionActions(
   current: LocalOrderStatus,

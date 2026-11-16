@@ -273,6 +273,97 @@ function appendFact(
   return { entryId, created: true }
 }
 
+export interface LocalOrderFactSource {
+  id: string
+  communityId: string
+  productId: string
+  totalCents: number
+  createdAt: Date
+  status: string
+  verifiedAt: Date | null
+  updatedAt: Date
+}
+
+export interface LocalOrderFactProjection {
+  registeredCreated: boolean
+  verifiedAttempted: boolean
+  verifiedCreated: boolean
+}
+
+/**
+ * Projects one local order into the ledger inside the caller's transaction.
+ *
+ * Used by both the explicit source sync and the verification write, so a freshly
+ * verified order contributes its community-effective fact immediately and the
+ * same `(source_system, source_id, fact_kind)` keys make a later sync a no-op.
+ * Personal attribution stays `pending`: community performance comes from
+ * `communityId`, while the verifier is only an audit fact.
+ */
+export function projectLocalOrderFacts(
+  tx: LocalTransaction,
+  order: LocalOrderFactSource,
+  ingestedAt: Date,
+): LocalOrderFactProjection {
+  const registered = appendFact(tx, {
+    factKind: 'order_registered',
+    sourceSystem: 'local_order',
+    sourceId: order.id,
+    sourceDisplayNo: order.id,
+    communityId: order.communityId,
+    productId: order.productId,
+    attributedStaffId: null,
+    attributionState: 'pending',
+    attributionBasis: 'no_explicit_attribution',
+    amountCents: order.totalCents,
+    occurredAt: order.createdAt,
+    verifiedAt: null,
+    recordedByUserId: null,
+    recordedByStaffId: null,
+    counterEntryId: null,
+    evidenceKind: 'none',
+    evidenceRef: null,
+    createdAt: ingestedAt,
+  })
+
+  if (order.status !== 'verified') {
+    return {
+      registeredCreated: registered.created,
+      verifiedAttempted: false,
+      verifiedCreated: false,
+    }
+  }
+
+  const verifiedAt = order.verifiedAt ?? order.updatedAt
+  const verified = appendFact(tx, {
+    factKind: 'order_verified',
+    sourceSystem: 'local_order',
+    sourceId: order.id,
+    sourceDisplayNo: order.id,
+    communityId: order.communityId,
+    productId: order.productId,
+    attributedStaffId: null,
+    attributionState: 'pending',
+    attributionBasis: 'no_explicit_attribution',
+    amountCents: order.totalCents,
+    occurredAt: verifiedAt,
+    verifiedAt,
+    recordedByUserId: null,
+    recordedByStaffId: null,
+    counterEntryId: null,
+    evidenceKind: 'order_verification',
+    // The verification itself is the evidence; the order id is the human
+    // reference an auditor can look up.
+    evidenceRef: order.id,
+    createdAt: ingestedAt,
+  })
+
+  return {
+    registeredCreated: registered.created,
+    verifiedAttempted: true,
+    verifiedCreated: verified.created,
+  }
+}
+
 /** `application/x-www-form-urlencoded`-free helper: the business-date window. */
 function occurredWindow(input: SyncLedgerFactsRequest): { startMs: number | null; endMs: number | null } {
   return {
@@ -393,60 +484,13 @@ export function syncLedgerFacts(
 
       for (const order of orders) {
         localOrder.scanned += 1
-        // 登记金额：created_at 就是这笔登记发生的时间。
-        const registered = appendFact(tx, {
-          factKind: 'order_registered',
-          sourceSystem: 'local_order',
-          sourceId: order.id,
-          sourceDisplayNo: order.id,
-          communityId: order.communityId,
-          productId: order.productId,
-          // `local_orders.attributed_staff_id` is written unconditionally with the
-          // creator (`src/local/orders.ts`), so it can never distinguish an explicit
-          // attribution from creator backfill. Every local-order fact therefore
-          // enters the ledger as 待归属; only a human confirmation moves it.
-          attributedStaffId: null,
-          attributionState: 'pending',
-          attributionBasis: 'no_explicit_attribution',
-          amountCents: order.totalCents,
-          occurredAt: order.createdAt,
-          verifiedAt: null,
-          recordedByUserId: null,
-          recordedByStaffId: null,
-          counterEntryId: null,
-          evidenceKind: 'none',
-          evidenceRef: null,
-          createdAt,
-        })
-        if (registered.created) localOrder.created += 1
+        const projection = projectLocalOrderFacts(tx, order, createdAt)
+        if (projection.registeredCreated) localOrder.created += 1
         else localOrder.skipped += 1
 
-        if (order.status !== 'verified') continue
+        if (!projection.verifiedAttempted) continue
         localOrder.scanned += 1
-        const verifiedAt = order.verifiedAt ?? order.updatedAt
-        const verified = appendFact(tx, {
-          factKind: 'order_verified',
-          sourceSystem: 'local_order',
-          sourceId: order.id,
-          sourceDisplayNo: order.id,
-          communityId: order.communityId,
-          productId: order.productId,
-          attributedStaffId: null,
-          attributionState: 'pending',
-          attributionBasis: 'no_explicit_attribution',
-          amountCents: order.totalCents,
-          occurredAt: verifiedAt,
-          verifiedAt,
-          recordedByUserId: null,
-          recordedByStaffId: null,
-          counterEntryId: null,
-          evidenceKind: 'order_verification',
-          // The verification itself is the evidence; the order id is the human
-          // reference an auditor can look up.
-          evidenceRef: order.id,
-          createdAt,
-        })
-        if (verified.created) localOrder.created += 1
+        if (projection.verifiedCreated) localOrder.created += 1
         else localOrder.skipped += 1
       }
 

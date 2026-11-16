@@ -326,6 +326,9 @@ describe('LedgerPage list and detail', () => {
     renderPage(ADMIN_SESSION)
     await waitForList()
 
+    expect(
+      screen.getByText(/本地订单核验通过后会自动生成社区有效业绩/),
+    ).toBeTruthy()
     const url = entryUrls(calls)[0]!
     expect(url).toContain('page=1')
     expect(url).toContain('pageSize=20')
@@ -356,7 +359,7 @@ describe('LedgerPage list and detail', () => {
       expect(entryUrls(calls).at(-1)).toContain(`communityId=${COMMUNITY_A.id}`)
     })
 
-    await chooseOption(firstLabel('业绩归属网格员'), '网格员甲（网格员）')
+    await chooseOption(firstLabel('历史人员归属'), '网格员甲（网格员）')
     fireEvent.click(screen.getByRole('button', { name: /查\s*询/ }))
     await waitFor(() => expect(entryUrls(calls).at(-1)).toContain(`staffId=${GRID_ID}`))
 

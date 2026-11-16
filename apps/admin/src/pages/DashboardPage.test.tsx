@@ -90,7 +90,12 @@ describe('DashboardPage read-only operating cockpit', () => {
 
     vi.mocked(listAdminLocalOrders).mockResolvedValue({ items: [], total: 2, page: 1, pageSize: 1 })
     fireEvent.click(screen.getByRole('button', { name: /刷新数据/ }))
-    await waitFor(() => expect(order.textContent).toContain('2'))
+    // Re-query after refresh: the metric button may be replaced by a new render.
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: '待人工核验订单，查看详情' }).textContent,
+      ).toContain('2'),
+    )
     expect(vi.mocked(listAdminLocalOrders)).toHaveBeenCalledTimes(2)
   })
 })

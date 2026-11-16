@@ -88,6 +88,7 @@ function summary(overrides: Partial<LocalOrderSummary> = {}): LocalOrderSummary 
 function detail(overrides: Partial<LocalOrderDetail> = {}): LocalOrderDetail {
   return {
     ...summary(),
+    residentContact: { phone: '13800000000', address: null },
     verification: null,
     statusNote: null,
     events: [orderEvent()],
