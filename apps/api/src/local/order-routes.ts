@@ -55,8 +55,9 @@ interface StaffGuard {
  * Three prefixes with three different guards, sharing one service layer:
  * - `/local-orders*`       resident session only; the resident is never in the URL/body
  * - `/staff/local-orders*` any staff role, community-scoped (grid workers included,
- *                          because `/admin/*` rejects them by convention)
- * - `/admin/local-orders*` admin/operator; verification lives exclusively here
+ *                          because `/admin/*` rejects them by convention); grid
+ *                          verification is limited to the current territory owner
+ * - `/admin/local-orders*` admin/operator back-office surface
  *
  * Session, CSRF double-submit + trusted Origin and the error envelope all come
  * from `createApp`; this module never builds a second auth implementation.
@@ -266,6 +267,29 @@ export function registerLocalOrderRoutes(
     if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '订单状态信息不正确')
     try {
       return c.json(updateOrderStatus(db, actorOf(guard), orderId, body))
+    } catch (error) {
+      return failWithLocalError(c, error)
+    }
+  })
+
+  /**
+   * Staff verification. The shared service re-checks the actor's CURRENT
+   * territory assignment, so this route is safe to expose to all staff roles.
+   */
+  app.post(LOCAL_ORDER_ROUTES.staffOrderVerify, async (c) => {
+    const guard = requireStaff(c)
+    if (guard instanceof Response) return guard
+    const csrfFailure = requireCsrf(c, guard.session)
+    if (csrfFailure) return csrfFailure
+    const orderId = requireParam(c)
+    if (orderId instanceof Response) return orderId
+    const body = bodySchemaError(
+      await c.req.json().catch(() => null),
+      localOrderVerifyRequestSchema,
+    )
+    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '核验信息不正确')
+    try {
+      return c.json(verifyOrder(db, actorOf(guard), orderId, body))
     } catch (error) {
       return failWithLocalError(c, error)
     }

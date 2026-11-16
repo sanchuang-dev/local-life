@@ -34,7 +34,10 @@ import {
   communities,
   localOrderEvents,
   localOrders,
+  residentPhoneIdentities,
+  residentProfiles,
   staffAccounts,
+  staffCommunityAssignments,
   users,
 } from '../db/schema.js'
 import { assertResidentOfConfirmedCommunity } from '../resident-community/service.js'
@@ -55,6 +58,7 @@ import {
 import { requireProduct, type ProductRow } from './products.js'
 import { readCouponForOrder, reserveCouponForOrder, redeemCouponForOrder } from '../purchase-reward/coupon-usage.js'
 import { assertCouponStillReservedForOrder, releaseUnpaidOrderCoupon } from '../purchase-reward/coupon-recovery.js'
+import { projectLocalOrderFacts } from '../ledger/service.js'
 
 /* ------------------------------- Selections ------------------------------- */
 
@@ -291,8 +295,17 @@ function toDetail(row: OrderRow, db: AppDatabase): LocalOrderDetail {
   const events = eventRows(db, row.id)
   const maps = refMaps(db, [row], events)
   const lastNote = [...events].reverse().find((event) => event.note)?.note ?? null
+  const phone = db.select({ phone: residentPhoneIdentities.phone })
+    .from(residentPhoneIdentities)
+    .where(eq(residentPhoneIdentities.userId, row.residentUserId))
+    .get()?.phone ?? null
+  const address = db.select({ contactAddress: residentProfiles.contactAddress })
+    .from(residentProfiles)
+    .where(eq(residentProfiles.userId, row.residentUserId))
+    .get()?.contactAddress ?? null
   return localOrderDetailSchema.parse({
     ...toSummary(row, maps),
+    residentContact: { phone, address },
     verification:
       row.status === 'verified' && row.verifiedAt
         ? {
@@ -972,6 +985,42 @@ export function updateOrderStatus(
 }
 
 /**
+ * Verification access is slightly narrower than ordinary staff reads:
+ *
+ * - admin: all communities;
+ * - operator: any community in `staff_community_assignments`;
+ * - grid worker: ONLY the community where they are the current
+ *   `grid_territory` owner, re-read from SQLite on every write. A stale session
+ *   that still lists an old community therefore cannot verify its orders.
+ */
+function assertVerificationCommunityAccess(
+  db: AppDatabase,
+  actor: LocalActor,
+  communityId: string,
+): void {
+  if (actor.role !== 'grid_worker') {
+    assertCommunityAccess(db, actor, communityId)
+    return
+  }
+  if (!actor.staffId) {
+    throw new LocalError(403, API_ERROR_CODES.forbidden, '无权核验该片区订单')
+  }
+  const current = db.select({ staffAccountId: staffCommunityAssignments.staffAccountId })
+    .from(staffCommunityAssignments)
+    .innerJoin(staffAccounts, eq(staffAccounts.id, staffCommunityAssignments.staffAccountId))
+    .where(and(
+      eq(staffCommunityAssignments.staffAccountId, actor.staffId),
+      eq(staffCommunityAssignments.communityId, communityId),
+      eq(staffCommunityAssignments.assignmentKind, 'grid_territory'),
+      eq(staffAccounts.status, 'active'),
+    ))
+    .get()
+  if (!current) {
+    throw new LocalError(403, API_ERROR_CODES.forbidden, '当前账号不是该片区的经营网格员')
+  }
+}
+
+/**
  * Operations manual verification. `verified` records that a human checked the
  * facts; it never means paid or activated, which is why no such field exists.
  *
@@ -985,11 +1034,8 @@ export function verifyOrder(
   orderId: string,
   body: LocalOrderVerifyRequest,
 ): LocalOrderDetail {
-  if (actor.role === 'grid_worker' || !actor.role) {
-    throw new LocalError(403, API_ERROR_CODES.forbidden, '网格员无权执行人工核验')
-  }
   const row = requireOrder(db, orderId)
-  assertCommunityAccess(db, actor, row.communityId)
+  assertVerificationCommunityAccess(db, actor, row.communityId)
   if (row.status === 'verified') {
     throw new LocalError(
       409,
@@ -1053,6 +1099,22 @@ export function verifyOrder(
       if (body.decision === 'verify' && row.couponId &&
           row.totalCents === row.couponDiscountCents) {
         redeemCouponForOrder(tx, orderId, now)
+      }
+      if (body.decision === 'verify') {
+        // Community-effective performance is projected in the same transaction:
+        // a verified order becomes visible to the ledger immediately, without a
+        // per-order attribution step or a second manual sync. The dedupe keys
+        // make a later source sync a no-op.
+        projectLocalOrderFacts(tx, {
+          id: row.id,
+          communityId: row.communityId,
+          productId: row.productId,
+          totalCents: row.totalCents,
+          createdAt: row.createdAt,
+          status: 'verified',
+          verifiedAt: now,
+          updatedAt,
+        }, now)
       }
       insertOrderEvent(tx, {
         orderId,

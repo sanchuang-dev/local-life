@@ -205,6 +205,7 @@ function PerformanceConsole({ session }: { session: AuthenticatedSession }) {
               <li>六类事实不合并：登记金额与已核验业绩常描述同一笔业务，因此不提供合计金额。</li>
               <li>人工实收只统计带凭据的线下收款；冲正单独成行，不减记实收。</li>
               <li>归属只取来源事实上明确存在的网格员，待归属不计入任何人的业绩。</li>
+              <li>社区有效业绩按订单原始的 communityId 汇总，不依赖个人归属；人员归属只用于历史核查。</li>
               <li>结算规则未配置，金额均为账面登记毛额（{SETTLEMENT_AMOUNT_STATUS_LABELS.pending_rule}），不据此计算应付或分账。</li>
               <li>「重读总览」只重新读取服务端投影；新订单核验后需先「同步来源事实」，本页不做自动实时同步。</li>
             </ul>
