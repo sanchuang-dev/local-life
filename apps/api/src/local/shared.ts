@@ -31,10 +31,10 @@ export interface LocalActor {
  * like `CrmError`/`ParticipationError` do.
  */
 export class LocalError extends Error {
-  status: 400 | 401 | 403 | 404 | 409
+  status: 400 | 401 | 403 | 404 | 409 | 503
   code: ApiErrorCode
 
-  constructor(status: 400 | 401 | 403 | 404 | 409, code: ApiErrorCode, message: string) {
+  constructor(status: 400 | 401 | 403 | 404 | 409 | 503, code: ApiErrorCode, message: string) {
     super(message)
     this.name = 'LocalError'
     this.status = status

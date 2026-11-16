@@ -71,6 +71,7 @@ import { registerCrmRoutes } from './crm/routes.js'
 import { registerLocalCatalogRoutes } from './local/routes.js'
 import { registerExternalOfferRoutes } from './external-offers/routes.js'
 import { registerLocalOrderRoutes } from './local/order-routes.js'
+import { registerPaymentRoutes } from './payments/routes.js'
 import { registerLedgerRouteGroup } from './routes/ledger-route-group.js'
 import { registerParticipationRoutes } from './participation/routes.js'
 import { registerPurchaseRewardRoutes } from './purchase-reward/routes.js'
@@ -2047,6 +2048,14 @@ export function createApp(options: AppOptions = {}): Hono<AppBindings> {
     bodySchemaError,
   })
 
+  registerPaymentRoutes(app, {
+    db,
+    config,
+    fail,
+    validCsrf,
+    bodySchemaError,
+  })
+
   // Ledger + settlement (LL-MVP-008, Issue #64 and follow-ups) is mounted after
   // the local order routes, since its facts are derived from them. The group
   // additionally registers reconciliation **before** the read-only ledger
@@ -2147,5 +2156,6 @@ function defaultTestConfig(): ApiConfig {
     trustedOrigins: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5174', 'http://127.0.0.1:5174'],
     webBaseUrl: 'http://localhost:5173',
     authDevEnabled: false,
+    paymentMockEnabled: false,
   }
 }
