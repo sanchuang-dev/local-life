@@ -1660,6 +1660,16 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
         onClose={closeEditor}
         rootClassName="activity-drawer"
         forceRender
+        footer={
+          !detailLoading && !detailError && !readOnlyEditor ? (
+            <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button onClick={closeEditor} disabled={saving}>取消</Button>
+              <Button type="primary" htmlType="submit" form="activity-editor-form" loading={saving}>
+                {editorMode === 'create' ? '保存草稿' : '保存修改'}
+              </Button>
+            </Space>
+          ) : null
+        }
       >
         {detailLoading ? (
           <div className="activity-drawer-loading">
@@ -1739,6 +1749,7 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
         ) : (
           <Form<ActivityFormValues>
             form={form}
+            id="activity-editor-form"
             layout="vertical"
             className="activity-form"
             onFinish={submitEditor}
@@ -2039,14 +2050,6 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
               />
             ) : null}
 
-            <Space className="activity-form-actions">
-              <Button onClick={closeEditor} disabled={saving}>
-                取消
-              </Button>
-              <Button type="primary" htmlType="submit" loading={saving}>
-                {editorMode === 'create' ? '保存草稿' : '保存修改'}
-              </Button>
-            </Space>
           </Form>
         )}
       </Drawer>

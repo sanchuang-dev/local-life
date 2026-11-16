@@ -571,11 +571,19 @@ export function SettlementRulesPanel() {
           onClose={closeDrawer}
           rootClassName="local-drawer"
           destroyOnHidden
+          footer={
+            <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button onClick={closeDrawer} disabled={submitting}>取消</Button>
+              <Button type="primary" htmlType="submit" form="settlement-rules-form" loading={submitting} disabled={submitting}>
+              提交登记
+              </Button>
+            </Space>
+          }
         >
           <Typography.Paragraph type="secondary">
             登记的是已核准合同的不可变版本：保存后不能修改，调整必须登记新版本。本页不预填任何费率或金额，只做共享契约能表达的校验，也不做任何试算。
           </Typography.Paragraph>
-          <Form<RuleFormValues>
+          <Form<RuleFormValues> id="settlement-rules-form"
             form={form}
             layout="vertical"
             onFinish={(values) => void submitRule(values)}
@@ -795,15 +803,6 @@ export function SettlementRulesPanel() {
                 计费基数为凭据实际到账金额；规则登记 ≠ 结算单锁定 ≠ 付款。
               </Typography.Paragraph>
             </section>
-
-            <Space wrap style={{ marginTop: 16 }}>
-              <Button type="primary" htmlType="submit" loading={submitting} disabled={submitting}>
-                提交登记
-              </Button>
-              <Button onClick={closeDrawer} disabled={submitting}>
-                取消
-              </Button>
-            </Space>
           </Form>
         </Drawer>
       ) : null}

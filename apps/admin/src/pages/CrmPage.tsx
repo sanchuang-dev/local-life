@@ -1093,6 +1093,18 @@ function OrderPanel({ session, filterOptions }: PanelOptionsProps) {
         open={detailOpen}
         onClose={closeDetail}
         rootClassName="crm-drawer"
+        footer={
+          !detailLoading && !detailError && detail && canReview ? (
+            <Space style={{ display: 'flex', justifyContent: 'flex-end' }} wrap>
+              <Button danger loading={reviewing} onClick={() => requestReview('reject')}>
+                驳回
+              </Button>
+              <Button type="primary" loading={reviewing} onClick={() => requestReview('confirm')}>
+                确认有效成交
+              </Button>
+            </Space>
+          ) : null
+        }
       >
         {detailLoading ? (
           <div className="crm-drawer-loading">
@@ -1237,27 +1249,15 @@ function OrderPanel({ session, filterOptions }: PanelOptionsProps) {
                     description={reviewError}
                   />
                 ) : null}
-                <Space wrap className="crm-review-actions">
-                  <Button
-                    type="primary"
-                    loading={reviewing}
-                    onClick={() => requestReview('confirm')}
-                  >
-                    确认有效成交
-                  </Button>
-                  <Button danger loading={reviewing} onClick={() => requestReview('reject')}>
-                    驳回
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setReviewNote('')
-                      setReviewError(null)
-                    }}
-                    disabled={reviewing}
-                  >
-                    清空备注
-                  </Button>
-                </Space>
+                <Button
+                  onClick={() => {
+                    setReviewNote('')
+                    setReviewError(null)
+                  }}
+                  disabled={reviewing}
+                >
+                  清空备注
+                </Button>
               </section>
             ) : (
               <PageInfoAlert inline

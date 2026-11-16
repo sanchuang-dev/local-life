@@ -408,6 +408,20 @@ export function DrawPoolDrawer({ open, activity, session, onClose }: DrawPoolDra
       open={open}
       onClose={handleClose}
       rootClassName="draw-pool-drawer"
+      footer={
+        !loading && !loadError && pool && !readOnly ? (
+          <Space style={{ display: 'flex', justifyContent: 'flex-end' }} wrap>
+            {pool.enabled ? (
+              <Button danger loading={savingConfig} onClick={() => void disableNow()}>
+                一键关闭抽奖
+              </Button>
+            ) : null}
+            <Button type="primary" loading={savingConfig} onClick={() => void submitConfig()}>
+              保存配置
+            </Button>
+          </Space>
+        ) : null
+      }
     >
       {loading ? (
         <div className="draw-pool-loading">
@@ -503,26 +517,11 @@ export function DrawPoolDrawer({ open, activity, session, onClose }: DrawPoolDra
                     : '概率权重不是百分比；系统不会自动设置或保证中奖率。'
                 }
               />
-              <Space wrap>
-                <Button
-                  type="primary"
-                  loading={savingConfig}
-                  disabled={readOnly}
-                  onClick={() => void submitConfig()}
-                >
-                  保存配置
-                </Button>
-                {pool.enabled ? (
-                  <Button danger loading={savingConfig} disabled={readOnly} onClick={() => void disableNow()}>
-                    一键关闭抽奖
-                  </Button>
-                ) : null}
-                <Typography.Text type="secondary">
-                  {pool.configured
-                    ? `服务端状态：${pool.enabled ? '已启用' : '未启用'}`
-                    : '尚未创建抽奖配置，默认关闭'}
-                </Typography.Text>
-              </Space>
+              <Typography.Text type="secondary">
+                {pool.configured
+                  ? `服务端状态：${pool.enabled ? '已启用' : '未启用'}`
+                  : '尚未创建抽奖配置，默认关闭'}
+              </Typography.Text>
               {configError ? (
                 <Alert type="error" showIcon title="保存失败" description={configError} />
               ) : null}

@@ -477,6 +477,7 @@ describe('OrdersPage handling', () => {
     fireEvent.click(await screen.findByRole('button', { name: '人工核验' }))
     expect(await screen.findByText('运营人工核验')).toBeTruthy()
 
+    expect(screen.getByRole('button', { name: '确认人工核验通过' }).closest('.ant-drawer-footer')).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '确认人工核验通过' }))
     expect(
       await screen.findByText('核验备注必填（至少 2 个字符）；驳回时必须写明原因。'),

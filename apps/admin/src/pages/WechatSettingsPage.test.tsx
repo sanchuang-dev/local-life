@@ -382,6 +382,7 @@ describe('WechatSettingsPage save/verify/activate requests', () => {
     fillSaveForm()
     expect((screen.getByLabelText('AppSecret') as HTMLInputElement).value).toBe(APP_SECRET)
 
+    expect(screen.getByRole('button', { name: '保存凭证' }).closest('.ant-drawer-footer')).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '保存凭证' }))
 
     await waitFor(() => expect(postCall).toBeTruthy())

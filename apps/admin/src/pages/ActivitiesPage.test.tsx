@@ -470,7 +470,9 @@ describe('ActivitiesPage in-flight detail race', () => {
     // The superseded detail request must not leave the create drawer spinning.
     expect(await screen.findByText('新建活动草稿')).toBeTruthy()
     await waitFor(() => expect(screen.queryByText('正在读取活动详情…')).toBeNull())
-    expect(screen.getByText('保存草稿')).toBeTruthy()
+    const saveButton = screen.getByRole('button', { name: '保存草稿' })
+    expect(saveButton.closest('.ant-drawer-footer')).not.toBeNull()
+
     expect(screen.getByText('参与资格')).toBeTruthy()
 
     // A late answer is ignored by the request guard and cannot flip the state.

@@ -129,6 +129,7 @@ describe('DrawPoolDrawer', () => {
     renderDrawer()
     await screen.findByText('尚未创建抽奖配置，默认关闭')
 
+    expect(screen.getByRole('button', { name: '保存配置' }).closest('.ant-drawer-footer')).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '保存配置' }))
 
     await waitFor(() => expect(calls).toHaveLength(1))
@@ -219,6 +220,7 @@ describe('DrawPoolDrawer', () => {
     )
 
     expect(await screen.findByText('活动已结束')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '保存配置' })).toHaveProperty('disabled', true)
+    expect(screen.queryByRole('button', { name: '保存配置' })).toBeNull()
+    expect(document.querySelector('.ant-drawer-footer')).toBeNull()
   })
 })

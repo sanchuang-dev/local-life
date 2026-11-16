@@ -67,6 +67,10 @@ apps/admin/src/
 - 状态：加载中不显示「暂无数据」；失败态提供 `errorTitle`/`message` 与「重试」；空态区分「无匹配筛选」与页码过期，后者提供「回到第一页」。筛选摘要不写入 URL（LL-UI-003）。
 - 组件验收页：`/#/system/components`（`pages/ComponentPreviewPage.tsx`）使用 14 条本地样例数据，明确标注为开发预览，不代表居民/订单/业绩等真实业务；样例数据与状态切换仅用于验收组件状态，不写库、不调 API。
 
+## Drawer 表单操作区
+
+管理后台所有带「保存 / 提交 / 核验确认」操作的 Ant Design Drawer 使用原生 `footer`，由 Drawer 负责固定底部操作区、正文独立滚动。长表单采用 `Form id` 和 Footer 按钮的 `htmlType="submit" form="<对应 id>"` 关联，不能因为按钮移出 Form 而绕开验证、禁用态或 CSRF。涉及状态流转的核验、驳回、配置操作，仅在可提交状态显示 Footer；原有二次确认与错误提示留在对应业务分区。纯只读详情、规则历史、操作审计和导航 Drawer 不显示空 Footer；独立工具栏动作（如批次导出）保留业务上下文。
+
 ## 6. 与 #58 真实身份/权限集成
 
 - `App.tsx` 在渲染任何受保护路由前通过 `/api/auth/session` 恢复会话；未认证/无后台身份时显示真实登录表单，不渲染 AppShell。

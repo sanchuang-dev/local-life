@@ -397,6 +397,7 @@ describe('SettlementMappingPanel · 新增映射', () => {
     await screen.findByText('新增商户映射')
     await fillCreateForm()
 
+    expect(screen.getByRole('button', { name: '保存映射' }).closest('.ant-drawer-footer')).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '保存映射' }))
 
     await waitFor(() => expect(writesOf(calls, MAPPINGS_ROUTE)).toHaveLength(1))
