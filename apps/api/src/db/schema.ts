@@ -1,6 +1,7 @@
 import { relations, sql } from 'drizzle-orm'
 import {
   check,
+  foreignKey,
   index,
   integer,
   primaryKey,
@@ -30,6 +31,11 @@ import type {
   ParticipationInviteSource,
   ParticipationRole,
   ParticipationTeamStatus,
+  PaymentChannel,
+  PaymentEventSource,
+  PaymentEventType,
+  PaymentIntentKind,
+  PaymentStatus,
   PhoneOtpPurpose,
   ReconciliationBatchStatus,
   RewardCredentialStatus,
@@ -1826,6 +1832,13 @@ export const localOrders = sqliteTable(
       table.residentUserId,
       table.idempotencyKey,
     ),
+    // Parent key for the payment composite FK: a payment's order, resident and
+    // community must all come from the same local order row.
+    uniqueIndex('local_orders_payment_identity_uq').on(
+      table.id,
+      table.residentUserId,
+      table.communityId,
+    ),
     index('local_orders_community_status_idx').on(table.communityId, table.status),
     index('local_orders_resident_created_idx').on(table.residentUserId, table.createdAt),
     index('local_orders_product_idx').on(table.productId),
@@ -1854,6 +1867,212 @@ export const localOrders = sqliteTable(
   ],
 )
 
+
+/* -------------------------------------------------------------------------- */
+/* Payment intents / attempts / append-only events (PAY-01 #276)              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * PAY-01 payment truth source. It is separate from the local order and from the
+ * manual `payment_received` ledger fact. `status='paid'` means a trusted payment
+ * fact, never a bank settlement. At most one paid intent exists per local order
+ * via the partial unique index below; retries use new intents/attempts.
+ *
+ * `kind='zero_amount'` is the independent non-channel completion boundary for a
+ * fully coupon-discounted order. It has no channel, is not simulated, and is
+ * completed as paid with zero net payable.
+ */
+export const paymentIntents = sqliteTable('payment_intents', {
+  id: text('id').primaryKey(),
+  localOrderId: text('local_order_id').notNull(),
+  residentUserId: text('resident_user_id').notNull(),
+  communityId: text('community_id').notNull(),
+  kind: text('kind').$type<PaymentIntentKind>().notNull(),
+  channel: text('channel').$type<PaymentChannel>(),
+  simulated: integer('simulated', { mode: 'boolean' }).notNull(),
+  merchantOrderNo: text('merchant_order_no').notNull(),
+  merchantAppId: text('merchant_app_id'),
+  merchantId: text('merchant_id'),
+  grossAmountCents: integer('gross_amount_cents').notNull(),
+  discountCents: integer('discount_cents').notNull(),
+  netPayableCents: integer('net_payable_cents').notNull(),
+  status: text('status').$type<PaymentStatus>().notNull(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+  paidAt: integer('paid_at', { mode: 'timestamp_ms' }),
+  closedAt: integer('closed_at', { mode: 'timestamp_ms' }),
+  failedAt: integer('failed_at', { mode: 'timestamp_ms' }),
+  failureCode: text('failure_code'),
+  failureMessage: text('failure_message'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  foreignKey({
+    columns: [table.localOrderId, table.residentUserId, table.communityId],
+    foreignColumns: [localOrders.id, localOrders.residentUserId, localOrders.communityId],
+  }).onDelete('restrict'),
+  uniqueIndex('payment_intents_merchant_order_uq').on(table.merchantOrderNo),
+  uniqueIndex('payment_intents_idempotency_uq').on(table.idempotencyKey),
+  // The DB-level guarantee for "one business order, at most one paid fact".
+  uniqueIndex('payment_intents_one_paid_per_order_uq')
+    .on(table.localOrderId)
+    .where(sql`${table.status} = 'paid'`),
+  index('payment_intents_order_created_idx').on(table.localOrderId, table.createdAt),
+  index('payment_intents_status_created_idx').on(table.status, table.createdAt),
+  check(
+    'payment_intents_kind_channel_check',
+    sql`(${table.simulated} IN (0, 1))
+      AND (
+        (${table.kind} = 'channel'
+          AND ${table.channel} IN ('mock', 'wechat_jsapi')
+          AND ${table.netPayableCents} > 0
+          AND ((${table.channel} = 'mock' AND ${table.simulated} = 1)
+            OR (${table.channel} = 'wechat_jsapi' AND ${table.simulated} = 0)))
+        OR
+        (${table.kind} = 'zero_amount'
+          AND ${table.channel} IS NULL
+          AND ${table.simulated} = 0
+          AND ${table.netPayableCents} = 0
+          AND ${table.status} = 'paid'
+          AND ${table.paidAt} IS NOT NULL)
+      )`,
+  ),
+  check(
+    'payment_intents_amount_check',
+    sql`typeof(${table.grossAmountCents}) = 'integer'
+      AND typeof(${table.discountCents}) = 'integer'
+      AND typeof(${table.netPayableCents}) = 'integer'
+      AND ${table.grossAmountCents} >= 0
+      AND ${table.discountCents} >= 0
+      AND ${table.netPayableCents} >= 0
+      AND ${table.grossAmountCents} <= 9007199254740991
+      AND ${table.discountCents} <= 9007199254740991
+      AND ${table.netPayableCents} <= 9007199254740991
+      AND ${table.grossAmountCents} - ${table.discountCents} = ${table.netPayableCents}`,
+  ),
+  check(
+    'payment_intents_status_check',
+    sql`${table.status} IN ('pending', 'confirming', 'paid', 'closed', 'failed')`,
+  ),
+  check(
+    'payment_intents_terminal_time_check',
+    sql`((${table.status} = 'paid') = (${table.paidAt} IS NOT NULL))
+      AND ((${table.status} = 'closed') = (${table.closedAt} IS NOT NULL))
+      AND ((${table.status} = 'failed') = (${table.failedAt} IS NOT NULL))
+      AND (${table.status} = 'failed' OR (${table.failureCode} IS NULL AND ${table.failureMessage} IS NULL))`,
+  ),
+  check(
+    'payment_intents_time_order_check',
+    sql`${table.expiresAt} > ${table.createdAt} AND ${table.updatedAt} >= ${table.createdAt}`,
+  ),
+  check(
+    'payment_intents_text_check',
+    sql`length(trim(${table.merchantOrderNo})) BETWEEN 1 AND 64
+      AND length(trim(${table.idempotencyKey})) BETWEEN 8 AND 128
+      AND (${table.merchantAppId} IS NULL OR length(trim(${table.merchantAppId})) BETWEEN 1 AND 64)
+      AND (${table.merchantId} IS NULL OR length(trim(${table.merchantId})) BETWEEN 1 AND 64)
+      AND (${table.failureCode} IS NULL OR length(trim(${table.failureCode})) BETWEEN 1 AND 64)
+      AND (${table.failureMessage} IS NULL OR length(trim(${table.failureMessage})) BETWEEN 1 AND 500)`,
+  ),
+])
+
+/**
+ * One channel call/query attempt under a payment intent. Paid attempts are
+ * unique per intent (partial index) and provider transaction ids are globally
+ * unique, so a duplicated channel success cannot be recorded twice.
+ */
+export const paymentAttempts = sqliteTable('payment_attempts', {
+  id: text('id').primaryKey(),
+  paymentIntentId: text('payment_intent_id')
+    .notNull()
+    .references(() => paymentIntents.id, { onDelete: 'restrict' }),
+  attemptNo: integer('attempt_no').notNull(),
+  status: text('status').$type<PaymentStatus>().notNull(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  providerTransactionId: text('provider_transaction_id'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  confirmedAt: integer('confirmed_at', { mode: 'timestamp_ms' }),
+  closedAt: integer('closed_at', { mode: 'timestamp_ms' }),
+  failedAt: integer('failed_at', { mode: 'timestamp_ms' }),
+  failureCode: text('failure_code'),
+  failureMessage: text('failure_message'),
+}, (table) => [
+  uniqueIndex('payment_attempts_intent_no_uq').on(table.paymentIntentId, table.attemptNo),
+  uniqueIndex('payment_attempts_idempotency_uq').on(table.idempotencyKey),
+  uniqueIndex('payment_attempts_provider_txn_uq').on(table.providerTransactionId),
+  uniqueIndex('payment_attempts_one_paid_per_intent_uq')
+    .on(table.paymentIntentId)
+    .where(sql`${table.status} = 'paid'`),
+  // Parent key for the event -> attempt composite FK.
+  uniqueIndex('payment_attempts_id_intent_uq').on(table.id, table.paymentIntentId),
+  index('payment_attempts_intent_created_idx').on(table.paymentIntentId, table.createdAt),
+  check('payment_attempts_attempt_no_check', sql`${table.attemptNo} >= 1`),
+  check(
+    'payment_attempts_status_check',
+    sql`${table.status} IN ('pending', 'confirming', 'paid', 'closed', 'failed')`,
+  ),
+  check(
+    'payment_attempts_terminal_time_check',
+    sql`((${table.status} = 'paid') = (${table.confirmedAt} IS NOT NULL))
+      AND ((${table.status} = 'closed') = (${table.closedAt} IS NOT NULL))
+      AND ((${table.status} = 'failed') = (${table.failedAt} IS NOT NULL))
+      AND (${table.status} = 'failed' OR (${table.failureCode} IS NULL AND ${table.failureMessage} IS NULL))
+      AND (${table.status} <> 'paid' OR ${table.providerTransactionId} IS NOT NULL)`,
+  ),
+  check(
+    'payment_attempts_text_check',
+    sql`length(trim(${table.idempotencyKey})) BETWEEN 8 AND 128
+      AND (${table.providerTransactionId} IS NULL OR length(trim(${table.providerTransactionId})) BETWEEN 1 AND 128)
+      AND (${table.failureCode} IS NULL OR length(trim(${table.failureCode})) BETWEEN 1 AND 64)
+      AND (${table.failureMessage} IS NULL OR length(trim(${table.failureMessage})) BETWEEN 1 AND 500)`,
+  ),
+])
+
+/** Append-only event trail. UPDATE/DELETE are blocked by migration triggers. */
+export const paymentEvents = sqliteTable('payment_events', {
+  id: text('id').primaryKey(),
+  paymentIntentId: text('payment_intent_id')
+    .notNull()
+    .references(() => paymentIntents.id, { onDelete: 'restrict' }),
+  paymentAttemptId: text('payment_attempt_id'),
+  eventType: text('event_type').$type<PaymentEventType>().notNull(),
+  source: text('source').$type<PaymentEventSource>().notNull(),
+  fromStatus: text('from_status').$type<PaymentStatus>(),
+  toStatus: text('to_status').$type<PaymentStatus>(),
+  providerEventRef: text('provider_event_ref'),
+  dedupeKey: text('dedupe_key'),
+  note: text('note'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  foreignKey({
+    columns: [table.paymentAttemptId, table.paymentIntentId],
+    foreignColumns: [paymentAttempts.id, paymentAttempts.paymentIntentId],
+  }).onDelete('restrict'),
+  uniqueIndex('payment_events_dedupe_uq').on(table.dedupeKey),
+  index('payment_events_intent_created_idx').on(table.paymentIntentId, table.createdAt),
+  index('payment_events_attempt_idx').on(table.paymentAttemptId),
+  check(
+    'payment_events_type_check',
+    sql`${table.eventType} IN ('payment.intent_created', 'payment.attempt_created',
+      'payment.status_changed', 'payment.channel_notification', 'payment.channel_query')`,
+  ),
+  check(
+    'payment_events_source_check',
+    sql`${table.source} IN ('system', 'channel', 'admin', 'reconciliation')`,
+  ),
+  check(
+    'payment_events_status_check',
+    sql`(${table.fromStatus} IS NULL OR ${table.fromStatus} IN ('pending', 'confirming', 'paid', 'closed', 'failed'))
+      AND (${table.toStatus} IS NULL OR ${table.toStatus} IN ('pending', 'confirming', 'paid', 'closed', 'failed'))`,
+  ),
+  check(
+    'payment_events_text_check',
+    sql`(${table.providerEventRef} IS NULL OR length(trim(${table.providerEventRef})) BETWEEN 1 AND 128)
+      AND (${table.dedupeKey} IS NULL OR length(trim(${table.dedupeKey})) BETWEEN 1 AND 200)
+      AND (${table.note} IS NULL OR length(trim(${table.note})) BETWEEN 1 AND 500)`,
+  ),
+])
 
 /* -------------------------------------------------------------------------- */
 /* Independently identified settlement parties and immutable sales provenance */

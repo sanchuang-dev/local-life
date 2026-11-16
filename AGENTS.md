@@ -7,6 +7,7 @@
 - 自 [Issue #57](https://github.com/sanchuang-dev/local-life/issues/57) 起，本仓库进入 **Pre-MVP 真实工程基座**：pnpm workspace + 居民 H5 + 管理台 + Node API。
 - **居民 H5** 保留已评审页面、视觉和路由；居民主身份现已接入账户 API。微信网页授权只有在公众号 AppID、AppSecret、授权回调域名等真实配置齐备后才可使用；CRMEB 商品与购买跳转也只读取服务端真实配置，未配置时必须明确不可用。
 - **管理台与 API** 已具备管理员/运营员/网格员登录、退出、会话、社区分配和居民目录的服务端权限校验；当前片区网格员可在 H5 工作台电话核验居民自助订单，核验通过会在同一事务内形成社区有效业绩，个人归属不再是社区统计的前置条件（见 [grid-order-verification.md](docs/engineering/grid-order-verification.md)）。`dev` 代码已经包含活动创建/发布/暂停与居民公开读取（LL-MVP-003）、三人团（LL-MVP-004）、网格员 CRM（LL-MVP-005）、签到与奖励履约（LL-MVP-006）、CRMEB adapter（LL-MVP-007）、统一经营流水/对账/结算（LL-MVP-008 及后续 SET 卡）、本地商品目录与居民订单（LL-MVP-010）、消费返券和抽奖（PUR/LOT 卡）等模块；每个模块的真实边界仍以 `docs/engineering/` 对应文档、当前代码和测试为准。
+- **支付边界**：`dev` 已包含 PAY-01 的支付意图/尝试/事件契约与 SQLite 约束，但**没有**支付下单、查询、微信/Mock 渠道、H5/后台 UI、订单交易完成、账本投影或退款执行。不得据此宣称微信支付或在线收款可用；契约与边界见 [payments-domain.md](docs/engineering/payments-domain.md)。
 - **代码存在不等于线上可用**：`dev` 上的实现和测试不等于已部署到 `mvp`，也不等于真实微信、CRMEB 或支付依赖已经可用。`mvp` 的实际能力只以对应晋级部署的 SHA、健康检查和验收证据为准；在线支付、自动分账/自动佣金等仍未由现行代码证明可用。
 - **API** 使用 SQLite + Drizzle 持久化用户、微信身份、后台账户、社区范围、会话、OAuth state、限流与审计记录。数据库只允许落在 `apps/api` 内。
 - 所有未实现业务必须显式标注，不得用 Mock 成功、写死数据或假鉴权伪装。
