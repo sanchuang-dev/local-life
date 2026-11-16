@@ -156,7 +156,7 @@ function intentRow(world: World, overrides: Record<string, unknown> = {}) {
     kind: 'channel' as const,
     channel: 'wechat_jsapi' as const,
     simulated: false,
-    merchantOrderNo: `PAY-${uuid()}`,
+    merchantOrderNo: `PAY-${uuid().replace(/-/gu, '').slice(0, 28)}`,
     merchantAppId: null,
     merchantId: null,
     grossAmountCents: 3980,
