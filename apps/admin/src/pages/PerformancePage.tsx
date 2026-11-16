@@ -441,7 +441,7 @@ function LedgerReport({
           }
         />
         <MetricCard
-          title="业绩归属"
+          title="历史人员归属"
           value={overview.attributed.entryCount}
           suffix={`/ ${overview.totals.entryCount} 笔已归属`}
           testId="ledger-attribution"
