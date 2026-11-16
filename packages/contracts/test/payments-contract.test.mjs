@@ -132,4 +132,75 @@ describe('payment amount and state contracts', () => {
     )
     assert.equal(paymentAttemptSchema.safeParse({ ...base, confirmedAt: null }).success, false)
   })
+
+  it('keeps payment intent terminal facts consistent with the SQLite CHECK constraints', () => {
+    for (const patch of [
+      { status: 'pending' },
+      { status: 'confirming' },
+      { status: 'paid', paidAt: LATER },
+      { status: 'closed', closedAt: LATER },
+      { status: 'failed', failedAt: LATER, failureCode: 'DECLINED', failureMessage: 'Declined' },
+    ]) {
+      assert.equal(paymentIntentSchema.safeParse(intent(patch)).success, true, JSON.stringify(patch))
+    }
+
+    for (const patch of [
+      { status: 'pending', paidAt: LATER },
+      { status: 'confirming', closedAt: LATER },
+      { status: 'pending', failedAt: LATER },
+      { status: 'paid' },
+      { status: 'paid', paidAt: LATER, closedAt: LATER },
+      { status: 'closed', closedAt: LATER, paidAt: LATER },
+      { status: 'failed', failedAt: LATER, closedAt: LATER },
+      { status: 'failed' },
+      { status: 'pending', failureCode: 'EARLY_ERROR' },
+      { status: 'paid', paidAt: LATER, failureMessage: 'unexpected' },
+    ]) {
+      assert.equal(paymentIntentSchema.safeParse(intent(patch)).success, false, JSON.stringify(patch))
+    }
+  })
+
+  it('keeps payment attempt terminal facts consistent with the SQLite CHECK constraints', () => {
+    const attempt = (overrides = {}) => ({
+      id: '123e4567-e89b-42d3-a456-426614174005',
+      paymentIntentId: intent().id,
+      attemptNo: 1,
+      status: 'pending',
+      idempotencyKey: 'attempt-key-0001',
+      providerTransactionId: null,
+      createdAt: NOW,
+      updatedAt: LATER,
+      confirmedAt: null,
+      closedAt: null,
+      failedAt: null,
+      failureCode: null,
+      failureMessage: null,
+      ...overrides,
+    })
+
+    for (const patch of [
+      { status: 'pending' },
+      { status: 'confirming' },
+      { status: 'paid', confirmedAt: LATER, providerTransactionId: 'wx-txn-valid' },
+      { status: 'closed', closedAt: LATER },
+      { status: 'failed', failedAt: LATER, failureCode: 'FAILED', failureMessage: 'Failed' },
+    ]) {
+      assert.equal(paymentAttemptSchema.safeParse(attempt(patch)).success, true, JSON.stringify(patch))
+    }
+
+    for (const patch of [
+      { status: 'pending', confirmedAt: LATER },
+      { status: 'confirming', failedAt: LATER },
+      { status: 'paid', confirmedAt: LATER },
+      { status: 'paid', providerTransactionId: 'wx-txn-missing-time' },
+      { status: 'paid', confirmedAt: LATER, providerTransactionId: 'wx-txn-conflict', closedAt: LATER },
+      { status: 'paid', confirmedAt: LATER, providerTransactionId: 'wx-txn-failure', failureCode: 'FAILED' },
+      { status: 'closed', closedAt: LATER, confirmedAt: LATER },
+      { status: 'failed', failedAt: LATER, closedAt: LATER },
+      { status: 'failed' },
+      { status: 'pending', failureMessage: 'unexpected' },
+    ]) {
+      assert.equal(paymentAttemptSchema.safeParse(attempt(patch)).success, false, JSON.stringify(patch))
+    }
+  })
 })
