@@ -113,3 +113,11 @@ PAY-02 依赖本卡：
 - 通过 `payment_attempts` 记录渠道请求/通知，依赖 `provider_transaction_id` 唯一索引和 paid attempt 部分唯一索引去重。
 - 通过 `payment_events.dedupe_key` 去重通知/查单，通过状态触发器收敛 `paid`。
 - 创建 API 不会调用渠道；PAY-03 必须独立验证渠道事实后才能把意图推进到 paid。
+
+### 并发验证边界（PAY-02）
+
+`payments-http.test.ts` 的 `Promise.all` 用例运行在同一个同步 SQLite/Hono 实例上，证明的是重复调用、active 意图复用与幂等收敛，**不能单独证明跨连接/跨进程的 SQLite 写锁竞争**。实现方向仍是 `BEGIN IMMEDIATE` 事务 + 唯一索引；跨进程双连接竞争验证留给后续资金链路加固或 PAY-03/PAY-06 的并发验收，不在本卡证据中冒充已验证。
+
+### 商户订单号
+
+`merchantOrderNo` 由服务端生成 `PAY-` + 28 位大写十六进制（总长 32），满足微信 JSAPI `out_trade_no` 的 6–32 字符限制；共享契约同时限制为 6–32 个 `[A-Za-z0-9_-]` 字符。PAY-10 可直接复用该持久化值，不再生成第二套单号。

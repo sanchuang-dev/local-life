@@ -98,6 +98,16 @@ export const paymentEventSourceSchema = z.enum([
 export type PaymentEventSource = z.infer<typeof paymentEventSourceSchema>
 
 const merchantPartSchema = z.string().trim().min(1).max(64)
+/**
+ * WeChat JSAPI `out_trade_no` is 6-32 characters. Keep the shared contract at
+ * least as strict as the real channel so PAY-02 already produces a usable id.
+ */
+const merchantOrderNoSchema = z
+  .string()
+  .trim()
+  .min(6)
+  .max(32)
+  .regex(/^[A-Za-z0-9_-]+$/, 'merchant order number must be channel-safe')
 
 /**
  * Match the SQLite terminal_time CHECK constraints exactly. A terminal state
@@ -152,7 +162,7 @@ export const paymentIntentSchema = z
     channel: paymentChannelSchema.nullable(),
     /** Persistently distinguishes simulated money from real channel money. */
     simulated: z.boolean(),
-    merchantOrderNo: merchantPartSchema,
+    merchantOrderNo: merchantOrderNoSchema,
     merchantAppId: merchantPartSchema.nullable(),
     merchantId: merchantPartSchema.nullable(),
     grossAmountCents: paymentCentsSchema,
@@ -307,7 +317,7 @@ export const paymentIntentListQuerySchema = z.strictObject({
   communityId: z.string().uuid().optional(),
   status: paymentStatusSchema.optional(),
   channel: paymentChannelSchema.optional(),
-  merchantOrderNo: z.string().trim().min(1).max(64).optional(),
+  merchantOrderNo: merchantOrderNoSchema.optional(),
 })
 export type PaymentIntentListQuery = z.infer<typeof paymentIntentListQuerySchema>
 

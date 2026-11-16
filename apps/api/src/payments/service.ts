@@ -207,7 +207,10 @@ export function createPaymentIntent(
       kind: 'channel',
       channel: body.channel,
       simulated: body.channel === 'mock',
-      merchantOrderNo: `PAY-${id.replace(/-/gu, '').toUpperCase()}`,
+      // WeChat JSAPI out_trade_no: 6-32 chars. `PAY-` + 28 hex = 32 exactly,
+      // retaining 112 bits of randomness while staying usable by PAY-10
+      // without a second merchant-order-number generator.
+      merchantOrderNo: `PAY-${id.replace(/-/gu, '').toUpperCase().slice(0, 28)}`,
       merchantAppId: null,
       merchantId: null,
       grossAmountCents: order.totalCents,

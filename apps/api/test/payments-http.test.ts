@@ -225,6 +225,10 @@ test('resident creates one pending mock intent with server-derived amounts and r
     assert.equal(created.intent.paidAt, null)
     assert.equal(created.intent.merchantAppId, null)
     assert.equal(created.intent.merchantId, null)
+    // WeChat JSAPI out_trade_no is 6-32 channel-safe characters; PAY-10 must
+    // be able to consume this persisted value directly.
+    assert.match(created.intent.merchantOrderNo, /^[A-Za-z0-9_-]{6,32}$/u)
+    assert.equal(created.intent.merchantOrderNo.length, 32)
 
     db.insert(paymentAttempts).values({
       id: randomUUID(),
@@ -367,7 +371,7 @@ test('an expired active intent is not assumed unpaid; a closed intent permits a 
       kind: 'channel',
       channel: 'mock',
       simulated: true,
-      merchantOrderNo: `PAY-${expiredId.replace(/-/gu, '')}`,
+      merchantOrderNo: `PAY-${expiredId.replace(/-/gu, '').slice(0, 28)}`,
       merchantAppId: null,
       merchantId: null,
       grossAmountCents: 3980,
@@ -525,7 +529,7 @@ test('closed, verified, zero-amount, already-paid and unavailable-channel bounda
       kind: 'channel',
       channel: 'mock',
       simulated: true,
-      merchantOrderNo: `PAY-${randomUUID()}`,
+      merchantOrderNo: `PAY-${randomUUID().replace(/-/gu, '').slice(0, 28)}`,
       merchantAppId: null,
       merchantId: null,
       grossAmountCents: 3980,
