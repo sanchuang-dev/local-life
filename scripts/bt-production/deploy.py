@@ -99,7 +99,7 @@ def check_sha_and_archives(sha):
         raise ReleaseError("Incoming SHA mismatch")
     invoke(["sha256sum", "-c", "SHA256SUMS"], cwd=incoming, quiet=True)
     for name in ("web.tar.gz", "admin.tar.gz", "api.tar.gz", "deploy.py",
-                 "migrate-db.mjs", "register-bt-node.py"):
+                 "migrate-db.mjs", "register-bt-node.py", "pm2-control.py"):
         if not (incoming / name).is_file():
             raise ReleaseError("Incomplete release: " + name)
     return incoming
@@ -209,10 +209,10 @@ def health(url, attempts=25):
     raise ReleaseError("Unhealthy API: " + url)
 
 
-def panel_action(incoming, action):
-    if action not in ("stop", "start", "restart"):
-        raise ReleaseError("Unsupported Baota project action")
-    invoke([BTPY, str(incoming / "register-bt-node.py"), action], quiet=True)
+def pm2_action(incoming, action):
+    if action not in ("check", "stop", "start", "save"):
+        raise ReleaseError("Unsupported dedicated PM2 action")
+    invoke([sys.executable, str(incoming / "pm2-control.py"), action], quiet=True)
 
 
 def site_paths():
@@ -327,6 +327,7 @@ def deploy(sha, preflight_only=False):
     if old_release.parent != BASE / "releases" or not SHA_PATTERN.fullmatch(old_release.name):
         raise ReleaseError("Unexpected current release target")
     if old_release.name == sha and not preflight_only:
+        pm2_action(BASE / "incoming" / sha, "check")
         health("http://127.0.0.1:18081/healthz")
         validate_public(old_release, sha)
         log("BT_PRODUCTION_ALREADY_ACTIVE_SHA=" + sha)
@@ -353,6 +354,8 @@ def deploy(sha, preflight_only=False):
     log("BT_PRODUCTION_PREFLIGHT=PASS")
     if preflight_only:
         return
+    # A one-time handoff must have disabled Baota Node auto-start first.
+    pm2_action(incoming, "check")
 
     # No other writes are performed by this program before the old API is stopped.
     marker = BASE / "ops" / "manual-recovery-required"
@@ -379,7 +382,7 @@ def deploy(sha, preflight_only=False):
         raise ReleaseError("Residual stopped SQLite snapshots")
     try:
         stopped = True
-        panel_action(incoming, "stop")
+        pm2_action(incoming, "stop")
         # With API stopped, no application writes can occur between snapshot
         # and rehearsal. Keep this immutable recovery point root-only.
         snapshot(old_api, stopped_snapshot)
@@ -397,12 +400,13 @@ def deploy(sha, preflight_only=False):
         migrate(new_api, DB)
         switch_release(release, sha)
         switched = True
-        panel_action(incoming, "start")
+        pm2_action(incoming, "start")
         health("http://127.0.0.1:18081/healthz")
         for area, _, target in site_paths():
             write_static(release / area, target, sha)
         validate_public(release, sha)
         node_at(new_api, "verify-db.mjs", "verify", str(DB), quiet=True)
+        pm2_action(incoming, "save")
         log("BT_PRODUCTION_ACTIVE_SHA=" + sha)
         log("BT_PRODUCTION_MIGRATION_BACKUP=" + str(recovery))
         if marker.exists():
@@ -414,7 +418,7 @@ def deploy(sha, preflight_only=False):
                 marker.write_text("Interrupted schema-changing cutover: " + sha + "\n")
                 os.chmod(marker, 0o600)
             try:
-                panel_action(incoming, "stop")
+                pm2_action(incoming, "stop")
             except Exception:
                 log("BT_RECOVERY_STOP_FAILED=manual_action_required")
             # The pre-cutover snapshot is retained. Never auto-replace the
@@ -423,11 +427,12 @@ def deploy(sha, preflight_only=False):
             log("BT_AUTOMATIC_APPLICATION_ROLLBACK=starting")
             try:
                 if switched:
-                    panel_action(incoming, "stop")
+                    pm2_action(incoming, "stop")
                 switch_release(old_release, sha)
                 restore_static(backup, sha)
-                panel_action(incoming, "start")
+                pm2_action(incoming, "start")
                 health("http://127.0.0.1:18081/healthz")
+                pm2_action(incoming, "save")
                 log("BT_AUTOMATIC_APPLICATION_ROLLBACK=success")
             except Exception:
                 marker.write_text("Automatic rollback failed: " + sha + "\n")

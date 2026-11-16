@@ -1,0 +1,27 @@
+[Unit]
+Description=Local Life dedicated www-user PM2 process manager
+Documentation=https://pm2.io/docs/runtime/guide/startup-hook/
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/www/local-life/current/api/dist/index.js
+
+[Service]
+Type=forking
+User=www
+Group=www
+Environment=HOME=/home/www
+Environment=PM2_HOME=/home/www/.pm2
+Environment=PATH=/www/server/nodejs/v24.22.1/bin:/usr/local/bin:/usr/bin:/bin
+PIDFile=/home/www/.pm2/pm2.pid
+ExecStartPre=+/usr/bin/test ! -e /www/local-life/ops/manual-recovery-required
+ExecStart=/www/server/nodejs/v24.22.1/bin/pm2 resurrect
+ExecReload=/www/server/nodejs/v24.22.1/bin/pm2 reload all
+ExecStop=/www/server/nodejs/v24.22.1/bin/pm2 kill
+Restart=on-failure
+RestartSec=3
+TimeoutStartSec=40
+TimeoutStopSec=20
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
