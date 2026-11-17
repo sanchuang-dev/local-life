@@ -40,10 +40,18 @@ const environmentSchema = z
     AUTH_DEV_ENABLED: z.enum(['true', 'false']).default('false'),
     /**
      * PAY-02 only creates intents for an explicitly enabled isolated Mock
-     * channel. It never executes a mock payment; PAY-04 owns that. Production
-     * must keep this false (validated below).
+     * channel; PAY-03 accepts normalized trusted evidence for it. This flag
+     * never executes a mock payment itself; PAY-04 owns that. Production must
+     * keep this false (validated below).
      */
     PAYMENT_MOCK_ENABLED: z.enum(['true', 'false']).default('false'),
+    /**
+     * Shared secret for the PAY-03 internal provider-result endpoint. Absent
+     * keeps the HTTP surface closed; PAY-11 may still call the service
+     * in-process. This token is never sent to a browser and never substitutes
+     * for provider signature verification.
+     */
+    PAYMENT_INTERNAL_TOKEN: z.string().trim().min(32).max(200).optional(),
     // CRMEB integration (Issue #63). The three credentials are optional as a
     // group: when they are absent the adapter reports `not_configured` instead
     // of faking a working shop. A partially supplied group is a deployment
@@ -165,6 +173,7 @@ export interface ApiConfig {
   authDevEnabled: boolean
   /** PAY-02 isolated Mock channel availability; false in production by validation. */
   paymentMockEnabled: boolean
+  paymentInternalToken?: string
   crmeb?: {
     baseUrl: string
     appId: string
@@ -333,6 +342,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): ApiConfig {
     webBaseUrl,
     authDevEnabled: value.AUTH_DEV_ENABLED === 'true',
     paymentMockEnabled: value.PAYMENT_MOCK_ENABLED === 'true',
+    ...(value.PAYMENT_INTERNAL_TOKEN ? { paymentInternalToken: value.PAYMENT_INTERNAL_TOKEN } : {}),
     ...(value.CRMEB_BASE_URL && value.CRMEB_OUTAPI_APPID && value.CRMEB_OUTAPI_APPSECRET
       ? {
           crmeb: {

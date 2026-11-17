@@ -2,14 +2,18 @@ import { z } from 'zod'
 import type { Hono } from 'hono'
 import {
   API_ERROR_CODES,
+  PAYMENT_INTERNAL_ROUTES,
   PAYMENT_ROUTES,
   createPaymentIntentRequestSchema,
+  paymentEvidenceSchema,
   type CreatePaymentIntentRequest,
 } from '@sanchuang-dev/local-life-contracts'
 import type { ApiConfig } from '../config.js'
 import type { AppDatabase } from '../db/client.js'
 import type { AppBindings, AppContext, AuthSession, HttpErrorStatus } from '../http.js'
+import { constantTimeTextEqual } from '../auth/security.js'
 import { LocalError, type LocalActor } from '../local/shared.js'
+import { confirmTrustedPayment } from './confirmation.js'
 import { createPaymentIntent, getMyPaymentIntent } from './service.js'
 
 export interface PaymentRouteDeps {
@@ -76,6 +80,37 @@ export function registerPaymentRoutes(
       const result = createPaymentIntent(db, config, guard.actor, body as CreatePaymentIntentRequest)
       c.header('Cache-Control', 'no-store')
       return c.json(result, result.created ? 201 : 200)
+    } catch (error) {
+      return failWithPaymentError(c, error)
+    }
+  })
+
+  /**
+   * Internal provider-result endpoint for PAY-11 adapters and integration tests.
+   * It is not a resident route: a server-held token is required and no session
+   * or browser CSRF token can substitute for it.
+   */
+  app.post(PAYMENT_INTERNAL_ROUTES.confirm, async (c) => {
+    const expectedToken = config.paymentInternalToken
+    if (!expectedToken) {
+      return fail(c, 503, API_ERROR_CODES.paymentInternalNotConfigured, '内部支付确认未配置')
+    }
+    const authorization = c.req.header('authorization')?.trim() ?? ''
+    const token = authorization.startsWith('Bearer ')
+      ? authorization.slice('Bearer '.length).trim()
+      : ''
+    if (!token || !constantTimeTextEqual(token, expectedToken)) {
+      return fail(c, 401, API_ERROR_CODES.paymentInternalUnauthorized, '内部支付确认凭证无效')
+    }
+    const body = bodySchemaError(
+      await c.req.json().catch(() => null),
+      paymentEvidenceSchema,
+    )
+    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '支付证据格式不正确')
+    try {
+      const result = confirmTrustedPayment(db, body)
+      c.header('Cache-Control', 'no-store')
+      return c.json(result)
     } catch (error) {
       return failWithPaymentError(c, error)
     }

@@ -113,6 +113,14 @@ export const API_ERROR_CODES = {
   paymentActiveIntentConflict: 'payment_active_intent_conflict',
   paymentZeroAmountUnavailable: 'payment_zero_amount_unavailable',
   /**
+   * PAY-03 trusted confirmation. Only a server-side adapter result may reach
+   * these paths; conflicts preserve evidence instead of rewinding a payment.
+   */
+  paymentEvidenceRejected: 'payment_evidence_rejected',
+  paymentConfirmationConflict: 'payment_confirmation_conflict',
+  paymentInternalUnauthorized: 'payment_internal_unauthorized',
+  paymentInternalNotConfigured: 'payment_internal_not_configured',
+  /**
    * Ledger (LL-MVP-008, Issue #64). Every one of these is a *refusal*: the ledger
    * prefers an explicit "cannot do that" over a silently corrected number.
    */
