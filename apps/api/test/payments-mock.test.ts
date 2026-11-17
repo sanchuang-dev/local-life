@@ -293,7 +293,7 @@ test('Mock success is driven through PAY-03 and remains visibly simulated', asyn
     const outbox = world.db.select().from(paymentOutbox).get()!
     const payload = paymentPaidEventPayloadSchema.parse(JSON.parse(outbox.payloadJson))
     assert.equal(payload.simulated, true)
-    assert.match(payload.providerTransactionId, /^MOCK-TXN-/u)
+    assert.equal(payload.providerTransactionId, `MOCK-TXN-${intent.id}`)
 
     // Mock confirmation never completes the order, writes a manual receipt or
     // touches an immutable ledger fact.
@@ -323,6 +323,7 @@ test('Mock failure, cancellation, timeout and pending outcomes use the same stat
     ).intent.status, 'failed')
     const failedDetail = await getIntent(world, resident, failedIntent.id)
     assert.equal(failedDetail.attempts[0]?.failureCode, 'MOCK_PAYMENT_FAILED')
+    assert.equal(failedDetail.attempts[0]?.providerTransactionId, null)
 
     const cancelOrder = seedOrder(world.db, { ...scope, residentUserId: resident.userId })
     const cancelIntent = await createIntent(world, resident, cancelOrder)
@@ -334,6 +335,7 @@ test('Mock failure, cancellation, timeout and pending outcomes use the same stat
     ).intent.status, 'failed')
     const cancelDetail = await getIntent(world, resident, cancelIntent.id)
     assert.equal(cancelDetail.attempts[0]?.failureCode, 'MOCK_USER_CANCELLED')
+    assert.equal(cancelDetail.attempts[0]?.providerTransactionId, null)
 
     const pendingOrder = seedOrder(world.db, { ...scope, residentUserId: resident.userId })
     const pendingIntent = await createIntent(world, resident, pendingOrder)
@@ -344,6 +346,7 @@ test('Mock failure, cancellation, timeout and pending outcomes use the same stat
       { now: actionTime(pendingIntent, 1) },
     )
     assert.equal(pending.intent.status, 'confirming')
+    assert.equal(pending.attempt?.providerTransactionId, null)
     const paid = executeMockPaymentAction(
       world.db,
       world.config,
@@ -352,6 +355,7 @@ test('Mock failure, cancellation, timeout and pending outcomes use the same stat
     )
     assert.equal(paid.outcome, 'confirmed')
     assert.equal(paid.intent.status, 'paid')
+    assert.equal(paid.attempt?.providerTransactionId, `MOCK-TXN-${pendingIntent.id}`)
 
     const timeoutOrder = seedOrder(world.db, { ...scope, residentUserId: resident.userId })
     const timeoutIntent = createMockPayment(
@@ -375,7 +379,16 @@ test('Mock failure, cancellation, timeout and pending outcomes use the same stat
       { now: timeoutAt },
     )
     assert.equal(timeout.intent.status, 'closed')
-    assert.equal((await getIntent(world, resident, timeoutIntent.id)).intent.status, 'closed')
+    const timeoutDetail = await getIntent(world, resident, timeoutIntent.id)
+    assert.equal(timeoutDetail.intent.status, 'closed')
+    assert.equal(timeoutDetail.attempts[0]?.providerTransactionId, null)
+    const replayedTimeout = executeMockPaymentAction(
+      world.db,
+      world.config,
+      { paymentIntentId: timeoutIntent.id, action: 'timeout', source: 'notification' },
+      { now: new Date(timeoutAt.getTime() + 120_000) },
+    )
+    assert.equal(replayedTimeout.intent.closedAt, timeoutDetail.intent.closedAt)
 
     // A trusted late success never rewinds closed -> paid; it remains a review
     // exception and cannot produce a paid attempt/outbox.
@@ -391,6 +404,95 @@ test('Mock failure, cancellation, timeout and pending outcomes use the same stat
     const late = world.db.select().from(paymentReviewExceptions)
       .where(eq(paymentReviewExceptions.kind, 'late_success_after_closed')).get()
     assert.ok(late)
+  } finally {
+    world.sqlite.close()
+  }
+})
+
+test('pending -> failure/cancel never inherits a synthetic transaction id', async () => {
+  const world = context()
+  try {
+    const scope = seedCommunityAndProduct(world.db)
+    const resident = await loginResident(world.app, 'Mock pending 终态居民')
+
+    for (const action of ['fail', 'cancel'] as const) {
+      const orderId = seedOrder(world.db, { ...scope, residentUserId: resident.userId })
+      const intent = await createIntent(world, resident, orderId)
+      assert.equal(executeMockPaymentAction(
+        world.db,
+        world.config,
+        { paymentIntentId: intent.id, action: 'pending', source: 'query' },
+        { now: actionTime(intent, 1) },
+      ).intent.status, 'confirming')
+      const terminal = executeMockPaymentAction(
+        world.db,
+        world.config,
+        { paymentIntentId: intent.id, action, source: 'notification' },
+        { now: actionTime(intent, 2) },
+      )
+      assert.equal(terminal.intent.status, 'failed')
+      const detail = await getIntent(world, resident, intent.id)
+      assert.equal(detail.attempts.length, 1)
+      assert.equal(detail.attempts[0]?.status, 'failed')
+      assert.equal(detail.attempts[0]?.providerTransactionId, null)
+    }
+  } finally {
+    world.sqlite.close()
+  }
+})
+
+test('Mock observedAt uses the execution clock and repeats reuse the first persisted time', async () => {
+  const world = context()
+  try {
+    const scope = seedCommunityAndProduct(world.db)
+    const resident = await loginResident(world.app, 'Mock 时间居民')
+
+    const successOrder = seedOrder(world.db, { ...scope, residentUserId: resident.userId })
+    const successIntent = await createIntent(world, resident, successOrder)
+    const firstAt = new Date(Date.parse(successIntent.createdAt) + 1_000)
+    const immediate = executeMockPaymentAction(
+      world.db,
+      world.config,
+      { paymentIntentId: successIntent.id, action: 'succeed', source: 'notification' },
+      { now: firstAt },
+    )
+    assert.equal(immediate.intent.paidAt, firstAt.toISOString())
+    assert.ok(Date.parse(immediate.intent.paidAt!) <= firstAt.getTime())
+
+    const laterAt = new Date(Date.parse(successIntent.createdAt) + 6 * 60_000)
+    const replay = executeMockPaymentAction(
+      world.db,
+      world.config,
+      { paymentIntentId: successIntent.id, action: 'succeed', source: 'notification' },
+      { now: laterAt },
+    )
+    assert.equal(replay.outcome, 'already_confirmed')
+    assert.equal(replay.intent.paidAt, firstAt.toISOString())
+    assert.equal(replay.attempt?.confirmedAt, firstAt.toISOString())
+
+    const cancelOrder = seedOrder(world.db, { ...scope, residentUserId: resident.userId })
+    const cancelIntent = await createIntent(world, resident, cancelOrder)
+    const cancelAt = new Date(Date.parse(cancelIntent.createdAt) + 1_000)
+    const cancelled = executeMockPaymentAction(
+      world.db,
+      world.config,
+      { paymentIntentId: cancelIntent.id, action: 'cancel', source: 'notification' },
+      { now: cancelAt },
+    )
+    assert.equal(cancelled.intent.failedAt, cancelAt.toISOString())
+    assert.ok(Date.parse(cancelled.intent.failedAt!) <= cancelAt.getTime())
+
+    const delayedOrder = seedOrder(world.db, { ...scope, residentUserId: resident.userId })
+    const delayedIntent = await createIntent(world, resident, delayedOrder)
+    const delayedAt = new Date(Date.parse(delayedIntent.createdAt) + 10 * 60_000)
+    const delayed = executeMockPaymentAction(
+      world.db,
+      world.config,
+      { paymentIntentId: delayedIntent.id, action: 'succeed', source: 'notification' },
+      { now: delayedAt },
+    )
+    assert.equal(delayed.intent.paidAt, delayedAt.toISOString())
+    assert.ok(Date.parse(delayed.intent.paidAt!) > Date.parse(delayedIntent.createdAt) + 5 * 60_000)
   } finally {
     world.sqlite.close()
   }
@@ -419,6 +521,7 @@ test('duplicate Mock notifications are idempotent and produce one paid fact', as
     assert.equal(world.db.select().from(paymentAttempts).all().length, 1)
     assert.equal(world.db.select().from(paymentOutbox).all().length, 1)
     assert.equal(world.db.select().from(paymentEvents).all().length, 2)
+    assert.equal(world.db.select().from(paymentReviewExceptions).all().length, 0)
   } finally {
     world.sqlite.close()
   }

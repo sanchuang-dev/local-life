@@ -33,10 +33,18 @@
 - Mock 驱动要求 `PAYMENT_MOCK_ENABLED=true` 且 `NODE_ENV !== production`；`loadConfig` 在 production + true 时直接启动失败，驱动自身再次 fail-closed。
 - Mock 意图由 PAY-02 固定写入 `channel='mock'`、`simulated=true`；驱动拒绝任何非 Mock/非模拟支付单，不会借 Mock 驱动真实微信意图。
 - 驱动输入只有支付意图 UUID、action 和 source；金额、商户订单号、商户身份、渠道交易号、渠道证据都由服务端派生，客户端没有对应 HTTP 入口。
-- 渠道交易号固定为 `MOCK-TXN-<paymentIntentId>`，去重键和处理时间由模拟事件稳定派生；能明确识别为模拟数据。
+- 渠道交易号只在成功时固定为 `MOCK-TXN-<paymentIntentId>`；失败/取消/超时/pending 不生成交易号。去重键和处理时间由模拟事件稳定派生，能明确识别为模拟数据。
 - `payment.paid.v1` outbox payload 永久携带 `simulated=true`；PAY-04 不写 `local_orders`、优惠券、`ledger_entries` 或人工 `payment_received`。
 - `timeout` 未到 `expiresAt` 时拒绝，不能提前伪造关闭。
 - 关闭/失败后的 `succeed` 只让 PAY-03 保存 `late_success_after_closed` / `late_success_after_failed` 异常，不会把终态改回 `paid`，也不会产生 paid attempt/outbox。
+- `succeed / fail / cancel / pending` 首次使用调用方的模拟时钟 `now` 作为 `observedAt`；`timeout` 使用 `expiresAt`。重复事件先从 `payment_events`、terminal attempt 或异常快照恢复首次时间，不重新取 `now`，因此 evidence fingerprint 和 PAY-03 幂等边界保持稳定。
+- `providerTransactionId` 只在 `succeed` 时生成 `MOCK-TXN-<intentId>`；`fail / cancel / timeout / pending` 均为 null，pending 阶段不会提前占用交易号。
+
+### 并发首次生成边界
+
+现有持久化事件、attempt 和异常快照能可靠覆盖“首次结果已落库后的重复通知/查单”。两个独立进程**同时首次**生成同一 `dedupeKey` 且传入不同 `now` 时，双方都读不到事件，可能以不同 observedAt 进入 PAY-03；PAY-03 会把后到者按证据指纹冲突处理。
+
+本卡没有为这个首次竞争偷偷新增支付状态机或表。若维护者要求彻底消除该窗口，最小方案是增加只用于 Mock 的 `(dedupe_key PK, observed_at)` 预留表，在调用 `confirmTrustedPayment` 前用 `BEGIN IMMEDIATE` 做 insert-or-read；这会新增迁移，需单独批准，不在本次 P2 返修范围内。
 
 ## 3. 部署配置核验
 
@@ -61,7 +69,9 @@ pnpm --filter @sanchuang-dev/local-life-api exec tsx --test test/payments-mock.t
 
 测试覆盖：
 
-- 成功、失败、用户取消、超时、待确认。
+- 成功、失败、用户取消、超时、待确认，以及 pending → success/fail/cancel。
+- 立即成功/取消的终态时间、延迟十分钟成功、重复通知复用首次 observedAt、timeout 复用 expiresAt。
+- 失败/取消/超时/pending 的 attempt 交易号为 null；pending → success 才生成 `MOCK-TXN-<intentId>`；成功 outbox 保留正确交易号。
 - 重复通知幂等；通知 + 查单双进程双 SQLite 连接竞争。
 - 关闭后的迟到成功只进入异常。
 - 进程重启后仍可查询 `paid` 和 pending outbox。

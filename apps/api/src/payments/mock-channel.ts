@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { eq } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 import {
   API_ERROR_CODES,
   type PaymentConfirmationResponse,
@@ -8,7 +8,12 @@ import {
 } from '@sanchuang-dev/local-life-contracts'
 import type { ApiConfig } from '../config.js'
 import type { AppDatabase } from '../db/client.js'
-import { paymentIntents } from '../db/schema.js'
+import {
+  paymentAttempts,
+  paymentEvents,
+  paymentIntents,
+  paymentReviewExceptions,
+} from '../db/schema.js'
 import { LocalError, type LocalActor } from '../local/shared.js'
 import { confirmTrustedPayment } from './confirmation.js'
 import { createPaymentIntent } from './service.js'
@@ -56,34 +61,63 @@ function assertMockChannelEnabled(config: MockConfig): void {
   }
 }
 
-function terminalOrCreated(intent: IntentRow): Date {
-  return intent.paidAt ?? intent.closedAt ?? intent.failedAt ?? intent.createdAt
+function mockDedupeKey(
+  intent: IntentRow,
+  action: MockPaymentAction,
+  source: MockPaymentSource,
+): string {
+  return `MOCK-EVT-${intent.id}-${action}-${source}`
 }
 
 /**
- * Synthetic provider observation times are stable for the same provider event,
- * so a repeated notification/query is an exact PAY-03 replay rather than a
- * different-evidence conflict. Late success is anchored after the terminal time.
+ * Replay the original persisted observation time for the same provider event.
+ * The provider event row is the durable multi-process source of truth; the
+ * attempt/exception is used for cases where the event's createdAt is not the
+ * original evidence time (notably timeout uses expiresAt, late success has only
+ * a review exception). This avoids process-local caches.
  */
-function mockObservedAt(intent: IntentRow, action: MockPaymentAction): Date {
-  if (action === 'succeed') {
-    if (intent.status === 'paid') return terminalOrCreated(intent)
-    if (intent.status === 'closed' && intent.closedAt) {
-      return new Date(intent.closedAt.getTime() + 60_000)
+function persistedMockObservedAt(
+  db: AppDatabase,
+  intent: IntentRow,
+  action: MockPaymentAction,
+  source: MockPaymentSource,
+): Date | null {
+  const event = db.select().from(paymentEvents)
+    .where(eq(paymentEvents.dedupeKey, mockDedupeKey(intent, action, source)))
+    .get()
+  if (event) {
+    if (action === 'timeout') {
+      const attempt = event.paymentAttemptId
+        ? db.select().from(paymentAttempts)
+          .where(eq(paymentAttempts.id, event.paymentAttemptId))
+          .get()
+        : null
+      return attempt?.closedAt ?? intent.closedAt ?? intent.expiresAt
     }
-    if (intent.status === 'failed' && intent.failedAt) {
-      return new Date(intent.failedAt.getTime() + 60_000)
-    }
-    return new Date(intent.createdAt.getTime() + 120_000)
+    // For success/fail/cancel/pending, PAY-03's channel event createdAt is the
+    // first confirmation clock (the same value supplied as observedAt).
+    return event.createdAt
   }
-  if (action === 'timeout') {
-    return intent.closedAt ?? intent.expiresAt
-  }
-  if (action === 'fail' || action === 'cancel') {
-    return intent.failedAt
-      ?? new Date(intent.createdAt.getTime() + (action === 'fail' ? 60_000 : 120_000))
-  }
-  return new Date(intent.createdAt.getTime() + 30_000)
+  const exception = db.select().from(paymentReviewExceptions)
+    .where(eq(paymentReviewExceptions.dedupeKey, mockDedupeKey(intent, action, source)))
+    .orderBy(desc(paymentReviewExceptions.createdAt), desc(paymentReviewExceptions.id))
+    .get()
+  return exception?.observedAt ?? null
+}
+
+function mockObservedAt(
+  db: AppDatabase,
+  intent: IntentRow,
+  action: MockPaymentAction,
+  source: MockPaymentSource,
+  now: Date,
+): Date {
+  const persisted = persistedMockObservedAt(db, intent, action, source)
+  if (persisted) return persisted
+  // Timeout occurs at the server-side expiry, never before it. Every other
+  // first observation carries the actual simulated clock instead of a value
+  // fabricated from intent.createdAt.
+  return action === 'timeout' ? (intent.closedAt ?? intent.expiresAt) : now
 }
 
 function mockProviderStatus(action: MockPaymentAction): PaymentEvidence['providerStatus'] {
@@ -93,26 +127,36 @@ function mockProviderStatus(action: MockPaymentAction): PaymentEvidence['provide
   return 'pending'
 }
 
+function mockProviderTransactionId(
+  intent: IntentRow,
+  action: MockPaymentAction,
+): string | null {
+  return action === 'succeed' ? `MOCK-TXN-${intent.id}` : null
+}
+
 function mockEvidence(
+  db: AppDatabase,
   intent: IntentRow,
   action: MockPaymentAction,
   source: MockPaymentSource,
+  now: Date,
 ): PaymentEvidence {
   const providerStatus = mockProviderStatus(action)
   return {
     merchantOrderNo: intent.merchantOrderNo,
     channel: 'mock',
     providerStatus,
-    // A synthetic, permanently non-WeChat transaction reference. No caller can
-    // supply a transaction id, amount, merchant identity or raw evidence.
-    providerTransactionId: `MOCK-TXN-${intent.id}`,
+    // Only a successful simulation owns a synthetic channel transaction. A
+    // failed/cancelled/closed/pending result must not leave a transaction id on
+    // its attempt, especially after pending -> terminal.
+    providerTransactionId: mockProviderTransactionId(intent, action),
     amountCents: intent.netPayableCents,
     currency: 'CNY',
     merchantAppId: null,
     merchantId: null,
-    observedAt: mockObservedAt(intent, action).toISOString(),
+    observedAt: mockObservedAt(db, intent, action, source, now).toISOString(),
     source,
-    dedupeKey: `MOCK-EVT-${intent.id}-${action}-${source}`,
+    dedupeKey: mockDedupeKey(intent, action, source),
     providerEventRef: `MOCK-REF-${intent.id}-${action}-${source}`,
     failureCode: action === 'fail'
       ? MOCK_FAILURE_CODE
@@ -184,7 +228,7 @@ export function executeMockPaymentAction(
   }
   return confirmTrustedPayment(
     db,
-    mockEvidence(intent, parsed.action, parsed.source),
+    mockEvidence(db, intent, parsed.action, parsed.source, now),
     { now },
   )
 }
