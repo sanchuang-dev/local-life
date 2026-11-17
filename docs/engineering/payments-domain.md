@@ -1,6 +1,6 @@
-# 支付领域契约、持久化、居民创建/查询与可信确认（PAY-01 #276 / PAY-02 #277 / PAY-03 #278）
+# 支付领域契约、持久化、居民创建/查询、可信确认与隔离 Mock（PAY-01 #276 / PAY-02 #277 / PAY-03 #278 / PAY-04 #279）
 
-> **PAY-01** 建立支付意图、尝试与事件的共享契约和 SQLite 真相源；**PAY-02** 增加居民创建/查询待支付意图的受控 API；**PAY-03** 增加可信渠道证据确认、状态收敛、下游 outbox 与冲突证据队列。当前仍**没有**真实微信支付商户配置/回调验签（PAY-10/PAY-11）、Mock 网关执行（PAY-04）、订单交易完成、优惠券核销、账本投影或退款执行（PAY-05/PAY-06）。不得据此宣称在线支付已可用。
+> **PAY-01** 建立支付意图、尝试与事件的共享契约和 SQLite 真相源；**PAY-02** 增加居民创建/查询待支付意图的受控 API；**PAY-03** 增加可信渠道证据确认、状态收敛、下游 outbox 与冲突证据队列；**PAY-04** 增加进程内隔离 Mock 驱动，所有模拟结果仍走 `confirmTrustedPayment`。当前仍**没有**真实微信支付商户配置/回调验签（PAY-10/PAY-11）、公网 Mock 控制接口、订单交易完成、优惠券核销、账本投影或退款执行（PAY-05/PAY-06）。不得据此宣称在线支付已可用。
 
 ## 1. 与既有事实的边界
 
@@ -116,14 +116,23 @@ PAY-02 依赖本卡：
 - `payments-confirmation.test.ts` 使用真实 SQLite/Hono 验证成功、重复、通知/查单收敛、金额/商户/订单/终态冲突、迟到成功、outbox 重启恢复，以及“outbox 唯一冲突导致已写意图/attempt 全部回滚”的失败路径。
 - 跨连接/跨进程竞争由**两个独立 Node 进程、两个独立 better-sqlite3 连接**验证三组场景：同一证据并发确认收敛为一个 `confirmed`、一个 `already_confirmed`；通知与查单使用不同去重键但同一渠道交易号并发确认，会分别保留两条 provider observation，但只产生一条 paid 状态事实、attempt 与 outbox；不同渠道交易号并发确认同一支付意图只允许一个 `confirmed`，另一请求得到 `payment_confirmation_conflict` 并留下 `transaction_conflict` 异常，仍只有一条 paid attempt/outbox。此证据不再沿用 PAY-02 同实例 `Promise.all` 的弱结论。
 
-## 5. 验证
+## 5. PAY-04 隔离 Mock 驱动（已落地）
+
+- 代码入口：`apps/api/src/payments/mock-channel.ts`。只提供进程内 `createMockPayment` 与 `executeMockPaymentAction`，**不注册公网 HTTP 控制路由**。
+- 成功、失败、用户取消、超时、待确认、重复通知、通知+查单、关闭后迟到成功都先归一化为 `PaymentEvidence`，再调用 PAY-03 `confirmTrustedPayment`；没有第二套支付状态机。
+- 输入只有支付意图 UUID、action、source 和服务端时间；金额、商户订单号、商户身份、渠道交易号、证据由服务端派生，调用方不能提交。只有成功结果生成带 `MOCK-TXN-` 前缀的交易号；失败/取消/超时/pending 的交易号为 null。首次 observedAt 在 Mock 专用预留表中通过 `BEGIN IMMEDIATE` 原子 insert-or-read；迁移前的事件从既有事件/attempt/异常恢复并补建预留，确保同一 dedupeKey 跨进程始终使用相同证据时间。意图与 outbox 永久 `simulated=true`。
+- Mock 驱动要求 `PAYMENT_MOCK_ENABLED=true` 且非 production；production/公开预览配置启用会 fail-closed。公开预览 `mvp` 的实际 installer 固定 `NODE_ENV=production`、`AUTH_DEV_ENABLED=false` 且未设置 Mock 开关；`apps/api/Dockerfile` 也固定 production。
+- 复跑命令：`pnpm --filter @sanchuang-dev/local-life-api exec tsx --test test/payments-mock.test.ts`。详细场景、排障和安全边界见 [payments-mock.md](payments-mock.md)。
+
+## 6. 验证
 
 - `packages/contracts/test/payments-contract.test.mjs`：状态机、整数分/负数/浮点/溢出、金额守恒、渠道/模拟/零元、支付意图与尝试的终态时间戳双向一致性、失败原因禁用规则、paid attempt 交易号要求，以及 PAY-03 证据/outbox/异常 DTO。
 - `apps/api/test/payments-db.test.ts`：真实 SQLite 新库、历史库升级、金额/归属/唯一性/状态转换/事件追加式/跨意图引用负例，并确认旧订单、Ledger 行与锁定批次不丢失。
 - `apps/api/test/payments-http.test.ts`：真实 Hono HTTP + SQLite 的创建/查询、金额派生、幂等、并发、过期/关闭/已付/零元、鉴权/CSRF/Origin、重启恢复和渠道不可用边界。
 - `apps/api/test/payments-confirmation.test.ts`：内部 token、证据校验、paid/pending/terminal 收敛、跨表去重、完整异常证据、outbox 事务/重启、同证据/通知查单/不同交易号三组跨进程双连接竞争、不可变证据与失败回滚。
+- `apps/api/test/payments-mock.test.ts`：真实 Hono + SQLite 的 Mock 发起、成功/失败/取消/超时/待确认、重复通知、通知+查单双进程竞争、重启查询、迟到成功、非法输入与 production/公开预览 fail-closed。
 
-## 6. PAY-02 居民创建 / 查询 API
+## 7. PAY-02 居民创建 / 查询 API
 
 ### 路由
 
@@ -167,10 +176,10 @@ PAY-02 依赖本卡：
 
 `merchantOrderNo` 由服务端生成 `PAY-` + 28 位大写十六进制（总长 32），满足微信 JSAPI `out_trade_no` 的 6–32 字符限制；共享契约同时限制为 6–32 个 `[A-Za-z0-9_-]` 字符。PAY-10 可直接复用该持久化值，不再生成第二套单号。
 
-## 7. 已知限制
+## 8. 已知限制
 
 - 未接真实微信支付商户 API、回调验签、证书/API v3 解密；PAY-11 才完成真实适配器。
-- 未实现 Mock 网关执行/自动完成；PAY-04 负责。
+- PAY-04 Mock 是进程内测试/开发驱动，没有公网 HTTP 控制接口、H5 收银台或自动完成；PAY-05/PAY-06 之前不会完成订单或写实收账务。
 - 未实现订单完成、优惠券核销、账本收款投影、结算、退款或管理员支付运维 UI；PAY-05/PAY-06 负责。
 - `mock` 支付只用于隔离契约测试；其 outbox 永久带 `simulated=true`，后续消费方不得把它当正式收款。
 - 内部 token 是服务端共享密钥，不是微信签名；泄露风险由部署密钥管理承担，未配置时接口保持关闭。

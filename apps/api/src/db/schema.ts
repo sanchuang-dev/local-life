@@ -2136,6 +2136,22 @@ export const paymentOutbox = sqliteTable('payment_outbox', {
 ])
 
 /**
+ * First-observation clock reserved before PAY-03 confirmation. This table is
+ * Mock-only and intentionally has no payment-event FK: the reservation must
+ * survive a failed confirmation so retries keep the same evidence fingerprint.
+ */
+export const mockPaymentEventReservations = sqliteTable('mock_payment_event_reservations', {
+  dedupeKey: text('dedupe_key').primaryKey(),
+  observedAt: integer('observed_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  check(
+    'mock_payment_event_reservations_key_check',
+    sql`${table.dedupeKey} GLOB 'MOCK-EVT-*'
+      AND length(trim(${table.dedupeKey})) BETWEEN 1 AND 200`,
+  ),
+])
+
+/**
  * Persistent conflict/late-payment evidence. An exception never rewrites a
  * terminal intent; it preserves the channel facts for PAY-11's query/ops flow.
  */
@@ -3256,4 +3272,5 @@ export const schema = {
   ledgerEntrySources,
   ledgerAnomalies,
   externalOffers,
+  mockPaymentEventReservations,
 }
