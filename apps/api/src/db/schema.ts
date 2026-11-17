@@ -2136,10 +2136,6 @@ export const paymentOutbox = sqliteTable('payment_outbox', {
 ])
 
 /**
- * Persistent conflict/late-payment evidence. An exception never rewrites a
- * terminal intent; it preserves the channel facts for PAY-11's query/ops flow.
- */
-/**
  * First-observation clock reserved before PAY-03 confirmation. This table is
  * Mock-only and intentionally has no payment-event FK: the reservation must
  * survive a failed confirmation so retries keep the same evidence fingerprint.
@@ -2155,6 +2151,10 @@ export const mockPaymentEventReservations = sqliteTable('mock_payment_event_rese
   ),
 ])
 
+/**
+ * Persistent conflict/late-payment evidence. An exception never rewrites a
+ * terminal intent; it preserves the channel facts for PAY-11's query/ops flow.
+ */
 export const paymentReviewExceptions = sqliteTable('payment_review_exceptions', {
   id: text('id').primaryKey(),
   paymentIntentId: text('payment_intent_id')

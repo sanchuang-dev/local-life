@@ -241,32 +241,34 @@ async function runMockWorkers(input: {
 }): Promise<Array<{ code: number | null; output: string; error: string }>> {
   const workerPath = fileURLToPath(new URL('./helpers/mock-payment-worker.ts', import.meta.url))
   const cwd = fileURLToPath(new URL('..', import.meta.url))
-  return Promise.all(input.sources.map((source, index) => {
-    const workerNow = Array.isArray(input.now) ? input.now[index] : input.now
-    if (!workerNow) throw new Error('missing Mock worker clock')
-    return new Promise<{
-    code: number | null
-    output: string
-    error: string
-  }>((resolve) => {
-    const child = spawn(process.execPath, ['--import', 'tsx', workerPath], {
-      cwd,
-      env: {
-        ...process.env,
-        MOCK_DB_PATH: input.databasePath,
-        MOCK_INTENT_ID: input.intentId,
-        MOCK_ACTION: input.action,
-        MOCK_SOURCE: source,
-        MOCK_NOW: workerNow,
-      },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
-    let output = ''
-    let error = ''
-    child.stdout.on('data', (chunk) => { output += String(chunk) })
-    child.stderr.on('data', (chunk) => { error += String(chunk) })
-    child.on('close', (code) => resolve({ code, output, error }))
-  }))
+  return Promise.all(
+    input.sources.map((source, index) => {
+      const workerNow = Array.isArray(input.now) ? input.now[index] : input.now
+      if (!workerNow) throw new Error('missing Mock worker clock')
+      return new Promise<{
+        code: number | null
+        output: string
+        error: string
+      }>((resolve) => {
+        const child = spawn(process.execPath, ['--import', 'tsx', workerPath], {
+          cwd,
+          env: {
+            ...process.env,
+            MOCK_DB_PATH: input.databasePath,
+            MOCK_INTENT_ID: input.intentId,
+            MOCK_ACTION: input.action,
+            MOCK_SOURCE: source,
+            MOCK_NOW: workerNow,
+          },
+          stdio: ['ignore', 'pipe', 'pipe'],
+        })
+        let output = ''
+        let error = ''
+        child.stdout.on('data', (chunk) => { output += String(chunk) })
+        child.stderr.on('data', (chunk) => { error += String(chunk) })
+        child.on('close', (code) => resolve({ code, output, error }))
+      })
+    }),
   )
 }
 
