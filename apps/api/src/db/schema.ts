@@ -2134,8 +2134,14 @@ export const paymentReviewExceptions = sqliteTable('payment_review_exceptions', 
   channel: text('channel').notNull(),
   providerTransactionId: text('provider_transaction_id'),
   amountCents: integer('amount_cents'),
+  merchantAppId: text('merchant_app_id'),
+  merchantId: text('merchant_id'),
+  observedAt: integer('observed_at', { mode: 'timestamp_ms' }).notNull(),
   source: text('source').$type<PaymentEvidenceSource>().notNull(),
   dedupeKey: text('dedupe_key').notNull(),
+  providerEventRef: text('provider_event_ref'),
+  failureCode: text('failure_code'),
+  failureMessage: text('failure_message'),
   kind: text('kind').$type<PaymentReviewExceptionKind>().notNull(),
   detail: text('detail').notNull(),
   status: text('status').$type<'open' | 'reviewed' | 'resolved'>().notNull(),
@@ -2174,6 +2180,11 @@ export const paymentReviewExceptions = sqliteTable('payment_review_exceptions', 
       AND length(trim(${table.dedupeKey})) BETWEEN 1 AND 200
       AND length(trim(${table.detail})) BETWEEN 1 AND 500
       AND (${table.providerTransactionId} IS NULL OR length(trim(${table.providerTransactionId})) BETWEEN 1 AND 128)
+      AND (${table.merchantAppId} IS NULL OR length(trim(${table.merchantAppId})) BETWEEN 1 AND 64)
+      AND (${table.merchantId} IS NULL OR length(trim(${table.merchantId})) BETWEEN 1 AND 64)
+      AND (${table.providerEventRef} IS NULL OR length(trim(${table.providerEventRef})) BETWEEN 1 AND 128)
+      AND (${table.failureCode} IS NULL OR length(trim(${table.failureCode})) BETWEEN 1 AND 64)
+      AND (${table.failureMessage} IS NULL OR length(trim(${table.failureMessage})) BETWEEN 1 AND 500)
       AND ((${table.status} = 'resolved') = (${table.resolvedAt} IS NOT NULL))`,
   ),
 ])

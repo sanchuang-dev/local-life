@@ -50,8 +50,14 @@ CREATE TABLE `payment_review_exceptions` (
 	`channel` text NOT NULL,
 	`provider_transaction_id` text,
 	`amount_cents` integer,
+	`merchant_app_id` text,
+	`merchant_id` text,
+	`observed_at` integer NOT NULL,
 	`source` text NOT NULL,
 	`dedupe_key` text NOT NULL,
+	`provider_event_ref` text,
+	`failure_code` text,
+	`failure_message` text,
 	`kind` text NOT NULL,
 	`detail` text NOT NULL,
 	`status` text NOT NULL,
@@ -83,6 +89,12 @@ CREATE TABLE `payment_review_exceptions` (
 		AND length(trim(`detail`)) BETWEEN 1 AND 500
 		AND (`provider_transaction_id` IS NULL
 			OR length(trim(`provider_transaction_id`)) BETWEEN 1 AND 128)
+		AND (`merchant_app_id` IS NULL OR length(trim(`merchant_app_id`)) BETWEEN 1 AND 64)
+		AND (`merchant_id` IS NULL OR length(trim(`merchant_id`)) BETWEEN 1 AND 64)
+		AND (`provider_event_ref` IS NULL
+			OR length(trim(`provider_event_ref`)) BETWEEN 1 AND 128)
+		AND (`failure_code` IS NULL OR length(trim(`failure_code`)) BETWEEN 1 AND 64)
+		AND (`failure_message` IS NULL OR length(trim(`failure_message`)) BETWEEN 1 AND 500)
 		AND ((`status` = 'resolved') = (`resolved_at` IS NOT NULL))
 	)
 );
@@ -129,8 +141,14 @@ WHEN OLD.`id` IS NOT NEW.`id`
   OR OLD.`channel` IS NOT NEW.`channel`
   OR OLD.`provider_transaction_id` IS NOT NEW.`provider_transaction_id`
   OR OLD.`amount_cents` IS NOT NEW.`amount_cents`
+  OR OLD.`merchant_app_id` IS NOT NEW.`merchant_app_id`
+  OR OLD.`merchant_id` IS NOT NEW.`merchant_id`
+  OR OLD.`observed_at` IS NOT NEW.`observed_at`
   OR OLD.`source` IS NOT NEW.`source`
   OR OLD.`dedupe_key` IS NOT NEW.`dedupe_key`
+  OR OLD.`provider_event_ref` IS NOT NEW.`provider_event_ref`
+  OR OLD.`failure_code` IS NOT NEW.`failure_code`
+  OR OLD.`failure_message` IS NOT NEW.`failure_message`
   OR OLD.`kind` IS NOT NEW.`kind`
   OR OLD.`detail` IS NOT NEW.`detail`
   OR OLD.`created_at` IS NOT NEW.`created_at`

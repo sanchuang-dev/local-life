@@ -51,7 +51,8 @@ function failure(
 
 /**
  * Persist a conflict/late/unknown channel observation without changing the
- * payment or attempt state. The same evidence key can only create one exception.
+ * payment or attempt state. A dedupe key may never exist in both the exception
+ * table and the accepted-event table; the transaction checks both directions.
  */
 function recordException(
   tx: LocalTransaction,
@@ -60,12 +61,17 @@ function recordException(
   kind: ExceptionKind,
   detail: string,
   now: Date,
-): string {
+): string | null {
   const existing = tx.select({ id: paymentReviewExceptions.id })
     .from(paymentReviewExceptions)
     .where(eq(paymentReviewExceptions.dedupeKey, evidence.dedupeKey))
     .get()
   if (existing) return existing.id
+  const accepted = tx.select({ id: paymentEvents.id })
+    .from(paymentEvents)
+    .where(eq(paymentEvents.dedupeKey, evidence.dedupeKey))
+    .get()
+  if (accepted) return null
 
   const id = randomUUID()
   tx.insert(paymentReviewExceptions).values({
@@ -75,8 +81,14 @@ function recordException(
     channel: evidence.channel,
     providerTransactionId: evidence.providerTransactionId,
     amountCents: evidence.amountCents,
+    merchantAppId: evidence.merchantAppId,
+    merchantId: evidence.merchantId,
+    observedAt: new Date(evidence.observedAt),
     source: evidence.source,
     dedupeKey: evidence.dedupeKey,
+    providerEventRef: evidence.providerEventRef,
+    failureCode: evidence.failureCode,
+    failureMessage: evidence.failureMessage,
     kind,
     detail,
     status: 'open',
@@ -178,6 +190,10 @@ function validateEvidence(
   if (evidence.channel !== intent.channel) {
     recordException(tx, evidence, intent.id, 'channel_mismatch', '渠道不匹配', now)
     return failure(409, API_ERROR_CODES.paymentEvidenceRejected, '支付渠道不匹配')
+  }
+  if (intent.channel === 'wechat_jsapi' && (!intent.merchantAppId || !intent.merchantId)) {
+    recordException(tx, evidence, intent.id, 'merchant_mismatch', '支付意图缺少微信商户身份', now)
+    return failure(409, API_ERROR_CODES.paymentEvidenceRejected, '支付意图缺少微信商户身份')
   }
   if (
     evidence.merchantAppId !== intent.merchantAppId ||
@@ -519,6 +535,20 @@ export function confirmTrustedPayment(
     if ('kind' in validated) return validated
     const { intent } = validated
 
+    // A provider event identity that was previously rejected must never be
+    // reused to declare success, even if the payload was edited in transit.
+    const rejected = tx.select({ id: paymentReviewExceptions.id })
+      .from(paymentReviewExceptions)
+      .where(eq(paymentReviewExceptions.dedupeKey, evidence.dedupeKey))
+      .get()
+    if (rejected) {
+      return failure(
+        409,
+        API_ERROR_CODES.paymentConfirmationConflict,
+        '该渠道证据已进入复核，不能重复声明成功',
+      )
+    }
+
     const duplicate = tx.select().from(paymentEvents)
       .where(eq(paymentEvents.dedupeKey, evidence.dedupeKey)).get()
     if (duplicate) {
@@ -591,8 +621,14 @@ export function listOpenPaymentReviewExceptions(
       channel: row.channel,
       providerTransactionId: row.providerTransactionId,
       amountCents: row.amountCents,
+      merchantAppId: row.merchantAppId,
+      merchantId: row.merchantId,
+      observedAt: iso(row.observedAt),
       source: row.source,
       dedupeKey: row.dedupeKey,
+      providerEventRef: row.providerEventRef,
+      failureCode: row.failureCode,
+      failureMessage: row.failureMessage,
       kind: row.kind,
       detail: row.detail,
       status: row.status,

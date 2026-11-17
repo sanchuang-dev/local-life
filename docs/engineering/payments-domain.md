@@ -52,7 +52,7 @@
 
 - `payment_outbox` 每个 `payment_event_id` 和 `dedupe_key` 唯一；`payment.paid.v1` 仅在支付意图首次进入 `paid` 的同一事务内写入。
 - `payment_review_exceptions` 以 `dedupe_key` 唯一保存冲突/迟到/未知渠道证据，不修改已终态支付意图。
-- 两张表均拒绝 DELETE，且 outbox 的身份/payload、异常表的原始证据字段不可 UPDATE；outbox 仅允许消费状态/重试字段更新，异常表仅允许 `status/resolved_at` 处理字段更新。异常表保留原始商户订单号、渠道交易号、金额、来源与错误类型。
+- 两张表均拒绝 DELETE，且 outbox 的身份/payload、异常表的原始证据字段不可 UPDATE；outbox 仅允许消费状态/重试字段更新，异常表仅允许 `status/resolved_at` 处理字段更新。异常表不可变地保存商户订单号、渠道、渠道交易号、金额、商户 AppID/商户号、观察时间、来源、去重键、渠道事件引用、失败码/失败信息与错误类型。
 
 ## 3. PAY-02 实现约定（已落地）
 
@@ -80,7 +80,9 @@ PAY-02 依赖本卡：
 - `confirmTrustedPayment` 只接收**已归一化**的证据。渠道签名、证书、微信支付 API v3 解密与查单真实性由 PAY-11 适配器完成；PAY-03 不自行声明“已验签”。
 - 证据必须携带：商户订单号、渠道、渠道结果、渠道交易号（paid 必填）、金额分、币种、商户 AppID/商户号、观察时间、来源（notification/query）与去重键。
 - 服务端按 `merchant_order_no` 查找既有支付意图，绝不创建第二张支付单；校验 `kind='channel'`、渠道一致、商户上下文一致、金额等于冻结的净应付、币种为 `CNY`，并重新读取本地订单确认居民/社区归属。
-- 金额、商户订单号、商户号、渠道、币种或归属不一致时，不写 `paid`，保存异常证据并返回通用冲突错误；不向调用方泄露内部字段。
+- `wechat_jsapi` 证据必须携带真实 `merchantAppId` 与 `merchantId`；共享契约拒绝 null/空值，服务层同时拒绝持久化意图缺少商户身份。Mock 渠道才允许两者为 null，且不能把双重 null 当作“商户匹配”。
+- 同一 `dedupe_key` 一旦进入异常表，后续即使把证据改成合法金额也不能再声明成功；同一 key 已存在于成功事件表时，也不会再写入异常。事务内双向检查保证异常证据与成功事件不会同时占用同一个渠道事件身份。
+- 金额、商户订单号、商户号、渠道、币种或归属不一致时，不写 `paid`，保存完整异常证据并返回通用冲突错误；不向调用方泄露内部字段。
 
 ### 状态与幂等收敛
 
@@ -106,7 +108,7 @@ PAY-02 依赖本卡：
 
 `intent_not_found`、`amount_mismatch`、`merchant_mismatch`、`channel_mismatch`、`ownership_mismatch`、`transaction_conflict`、`late_success_after_closed`、`late_success_after_failed`、`terminal_conflict`、`unknown_evidence`。
 
-同一证据 `dedupe_key` 只保存一条异常。异常与终态支付意图均不删除、不改写；后续 PAY-11 运营查单/处理界面在本卡之后实现。
+同一证据 `dedupe_key` 只保存一条异常，且该 key 与 `payment_events.dedupe_key` 跨表互斥。异常行不可变地保存规范化证据快照：商户订单号、渠道、渠道交易号、金额、商户 AppID/商户号、`observedAt`、来源、去重键、`providerEventRef`、`failureCode`、`failureMessage`、错误类型和明细；仅允许后续把 `status/resolved_at` 从 `open` 处理为 `reviewed/resolved`。异常与终态支付意图均不删除、不改写；后续 PAY-11 运营查单/处理界面在本卡之后实现。
 
 ### 事务与并发证据
 
@@ -119,7 +121,7 @@ PAY-02 依赖本卡：
 - `packages/contracts/test/payments-contract.test.mjs`：状态机、整数分/负数/浮点/溢出、金额守恒、渠道/模拟/零元、支付意图与尝试的终态时间戳双向一致性、失败原因禁用规则、paid attempt 交易号要求，以及 PAY-03 证据/outbox/异常 DTO。
 - `apps/api/test/payments-db.test.ts`：真实 SQLite 新库、历史库升级、金额/归属/唯一性/状态转换/事件追加式/跨意图引用负例，并确认旧订单、Ledger 行与锁定批次不丢失。
 - `apps/api/test/payments-http.test.ts`：真实 Hono HTTP + SQLite 的创建/查询、金额派生、幂等、并发、过期/关闭/已付/零元、鉴权/CSRF/Origin、重启恢复和渠道不可用边界。
-- `apps/api/test/payments-confirmation.test.ts`：内部 token、证据校验、paid/pending/terminal 收敛、异常留存、outbox 事务/重启、同证据/通知查单/不同交易号三组跨进程双连接竞争、不可变证据与失败回滚。
+- `apps/api/test/payments-confirmation.test.ts`：内部 token、证据校验、paid/pending/terminal 收敛、跨表去重、完整异常证据、outbox 事务/重启、同证据/通知查单/不同交易号三组跨进程双连接竞争、不可变证据与失败回滚。
 
 ## 6. PAY-02 居民创建 / 查询 API
 

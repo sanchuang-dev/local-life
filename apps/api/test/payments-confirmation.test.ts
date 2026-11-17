@@ -32,7 +32,7 @@ import {
   users,
 } from '../src/db/schema.js'
 import { LocalError } from '../src/local/shared.js'
-import { createPaymentIntent } from '../src/payments/service.js'
+import { createPaymentIntent, toIntent } from '../src/payments/service.js'
 import {
   confirmTrustedPayment,
   listOpenPaymentReviewExceptions,
@@ -316,13 +316,23 @@ test('wrong amount, merchant, order and late success are refused and preserved f
     )
 
     assertLocalError('payment_evidence_rejected', () => confirmTrustedPayment(w.db, evidence(intent, {
+      merchantAppId: 'wrong-app',
       merchantId: 'wrong-merchant',
+      observedAt: '2026-11-17T01:59:00.000Z',
+      providerEventRef: 'evt-wrong-merchant',
+      failureCode: 'MCH_MISMATCH',
+      failureMessage: '渠道商户号不一致',
       dedupeKey: 'wrong-merchant',
     }), { now: NOW }))
-    assert.equal(
-      w.db.select().from(paymentReviewExceptions).where(eq(paymentReviewExceptions.dedupeKey, 'wrong-merchant')).get()?.kind,
-      'merchant_mismatch',
-    )
+    const merchantException = w.db.select().from(paymentReviewExceptions)
+      .where(eq(paymentReviewExceptions.dedupeKey, 'wrong-merchant')).get()
+    assert.equal(merchantException?.kind, 'merchant_mismatch')
+    assert.equal(merchantException?.merchantAppId, 'wrong-app')
+    assert.equal(merchantException?.merchantId, 'wrong-merchant')
+    assert.equal(merchantException?.observedAt.getTime(), Date.parse('2026-11-17T01:59:00.000Z'))
+    assert.equal(merchantException?.providerEventRef, 'evt-wrong-merchant')
+    assert.equal(merchantException?.failureCode, 'MCH_MISMATCH')
+    assert.equal(merchantException?.failureMessage, '渠道商户号不一致')
 
     assertLocalError('payment_evidence_rejected', () => confirmTrustedPayment(w.db, evidence(intent, {
       merchantOrderNo: 'PAY-UNKNOWN-ORDER-000000000001',
@@ -352,6 +362,89 @@ test('wrong amount, merchant, order and late success are refused and preserved f
     const open = listOpenPaymentReviewExceptions(w.db)
     assert.ok(open.length >= 4)
     for (const exception of open) paymentReviewExceptionSchema.parse(exception)
+  } finally {
+    w.sqlite.close()
+  }
+})
+
+test('a dedupe key cannot be both rejected evidence and an accepted payment event', () => {
+  const w = world()
+  try {
+    const intent = createIntent(w)
+    assertLocalError('payment_evidence_rejected', () => confirmTrustedPayment(w.db, evidence(intent, {
+      amountCents: intent.netPayableCents - 1,
+      dedupeKey: 'rejected-then-success',
+    }), { now: NOW }))
+    assertLocalError('payment_confirmation_conflict', () => confirmTrustedPayment(w.db, evidence(intent, {
+      dedupeKey: 'rejected-then-success',
+    }), { now: NOW }))
+    assert.equal(w.db.select().from(paymentIntents).where(eq(paymentIntents.id, intent.id)).get()?.status, 'pending')
+    assert.equal(count(w.db, paymentOutbox), 0)
+    assert.equal(count(w.db, paymentEvents), 1) // intent_created
+    assert.equal(count(w.db, paymentReviewExceptions), 1)
+
+    const paidEvidence = evidence(intent, { dedupeKey: 'accepted-then-rejected' })
+    assert.equal(confirmTrustedPayment(w.db, paidEvidence, { now: NOW }).outcome, 'confirmed')
+    assertLocalError('payment_evidence_rejected', () => confirmTrustedPayment(w.db, evidence(intent, {
+      amountCents: intent.netPayableCents - 1,
+      dedupeKey: 'accepted-then-rejected',
+    }), { now: NOW }))
+    // The accepted key stays unique to the success event; no exception row is
+    // created for an edited payload carrying the same provider event identity.
+    assert.equal(count(w.db, paymentReviewExceptions), 1)
+    assert.equal(count(w.db, paymentEvents), 2)
+    assert.equal(count(w.db, paymentOutbox), 1)
+  } finally {
+    w.sqlite.close()
+  }
+})
+
+test('a WeChat intent without persisted merchant identity is refused even with full evidence', () => {
+  const w = world()
+  try {
+    const orderId = secondOrder(w)
+    const intentId = randomUUID()
+    const createdAt = NOW
+    const expiresAt = new Date(NOW.getTime() + 15 * 60 * 1000)
+    w.db.insert(paymentIntents).values({
+      id: intentId,
+      localOrderId: orderId,
+      residentUserId: w.userId,
+      communityId: w.communityId,
+      kind: 'channel',
+      channel: 'wechat_jsapi',
+      simulated: false,
+      merchantOrderNo: `PAY-${intentId.replace(/-/gu, '').toUpperCase().slice(0, 28)}`,
+      merchantAppId: null,
+      merchantId: null,
+      grossAmountCents: 3980,
+      discountCents: 0,
+      netPayableCents: 3980,
+      status: 'pending',
+      idempotencyKey: `wechat-missing-${intentId}`,
+      expiresAt,
+      paidAt: null,
+      closedAt: null,
+      failedAt: null,
+      failureCode: null,
+      failureMessage: null,
+      createdAt,
+      updatedAt: createdAt,
+    }).run()
+    const intent = toIntent(w.db.select().from(paymentIntents).where(eq(paymentIntents.id, intentId)).get()!)
+    assertLocalError('payment_evidence_rejected', () => confirmTrustedPayment(w.db, evidence(intent, {
+      channel: 'wechat_jsapi',
+      merchantAppId: 'wx-real-app',
+      merchantId: 'real-merchant',
+      dedupeKey: 'wechat-intent-missing-merchant',
+    }), { now: NOW }))
+    assert.equal(w.db.select().from(paymentIntents).where(eq(paymentIntents.id, intentId)).get()?.status, 'pending')
+    const exception = w.db.select().from(paymentReviewExceptions)
+      .where(eq(paymentReviewExceptions.dedupeKey, 'wechat-intent-missing-merchant')).get()
+    assert.equal(exception?.kind, 'merchant_mismatch')
+    assert.equal(exception?.merchantAppId, 'wx-real-app')
+    assert.equal(exception?.merchantId, 'real-merchant')
+    assert.equal(count(w.db, paymentOutbox), 0)
   } finally {
     w.sqlite.close()
   }
@@ -694,6 +787,8 @@ test('outbox and review evidence reject deletes and identity mutation', () => {
     assert.throws(() => w.sqlite.prepare('DELETE FROM payment_review_exceptions WHERE id = ?').run(exception.id))
     assert.throws(() => w.sqlite.prepare('UPDATE payment_review_exceptions SET amount_cents = 0 WHERE id = ?')
       .run(exception.id))
+    assert.throws(() => w.sqlite.prepare('UPDATE payment_review_exceptions SET merchant_id = ? WHERE id = ?')
+      .run('other-merchant', exception.id))
     assert.doesNotThrow(() => w.sqlite.prepare(`UPDATE payment_review_exceptions
       SET status = 'resolved', resolved_at = ? WHERE id = ?`).run(NOW.getTime(), exception.id))
   } finally {

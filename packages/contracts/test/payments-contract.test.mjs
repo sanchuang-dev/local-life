@@ -269,6 +269,19 @@ describe('PAY-03 trusted evidence, outbox and review contracts', () => {
     assert.equal(paymentEvidenceSchema.safeParse({ ...paidEvidence, amountCents: 1.5 }).success, false)
   })
 
+  it('requires real WeChat merchant identity and never treats null as a match', () => {
+    assert.equal(paymentEvidenceSchema.safeParse({ ...paidEvidence, merchantAppId: null }).success, false)
+    assert.equal(paymentEvidenceSchema.safeParse({ ...paidEvidence, merchantId: null }).success, false)
+    assert.equal(paymentEvidenceSchema.safeParse({ ...paidEvidence, merchantAppId: '' }).success, false)
+    assert.equal(paymentEvidenceSchema.safeParse({ ...paidEvidence, merchantId: '' }).success, false)
+    assert.equal(paymentEvidenceSchema.safeParse({
+      ...paidEvidence,
+      channel: 'mock',
+      merchantAppId: null,
+      merchantId: null,
+    }).success, true)
+  })
+
   it('keeps the paid handoff payload stable and strict', () => {
     const payload = {
       paymentIntentId: '123e4567-e89b-42d3-a456-426614174001',
@@ -310,8 +323,14 @@ describe('PAY-03 trusted evidence, outbox and review contracts', () => {
       channel: 'wechat_jsapi',
       providerTransactionId: null,
       amountCents: null,
+      merchantAppId: null,
+      merchantId: null,
+      observedAt: NOW,
       source: 'query',
       dedupeKey: 'wx-query-0001',
+      providerEventRef: null,
+      failureCode: null,
+      failureMessage: null,
       kind: 'intent_not_found',
       detail: '商户订单号不存在',
       status: 'open',

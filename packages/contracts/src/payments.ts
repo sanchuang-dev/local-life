@@ -322,6 +322,22 @@ export const paymentEvidenceSchema = z
         path: ['providerTransactionId'],
       })
     }
+    if (value.channel === 'wechat_jsapi') {
+      if (value.merchantAppId === null) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'wechat evidence requires merchantAppId',
+          path: ['merchantAppId'],
+        })
+      }
+      if (value.merchantId === null) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'wechat evidence requires merchantId',
+          path: ['merchantId'],
+        })
+      }
+    }
   })
 export type PaymentEvidence = z.infer<typeof paymentEvidenceSchema>
 
@@ -394,8 +410,14 @@ export const paymentReviewExceptionSchema = z.strictObject({
   channel: paymentChannelSchema,
   providerTransactionId: z.string().trim().min(1).max(128).nullable(),
   amountCents: paymentCentsSchema.nullable(),
+  merchantAppId: z.string().trim().min(1).max(64).nullable(),
+  merchantId: z.string().trim().min(1).max(64).nullable(),
+  observedAt: z.string().datetime({ offset: true }),
   source: paymentEvidenceSourceSchema,
   dedupeKey: z.string().trim().min(1).max(200),
+  providerEventRef: z.string().trim().min(1).max(128).nullable(),
+  failureCode: z.string().trim().min(1).max(64).nullable(),
+  failureMessage: z.string().trim().min(1).max(500).nullable(),
   kind: paymentReviewExceptionKindSchema,
   detail: z.string().trim().min(1).max(500),
   status: z.enum(['open', 'reviewed', 'resolved']),
