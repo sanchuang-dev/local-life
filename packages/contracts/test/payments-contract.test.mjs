@@ -262,6 +262,13 @@ describe('PAY-03 trusted evidence, outbox and review contracts', () => {
     assert.equal(paymentEvidenceSchema.safeParse({ ...paidEvidence, source: 'callback' }).success, false)
   })
 
+  it('rejects fake signatures and malformed channel events before any state write', () => {
+    assert.equal(paymentEvidenceSchema.safeParse({ ...paidEvidence, signature: 'fake' }).success, false)
+    assert.equal(paymentEvidenceSchema.safeParse({ ...paidEvidence, providerStatus: 'succeeded' }).success, false)
+    assert.equal(paymentEvidenceSchema.safeParse({ ...paidEvidence, observedAt: 'not-a-date' }).success, false)
+    assert.equal(paymentEvidenceSchema.safeParse({ ...paidEvidence, amountCents: 1.5 }).success, false)
+  })
+
   it('keeps the paid handoff payload stable and strict', () => {
     const payload = {
       paymentIntentId: '123e4567-e89b-42d3-a456-426614174001',
