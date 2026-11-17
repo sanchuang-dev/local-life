@@ -51,6 +51,8 @@ import type {
   ResidentCommunityStoredCandidateSource,
   SettlementAmountStatus,
   LocalOrderEventType,
+  LocalOrderOnlineCompletionKind,
+  LocalOrderOnlineConflictKind,
   LocalOrderRecordSource,
   LocalOrderStatus,
   LocalProductStatus,
@@ -1861,7 +1863,7 @@ export const localOrders = sqliteTable(
     ),
     check(
       'local_orders_status_check',
-      sql`${table.status} IN ('registered', 'processing', 'pending_review', 'verified', 'cancelled', 'rejected')`,
+      sql`${table.status} IN ('registered', 'processing', 'pending_review', 'verified', 'online_completed', 'cancelled', 'rejected')`,
     ),
     check(
       'local_orders_record_source_check',
@@ -2210,6 +2212,138 @@ export const paymentReviewExceptions = sqliteTable('payment_review_exceptions', 
       AND ((${table.status} = 'resolved') = (${table.resolvedAt} IS NOT NULL))`,
   ),
 ])
+
+/* -------------------------------------------------------------------------- */
+/* PAY-05 online order completion: immutable completion fact + review conflicts*/
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The single immutable "this order completed online" fact (PAY-05).
+ *
+ * It is deliberately separate from `local_orders.verified_*` (a human fact
+ * check) and from every ledger receipt: no finance projection is written here.
+ * The unique indexes are the idempotency authority:
+ * - one completion per order (`local_order_id` unique);
+ * - one completion per payment intent (`payment_intent_id` unique), which also
+ *   means a replay of the same trusted `payment.paid.v1` can never produce a
+ *   second completion;
+ * - one completion per provider transaction reference.
+ *
+ * `kind='zero_amount'` is the fully coupon-discounted path: no channel, no
+ * provider reference, `amount_cents = 0`, so it can never be read as cash.
+ */
+export const localOrderOnlineCompletions = sqliteTable(
+  'local_order_online_completions',
+  {
+    id: text('id').primaryKey(),
+    localOrderId: text('local_order_id')
+      .notNull()
+      .references(() => localOrders.id, { onDelete: 'restrict' }),
+    paymentIntentId: text('payment_intent_id')
+      .notNull()
+      .references(() => paymentIntents.id, { onDelete: 'restrict' }),
+    kind: text('kind').$type<LocalOrderOnlineCompletionKind>().notNull(),
+    simulated: integer('simulated', { mode: 'boolean' }).notNull(),
+    grossAmountCents: integer('gross_amount_cents').notNull(),
+    discountCents: integer('discount_cents').notNull(),
+    /** Net cash actually paid online: 0 for the coupon-only completion. */
+    amountCents: integer('amount_cents').notNull(),
+    providerTransactionId: text('provider_transaction_id'),
+    completedAt: integer('completed_at', { mode: 'timestamp_ms' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('local_order_online_completions_order_uq').on(table.localOrderId),
+    uniqueIndex('local_order_online_completions_intent_uq').on(table.paymentIntentId),
+    uniqueIndex('local_order_online_completions_provider_txn_uq')
+      .on(table.providerTransactionId)
+      .where(sql`${table.providerTransactionId} IS NOT NULL`),
+    index('local_order_online_completions_completed_idx').on(table.completedAt),
+    check(
+      'local_order_online_completions_kind_check',
+      sql`${table.kind} IN ('channel', 'zero_amount')`,
+    ),
+    check(
+      'local_order_online_completions_amount_check',
+      sql`${table.grossAmountCents} >= 0
+        AND ${table.discountCents} >= 0
+        AND ${table.amountCents} >= 0
+        AND ${table.grossAmountCents} - ${table.discountCents} = ${table.amountCents}`,
+    ),
+    check(
+      'local_order_online_completions_kind_facts_check',
+      sql`(
+        (${table.kind} = 'zero_amount'
+          AND ${table.amountCents} = 0
+          AND ${table.providerTransactionId} IS NULL
+          AND ${table.simulated} = 0)
+        OR
+        (${table.kind} = 'channel'
+          AND ${table.amountCents} > 0
+          AND ${table.providerTransactionId} IS NOT NULL)
+      )`,
+    ),
+    check(
+      'local_order_online_completions_text_check',
+      sql`${table.providerTransactionId} IS NULL
+        OR length(trim(${table.providerTransactionId})) BETWEEN 1 AND 128`,
+    ),
+  ],
+)
+
+/**
+ * PAY-05 durable manual-review path for an online payment that could not be
+ * projected onto its order. It never rewinds a payment, re-reserves a released
+ * coupon or completes a terminal order; it preserves the conflict so a human can
+ * reconcile it. `dedupeKey` makes re-consumption of the same evidence a no-op.
+ */
+export const localOrderOnlineConflicts = sqliteTable(
+  'local_order_online_conflicts',
+  {
+    id: text('id').primaryKey(),
+    localOrderId: text('local_order_id')
+      .notNull()
+      .references(() => localOrders.id, { onDelete: 'restrict' }),
+    paymentIntentId: text('payment_intent_id')
+      .references(() => paymentIntents.id, { onDelete: 'restrict' }),
+    paymentOutboxId: text('payment_outbox_id')
+      .references(() => paymentOutbox.id, { onDelete: 'restrict' }),
+    dedupeKey: text('dedupe_key').notNull(),
+    kind: text('kind').$type<LocalOrderOnlineConflictKind>().notNull(),
+    detail: text('detail').notNull(),
+    status: text('status').$type<'open' | 'reviewed' | 'resolved'>().notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    resolvedAt: integer('resolved_at', { mode: 'timestamp_ms' }),
+  },
+  (table) => [
+    uniqueIndex('local_order_online_conflicts_dedupe_uq').on(table.dedupeKey),
+    index('local_order_online_conflicts_order_created_idx').on(
+      table.localOrderId,
+      table.createdAt,
+    ),
+    index('local_order_online_conflicts_status_created_idx').on(
+      table.status,
+      table.createdAt,
+    ),
+    check(
+      'local_order_online_conflicts_kind_check',
+      sql`${table.kind} IN ('order_not_payable', 'order_already_completed',
+        'payment_state_invalid', 'coupon_state_invalid', 'late_success')`,
+    ),
+    check(
+      'local_order_online_conflicts_status_check',
+      sql`${table.status} IN ('open', 'reviewed', 'resolved')`,
+    ),
+    check(
+      'local_order_online_conflicts_detail_check',
+      sql`length(trim(${table.detail})) BETWEEN 1 AND 500`,
+    ),
+    check(
+      'local_order_online_conflicts_resolved_check',
+      sql`((${table.status} = 'resolved') = (${table.resolvedAt} IS NOT NULL))`,
+    ),
+  ],
+)
 
 /* -------------------------------------------------------------------------- */
 /* Independently identified settlement parties and immutable sales provenance */
@@ -2610,7 +2744,7 @@ export const localOrderEvents = sqliteTable(
     ),
     check(
       'local_order_events_event_check',
-      sql`${table.event} IN ('order.registered', 'order.created_on_behalf', 'order.status_changed', 'order.verified', 'order.rejected')`,
+      sql`${table.event} IN ('order.registered', 'order.created_on_behalf', 'order.status_changed', 'order.verified', 'order.rejected', 'order.online_completed')`,
     ),
   ],
 )

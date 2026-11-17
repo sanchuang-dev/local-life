@@ -22,6 +22,7 @@ const eventLabels: Record<LocalOrderEvent['event'], string> = {
   'order.status_changed': '处理状态变更',
   'order.verified': '运营人工核验通过',
   'order.rejected': '未通过',
+  'order.online_completed': '在线交易完成',
 }
 
 function StatusPill({ order }: { order: LocalOrderDetail }) {

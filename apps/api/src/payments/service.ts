@@ -24,8 +24,12 @@ import { LocalError, iso, type LocalActor } from '../local/shared.js'
 
 const PAYMENT_INTENT_TTL_MS = 15 * 60 * 1000
 
-/** Old manual terminal states are not silently converted into online payments. */
-const PAYABLE_ORDER_STATUSES: Readonly<Record<string, true>> = {
+/**
+ * Old manual terminal states are not silently converted into online payments.
+ * PAY-05 reuses this exact set when projecting a trusted paid event, so the two
+ * payment cards can never disagree about what "payable" means.
+ */
+export const PAYABLE_ORDER_STATUSES: Readonly<Record<string, true>> = {
   registered: true,
   processing: true,
   pending_review: true,

@@ -6,6 +6,7 @@ import {
   PAYMENT_ROUTES,
   createPaymentIntentRequestSchema,
   paymentEvidenceSchema,
+  paymentOutboxConsumeRequestSchema,
   type CreatePaymentIntentRequest,
 } from '@sanchuang-dev/local-life-contracts'
 import type { ApiConfig } from '../config.js'
@@ -14,6 +15,7 @@ import type { AppBindings, AppContext, AuthSession, HttpErrorStatus } from '../h
 import { constantTimeTextEqual } from '../auth/security.js'
 import { LocalError, type LocalActor } from '../local/shared.js'
 import { confirmTrustedPayment } from './confirmation.js'
+import { runPaymentOutboxConsumer } from './outbox.js'
 import { createPaymentIntent, getMyPaymentIntent } from './service.js'
 
 export interface PaymentRouteDeps {
@@ -65,6 +67,26 @@ export function registerPaymentRoutes(
     }
   }
 
+  /**
+   * Shared guard for the two internal payment surfaces. A missing server token is
+   * a 503 (fail closed), a wrong/absent Bearer token is a 401. Neither a resident
+   * session nor a CSRF token can stand in for it.
+   */
+  const requireInternalToken = (c: AppContext): Response | null => {
+    const expectedToken = config.paymentInternalToken
+    if (!expectedToken) {
+      return fail(c, 503, API_ERROR_CODES.paymentInternalNotConfigured, '内部支付确认未配置')
+    }
+    const authorization = c.req.header('authorization')?.trim() ?? ''
+    const token = authorization.startsWith('Bearer ')
+      ? authorization.slice('Bearer '.length).trim()
+      : ''
+    if (!token || !constantTimeTextEqual(token, expectedToken)) {
+      return fail(c, 401, API_ERROR_CODES.paymentInternalUnauthorized, '内部支付确认凭证无效')
+    }
+    return null
+  }
+
   app.post(PAYMENT_ROUTES.createIntent, async (c) => {
     const guard = requireResident(c)
     if (guard instanceof Response) return guard
@@ -91,17 +113,8 @@ export function registerPaymentRoutes(
    * or browser CSRF token can substitute for it.
    */
   app.post(PAYMENT_INTERNAL_ROUTES.confirm, async (c) => {
-    const expectedToken = config.paymentInternalToken
-    if (!expectedToken) {
-      return fail(c, 503, API_ERROR_CODES.paymentInternalNotConfigured, '内部支付确认未配置')
-    }
-    const authorization = c.req.header('authorization')?.trim() ?? ''
-    const token = authorization.startsWith('Bearer ')
-      ? authorization.slice('Bearer '.length).trim()
-      : ''
-    if (!token || !constantTimeTextEqual(token, expectedToken)) {
-      return fail(c, 401, API_ERROR_CODES.paymentInternalUnauthorized, '内部支付确认凭证无效')
-    }
+    const unauthorized = requireInternalToken(c)
+    if (unauthorized) return unauthorized
     const body = bodySchemaError(
       await c.req.json().catch(() => null),
       paymentEvidenceSchema,
@@ -109,6 +122,30 @@ export function registerPaymentRoutes(
     if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '支付证据格式不正确')
     try {
       const result = confirmTrustedPayment(db, body)
+      c.header('Cache-Control', 'no-store')
+      return c.json(result)
+    } catch (error) {
+      return failWithPaymentError(c, error)
+    }
+  })
+
+  /**
+   * PAY-05 consumer trigger. Same server-side token as `confirm`: a browser,
+   * resident session or CSRF token can never drive order completion.
+   *
+   * The body is optional (an empty POST drains the default batch). Every claim is
+   * one `BEGIN IMMEDIATE` transaction, so repeated or concurrent calls are safe.
+   */
+  app.post(PAYMENT_INTERNAL_ROUTES.consumeOutbox, async (c) => {
+    const unauthorized = requireInternalToken(c)
+    if (unauthorized) return unauthorized
+    const raw = await c.req.json().catch(() => ({}))
+    const body = bodySchemaError(raw ?? {}, paymentOutboxConsumeRequestSchema)
+    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '消费参数不正确')
+    try {
+      const result = runPaymentOutboxConsumer(db, {
+        ...(body.limit === undefined ? {} : { limit: body.limit }),
+      })
       c.header('Cache-Control', 'no-store')
       return c.json(result)
     } catch (error) {

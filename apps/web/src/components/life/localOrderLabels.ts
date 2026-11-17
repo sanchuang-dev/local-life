@@ -17,6 +17,12 @@ export const localOrderStatusLabels: Record<LocalOrderStatus, string> = {
   processing: '处理中',
   pending_review: '待人工核验',
   verified: '人工核验通过',
+  /**
+   * PAY-05: a trusted server-side online payment completed this order. It is the
+   * online counterpart of `verified` and is deliberately worded differently: it
+   * never means a human verified the facts, and it never means bank settlement.
+   */
+  online_completed: '在线交易完成',
   cancelled: '已取消',
   rejected: '未通过',
 }
@@ -26,6 +32,8 @@ export const localOrderStatusDescriptions: Record<LocalOrderStatus, string> = {
   processing: '工作人员正在处理你登记的办理意向。',
   pending_review: '等待当前片区网格员或运营人员电话核验登记信息。',
   verified: '订单事实已由片区网格员或运营人员人工核验；这不代表收款、业务办理或结算已完成。',
+  online_completed:
+    '支付渠道已由服务端可信确认，该订单在线交易已完成；这不代表已结算到商户银行账户。',
   cancelled: '该订单已取消。',
   rejected: '该订单未通过，原因见订单详情。',
 }
@@ -33,7 +41,7 @@ export const localOrderStatusDescriptions: Record<LocalOrderStatus, string> = {
 type Tone = 'mint' | 'amber' | 'rose' | 'slate' | 'teal'
 
 export function localOrderStatusTone(status: LocalOrderStatus): Tone {
-  if (status === 'verified') return 'mint'
+  if (status === 'verified' || status === 'online_completed') return 'mint'
   if (status === 'pending_review' || status === 'processing') return 'amber'
   if (status === 'rejected') return 'rose'
   if (status === 'cancelled') return 'slate'
@@ -45,6 +53,7 @@ export const localOrderStatusOrder: LocalOrderStatus[] = [
   'processing',
   'pending_review',
   'verified',
+  'online_completed',
   'cancelled',
   'rejected',
 ]
