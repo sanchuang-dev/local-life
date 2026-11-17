@@ -62,7 +62,7 @@ function assertChannelAvailable(
   )
 }
 
-function toIntent(row: PaymentIntentRow): PaymentIntent {
+export function toIntent(row: PaymentIntentRow): PaymentIntent {
   return paymentIntentSchema.parse({
     ...row,
     expiresAt: iso(row.expiresAt),
@@ -74,7 +74,7 @@ function toIntent(row: PaymentIntentRow): PaymentIntent {
   })
 }
 
-function toAttempt(row: PaymentAttemptRow): PaymentAttempt {
+export function toAttempt(row: PaymentAttemptRow): PaymentAttempt {
   return paymentAttemptSchema.parse({
     ...row,
     createdAt: iso(row.createdAt),

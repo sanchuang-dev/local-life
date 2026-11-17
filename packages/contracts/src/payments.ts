@@ -31,6 +31,11 @@ export const PAYMENT_ROUTES = {
   myIntentDetail: '/payments/intents/:paymentIntentId',
 } as const
 
+/** Internal adapter/test surface; requires a server-side token, never a resident session. */
+export const PAYMENT_INTERNAL_ROUTES = {
+  confirm: '/internal/payments/confirm',
+} as const
+
 /** Non-negative integer cents; rejects floats, negatives and overflow. */
 export const paymentCentsSchema = z
   .number()
@@ -278,6 +283,133 @@ export const paymentEventSchema = z.strictObject({
   createdAt: z.string().datetime({ offset: true }),
 })
 export type PaymentEvent = z.infer<typeof paymentEventSchema>
+
+/* -------------------------------------------------------------------------- */
+/* PAY-03 trusted provider evidence, outbox and review exceptions             */
+/* -------------------------------------------------------------------------- */
+
+/** Normalized result supplied only by a trusted provider adapter (PAY-11). */
+export const paymentEvidenceStatusSchema = z.enum(['paid', 'failed', 'closed', 'pending'])
+export type PaymentEvidenceStatus = z.infer<typeof paymentEvidenceStatusSchema>
+
+export const paymentEvidenceSourceSchema = z.enum(['notification', 'query'])
+export type PaymentEvidenceSource = z.infer<typeof paymentEvidenceSourceSchema>
+
+export const paymentEvidenceSchema = z
+  .strictObject({
+    merchantOrderNo: merchantOrderNoSchema,
+    channel: paymentChannelSchema,
+    providerStatus: paymentEvidenceStatusSchema,
+    /** Required for a paid result; null for pending/closed/failed evidence. */
+    providerTransactionId: z.string().trim().min(1).max(128).nullable(),
+    amountCents: paymentCentsSchema,
+    currency: z.literal('CNY'),
+    merchantAppId: z.string().trim().min(1).max(64).nullable(),
+    merchantId: z.string().trim().min(1).max(64).nullable(),
+    observedAt: z.string().datetime({ offset: true }),
+    source: paymentEvidenceSourceSchema,
+    /** Provider event/query identity; the database enforces global uniqueness. */
+    dedupeKey: z.string().trim().min(1).max(200),
+    providerEventRef: z.string().trim().min(1).max(128).nullable(),
+    failureCode: z.string().trim().min(1).max(64).nullable(),
+    failureMessage: z.string().trim().min(1).max(500).nullable(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.providerStatus === 'paid' && value.providerTransactionId === null) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'paid evidence requires providerTransactionId',
+        path: ['providerTransactionId'],
+      })
+    }
+  })
+export type PaymentEvidence = z.infer<typeof paymentEvidenceSchema>
+
+export const paymentConfirmationOutcomeSchema = z.enum([
+  'confirmed',
+  'already_confirmed',
+  'recorded',
+])
+export type PaymentConfirmationOutcome = z.infer<typeof paymentConfirmationOutcomeSchema>
+
+export const paymentConfirmationResponseSchema = z.strictObject({
+  outcome: paymentConfirmationOutcomeSchema,
+  intent: paymentIntentSchema,
+  attempt: paymentAttemptSchema.nullable(),
+  outboxEventId: z.string().uuid().nullable(),
+})
+export type PaymentConfirmationResponse = z.infer<typeof paymentConfirmationResponseSchema>
+
+/** Stable downstream handoff payload; PAY-05/PAY-06 own its consumption. */
+export const paymentPaidEventPayloadSchema = z.strictObject({
+  paymentIntentId: z.string().uuid(),
+  localOrderId: z.string().uuid(),
+  residentUserId: z.string().uuid(),
+  communityId: z.string().uuid(),
+  amountCents: paymentCentsSchema,
+  providerTransactionId: z.string().trim().min(1).max(128),
+  simulated: z.boolean(),
+  paidAt: z.string().datetime({ offset: true }),
+})
+export type PaymentPaidEventPayload = z.infer<typeof paymentPaidEventPayloadSchema>
+
+export const paymentOutboxStatusSchema = z.enum(['pending', 'processing', 'delivered', 'failed'])
+export type PaymentOutboxStatus = z.infer<typeof paymentOutboxStatusSchema>
+
+export const paymentOutboxEventSchema = z.strictObject({
+  id: z.string().uuid(),
+  paymentIntentId: z.string().uuid(),
+  paymentEventId: z.string().uuid(),
+  topic: z.literal('payment.paid.v1'),
+  dedupeKey: z.string().trim().min(1).max(200),
+  payload: paymentPaidEventPayloadSchema,
+  status: paymentOutboxStatusSchema,
+  attempts: z.number().int().nonnegative(),
+  availableAt: z.string().datetime({ offset: true }),
+  lastError: z.string().trim().min(1).max(500).nullable(),
+  createdAt: z.string().datetime({ offset: true }),
+  updatedAt: z.string().datetime({ offset: true }),
+  deliveredAt: z.string().datetime({ offset: true }).nullable(),
+})
+export type PaymentOutboxEvent = z.infer<typeof paymentOutboxEventSchema>
+
+export const paymentReviewExceptionKindSchema = z.enum([
+  'intent_not_found',
+  'amount_mismatch',
+  'merchant_mismatch',
+  'channel_mismatch',
+  'ownership_mismatch',
+  'transaction_conflict',
+  'late_success_after_closed',
+  'late_success_after_failed',
+  'terminal_conflict',
+  'unknown_evidence',
+])
+export type PaymentReviewExceptionKind = z.infer<typeof paymentReviewExceptionKindSchema>
+
+export const paymentReviewExceptionSchema = z.strictObject({
+  id: z.string().uuid(),
+  paymentIntentId: z.string().uuid().nullable(),
+  merchantOrderNo: merchantOrderNoSchema,
+  channel: paymentChannelSchema,
+  providerTransactionId: z.string().trim().min(1).max(128).nullable(),
+  amountCents: paymentCentsSchema.nullable(),
+  source: paymentEvidenceSourceSchema,
+  dedupeKey: z.string().trim().min(1).max(200),
+  kind: paymentReviewExceptionKindSchema,
+  detail: z.string().trim().min(1).max(500),
+  status: z.enum(['open', 'reviewed', 'resolved']),
+  createdAt: z.string().datetime({ offset: true }),
+  resolvedAt: z.string().datetime({ offset: true }).nullable(),
+})
+export type PaymentReviewException = z.infer<typeof paymentReviewExceptionSchema>
+
+export const paymentReviewExceptionListResponseSchema = z.strictObject({
+  items: z.array(paymentReviewExceptionSchema),
+})
+export type PaymentReviewExceptionListResponse = z.infer<
+  typeof paymentReviewExceptionListResponseSchema
+>
 
 /* -------------------------------------------------------------------------- */
 /* PAY-02 resident create/query DTOs and responses                          */

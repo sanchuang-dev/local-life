@@ -34,7 +34,10 @@ import type {
   PaymentChannel,
   PaymentEventSource,
   PaymentEventType,
+  PaymentEvidenceSource,
   PaymentIntentKind,
+  PaymentOutboxStatus,
+  PaymentReviewExceptionKind,
   PaymentStatus,
   PhoneOtpPurpose,
   ReconciliationBatchStatus,
@@ -2071,6 +2074,107 @@ export const paymentEvents = sqliteTable('payment_events', {
     sql`(${table.providerEventRef} IS NULL OR length(trim(${table.providerEventRef})) BETWEEN 1 AND 128)
       AND (${table.dedupeKey} IS NULL OR length(trim(${table.dedupeKey})) BETWEEN 1 AND 200)
       AND (${table.note} IS NULL OR length(trim(${table.note})) BETWEEN 1 AND 500)`,
+  ),
+])
+
+/**
+ * Durable downstream handoff created atomically with a trusted `paid` fact.
+ * PAY-03 owns persistence/dedupe; PAY-05/PAY-06 own consuming the business event.
+ */
+export const paymentOutbox = sqliteTable('payment_outbox', {
+  id: text('id').primaryKey(),
+  paymentIntentId: text('payment_intent_id')
+    .notNull()
+    .references(() => paymentIntents.id, { onDelete: 'restrict' }),
+  paymentEventId: text('payment_event_id')
+    .notNull()
+    .references(() => paymentEvents.id, { onDelete: 'restrict' }),
+  topic: text('topic').notNull(),
+  dedupeKey: text('dedupe_key').notNull(),
+  payloadJson: text('payload_json').notNull(),
+  status: text('status').$type<PaymentOutboxStatus>().notNull(),
+  attempts: integer('attempts').notNull(),
+  availableAt: integer('available_at', { mode: 'timestamp_ms' }).notNull(),
+  lastError: text('last_error'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  deliveredAt: integer('delivered_at', { mode: 'timestamp_ms' }),
+}, (table) => [
+  uniqueIndex('payment_outbox_event_uq').on(table.paymentEventId),
+  uniqueIndex('payment_outbox_dedupe_uq').on(table.dedupeKey),
+  index('payment_outbox_status_available_idx').on(table.status, table.availableAt),
+  index('payment_outbox_intent_idx').on(table.paymentIntentId),
+  check('payment_outbox_topic_check', sql`${table.topic} = 'payment.paid.v1'`),
+  check(
+    'payment_outbox_status_check',
+    sql`${table.status} IN ('pending', 'processing', 'delivered', 'failed')`,
+  ),
+  check('payment_outbox_attempts_check', sql`${table.attempts} >= 0`),
+  check(
+    'payment_outbox_delivery_check',
+    sql`((${table.status} = 'delivered') = (${table.deliveredAt} IS NOT NULL))`,
+  ),
+  check(
+    'payment_outbox_text_check',
+    sql`length(trim(${table.dedupeKey})) BETWEEN 1 AND 200
+      AND length(trim(${table.payloadJson})) > 0
+      AND (${table.lastError} IS NULL OR length(trim(${table.lastError})) BETWEEN 1 AND 500)`,
+  ),
+])
+
+/**
+ * Persistent conflict/late-payment evidence. An exception never rewrites a
+ * terminal intent; it preserves the channel facts for PAY-11's query/ops flow.
+ */
+export const paymentReviewExceptions = sqliteTable('payment_review_exceptions', {
+  id: text('id').primaryKey(),
+  paymentIntentId: text('payment_intent_id')
+    .references(() => paymentIntents.id, { onDelete: 'restrict' }),
+  merchantOrderNo: text('merchant_order_no').notNull(),
+  channel: text('channel').notNull(),
+  providerTransactionId: text('provider_transaction_id'),
+  amountCents: integer('amount_cents'),
+  source: text('source').$type<PaymentEvidenceSource>().notNull(),
+  dedupeKey: text('dedupe_key').notNull(),
+  kind: text('kind').$type<PaymentReviewExceptionKind>().notNull(),
+  detail: text('detail').notNull(),
+  status: text('status').$type<'open' | 'reviewed' | 'resolved'>().notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  resolvedAt: integer('resolved_at', { mode: 'timestamp_ms' }),
+}, (table) => [
+  uniqueIndex('payment_review_exceptions_dedupe_uq').on(table.dedupeKey),
+  index('payment_review_exceptions_status_created_idx').on(table.status, table.createdAt),
+  index('payment_review_exceptions_intent_idx').on(table.paymentIntentId),
+  check(
+    'payment_review_exceptions_channel_check',
+    sql`${table.channel} IN ('mock', 'wechat_jsapi')`,
+  ),
+  check(
+    'payment_review_exceptions_source_check',
+    sql`${table.source} IN ('notification', 'query')`,
+  ),
+  check(
+    'payment_review_exceptions_kind_check',
+    sql`${table.kind} IN ('intent_not_found', 'amount_mismatch', 'merchant_mismatch',
+      'channel_mismatch', 'ownership_mismatch', 'transaction_conflict',
+      'late_success_after_closed', 'late_success_after_failed', 'terminal_conflict',
+      'unknown_evidence')`,
+  ),
+  check(
+    'payment_review_exceptions_status_check',
+    sql`${table.status} IN ('open', 'reviewed', 'resolved')`,
+  ),
+  check(
+    'payment_review_exceptions_amount_check',
+    sql`${table.amountCents} IS NULL OR ${table.amountCents} >= 0`,
+  ),
+  check(
+    'payment_review_exceptions_text_check',
+    sql`length(trim(${table.merchantOrderNo})) BETWEEN 6 AND 32
+      AND length(trim(${table.dedupeKey})) BETWEEN 1 AND 200
+      AND length(trim(${table.detail})) BETWEEN 1 AND 500
+      AND (${table.providerTransactionId} IS NULL OR length(trim(${table.providerTransactionId})) BETWEEN 1 AND 128)
+      AND ((${table.status} = 'resolved') = (${table.resolvedAt} IS NOT NULL))`,
   ),
 ])
 

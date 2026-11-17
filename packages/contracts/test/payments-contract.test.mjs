@@ -7,6 +7,12 @@ import {
   paymentAttemptSchema,
   paymentCentsSchema,
   paymentIntentSchema,
+  paymentOutboxEventSchema,
+  paymentPaidEventPayloadSchema,
+  paymentEvidenceSchema,
+  paymentReviewExceptionSchema,
+  paymentConfirmationResponseSchema,
+  PAYMENT_INTERNAL_ROUTES,
   paymentStatusSchema,
 } from '@sanchuang-dev/local-life-contracts'
 
@@ -220,5 +226,105 @@ describe('payment amount and state contracts', () => {
     ]) {
       assert.equal(paymentAttemptSchema.safeParse(attempt(patch)).success, false, JSON.stringify(patch))
     }
+  })
+})
+
+
+describe('PAY-03 trusted evidence, outbox and review contracts', () => {
+  const paidEvidence = {
+    merchantOrderNo: 'PAY-20261116-0001',
+    channel: 'wechat_jsapi',
+    providerStatus: 'paid',
+    providerTransactionId: '4200000000202611160000000001',
+    amountCents: 3480,
+    currency: 'CNY',
+    merchantAppId: 'wx1234567890',
+    merchantId: '1900000109',
+    observedAt: NOW,
+    source: 'notification',
+    dedupeKey: 'wx-notify-0001',
+    providerEventRef: 'evt-0001',
+    failureCode: null,
+    failureMessage: null,
+  }
+
+  it('requires a provider transaction id for paid evidence only', () => {
+    assert.equal(paymentEvidenceSchema.safeParse(paidEvidence).success, true)
+    assert.equal(paymentEvidenceSchema.safeParse({ ...paidEvidence, providerTransactionId: null }).success, false)
+    assert.equal(paymentEvidenceSchema.safeParse({
+      ...paidEvidence,
+      providerStatus: 'pending',
+      providerTransactionId: null,
+    }).success, true)
+    assert.equal(paymentEvidenceSchema.safeParse({ ...paidEvidence, amountCents: -1 }).success, false)
+    assert.equal(paymentEvidenceSchema.safeParse({ ...paidEvidence, currency: 'USD' }).success, false)
+    assert.equal(paymentEvidenceSchema.safeParse({ ...paidEvidence, extra: true }).success, false)
+    assert.equal(paymentEvidenceSchema.safeParse({ ...paidEvidence, source: 'callback' }).success, false)
+  })
+
+  it('keeps the paid handoff payload stable and strict', () => {
+    const payload = {
+      paymentIntentId: '123e4567-e89b-42d3-a456-426614174001',
+      localOrderId: '123e4567-e89b-42d3-a456-426614174002',
+      residentUserId: '123e4567-e89b-42d3-a456-426614174003',
+      communityId: '123e4567-e89b-42d3-a456-426614174004',
+      amountCents: 3480,
+      providerTransactionId: '4200000000202611160000000001',
+      simulated: false,
+      paidAt: NOW,
+    }
+    assert.equal(paymentPaidEventPayloadSchema.safeParse(payload).success, true)
+    assert.equal(paymentPaidEventPayloadSchema.safeParse({ ...payload, amountCents: 1.5 }).success, false)
+    assert.equal(paymentPaidEventPayloadSchema.safeParse({ ...payload, extra: true }).success, false)
+    const outbox = {
+      id: '123e4567-e89b-42d3-a456-426614174010',
+      paymentIntentId: payload.paymentIntentId,
+      paymentEventId: '123e4567-e89b-42d3-a456-426614174011',
+      topic: 'payment.paid.v1',
+      dedupeKey: `payment.paid:${payload.paymentIntentId}`,
+      payload,
+      status: 'pending',
+      attempts: 0,
+      availableAt: NOW,
+      lastError: null,
+      createdAt: NOW,
+      updatedAt: NOW,
+      deliveredAt: null,
+    }
+    assert.equal(paymentOutboxEventSchema.safeParse(outbox).success, true)
+    assert.equal(paymentOutboxEventSchema.safeParse({ ...outbox, topic: 'payment.refunded.v1' }).success, false)
+  })
+
+  it('exposes review exceptions without allowing invented fields', () => {
+    const exception = {
+      id: '123e4567-e89b-42d3-a456-426614174012',
+      paymentIntentId: null,
+      merchantOrderNo: 'PAY-20261116-0001',
+      channel: 'wechat_jsapi',
+      providerTransactionId: null,
+      amountCents: null,
+      source: 'query',
+      dedupeKey: 'wx-query-0001',
+      kind: 'intent_not_found',
+      detail: '商户订单号不存在',
+      status: 'open',
+      createdAt: NOW,
+      resolvedAt: null,
+    }
+    assert.equal(paymentReviewExceptionSchema.safeParse(exception).success, true)
+    assert.equal(paymentReviewExceptionSchema.safeParse({ ...exception, kind: 'made_up' }).success, false)
+    assert.equal(paymentReviewExceptionSchema.safeParse({ ...exception, extra: true }).success, false)
+  })
+
+  it('keeps the internal confirmation route and outcome contract explicit', () => {
+    assert.equal(PAYMENT_INTERNAL_ROUTES.confirm, '/internal/payments/confirm')
+    const response = {
+      outcome: 'confirmed',
+      intent: intent({ status: 'paid', paidAt: NOW, channel: 'wechat_jsapi', simulated: false }),
+      attempt: null,
+      outboxEventId: '123e4567-e89b-42d3-a456-426614174010',
+    }
+    assert.equal(paymentConfirmationResponseSchema.safeParse(response).success, true)
+    assert.equal(paymentConfirmationResponseSchema.safeParse({ ...response, outcome: 'client_says_paid' }).success, false)
   })
 })
