@@ -22,7 +22,7 @@
 --     trusted payment that could not be projected onto its order.
 --
 -- No rollback statement: the drizzle better-sqlite3 migrator applies a file
--- inside one transaction, so a failure leaves the database at 0033 intact.
+-- inside one transaction, so a failure leaves the database at 0034 intact.
 -- Existing triggers on *other* tables mention `local_orders`; during the rename
 -- below the old table no longer exists, and SQLite's modern RENAME re-parses (and
 -- therefore fails on) those triggers. Legacy rename only swaps the name, which is

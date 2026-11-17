@@ -5,6 +5,7 @@ import { PageHeader } from '../components/PageHeader'
 import {
   formatLocalDateTime,
   formatLocalPriceCents,
+  localOrderOnlineCompletionDescription,
   localOrderStatusDescriptions,
   localOrderStatusLabels,
   localOrderStatusTone,
@@ -77,7 +78,9 @@ function OrderDetailBody({ order }: { order: LocalOrderDetail }) {
           <StatusPill order={order} />
         </div>
         <p className="mt-2 break-words text-[12px] leading-5 text-slate-500">
-          {localOrderStatusDescriptions[order.status]}
+          {order.status === 'online_completed'
+            ? localOrderOnlineCompletionDescription(order.onlineCompletion)
+            : localOrderStatusDescriptions[order.status]}
         </p>
         {order.statusNote ? (
           <p className="mt-2 break-words rounded-xl bg-[#fff7ec] px-3 py-2 text-[11px] leading-5 text-[#8a6132]">

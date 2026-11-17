@@ -25,6 +25,7 @@ import { describeOrderAttribution } from '../../components/life/localOrderAttrib
 import {
   formatLocalDateTime,
   formatLocalPriceCents,
+  localOrderOnlineCompletionDescription,
   localOrderStatusDescriptions,
   localOrderStatusLabels,
   localOrderStatusTone,
@@ -174,9 +175,13 @@ function OrderContent({ order, onUpdated }: { order: LocalOrderDetail; onUpdated
           <div className="flex items-start gap-2">
             <Info size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
             <div className="min-w-0">
-              <p className="font-semibold">{localOrderStatusDescriptions[order.status]}</p>
+              <p className="font-semibold">{order.status === 'online_completed'
+            ? localOrderOnlineCompletionDescription(order.onlineCompletion)
+            : localOrderStatusDescriptions[order.status]}</p>
               <p className="mt-1">
-                核验只确认订单事实，不代表收款、业务开通或结算完成。
+                {order.status === 'online_completed'
+                  ? '在线交易完成与人工核验是两种不同事实。'
+                  : '核验只确认订单事实，不代表收款、业务开通或结算完成。'}
               </p>
             </div>
           </div>

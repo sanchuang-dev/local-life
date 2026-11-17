@@ -60,7 +60,12 @@ import {
 import { seedConfirmedCommunity } from './resident-community-fixtures.js'
 import { readOrderPaymentEvidence } from '../src/ledger/payment-evidence.js'
 import { confirmTrustedPayment } from '../src/payments/confirmation.js'
-import { runPaymentOutboxConsumer } from '../src/payments/outbox.js'
+import { projectPaymentExceptionsOntoOrders, settleDeferredCouponReleases } from '../src/payments/order-completion.js'
+import {
+  PAYMENT_OUTBOX_LEASE_MS,
+  PAYMENT_OUTBOX_MAX_ATTEMPTS,
+  runPaymentOutboxConsumer,
+} from '../src/payments/outbox.js'
 import { createPaymentIntent } from '../src/payments/service.js'
 
 const migrationsFolder = fileURLToPath(new URL('../db/migrations', import.meta.url))
@@ -690,7 +695,7 @@ test('two consumers over one file database produce exactly one completion', asyn
     // A second consumer claims the row first (as if another process won the claim).
     const claim = second.db.transaction((tx) => {
       return tx.update(paymentOutbox)
-        .set({ status: 'processing', updatedAt: realNow() })
+        .set({ status: 'processing', attempts: 1, updatedAt: realNow() })
         .where(eq(paymentOutbox.status, 'pending'))
         .run()
     }, { behavior: 'immediate' })
@@ -1071,6 +1076,101 @@ test('a trusted channel failure releases the deferred coupon exactly once', asyn
   }
 })
 
+test('deferred coupon release skips an older live payment before applying its batch limit', async () => {
+  const w = await world({ priceCents: 1000 })
+  try {
+    const pendingCoupon = seedRewardCoupon(w.db, {
+      communityId: w.communityId,
+      buyerUserId: w.resident.userId,
+      createdByUserId: w.coordinatorUserId,
+      faceValueCents: 200,
+    })
+    const pendingOrder = await registerOrder(w, { couponId: pendingCoupon.couponId })
+    await createIntent(w, pendingOrder.id)
+    assert.equal((await staffCancel(w, pendingOrder)).status, 200)
+
+    const closedCoupon = seedRewardCoupon(w.db, {
+      communityId: w.communityId,
+      buyerUserId: w.resident.userId,
+      createdByUserId: w.coordinatorUserId,
+      faceValueCents: 200,
+    })
+    const closedOrder = await registerOrder(w, { couponId: closedCoupon.couponId })
+    const closedIntent = await createIntent(w, closedOrder.id)
+    assert.equal((await staffCancel(w, closedOrder)).status, 200)
+    assert.equal((await confirmEvidence(w, paidEvidence(closedIntent, {
+      providerStatus: 'closed',
+      providerTransactionId: null,
+    }))).status, 200)
+
+    assert.equal(settleDeferredCouponReleases(w.db, realNow(), { limit: 1 }), 1)
+    assert.equal(couponRow(w.db, pendingCoupon.couponId).status, 'reserved')
+    assert.equal(couponRow(w.db, closedCoupon.couponId).status, 'available')
+  } finally {
+    w.sqlite.close()
+  }
+})
+
+test('a preserved late-success exception blocks a deferred coupon release', async () => {
+  const w = await world({ priceCents: 1000 })
+  try {
+    const fixture = seedRewardCoupon(w.db, {
+      communityId: w.communityId,
+      buyerUserId: w.resident.userId,
+      createdByUserId: w.coordinatorUserId,
+      faceValueCents: 200,
+    })
+    const order = await registerOrder(w, { couponId: fixture.couponId })
+    const intent = await createIntent(w, order.id)
+    assert.equal((await staffCancel(w, order)).status, 200)
+    assert.equal((await confirmEvidence(w, paidEvidence(intent, {
+      providerStatus: 'closed',
+      providerTransactionId: null,
+    }))).status, 200)
+
+    // PAY-03 already preserved the late paid evidence before PAY-05's release sweep.
+    const late = await confirmEvidence(w, paidEvidence(intent))
+    assert.equal(late.status, 409)
+    assert.equal(await errorCode(late), API_ERROR_CODES.paymentConfirmationConflict)
+
+    const result = await consumeOk(w)
+    assert.equal(result.couponsReleased, 0)
+    assert.equal(result.exceptionsProjected, 1)
+    const coupon = couponRow(w.db, fixture.couponId)
+    assert.equal(coupon.status, 'reserved')
+    assert.equal(coupon.reservedOrderId, order.id)
+    const detail = await readOrder(w, order)
+    assert.equal(detail.status, 'cancelled')
+    assert.equal(detail.onlineConflicts[0]?.kind, 'late_success')
+  } finally {
+    w.sqlite.close()
+  }
+})
+
+test('late-success exception projection advances past already projected rows', async () => {
+  const w = await world()
+  try {
+    const order = await registerOrder(w)
+    for (let index = 0; index < 2; index += 1) {
+      const intent = await createIntent(w, order.id)
+      assert.equal((await confirmEvidence(w, paidEvidence(intent, {
+        providerStatus: 'closed',
+        providerTransactionId: null,
+      }))).status, 200)
+      const late = await confirmEvidence(w, paidEvidence(intent))
+      assert.equal(late.status, 409)
+      assert.equal(await errorCode(late), API_ERROR_CODES.paymentConfirmationConflict)
+    }
+
+    assert.equal(w.db.select().from(paymentReviewExceptions).all().length, 2)
+    assert.equal(projectPaymentExceptionsOntoOrders(w.db, realNow(), { limit: 1 }), 1)
+    assert.equal(projectPaymentExceptionsOntoOrders(w.db, realNow(1), { limit: 1 }), 1)
+    assert.equal(conflicts(w.db, order.id).length, 2)
+  } finally {
+    w.sqlite.close()
+  }
+})
+
 test('a late trusted success after close stays cancelled, keeps the released coupon released and opens manual review', async () => {
   const w = await world({ priceCents: 1000 })
   try {
@@ -1379,6 +1479,34 @@ test('the legacy manual verification path is unchanged and never claims online p
 /* 6. Consumer retry / recovery behaviour                                     */
 /* -------------------------------------------------------------------------- */
 
+test('an expired final claimed attempt is parked after a process crash', async () => {
+  const w = await world()
+  try {
+    const order = await registerOrder(w)
+    const intent = await createIntent(w, order.id)
+    await confirmPaid(w, intent)
+    const outbox = w.db.select().from(paymentOutbox).get()!
+    const now = realNow()
+    w.db.update(paymentOutbox).set({
+      status: 'processing',
+      attempts: PAYMENT_OUTBOX_MAX_ATTEMPTS,
+      updatedAt: new Date(now.getTime() - PAYMENT_OUTBOX_LEASE_MS - 1),
+    }).where(eq(paymentOutbox.id, outbox.id)).run()
+
+    const result = runPaymentOutboxConsumer(w.db, { now, leaseMs: PAYMENT_OUTBOX_LEASE_MS })
+    assert.equal(result.claimed, 0)
+    assert.equal(result.failed, 1)
+    const parked = w.db.select().from(paymentOutbox).get()!
+    assert.equal(parked.status, 'failed')
+    assert.equal(parked.attempts, PAYMENT_OUTBOX_MAX_ATTEMPTS)
+    assert.ok(parked.lastError?.includes('最后一次尝试'))
+    assert.equal(orderRow(w.db, order.id).status, 'registered')
+    assert.equal(outline(w.db, order.id).length, 0)
+  } finally {
+    w.sqlite.close()
+  }
+})
+
 test('a transient projection failure retries with backoff and completes after recovery', async () => {
   const w = await world()
   try {
@@ -1421,6 +1549,7 @@ test('a transient projection failure retries with backoff and completes after re
     assert.equal(recovered.completed, 1)
     assert.equal(orderRow(w.db, order.id).status, 'online_completed')
     assert.equal(outline(w.db, order.id).length, 1)
+    assert.equal(w.db.select().from(paymentOutbox).get()?.attempts, 2)
   } finally {
     w.sqlite.close()
   }

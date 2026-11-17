@@ -1,4 +1,4 @@
-import { and, asc, eq, lte, lt } from 'drizzle-orm'
+import { and, asc, eq, lte, lt, sql } from 'drizzle-orm'
 import {
   paymentOutboxConsumeResponseSchema,
   type PaymentOutboxConsumeResponse,
@@ -72,7 +72,8 @@ function recordConsumerFailure(
     const row = tx.select().from(paymentOutbox).where(eq(paymentOutbox.id, outboxId)).get()
     if (!row) return 'failed'
     if (row.status === 'delivered') return 'delivered'
-    const attempts = row.attempts + 1
+    if (row.status !== 'processing') return row.status === 'failed' ? 'failed' : 'pending'
+    const attempts = row.attempts
     if (attempts >= maxAttempts) {
       tx.update(paymentOutbox).set({
         status: 'failed',
@@ -120,14 +121,46 @@ export function runPaymentOutboxConsumer(
   const leaseMs = options.leaseMs ?? PAYMENT_OUTBOX_LEASE_MS
   const maxAttempts = options.maxAttempts ?? PAYMENT_OUTBOX_MAX_ATTEMPTS
 
-  // 1. Restart safety: a crashed consumer leaves its claim behind.
+  let claimed = 0
+  let completed = 0
+  let alreadyCompleted = 0
+  let conflicts = 0
+  let retried = 0
+  let failed = 0
+
+  // 1. Recover abandoned claims. The attempt was counted when the row was
+  // claimed, so a process crash cannot evade the five-attempt ceiling.
   db.transaction((tx) => {
-    tx.update(paymentOutbox).set({ status: 'pending', updatedAt: now })
+    const expired = tx.select({
+      id: paymentOutbox.id,
+      attempts: paymentOutbox.attempts,
+      lastError: paymentOutbox.lastError,
+    }).from(paymentOutbox)
       .where(and(
         eq(paymentOutbox.status, 'processing'),
         lt(paymentOutbox.updatedAt, new Date(now.getTime() - leaseMs)),
       ))
-      .run()
+      .all()
+
+    for (const row of expired) {
+      const exhausted = row.attempts >= maxAttempts
+      const result = tx.update(paymentOutbox).set(exhausted
+        ? {
+            status: 'failed',
+            lastError: row.lastError ?? '消费者在最后一次尝试中中断，租约到期后已泊车',
+            updatedAt: now,
+          }
+        : {
+            status: 'pending',
+            lastError: '消费者在投影完成前中断，租约到期后重新入队',
+            availableAt: now,
+            updatedAt: now,
+          }).where(and(
+            eq(paymentOutbox.id, row.id),
+            eq(paymentOutbox.status, 'processing'),
+          )).run()
+      if (exhausted && result.changes === 1) failed += 1
+    }
   }, { behavior: 'immediate' })
 
   // 2. Fair ordering; delivered/failed rows are never picked up again.
@@ -140,16 +173,124 @@ export function runPaymentOutboxConsumer(
     .limit(limit)
     .all()
 
-  let claimed = 0
-  let completed = 0
-  let alreadyCompleted = 0
-  let conflicts = 0
-  let retried = 0
-  let failed = 0
-
   for (const candidate of candidates) {
-    // 3a. Claim in its own IMMEDIATE transaction: exactly one consumer wins.
+    // 3a. Claim in its own IMMEDIATE transaction. Increment attempts here,
+    // before any work can crash, so every claimed execution is counted once.
     const row: OutboxRow | null = db.transaction((tx) => {
+      const result = tx.update(paymentOutbox).set({
+        status: 'processing',
+        attempts: sql`${paymentOutbox.attempts} + 1`,
+        updatedAt: now,
+      }).where(and(
+        eq(paymentOutbox.id, candidate.id),
+        eq(paymentOutbox.status, 'pending'),
+      )).run()
+      if (result.changes !== 1) return null
+      return tx.select().from(paymentOutbox)
+        .where(eq(paymentOutbox.id, candidate.id))
+        .get() ?? null
+    }, { behavior: 'immediate' })
+    if (!row) continue
+    claimed += 1
+
+    // 3b. Projection and outbox bookkeeping commit atomically.
+    let result: AppliedResult
+    try {
+      result = db.transaction((tx): AppliedResult => {
+        const current = tx.select().from(paymentOutbox)
+          .where(eq(paymentOutbox.id, row.id))
+          .get()
+        if (!current) return { applied: 'failed', outcomeKind: 'failed' }
+        if (current.status !== 'processing') {
+          if (current.status === 'delivered') return { applied: 'delivered', outcomeKind: 'already_completed' }
+          if (current.status === 'failed') return { applied: 'failed', outcomeKind: 'failed' }
+          return { applied: 'pending', outcomeKind: 'retry' }
+        }
+        const outcome = consumePaidOutboxEvent(tx, current, now)
+        // Attempts were incremented in the claim transaction.
+        const attempts = current.attempts
+        if (outcome.kind === 'completed' || outcome.kind === 'already_completed') {
+          tx.update(paymentOutbox).set({
+            status: 'delivered',
+            attempts,
+            availableAt: now,
+            lastError: null,
+            updatedAt: now,
+            deliveredAt: now,
+          }).where(and(
+            eq(paymentOutbox.id, row.id),
+            eq(paymentOutbox.status, 'processing'),
+          )).run()
+          return { applied: 'delivered', outcomeKind: outcome.kind }
+        }
+        if (outcome.kind === 'conflict' || outcome.kind === 'failed') {
+          tx.update(paymentOutbox).set({
+            status: 'failed',
+            attempts,
+            lastError: outcome.kind === 'conflict' ? outcome.detail : outcome.error,
+            updatedAt: now,
+          }).where(and(
+            eq(paymentOutbox.id, row.id),
+            eq(paymentOutbox.status, 'processing'),
+          )).run()
+          return { applied: 'failed', outcomeKind: outcome.kind }
+        }
+        if (attempts >= maxAttempts) {
+          tx.update(paymentOutbox).set({
+            status: 'failed',
+            attempts,
+            lastError: outcome.error,
+            updatedAt: now,
+          }).where(and(
+            eq(paymentOutbox.id, row.id),
+            eq(paymentOutbox.status, 'processing'),
+          )).run()
+          return { applied: 'failed', outcomeKind: 'retry' }
+        }
+        tx.update(paymentOutbox).set({
+          status: 'pending',
+          attempts,
+          lastError: outcome.error,
+          availableAt: new Date(now.getTime() + backoffMs(attempts)),
+          updatedAt: now,
+        }).where(and(
+          eq(paymentOutbox.id, row.id),
+          eq(paymentOutbox.status, 'processing'),
+        )).run()
+        return { applied: 'pending', outcomeKind: 'retry' }
+      }, { behavior: 'immediate' })
+    } catch (error) {
+      result = {
+        applied: recordConsumerFailure(db, row.id, errorText(error), now, maxAttempts),
+        outcomeKind: 'retry',
+      }
+    }
+
+    if (result.outcomeKind === 'completed') completed += 1
+    else if (result.outcomeKind === 'already_completed') alreadyCompleted += 1
+    else if (result.outcomeKind === 'conflict') conflicts += 1
+    else if (result.outcomeKind === 'failed') failed += 1
+    else if (result.applied === 'failed') failed += 1
+    else retried += 1
+  }
+
+  // 4. Idempotent follow-ups: release deferred coupons once payment is terminal,
+  // and surface PAY-03's preserved late successes on the order.
+  const couponsReleased = settleDeferredCouponReleases(db, now)
+  const exceptionsProjected = projectPaymentExceptionsOntoOrders(db, now)
+
+  return paymentOutboxConsumeResponseSchema.parse({
+    claimed,
+    completed,
+    alreadyCompleted,
+    conflicts,
+    retried,
+    failed,
+    couponsReleased,
+    exceptionsProjected,
+    asOf: now.toISOString(),
+  })
+}null = db.transaction((tx) => {
       const result = tx.update(paymentOutbox).set({
         status: 'processing',
         updatedAt: now,

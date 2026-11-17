@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, eq, inArray, isNotNull, notExists, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNotNull, notExists, sql } from 'drizzle-orm'
 import {
   API_ERROR_CODES,
   localOrderOnlineCompletionResponseSchema,
@@ -557,21 +557,50 @@ const RELEASABLE_ORDER_STATUSES = ['cancelled', 'rejected'] as const
 export function settleDeferredCouponReleases(
   db: AppDatabase,
   now: Date,
+  options: { limit?: number } = {},
 ): number {
+  const limit = Math.min(Math.max(options.limit ?? 200, 1), 200)
   return db.transaction((tx): number => {
+    // Filter before LIMIT: a large backlog of still-live payments must not occupy
+    // every batch slot and starve reservations that have trusted terminal evidence.
+    // A preserved late-success exception is also a hard hold, even if the intent
+    // itself is now closed/failed.
     const candidates = tx.select({
       id: localOrders.id,
       couponId: localOrders.couponId,
     }).from(localOrders)
+      .innerJoin(couponIssues, and(
+        eq(couponIssues.id, localOrders.couponId),
+        eq(couponIssues.status, 'reserved'),
+        eq(couponIssues.reservedOrderId, localOrders.id),
+      ))
       .where(and(
         inArray(localOrders.status, RELEASABLE_ORDER_STATUSES),
-        isNotNull(localOrders.couponId),
         notExists(
           tx.select({ one: sql`1` }).from(ledgerPaymentOrderLinks)
             .where(eq(ledgerPaymentOrderLinks.orderId, localOrders.id)),
         ),
+        notExists(
+          tx.select({ one: sql`1` }).from(paymentIntents)
+            .where(and(
+              eq(paymentIntents.localOrderId, localOrders.id),
+              inArray(paymentIntents.status, ['pending', 'confirming', 'paid']),
+            )),
+        ),
+        notExists(
+          tx.select({ one: sql`1` }).from(paymentReviewExceptions)
+            .innerJoin(paymentIntents, eq(paymentReviewExceptions.paymentIntentId, paymentIntents.id))
+            .where(and(
+              eq(paymentIntents.localOrderId, localOrders.id),
+              inArray(paymentReviewExceptions.kind, [
+                'late_success_after_closed',
+                'late_success_after_failed',
+              ]),
+            )),
+        ),
       ))
-      .limit(200)
+      .orderBy(asc(localOrders.createdAt), asc(localOrders.id))
+      .limit(limit)
       .all()
 
     let released = 0
@@ -614,7 +643,9 @@ export function settleDeferredCouponReleases(
 export function projectPaymentExceptionsOntoOrders(
   db: AppDatabase,
   now: Date,
+  options: { limit?: number } = {},
 ): number {
+  const limit = Math.min(Math.max(options.limit ?? 200, 1), 200)
   return db.transaction((tx): number => {
     const exceptions = tx.select({
       id: paymentReviewExceptions.id,
@@ -631,8 +662,18 @@ export function projectPaymentExceptionsOntoOrders(
           'late_success_after_failed',
         ]),
         isNotNull(paymentReviewExceptions.paymentIntentId),
+        // Keep already-projected exceptions out of the bounded candidate set.
+        // Otherwise the oldest 200 open rows permanently starve later evidence.
+        notExists(
+          tx.select({ one: sql`1` }).from(localOrderOnlineConflicts)
+            .where(eq(
+              localOrderOnlineConflicts.dedupeKey,
+              sql`'payment_review_exception:' || ${paymentReviewExceptions.id}`,
+            )),
+        ),
       ))
-      .limit(200)
+      .orderBy(asc(paymentReviewExceptions.createdAt), asc(paymentReviewExceptions.id))
+      .limit(limit)
       .all()
 
     let projected = 0
@@ -664,4 +705,5 @@ export function projectPaymentExceptionsOntoOrders(
     }
     return projected
   }, { behavior: 'immediate' })
+}
 }

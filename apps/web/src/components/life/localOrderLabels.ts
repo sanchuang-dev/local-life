@@ -1,5 +1,6 @@
 import {
   LOCAL_ORDER_STATUS_TRANSITIONS,
+  type LocalOrderDetail,
   type LocalOrderStatus,
   type LocalOrderTransitionStatus,
 } from '@sanchuang-dev/local-life-contracts'
@@ -36,6 +37,23 @@ export const localOrderStatusDescriptions: Record<LocalOrderStatus, string> = {
     '支付渠道已由服务端可信确认，该订单在线交易已完成；这不代表已结算到商户银行账户。',
   cancelled: '该订单已取消。',
   rejected: '该订单未通过，原因见订单详情。',
+}
+
+
+/** Explain the online terminal fact without implying cash was always collected. */
+export function localOrderOnlineCompletionDescription(
+  completion: Pick<NonNullable<LocalOrderDetail['onlineCompletion']>, 'kind' | 'simulated'> | null,
+): string {
+  if (!completion) {
+    return '订单已完成在线交易；支付方式与实付金额暂不可用，请以服务端交易明细为准。'
+  }
+  if (completion.kind === 'zero_amount') {
+    return '已使用全额消费券抵扣，订单交易完成；本单没有渠道扣款或现金实付。'
+  }
+  if (completion.simulated) {
+    return '隔离模拟支付已由服务端确认，订单交易完成；这不是微信真实扣款，也不代表银行到账。'
+  }
+  return '支付渠道已由服务端可信确认，订单在线交易已完成；这不代表已结算到商户银行账户。'
 }
 
 type Tone = 'mint' | 'amber' | 'rose' | 'slate' | 'teal'

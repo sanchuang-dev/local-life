@@ -152,8 +152,8 @@ PAY-02 依赖本卡：
 - 任一校验不一致时不完成订单，而是把 outbox 泊为 `failed`（`lastError` 记录原因）并落一条订单级冲突记录；真实渠道证据仍保留在 PAY-03 的 outbox/异常表中，不被静默丢弃。
 - 重复消费：已 `delivered` 的 outbox 不再被领取；即使人工把同一行重新置为 `pending`，唯一完成事实也会让结果变成 `already_completed`，不会产生第二条完成事件或第二次核销。
 - 并发消费：领取（`pending → processing`）在独立事务内以条件 UPDATE 完成，`changes !== 1` 即放弃，因此两个消费者只有一个能投影同一事件。
-- 进程中断恢复：`processing` 行超过 `PAYMENT_OUTBOX_LEASE_MS`（默认 60s）租约后可被重新领取；投影本身幂等，重跑安全。
-- 暂时性失败（数据库/意外异常）按指数退避重试（1s→2s→4s…上限 60s），达到 `PAYMENT_OUTBOX_MAX_ATTEMPTS`（默认 5）后泊为 `failed` 等待人工。
+- 进程中断恢复：每次领取时原子递增 `attempts`，因此领取后崩溃也计入尝试次数；租约过期时，未达上限则重新入队，已达 `PAYMENT_OUTBOX_MAX_ATTEMPTS`（默认 5）则直接泊车，避免崩溃循环绕过上限。
+- 暂时性失败（数据库/意外异常）按指数退避重试（1s→2s→4s…上限 60s）；`attempts` 按每次领取计数，正常完成、业务冲突或异常都只计一次，达到 5 次后泊为 `failed` 等待人工。
 - 触发入口：`runPaymentOutboxConsumer(db, options)` 与 `POST /internal/payments/outbox/consume`（与 PAY-03 确认入口同一服务端 token；居民会话、Cookie、CSRF 不能替代）。一次调用有批量上限（50），不提供无界 drain。
 
 ### 7.4 零元券单（独立完成路径）
@@ -167,8 +167,9 @@ PAY-02 依赖本卡：
 
 - 复用 #212/#213：订单登记时占券；在线支付成功（或零元完成）时核销；`redeemed`/`void` 永不可恢复。
 - 人工取消/拒绝订单时，若仍存在 `pending/confirming` 支付意图（渠道可能仍会扣款）或已 `paid` 的意图（钱已到但完成事实尚未投影），`releaseUnpaidOrderCoupon` 返回 `deferred`：订单照常终结，但**不释放**消费券，审计记录 `couponRelease=deferred`。这样不会出现“已付款却把同一张券给了别的订单”。
-- 仅当支付渠道给出**可信终态**（PAY-03 `closed`/`failed`）且订单已 `cancelled/rejected`、且没有任何 `paid` 意图时，消费者在 `settleDeferredCouponReleases` 中调用既有释放例程，恰好释放一次；`expiresAt` 过期本身永远不是释放证据。
-- 迟到真实成功：PAY-03 拒绝 `closed → paid` 并保存 `late_success_after_closed/failed` 异常。PAY-05 在消费周期内把该异常投影成订单级 `late_success` 冲突（幂等），订单保持 `cancelled/rejected`、已释放的券不会被自动重新占用、也不会自动核销其他订单的券，等待人工核对/补偿（真实退款策略尚未拍板）。
+- 仅当支付渠道给出**可信终态**（PAY-03 `closed`/`failed`）、订单已 `cancelled/rejected`、没有任何 `pending/confirming/paid` 意图，且不存在该订单任何支付单的迟到成功异常时，消费者才会调用既有释放例程，恰好释放一次；已保存的迟到成功证据会继续占住消费券，等待人工处理；`expiresAt` 过期本身永远不是释放证据。
+- 迟到真实成功：PAY-03 拒绝 `closed → paid` 并保存 `late_success_after_closed/failed` 异常。若异常先于释放被保存，PAY-05 会阻止返券并投影订单级 `late_success` 冲突；若真实成功在可信关单及返券之后才到达，已释放的券不会自动重新占用，订单保持 `cancelled/rejected`，仍需人工核对/补偿（真实退款策略尚未拍板）。
+- 延迟释放批次在应用 `LIMIT` 前排除仍有风险的订单；异常投影批次也排除已有订单级冲突的来源记录，避免旧的阻塞/已处理记录长期占满前 200 个位置。
 
 ### 7.6 与 PAY-06 的交接边界
 
