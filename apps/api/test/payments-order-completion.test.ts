@@ -717,6 +717,8 @@ test('two consumers over one file database produce exactly one completion', asyn
     assert.equal(recovered.claimed, 1)
     assert.equal(recovered.completed, 1)
     assert.equal(outline(first.db, order.id).length, 1)
+    // The abandoned first claim and the recovered claim are both counted.
+    assert.equal(first.db.select().from(paymentOutbox).get()?.attempts, 2)
 
     // The other consumer sees a delivered row and does nothing.
     const loser = runPaymentOutboxConsumer(second.db, {
@@ -783,6 +785,7 @@ test('two independent consumer processes project the same event exactly once', a
     )
     assert.equal(orderRow(w.db, order.id).status, 'online_completed')
     assert.equal(w.db.select().from(paymentOutbox).get()?.status, 'delivered')
+    assert.equal(w.db.select().from(paymentOutbox).get()?.attempts, 1)
   } finally {
     w.sqlite.close()
     temp.cleanup()

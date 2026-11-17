@@ -126,7 +126,7 @@ PAY-02 依赖本卡：
 
 ## 6. PAY-05 在线订单完成、零元券单与券状态衔接（已落地）
 
-### 7.1 两个终态，互不冒充
+### 6.1 两个终态，互不冒充
 
 | 终态 | 含义 | 写入者 | 禁止事项 |
 | --- | --- | --- | --- |
@@ -138,7 +138,7 @@ PAY-02 依赖本卡：
 - 旧订单继续沿用人工登记 → 处理 → 核验路径，行为不变；`verified` 仍是人工核验的终态。
 - 在线完成的订单不能人工核验、不能再改状态、不能补记人工实收凭据：`ledger` 的人工凭据登记入口仍要求 `status='verified'`，因此 `online_completed` 自然得到 `pending_order_review` + `canRecord=false`，不需要第二套拒绝逻辑。
 
-### 7.2 完成事实与数据库约束
+### 6.2 完成事实与数据库约束
 
 新增两张追加式表（迁移 `0035_online_order_completion.sql`）：
 
@@ -146,7 +146,7 @@ PAY-02 依赖本卡：
 - 插入触发器要求：订单仍处于可支付状态、金额与订单快照一致、支付单确实是该订单的 `paid` 意图且 kind/金额/模拟标记一致；`local_orders` 侧触发器要求 `status='online_completed'` 必须已存在完成事实，且该状态不可再改。
 - `local_order_online_conflicts`：保存“可信支付无法投影到订单”的人工核对记录（`order_not_payable`、`order_already_completed`、`payment_state_invalid`、`coupon_state_invalid`、`late_success`），按 `dedupe_key` 唯一、证据不可变、只允许 `status/resolved_at` 处理字段更新。它从不回退支付、不重新占券、不完成订单。
 
-### 7.3 事件消费（唯一可信成功事件）
+### 6.3 事件消费（唯一可信成功事件）
 
 - 消费对象只有 PAY-03 的 `payment.paid.v1`（`payment_outbox`），不重新实现支付确认。消费方在**同一 `BEGIN IMMEDIATE` 事务**内依次完成：读取并校验 outbox payload → 校验支付意图/paid attempt/渠道交易号/居民/社区/金额快照 → 写完成事实 → 投影订单状态 → 核销绑定的单张消费券 → 追加 `order.online_completed` 时间线 → 写审计 → 把 outbox 标记 `delivered`。
 - 任一校验不一致时不完成订单，而是把 outbox 泊为 `failed`（`lastError` 记录原因）并落一条订单级冲突记录；真实渠道证据仍保留在 PAY-03 的 outbox/异常表中，不被静默丢弃。
@@ -156,14 +156,14 @@ PAY-02 依赖本卡：
 - 暂时性失败（数据库/意外异常）按指数退避重试（1s→2s→4s…上限 60s）；`attempts` 按每次领取计数，正常完成、业务冲突或异常都只计一次，达到 5 次后泊为 `failed` 等待人工。
 - 触发入口：`runPaymentOutboxConsumer(db, options)` 与 `POST /internal/payments/outbox/consume`（与 PAY-03 确认入口同一服务端 token；居民会话、Cookie、CSRF 不能替代）。一次调用有批量上限（50），不提供无界 drain。
 
-### 7.4 零元券单（独立完成路径）
+### 6.4 零元券单（独立完成路径）
 
 - PAY-02 继续拒绝净应付为 0 的支付意图（保护不绕过、不向微信发起零元支付）。全额券抵扣订单改走居民接口 `POST /local-orders/:localOrderId/zero-amount-completion`。
 - 服务端在单个事务中重新计算毛额/券抵扣/净应付，要求 `netPayableCents=0`、`couponDiscountCents=totalCents>0`、消费券仍 `reserved` 且绑定本单且属主/面额一致（已释放、已核销、已作废、来源奖励已冲正均拒绝），然后：写 `kind='zero_amount'` 的 `payment_intents` 行（无渠道、非模拟、`paid`、无 attempt）、写完成事实（金额 0、无渠道交易号）、投影 `online_completed`、核销券、写时间线与审计。
 - 不创建支付尝试、不产生 `payment.paid.v1`、不写 `ledger_entries`，因而不贡献正数实收或消费累计。
 - 重复调用幂等：第二次返回 `created:false`，不重复核销、不新增支付单。非零订单调用返回 `payment_zero_amount_unavailable`。
 
-### 7.5 券占用、释放与迟到支付
+### 6.5 券占用、释放与迟到支付
 
 - 复用 #212/#213：订单登记时占券；在线支付成功（或零元完成）时核销；`redeemed`/`void` 永不可恢复。
 - 人工取消/拒绝订单时，若仍存在 `pending/confirming` 支付意图（渠道可能仍会扣款）或已 `paid` 的意图（钱已到但完成事实尚未投影），`releaseUnpaidOrderCoupon` 返回 `deferred`：订单照常终结，但**不释放**消费券，审计记录 `couponRelease=deferred`。这样不会出现“已付款却把同一张券给了别的订单”。
@@ -171,7 +171,7 @@ PAY-02 依赖本卡：
 - 迟到真实成功：PAY-03 拒绝 `closed → paid` 并保存 `late_success_after_closed/failed` 异常。若异常先于释放被保存，PAY-05 会阻止返券并投影订单级 `late_success` 冲突；若真实成功在可信关单及返券之后才到达，已释放的券不会自动重新占用，订单保持 `cancelled/rejected`，仍需人工核对/补偿（真实退款策略尚未拍板）。
 - 延迟释放批次在应用 `LIMIT` 前排除仍有风险的订单；异常投影批次也排除已有订单级冲突的来源记录，避免旧的阻塞/已处理记录长期占满前 200 个位置。
 
-### 7.6 与 PAY-06 的交接边界
+### 6.6 与 PAY-06 的交接边界
 
 - PAY-05 **不写** `ledger_entries`、不做线上实收/分账/消费累计投影，`projectLocalOrderFacts` 的既有行为（只认 `verified` 人工核验）未修改。
 - 因此在线完成订单当前**不会**进入经营账本、结算候选或三人团消费累计；这需要 PAY-06 以 `local_order_online_completions`（+ `simulated` 标记）为唯一来源新增独立来源标识与幂等投影，并决定零元券单不计入实际净实付。PAY-06 不得复用人工 `payment_received` 语义，也不得把 `online_completed` 当成 `verified`。
@@ -183,7 +183,7 @@ PAY-02 依赖本卡：
 - `apps/api/test/payments-db.test.ts`：真实 SQLite 新库、历史库升级、金额/归属/唯一性/状态转换/事件追加式/跨意图引用负例，并确认旧订单、Ledger 行与锁定批次不丢失。
 - `apps/api/test/payments-http.test.ts`：真实 Hono HTTP + SQLite 的创建/查询、金额派生、幂等、并发、过期/关闭/已付/零元、鉴权/CSRF/Origin、重启恢复和渠道不可用边界。
 - `apps/api/test/payments-confirmation.test.ts`：内部 token、证据校验、paid/pending/terminal 收敛、跨表去重、完整异常证据、outbox 事务/重启、同证据/通知查单/不同交易号三组跨进程双连接竞争、不可变证据与失败回滚。
-- `apps/api/test/payments-order-completion.test.ts`：真实 SQLite + Hono 的在线完成一次、事件重放、双连接并发/租约恢复、损坏事件泊车、取消时延迟释放券、可信 close/failed 恰好释放一次、过期不释放、迟到成功进入人工核对且券不复活、零元券单完成/重复/已释放券拒绝/非零拒绝、已核销与已冲正券拒绝、人工核验旧路径不变、注入故障后的重试/恢复、内部入口鉴权，以及 0033 历史库升级（行保留、`PRAGMA foreign_key_check` 为空、触发器重建、旧支付事件续跑完成）。
+- `apps/api/test/payments-order-completion.test.ts`（22 例）：真实 SQLite + Hono 的在线完成一次、事件重放、双连接并发/租约恢复、崩溃尝试上限、损坏事件泊车、取消时延迟释放券、可信 close/failed 恰好释放一次、过期不释放、迟到成功先于返券时保持占券、迟到成功晚于返券时进入人工核对、返券与异常投影批次公平性、零元券单完成/重复/已释放券拒绝/非零拒绝、已核销与已冲正券拒绝、人工核验旧路径不变、注入故障后的重试/恢复、内部入口鉴权，以及 0033 历史库升级（行保留、`PRAGMA foreign_key_check` 为空、触发器重建、旧支付事件续跑完成）。
 - `apps/api/test/payments-mock.test.ts`：真实 Hono + SQLite 的 Mock 发起、成功/失败/取消/超时/待确认、重复通知、通知+查单双进程竞争、重启查询、迟到成功、非法输入与 production/公开预览 fail-closed。
 
 ## 8. PAY-02 居民创建 / 查询 API
