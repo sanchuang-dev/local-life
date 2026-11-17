@@ -39,10 +39,9 @@ const environmentSchema = z
     TRUSTED_ORIGINS: z.string().default(''),
     AUTH_DEV_ENABLED: z.enum(['true', 'false']).default('false'),
     /**
-     * PAY-02 only creates intents for an explicitly enabled isolated Mock
-     * channel; PAY-03 accepts normalized trusted evidence for it. This flag
-     * never executes a mock payment itself; PAY-04 owns that. Production must
-     * keep this false (validated below).
+     * PAY-02 creates Mock intents and PAY-04 provides the in-process Mock
+     * driver (no public control route) only when this is explicitly true.
+     * Production must keep it false; the config loader rejects true below.
      */
     PAYMENT_MOCK_ENABLED: z.enum(['true', 'false']).default('false'),
     /**
@@ -171,7 +170,7 @@ export interface ApiConfig {
   trustedOrigins: string[]
   webBaseUrl: string
   authDevEnabled: boolean
-  /** PAY-02 isolated Mock channel availability; false in production by validation. */
+  /** PAY-02/PAY-04 isolated Mock driver availability; false in production by validation. */
   paymentMockEnabled: boolean
   paymentInternalToken?: string
   crmeb?: {

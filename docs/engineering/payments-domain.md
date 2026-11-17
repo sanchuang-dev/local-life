@@ -1,6 +1,6 @@
-# 支付领域契约、持久化、居民创建/查询、可信确认与在线订单完成（PAY-01 #276 / PAY-02 #277 / PAY-03 #278 / PAY-05 #280）
+# 支付领域契约、持久化、居民创建/查询、可信确认与隔离 Mock（PAY-01 #276 / PAY-02 #277 / PAY-03 #278 / PAY-04 #279 / PAY-05 #280）
 
-> **PAY-01** 建立支付意图、尝试与事件的共享契约和 SQLite 真相源；**PAY-02** 增加居民创建/查询待支付意图的受控 API；**PAY-03** 增加可信渠道证据确认、状态收敛、下游 outbox 与冲突证据队列；**PAY-05** 消费唯一可信成功事件，在订单域内幂等完成在线交易、核销消费券、提供零元券单独立完成路径，并在支付渠道可信终态下安全释放/延迟释放券。当前仍**没有**真实微信支付商户配置/回调验签（PAY-10/PAY-11）、Mock 网关执行（PAY-04）、经营账本收入投影/消费累计（PAY-06）、H5/后台支付 UI（PAY-07/PAY-08）或退款执行。不得据此宣称在线支付或真实收款已可用。
+> **PAY-01** 建立支付意图、尝试与事件的共享契约和 SQLite 真相源；**PAY-02** 增加居民创建/查询待支付意图的受控 API；**PAY-03** 增加可信渠道证据确认、状态收敛、下游 outbox 与冲突证据队列；**PAY-04** 增加进程内隔离 Mock 驱动，所有模拟结果仍走 `confirmTrustedPayment`。当前仍**没有**真实微信支付商户配置/回调验签（PAY-10/PAY-11）、公网 Mock 控制接口、订单交易完成、优惠券核销、账本投影或退款执行（PAY-05/PAY-06）。不得据此宣称在线支付已可用。
 
 ## 1. 与既有事实的边界
 
@@ -8,11 +8,10 @@
 | --- | --- | --- |
 | 居民登记办理意向 | `local_orders`（LL-MVP-010） | 不改；支付单只引用它 |
 | 人工业务核验 | `local_orders.status='verified'` / `verifiedAt` | 不改，也不等同于付款 |
-| 在线交易完成 | `local_orders.status='online_completed'` + `local_order_online_completions`（PAY-05） | 新事实，与人工核验严格分离；不等于银行到账 |
 | 人工实收凭据 | `ledger_entries.payment_received` | 不改，不与渠道支付混写 |
 | 微信/渠道支付成功 | PAY-01 支付意图 `status='paid'`（PAY-03 写入） | 新事实，不等于银行到账或结算 |
 | Mock 支付 | `channel='mock'`, `simulated=1` | 永久标记模拟；不能流入正式资金/业绩 |
-| 零元券单 | `kind='zero_amount'` + `kind='zero_amount'` 完成事实（PAY-05） | 独立非渠道完成类型，不伪造微信交易、不产生正数收款 |
+| 零元券单 | `kind='zero_amount'` | 独立非渠道完成类型，不伪造微信交易；PAY-05 负责后续原子完成 |
 | 退款 | 本卡不建表、不开放动作 | 未来独立退款记录引用支付意图，不改支付状态历史 |
 
 支付状态只有 `pending / confirming / paid / closed / failed`。退款、银行到账、订单履约和结算都不是支付状态。PAY-03 只写支付意图证据与状态，不写 `local_orders`、优惠券核销或 `ledger_entries`。
@@ -100,8 +99,8 @@ PAY-02 依赖本卡：
 
 - `payment.paid.v1` payload 固定包含 `paymentIntentId`、`localOrderId`、`residentUserId`、`communityId`、`amountCents`、`providerTransactionId`、`simulated`、`paidAt`。
 - outbox 行在 paid 事务内以 `dedupe_key = payment.paid:<paymentIntentId>` 写入 `pending`；重复确认不会新增第二行。
-- PAY-03 **不消费** outbox，也不完成订单、核销优惠券或投影账本；PAY-05 消费 `payment.paid.v1` 完成在线交易，PAY-06 负责账本收入投影；消费方必须用稳定去重键保证重复执行不重复产生业务事实。
-- outbox 与异常表持久化，进程重启后仍可读取；PAY-03 不提供投递/重试/管理员 UI。PAY-05 提供基于该 outbox 的最小消费/重试/租约恢复能力，不另造队列。
+- PAY-03 **不消费** outbox，也不完成订单、核销优惠券或投影账本；PAY-05/PAY-06 负责按 payload 消费，并必须用稳定去重键保证重复执行不重复产生业务事实。
+- outbox 与异常表持久化，进程重启后仍可读取；PAY-03 不提供投递/重试/管理员 UI。
 
 ### 异常证据
 
@@ -117,15 +116,76 @@ PAY-02 依赖本卡：
 - `payments-confirmation.test.ts` 使用真实 SQLite/Hono 验证成功、重复、通知/查单收敛、金额/商户/订单/终态冲突、迟到成功、outbox 重启恢复，以及“outbox 唯一冲突导致已写意图/attempt 全部回滚”的失败路径。
 - 跨连接/跨进程竞争由**两个独立 Node 进程、两个独立 better-sqlite3 连接**验证三组场景：同一证据并发确认收敛为一个 `confirmed`、一个 `already_confirmed`；通知与查单使用不同去重键但同一渠道交易号并发确认，会分别保留两条 provider observation，但只产生一条 paid 状态事实、attempt 与 outbox；不同渠道交易号并发确认同一支付意图只允许一个 `confirmed`，另一请求得到 `payment_confirmation_conflict` 并留下 `transaction_conflict` 异常，仍只有一条 paid attempt/outbox。此证据不再沿用 PAY-02 同实例 `Promise.all` 的弱结论。
 
-## 5. 验证
+## 5. PAY-04 隔离 Mock 驱动（已落地）
+
+- 代码入口：`apps/api/src/payments/mock-channel.ts`。只提供进程内 `createMockPayment` 与 `executeMockPaymentAction`，**不注册公网 HTTP 控制路由**。
+- 成功、失败、用户取消、超时、待确认、重复通知、通知+查单、关闭后迟到成功都先归一化为 `PaymentEvidence`，再调用 PAY-03 `confirmTrustedPayment`；没有第二套支付状态机。
+- 输入只有支付意图 UUID、action、source 和服务端时间；金额、商户订单号、商户身份、渠道交易号、证据由服务端派生，调用方不能提交。只有成功结果生成带 `MOCK-TXN-` 前缀的交易号；失败/取消/超时/pending 的交易号为 null。首次 observedAt 在 Mock 专用预留表中通过 `BEGIN IMMEDIATE` 原子 insert-or-read；迁移前的事件从既有事件/attempt/异常恢复并补建预留，确保同一 dedupeKey 跨进程始终使用相同证据时间。意图与 outbox 永久 `simulated=true`。
+- Mock 驱动要求 `PAYMENT_MOCK_ENABLED=true` 且非 production；production/公开预览配置启用会 fail-closed。公开预览 `mvp` 的实际 installer 固定 `NODE_ENV=production`、`AUTH_DEV_ENABLED=false` 且未设置 Mock 开关；`apps/api/Dockerfile` 也固定 production。
+- 复跑命令：`pnpm --filter @sanchuang-dev/local-life-api exec tsx --test test/payments-mock.test.ts`。详细场景、排障和安全边界见 [payments-mock.md](payments-mock.md)。
+
+## 6. PAY-05 在线订单完成、零元券单与券状态衔接（已落地）
+
+### 7.1 两个终态，互不冒充
+
+| 终态 | 含义 | 写入者 | 禁止事项 |
+| --- | --- | --- | --- |
+| `local_orders.status='verified'` + `verified_by_user_id`/`verified_at` | **人工**业务核验事实 | 运营/管理员核验接口（既有 #109 路径） | 不得用于在线支付；不得伪造 `verifiedAt` 或 `order.verified` |
+| `local_orders.status='online_completed'` | **服务端可信在线交易完成** | PAY-05 消费者 / 零元完成路径 | 不写 `verified_*`、不写 `payment_received`、不代表银行到账 |
+
+- 共享契约 `localOrderStatusSchema` 增加 `online_completed`；`LOCAL_ORDER_STATUS_TRANSITIONS` 只允许 `registered/processing/pending_review → online_completed`，且它**不在** `localOrderTransitionStatusSchema` 中，人工改状态接口永远无法把订单推进到该状态。
+- `localOrderDetailSchema` 增加 `onlineCompletion`（仅 `online_completed` 存在）与 `onlineConflicts`。`verification` 与 `onlineCompletion` 在 DTO 层互斥：人工核验路径不可能声明线上付款，线上完成也不会出现核验人。
+- 旧订单继续沿用人工登记 → 处理 → 核验路径，行为不变；`verified` 仍是人工核验的终态。
+- 在线完成的订单不能人工核验、不能再改状态、不能补记人工实收凭据：`ledger` 的人工凭据登记入口仍要求 `status='verified'`，因此 `online_completed` 自然得到 `pending_order_review` + `canRecord=false`，不需要第二套拒绝逻辑。
+
+### 7.2 完成事实与数据库约束
+
+新增两张追加式表（迁移 `0035_online_order_completion.sql`）：
+
+- `local_order_online_completions`：**一单一完成、一支付单一完成**（`local_order_id`、`payment_intent_id`、非空 `provider_transaction_id` 各自唯一）。冻结毛额/券抵扣/实付分，`kind='channel'` 必须有正数实付与渠道交易号；`kind='zero_amount'` 必须 `amount_cents=0`、无渠道交易号、非模拟。表本身拒绝 UPDATE/DELETE。
+- 插入触发器要求：订单仍处于可支付状态、金额与订单快照一致、支付单确实是该订单的 `paid` 意图且 kind/金额/模拟标记一致；`local_orders` 侧触发器要求 `status='online_completed'` 必须已存在完成事实，且该状态不可再改。
+- `local_order_online_conflicts`：保存“可信支付无法投影到订单”的人工核对记录（`order_not_payable`、`order_already_completed`、`payment_state_invalid`、`coupon_state_invalid`、`late_success`），按 `dedupe_key` 唯一、证据不可变、只允许 `status/resolved_at` 处理字段更新。它从不回退支付、不重新占券、不完成订单。
+
+### 7.3 事件消费（唯一可信成功事件）
+
+- 消费对象只有 PAY-03 的 `payment.paid.v1`（`payment_outbox`），不重新实现支付确认。消费方在**同一 `BEGIN IMMEDIATE` 事务**内依次完成：读取并校验 outbox payload → 校验支付意图/paid attempt/渠道交易号/居民/社区/金额快照 → 写完成事实 → 投影订单状态 → 核销绑定的单张消费券 → 追加 `order.online_completed` 时间线 → 写审计 → 把 outbox 标记 `delivered`。
+- 任一校验不一致时不完成订单，而是把 outbox 泊为 `failed`（`lastError` 记录原因）并落一条订单级冲突记录；真实渠道证据仍保留在 PAY-03 的 outbox/异常表中，不被静默丢弃。
+- 重复消费：已 `delivered` 的 outbox 不再被领取；即使人工把同一行重新置为 `pending`，唯一完成事实也会让结果变成 `already_completed`，不会产生第二条完成事件或第二次核销。
+- 并发消费：领取（`pending → processing`）在独立事务内以条件 UPDATE 完成，`changes !== 1` 即放弃，因此两个消费者只有一个能投影同一事件。
+- 进程中断恢复：`processing` 行超过 `PAYMENT_OUTBOX_LEASE_MS`（默认 60s）租约后可被重新领取；投影本身幂等，重跑安全。
+- 暂时性失败（数据库/意外异常）按指数退避重试（1s→2s→4s…上限 60s），达到 `PAYMENT_OUTBOX_MAX_ATTEMPTS`（默认 5）后泊为 `failed` 等待人工。
+- 触发入口：`runPaymentOutboxConsumer(db, options)` 与 `POST /internal/payments/outbox/consume`（与 PAY-03 确认入口同一服务端 token；居民会话、Cookie、CSRF 不能替代）。一次调用有批量上限（50），不提供无界 drain。
+
+### 7.4 零元券单（独立完成路径）
+
+- PAY-02 继续拒绝净应付为 0 的支付意图（保护不绕过、不向微信发起零元支付）。全额券抵扣订单改走居民接口 `POST /local-orders/:localOrderId/zero-amount-completion`。
+- 服务端在单个事务中重新计算毛额/券抵扣/净应付，要求 `netPayableCents=0`、`couponDiscountCents=totalCents>0`、消费券仍 `reserved` 且绑定本单且属主/面额一致（已释放、已核销、已作废、来源奖励已冲正均拒绝），然后：写 `kind='zero_amount'` 的 `payment_intents` 行（无渠道、非模拟、`paid`、无 attempt）、写完成事实（金额 0、无渠道交易号）、投影 `online_completed`、核销券、写时间线与审计。
+- 不创建支付尝试、不产生 `payment.paid.v1`、不写 `ledger_entries`，因而不贡献正数实收或消费累计。
+- 重复调用幂等：第二次返回 `created:false`，不重复核销、不新增支付单。非零订单调用返回 `payment_zero_amount_unavailable`。
+
+### 7.5 券占用、释放与迟到支付
+
+- 复用 #212/#213：订单登记时占券；在线支付成功（或零元完成）时核销；`redeemed`/`void` 永不可恢复。
+- 人工取消/拒绝订单时，若仍存在 `pending/confirming` 支付意图（渠道可能仍会扣款）或已 `paid` 的意图（钱已到但完成事实尚未投影），`releaseUnpaidOrderCoupon` 返回 `deferred`：订单照常终结，但**不释放**消费券，审计记录 `couponRelease=deferred`。这样不会出现“已付款却把同一张券给了别的订单”。
+- 仅当支付渠道给出**可信终态**（PAY-03 `closed`/`failed`）且订单已 `cancelled/rejected`、且没有任何 `paid` 意图时，消费者在 `settleDeferredCouponReleases` 中调用既有释放例程，恰好释放一次；`expiresAt` 过期本身永远不是释放证据。
+- 迟到真实成功：PAY-03 拒绝 `closed → paid` 并保存 `late_success_after_closed/failed` 异常。PAY-05 在消费周期内把该异常投影成订单级 `late_success` 冲突（幂等），订单保持 `cancelled/rejected`、已释放的券不会被自动重新占用、也不会自动核销其他订单的券，等待人工核对/补偿（真实退款策略尚未拍板）。
+
+### 7.6 与 PAY-06 的交接边界
+
+- PAY-05 **不写** `ledger_entries`、不做线上实收/分账/消费累计投影，`projectLocalOrderFacts` 的既有行为（只认 `verified` 人工核验）未修改。
+- 因此在线完成订单当前**不会**进入经营账本、结算候选或三人团消费累计；这需要 PAY-06 以 `local_order_online_completions`（+ `simulated` 标记）为唯一来源新增独立来源标识与幂等投影，并决定零元券单不计入实际净实付。PAY-06 不得复用人工 `payment_received` 语义，也不得把 `online_completed` 当成 `verified`。
+- 人工线下收款、既有锁定结算批次与历史账本完全不受影响。
+
+## 7. 验证
 
 - `packages/contracts/test/payments-contract.test.mjs`：状态机、整数分/负数/浮点/溢出、金额守恒、渠道/模拟/零元、支付意图与尝试的终态时间戳双向一致性、失败原因禁用规则、paid attempt 交易号要求，以及 PAY-03 证据/outbox/异常 DTO。
 - `apps/api/test/payments-db.test.ts`：真实 SQLite 新库、历史库升级、金额/归属/唯一性/状态转换/事件追加式/跨意图引用负例，并确认旧订单、Ledger 行与锁定批次不丢失。
 - `apps/api/test/payments-http.test.ts`：真实 Hono HTTP + SQLite 的创建/查询、金额派生、幂等、并发、过期/关闭/已付/零元、鉴权/CSRF/Origin、重启恢复和渠道不可用边界。
 - `apps/api/test/payments-confirmation.test.ts`：内部 token、证据校验、paid/pending/terminal 收敛、跨表去重、完整异常证据、outbox 事务/重启、同证据/通知查单/不同交易号三组跨进程双连接竞争、不可变证据与失败回滚。
 - `apps/api/test/payments-order-completion.test.ts`：真实 SQLite + Hono 的在线完成一次、事件重放、双连接并发/租约恢复、损坏事件泊车、取消时延迟释放券、可信 close/failed 恰好释放一次、过期不释放、迟到成功进入人工核对且券不复活、零元券单完成/重复/已释放券拒绝/非零拒绝、已核销与已冲正券拒绝、人工核验旧路径不变、注入故障后的重试/恢复、内部入口鉴权，以及 0033 历史库升级（行保留、`PRAGMA foreign_key_check` 为空、触发器重建、旧支付事件续跑完成）。
+- `apps/api/test/payments-mock.test.ts`：真实 Hono + SQLite 的 Mock 发起、成功/失败/取消/超时/待确认、重复通知、通知+查单双进程竞争、重启查询、迟到成功、非法输入与 production/公开预览 fail-closed。
 
-## 6. PAY-02 居民创建 / 查询 API
+## 8. PAY-02 居民创建 / 查询 API
 
 ### 路由
 
@@ -169,64 +229,13 @@ PAY-02 依赖本卡：
 
 `merchantOrderNo` 由服务端生成 `PAY-` + 28 位大写十六进制（总长 32），满足微信 JSAPI `out_trade_no` 的 6–32 字符限制；共享契约同时限制为 6–32 个 `[A-Za-z0-9_-]` 字符。PAY-10 可直接复用该持久化值，不再生成第二套单号。
 
-## 7. PAY-05 在线订单完成、零元券单与券状态衔接（已落地）
-
-### 7.1 两个终态，互不冒充
-
-| 终态 | 含义 | 写入者 | 禁止事项 |
-| --- | --- | --- | --- |
-| `local_orders.status='verified'` + `verified_by_user_id`/`verified_at` | **人工**业务核验事实 | 运营/管理员核验接口（既有 #109 路径） | 不得用于在线支付；不得伪造 `verifiedAt` 或 `order.verified` |
-| `local_orders.status='online_completed'` | **服务端可信在线交易完成** | PAY-05 消费者 / 零元完成路径 | 不写 `verified_*`、不写 `payment_received`、不代表银行到账 |
-
-- 共享契约 `localOrderStatusSchema` 增加 `online_completed`；`LOCAL_ORDER_STATUS_TRANSITIONS` 只允许 `registered/processing/pending_review → online_completed`，且它**不在** `localOrderTransitionStatusSchema` 中，人工改状态接口永远无法把订单推进到该状态。
-- `localOrderDetailSchema` 增加 `onlineCompletion`（仅 `online_completed` 存在）与 `onlineConflicts`。`verification` 与 `onlineCompletion` 在 DTO 层互斥：人工核验路径不可能声明线上付款，线上完成也不会出现核验人。
-- 旧订单继续沿用人工登记 → 处理 → 核验路径，行为不变；`verified` 仍是人工核验的终态。
-- 在线完成的订单不能人工核验、不能再改状态、不能补记人工实收凭据：`ledger` 的人工凭据登记入口仍要求 `status='verified'`，因此 `online_completed` 自然得到 `pending_order_review` + `canRecord=false`，不需要第二套拒绝逻辑。
-
-### 7.2 完成事实与数据库约束
-
-新增两张追加式表（迁移 `0034_online_order_completion.sql`）：
-
-- `local_order_online_completions`：**一单一完成、一支付单一完成**（`local_order_id`、`payment_intent_id`、非空 `provider_transaction_id` 各自唯一）。冻结毛额/券抵扣/实付分，`kind='channel'` 必须有正数实付与渠道交易号；`kind='zero_amount'` 必须 `amount_cents=0`、无渠道交易号、非模拟。表本身拒绝 UPDATE/DELETE。
-- 插入触发器要求：订单仍处于可支付状态、金额与订单快照一致、支付单确实是该订单的 `paid` 意图且 kind/金额/模拟标记一致；`local_orders` 侧触发器要求 `status='online_completed'` 必须已存在完成事实，且该状态不可再改。
-- `local_order_online_conflicts`：保存“可信支付无法投影到订单”的人工核对记录（`order_not_payable`、`order_already_completed`、`payment_state_invalid`、`coupon_state_invalid`、`late_success`），按 `dedupe_key` 唯一、证据不可变、只允许 `status/resolved_at` 处理字段更新。它从不回退支付、不重新占券、不完成订单。
-
-### 7.3 事件消费（唯一可信成功事件）
-
-- 消费对象只有 PAY-03 的 `payment.paid.v1`（`payment_outbox`），不重新实现支付确认。消费方在**同一 `BEGIN IMMEDIATE` 事务**内依次完成：读取并校验 outbox payload → 校验支付意图/paid attempt/渠道交易号/居民/社区/金额快照 → 写完成事实 → 投影订单状态 → 核销绑定的单张消费券 → 追加 `order.online_completed` 时间线 → 写审计 → 把 outbox 标记 `delivered`。
-- 任一校验不一致时不完成订单，而是把 outbox 泊为 `failed`（`lastError` 记录原因）并落一条订单级冲突记录；真实渠道证据仍保留在 PAY-03 的 outbox/异常表中，不被静默丢弃。
-- 重复消费：已 `delivered` 的 outbox 不再被领取；即使人工把同一行重新置为 `pending`，唯一完成事实也会让结果变成 `already_completed`，不会产生第二条完成事件或第二次核销。
-- 并发消费：领取（`pending → processing`）在独立事务内以条件 UPDATE 完成，`changes !== 1` 即放弃，因此两个消费者只有一个能投影同一事件。
-- 进程中断恢复：`processing` 行超过 `PAYMENT_OUTBOX_LEASE_MS`（默认 60s）租约后可被重新领取；投影本身幂等，重跑安全。
-- 暂时性失败（数据库/意外异常）按指数退避重试（1s→2s→4s…上限 60s），达到 `PAYMENT_OUTBOX_MAX_ATTEMPTS`（默认 5）后泊为 `failed` 等待人工。
-- 触发入口：`runPaymentOutboxConsumer(db, options)` 与 `POST /internal/payments/outbox/consume`（与 PAY-03 确认入口同一服务端 token；居民会话、Cookie、CSRF 不能替代）。一次调用有批量上限（50），不提供无界 drain。
-
-### 7.4 零元券单（独立完成路径）
-
-- PAY-02 继续拒绝净应付为 0 的支付意图（保护不绕过、不向微信发起零元支付）。全额券抵扣订单改走居民接口 `POST /local-orders/:localOrderId/zero-amount-completion`。
-- 服务端在单个事务中重新计算毛额/券抵扣/净应付，要求 `netPayableCents=0`、`couponDiscountCents=totalCents>0`、消费券仍 `reserved` 且绑定本单且属主/面额一致（已释放、已核销、已作废、来源奖励已冲正均拒绝），然后：写 `kind='zero_amount'` 的 `payment_intents` 行（无渠道、非模拟、`paid`、无 attempt）、写完成事实（金额 0、无渠道交易号）、投影 `online_completed`、核销券、写时间线与审计。
-- 不创建支付尝试、不产生 `payment.paid.v1`、不写 `ledger_entries`，因而不贡献正数实收或消费累计。
-- 重复调用幂等：第二次返回 `created:false`，不重复核销、不新增支付单。非零订单调用返回 `payment_zero_amount_unavailable`。
-
-### 7.5 券占用、释放与迟到支付
-
-- 复用 #212/#213：订单登记时占券；在线支付成功（或零元完成）时核销；`redeemed`/`void` 永不可恢复。
-- 人工取消/拒绝订单时，若仍存在 `pending/confirming` 支付意图（渠道可能仍会扣款）或已 `paid` 的意图（钱已到但完成事实尚未投影），`releaseUnpaidOrderCoupon` 返回 `deferred`：订单照常终结，但**不释放**消费券，审计记录 `couponRelease=deferred`。这样不会出现“已付款却把同一张券给了别的订单”。
-- 仅当支付渠道给出**可信终态**（PAY-03 `closed`/`failed`）且订单已 `cancelled/rejected`、且没有任何 `paid` 意图时，消费者在 `settleDeferredCouponReleases` 中调用既有释放例程，恰好释放一次；`expiresAt` 过期本身永远不是释放证据。
-- 迟到真实成功：PAY-03 拒绝 `closed → paid` 并保存 `late_success_after_closed/failed` 异常。PAY-05 在消费周期内把该异常投影成订单级 `late_success` 冲突（幂等），订单保持 `cancelled/rejected`、已释放的券不会被自动重新占用、也不会自动核销其他订单的券，等待人工核对/补偿（真实退款策略尚未拍板）。
-
-### 7.6 与 PAY-06 的交接边界
-
-- PAY-05 **不写** `ledger_entries`、不做线上实收/分账/消费累计投影，`projectLocalOrderFacts` 的既有行为（只认 `verified` 人工核验）未修改。
-- 因此在线完成订单当前**不会**进入经营账本、结算候选或三人团消费累计；这需要 PAY-06 以 `local_order_online_completions`（+ `simulated` 标记）为唯一来源新增独立来源标识与幂等投影，并决定零元券单不计入实际净实付。PAY-06 不得复用人工 `payment_received` 语义，也不得把 `online_completed` 当成 `verified`。
-- 人工线下收款、既有锁定结算批次与历史账本完全不受影响。
-
-## 8. 已知限制
+## 9. 已知限制
 
 - 未接真实微信支付商户 API、回调验签、证书/API v3 解密；PAY-11 才完成真实适配器。
-- 未实现 Mock 网关执行/自动完成；PAY-04 负责。
+- PAY-04 Mock 是进程内测试/开发驱动，没有公网 HTTP 控制接口；所有模拟支付永久标记 `simulated=true`，不得被解释为真实微信扣款或银行到账。
 - 在线订单完成与消费券核销已由 PAY-05 落地，但**未**实现经营账本收款投影/消费累计（PAY-06）、H5/管理后台支付交互与运维 UI（PAY-07/PAY-08）、真实退款执行（策略未定）。在线完成订单因此暂不进入账本、结算候选或三人团累计。
 - 消费者由内部 token 入口或运维调度驱动，本仓库尚未内置定时器/常驻 worker；生产部署需要运维侧按 `POST /internal/payments/outbox/consume` 或进程内调用 `runPaymentOutboxConsumer` 安排触发。
 - 长期 `pending/confirming` 的支付意图需要 PAY-11 的可信查单/关单能力收敛；在渠道给出可信终态前，PAY-05 会一直保留其消费券占用（延迟释放），不会按过期时间猜测失败。
 - `mock` 支付只用于隔离契约测试；其 outbox 永久带 `simulated=true`，后续消费方不得把它当正式收款。
 - 内部 token 是服务端共享密钥，不是微信签名；泄露风险由部署密钥管理承担，未配置时接口保持关闭。
+

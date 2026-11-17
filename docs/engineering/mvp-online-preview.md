@@ -37,7 +37,7 @@
 1. **MVP 单独构建**：H5 和 Admin 的 Vite `base` 都为 `/`，因为它们分别运行在独立域名根路径；不能改动 GitHub Pages 的 `/local-life/`、`/local-life/prod/` 预览构建。BrowserRouter 直接访问及刷新、资源路径、入口与深链接都必须测试；GitHub Pages 预览保留 HashRouter。
 2. **API 同源访问**：页面只对当前站点 `/api/*` 发送请求；Caddy 在两个域名上分别执行相同的路径去前缀和反向代理规则。浏览器不直接访问第三个 API Origin，因此无需新增跨源 CORS/credentials 接线。禁止为节省工作量暴露 API 内部端口。
 3. **Cookie 和 CSRF**：每个站点以各自的 host-only HttpOnly/Secure/SameSite=Lax Cookie 提供会话，不配置跨四级子域共享的 `COOKIE_DOMAIN`。两站可共用后台数据库/session 表，但浏览器 Cookie 按域隔离，**不承诺跨站单点登录**。Hono 对写请求继续校验 CSRF token 和完整 Origin；`local` 与 `local-admin` 是不同 Origin，虽处于同一 site，SameSite 本身**不能**替代 Origin/CSRF 验证。应为两站点单独回归登录、登出、Cookie 生命周期、跨站伪造 Origin 及错误 CSRF 负例。
-4. **配置**：公网运行 `NODE_ENV=production`、`AUTH_DEV_ENABLED=false`，`WEB_BASE_URL=https://local.proto.3cgroup.cn/`；`TRUSTED_ORIGINS` 必须是这两个 **精确 HTTPS Origin**（逗号分隔）。微信 OAuth 使用居民域名的授权回跳，真实 AppID、回调域名和后台操作权限必须有实际授权；不能把开发登录放行到公网。后台登录独立，不让管理台复用居民端的微信跳转回调。
+4. **配置**：公网运行 `NODE_ENV=production`、`AUTH_DEV_ENABLED=false`，`WEB_BASE_URL=https://local.proto.3cgroup.cn/`；`TRUSTED_ORIGINS` 必须是这两个 **精确 HTTPS Origin**（逗号分隔）。微信 OAuth 使用居民域名的授权回跳，真实 AppID、回调域名和后台操作权限必须有实际授权；不能把开发登录放行到公网。后台登录独立，不让管理台复用居民端的微信跳转回调。PAY-04 Mock 支付控制不进入公网：固定 installer 未设置 `PAYMENT_MOCK_ENABLED`，且 production 配置若设为 true 会在启动时失败；Mock 驱动本身也没有 HTTP 控制路由。
 5. **数据**：一套 Node API、单写者 SQLite，放于独立持久卷（不在发布目录），预备备份、恢复、迁移和回滚；共享的 H5/Admin API 数据不复制为第二份数据库。敏感配置只存在授权服务器侧。
 6. **运营边界**：居民活动公开只读；后台真实登录且服务端鉴权；未验收的报名、交易、领奖等路径必须禁用或真实返回不可用，不能让静态 Mock 数据冒充已提交成功。
 7. **上线约束**：两个四级域名分别核对 DNS、TLS、Caddy 生效配置及安全响应，保留旧 `local-life.proto.3cgroup.cn` 原型站。部署前建版本化产物、数据库备份及健康检查机制；回滚只切换兼容应用版本，不能自动恢复旧 DB 快照导致用户数据丢失。
