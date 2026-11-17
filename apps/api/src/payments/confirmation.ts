@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { and, desc, eq, inArray } from 'drizzle-orm'
 import {
   API_ERROR_CODES,
@@ -50,9 +50,34 @@ function failure(
 }
 
 /**
+ * Bind a provider dedupe key to the complete normalized evidence it represents.
+ * A fixed tuple avoids depending on caller object-property order; timestamps are
+ * canonicalized so equivalent timezone offsets describe the same observation.
+ */
+function paymentEvidenceFingerprint(evidence: PaymentEvidence): string {
+  const canonicalEvidence = [
+    evidence.merchantOrderNo,
+    evidence.channel,
+    evidence.providerStatus,
+    evidence.providerTransactionId,
+    evidence.amountCents,
+    evidence.currency,
+    evidence.merchantAppId,
+    evidence.merchantId,
+    new Date(evidence.observedAt).toISOString(),
+    evidence.source,
+    evidence.dedupeKey,
+    evidence.providerEventRef,
+    evidence.failureCode,
+    evidence.failureMessage,
+  ]
+  return createHash('sha256').update(JSON.stringify(canonicalEvidence)).digest('hex')
+}
+
+/**
  * Persist a conflict/late/unknown channel observation without changing the
- * payment or attempt state. A dedupe key may never exist in both the exception
- * table and the accepted-event table; the transaction checks both directions.
+ * payment or attempt state. Exact evidence replays reuse one snapshot; a reused
+ * provider key with different evidence gets its own immutable anomaly snapshot.
  */
 function recordException(
   tx: LocalTransaction,
@@ -61,17 +86,16 @@ function recordException(
   kind: ExceptionKind,
   detail: string,
   now: Date,
-): string | null {
+): string {
+  const fingerprint = paymentEvidenceFingerprint(evidence)
   const existing = tx.select({ id: paymentReviewExceptions.id })
     .from(paymentReviewExceptions)
-    .where(eq(paymentReviewExceptions.dedupeKey, evidence.dedupeKey))
+    .where(and(
+      eq(paymentReviewExceptions.dedupeKey, evidence.dedupeKey),
+      eq(paymentReviewExceptions.evidenceFingerprint, fingerprint),
+    ))
     .get()
   if (existing) return existing.id
-  const accepted = tx.select({ id: paymentEvents.id })
-    .from(paymentEvents)
-    .where(eq(paymentEvents.dedupeKey, evidence.dedupeKey))
-    .get()
-  if (accepted) return null
 
   const id = randomUUID()
   tx.insert(paymentReviewExceptions).values({
@@ -86,6 +110,7 @@ function recordException(
     observedAt: new Date(evidence.observedAt),
     source: evidence.source,
     dedupeKey: evidence.dedupeKey,
+    evidenceFingerprint: fingerprint,
     providerEventRef: evidence.providerEventRef,
     failureCode: evidence.failureCode,
     failureMessage: evidence.failureMessage,
@@ -120,6 +145,7 @@ function appendChannelEvent(
     toStatus,
     providerEventRef: evidence.providerEventRef ?? evidence.providerTransactionId ?? evidence.dedupeKey,
     dedupeKey: evidence.dedupeKey,
+    evidenceFingerprint: paymentEvidenceFingerprint(evidence),
     note: null,
     createdAt: now,
   }).run()
@@ -231,6 +257,9 @@ function confirmPaid(
         .orderBy(desc(paymentAttempts.confirmedAt), desc(paymentAttempts.id))
         .get()
     if (paidAttempt?.status === 'paid' && paidAttempt.providerTransactionId === evidence.providerTransactionId) {
+      // A distinct notification/query key is a distinct provider observation,
+      // even though it must not create another paid transition or outbox row.
+      appendChannelEvent(tx, evidence, intent.id, paidAttempt.id, intent.status, 'paid', now)
       return {
         kind: 'ok',
         response: paymentConfirmationResponseSchema.parse({
@@ -531,42 +560,75 @@ export function confirmTrustedPayment(
   const now = options.now ?? new Date()
 
   const outcome = db.transaction((tx): ConfirmationOutcome => {
-    const validated = validateEvidence(tx, evidence, now)
-    if ('kind' in validated) return validated
-    const { intent } = validated
-
-    // A provider event identity that was previously rejected must never be
-    // reused to declare success, even if the payload was edited in transit.
-    const rejected = tx.select({ id: paymentReviewExceptions.id })
-      .from(paymentReviewExceptions)
-      .where(eq(paymentReviewExceptions.dedupeKey, evidence.dedupeKey))
-      .get()
-    if (rejected) {
-      return failure(
-        409,
-        API_ERROR_CODES.paymentConfirmationConflict,
-        '该渠道证据已进入复核，不能重复声明成功',
-      )
-    }
-
+    // Resolve provider event identity before validating against mutable lifecycle
+    // state. Exact evidence is an idempotent replay; changed evidence is an
+    // immutable conflict snapshot, never a successful replay.
     const duplicate = tx.select().from(paymentEvents)
       .where(eq(paymentEvents.dedupeKey, evidence.dedupeKey)).get()
     if (duplicate) {
-      if (duplicate.paymentIntentId !== intent.id) {
-        recordException(tx, evidence, intent.id, 'transaction_conflict', '事件去重键属于另一支付意图', now)
-        return failure(409, API_ERROR_CODES.paymentConfirmationConflict, '事件去重键冲突，已记录复核')
+      if (duplicate.evidenceFingerprint !== paymentEvidenceFingerprint(evidence)) {
+        const observedIntent = tx.select({ id: paymentIntents.id }).from(paymentIntents)
+          .where(eq(paymentIntents.merchantOrderNo, evidence.merchantOrderNo)).get()
+        recordException(
+          tx,
+          evidence,
+          observedIntent?.id ?? null,
+          'transaction_conflict',
+          '渠道事件去重键已被不同证据内容重复使用',
+          now,
+        )
+        return failure(
+          409,
+          API_ERROR_CODES.paymentConfirmationConflict,
+          '渠道事件去重键冲突，已保存复核证据',
+        )
+      }
+
+      const duplicateIntent = tx.select().from(paymentIntents)
+        .where(eq(paymentIntents.id, duplicate.paymentIntentId)).get()
+      if (!duplicateIntent) {
+        recordException(tx, evidence, null, 'unknown_evidence', '已接受事件关联支付意图不存在', now)
+        return failure(409, API_ERROR_CODES.paymentConfirmationConflict, '已接受事件关联的支付意图不可用')
       }
       const duplicateAttempt = attemptOfEvent(tx, duplicate.paymentAttemptId)
       return {
         kind: 'ok',
         response: paymentConfirmationResponseSchema.parse({
-          outcome: intent.status === 'paid' ? 'already_confirmed' : 'recorded',
-          intent: toIntent(intent),
+          outcome: duplicateIntent.status === 'paid' ? 'already_confirmed' : 'recorded',
+          intent: toIntent(duplicateIntent),
           attempt: duplicateAttempt ? toAttempt(duplicateAttempt) : null,
-          outboxEventId: outboxOfIntent(tx, intent.id),
+          outboxEventId: outboxOfIntent(tx, duplicateIntent.id),
         }),
       }
     }
+
+    // A rejected provider key is permanently reserved. A changed payload is
+    // still recorded as a separate anomaly rather than silently discarded.
+    const rejected = tx.select({ id: paymentReviewExceptions.id })
+      .from(paymentReviewExceptions)
+      .where(eq(paymentReviewExceptions.dedupeKey, evidence.dedupeKey))
+      .get()
+    if (rejected) {
+      const matchedIntent = tx.select({ id: paymentIntents.id }).from(paymentIntents)
+        .where(eq(paymentIntents.merchantOrderNo, evidence.merchantOrderNo)).get()
+      recordException(
+        tx,
+        evidence,
+        matchedIntent?.id ?? null,
+        'transaction_conflict',
+        '渠道事件去重键已被此前拒绝的证据占用，不能复用',
+        now,
+      )
+      return failure(
+        409,
+        API_ERROR_CODES.paymentConfirmationConflict,
+        '该渠道证据去重键已进入复核，不能重复声明成功',
+      )
+    }
+
+    const validated = validateEvidence(tx, evidence, now)
+    if ('kind' in validated) return validated
+    const { intent } = validated
 
     const txnAttempt = evidence.providerTransactionId
       ? tx.select().from(paymentAttempts)

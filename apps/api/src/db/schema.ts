@@ -2045,6 +2045,7 @@ export const paymentEvents = sqliteTable('payment_events', {
   toStatus: text('to_status').$type<PaymentStatus>(),
   providerEventRef: text('provider_event_ref'),
   dedupeKey: text('dedupe_key'),
+  evidenceFingerprint: text('evidence_fingerprint'),
   note: text('note'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (table) => [
@@ -2074,6 +2075,18 @@ export const paymentEvents = sqliteTable('payment_events', {
     sql`(${table.providerEventRef} IS NULL OR length(trim(${table.providerEventRef})) BETWEEN 1 AND 128)
       AND (${table.dedupeKey} IS NULL OR length(trim(${table.dedupeKey})) BETWEEN 1 AND 200)
       AND (${table.note} IS NULL OR length(trim(${table.note})) BETWEEN 1 AND 500)`,
+  ),
+  check(
+    'payment_events_evidence_fingerprint_check',
+    sql`(
+      ${table.eventType} IN ('payment.channel_notification', 'payment.channel_query')
+      AND ${table.evidenceFingerprint} IS NOT NULL
+      AND length(${table.evidenceFingerprint}) = 64
+      AND ${table.evidenceFingerprint} NOT GLOB '*[^0-9a-f]*'
+    ) OR (
+      ${table.eventType} NOT IN ('payment.channel_notification', 'payment.channel_query')
+      AND ${table.evidenceFingerprint} IS NULL
+    )`,
   ),
 ])
 
@@ -2139,6 +2152,7 @@ export const paymentReviewExceptions = sqliteTable('payment_review_exceptions', 
   observedAt: integer('observed_at', { mode: 'timestamp_ms' }).notNull(),
   source: text('source').$type<PaymentEvidenceSource>().notNull(),
   dedupeKey: text('dedupe_key').notNull(),
+  evidenceFingerprint: text('evidence_fingerprint').notNull().default(''),
   providerEventRef: text('provider_event_ref'),
   failureCode: text('failure_code'),
   failureMessage: text('failure_message'),
@@ -2148,7 +2162,8 @@ export const paymentReviewExceptions = sqliteTable('payment_review_exceptions', 
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   resolvedAt: integer('resolved_at', { mode: 'timestamp_ms' }),
 }, (table) => [
-  uniqueIndex('payment_review_exceptions_dedupe_uq').on(table.dedupeKey),
+  uniqueIndex('payment_review_exceptions_dedupe_fingerprint_uq')
+    .on(table.dedupeKey, table.evidenceFingerprint),
   index('payment_review_exceptions_status_created_idx').on(table.status, table.createdAt),
   index('payment_review_exceptions_intent_idx').on(table.paymentIntentId),
   check(
@@ -2173,6 +2188,13 @@ export const paymentReviewExceptions = sqliteTable('payment_review_exceptions', 
   check(
     'payment_review_exceptions_amount_check',
     sql`${table.amountCents} IS NULL OR ${table.amountCents} >= 0`,
+  ),
+  check(
+    'payment_review_exceptions_fingerprint_check',
+    sql`${table.evidenceFingerprint} = '' OR (
+      length(${table.evidenceFingerprint}) = 64
+      AND ${table.evidenceFingerprint} NOT GLOB '*[^0-9a-f]*'
+    )`,
   ),
   check(
     'payment_review_exceptions_text_check',

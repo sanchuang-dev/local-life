@@ -259,6 +259,10 @@ test('trusted paid evidence confirms once and writes attempt, event and outbox a
     assert.equal(payload.payload.simulated, true)
     assert.equal(payload.payload.providerTransactionId, paidEvidence.providerTransactionId)
 
+    const acceptedEvent = w.db.select().from(paymentEvents)
+      .where(eq(paymentEvents.dedupeKey, paidEvidence.dedupeKey)).get()
+    assert.match(acceptedEvent?.evidenceFingerprint ?? '', /^[0-9a-f]{64}$/)
+
     const replay = confirmTrustedPayment(w.db, paidEvidence, { now: NOW })
     assert.equal(replay.outcome, 'already_confirmed')
     assert.equal(count(w.db, paymentAttempts), 1)
@@ -294,6 +298,7 @@ test('notification and query evidence for the same transaction converge once', (
     })
     assert.equal(confirmTrustedPayment(w.db, query, { now: NOW }).outcome, 'already_confirmed')
     assert.equal(count(w.db, paymentAttempts), 1)
+    assert.equal(count(w.db, paymentEvents), 3) // intent_created + both provider observations
     assert.equal(count(w.db, paymentOutbox), 1)
   } finally {
     w.sqlite.close()
@@ -367,33 +372,160 @@ test('wrong amount, merchant, order and late success are refused and preserved f
   }
 })
 
-test('a dedupe key cannot be both rejected evidence and an accepted payment event', () => {
+test('rejected keys stay reserved and altered accepted evidence is preserved for review', () => {
   const w = world()
   try {
     const intent = createIntent(w)
-    assertLocalError('payment_evidence_rejected', () => confirmTrustedPayment(w.db, evidence(intent, {
+    const rejectedEvidence = evidence(intent, {
       amountCents: intent.netPayableCents - 1,
       dedupeKey: 'rejected-then-success',
-    }), { now: NOW }))
-    assertLocalError('payment_confirmation_conflict', () => confirmTrustedPayment(w.db, evidence(intent, {
-      dedupeKey: 'rejected-then-success',
-    }), { now: NOW }))
+      providerTransactionId: 'rejected-transaction',
+    })
+    assertLocalError('payment_evidence_rejected', () => confirmTrustedPayment(w.db, rejectedEvidence, { now: NOW }))
+
+    const correctedEvidence = { ...rejectedEvidence, amountCents: intent.netPayableCents }
+    assertLocalError('payment_confirmation_conflict', () => confirmTrustedPayment(w.db, correctedEvidence, { now: NOW }))
+    const rejectedSnapshots = w.db.select().from(paymentReviewExceptions)
+      .where(eq(paymentReviewExceptions.dedupeKey, 'rejected-then-success')).all()
+    assert.equal(rejectedSnapshots.length, 2)
+    assert.notEqual(rejectedSnapshots[0]?.evidenceFingerprint, rejectedSnapshots[1]?.evidenceFingerprint)
     assert.equal(w.db.select().from(paymentIntents).where(eq(paymentIntents.id, intent.id)).get()?.status, 'pending')
     assert.equal(count(w.db, paymentOutbox), 0)
     assert.equal(count(w.db, paymentEvents), 1) // intent_created
-    assert.equal(count(w.db, paymentReviewExceptions), 1)
 
-    const paidEvidence = evidence(intent, { dedupeKey: 'accepted-then-rejected' })
-    assert.equal(confirmTrustedPayment(w.db, paidEvidence, { now: NOW }).outcome, 'confirmed')
-    assertLocalError('payment_evidence_rejected', () => confirmTrustedPayment(w.db, evidence(intent, {
-      amountCents: intent.netPayableCents - 1,
+    const paidEvidence = evidence(intent, {
       dedupeKey: 'accepted-then-rejected',
-    }), { now: NOW }))
-    // The accepted key stays unique to the success event; no exception row is
-    // created for an edited payload carrying the same provider event identity.
+      providerTransactionId: 'accepted-transaction',
+    })
+    assert.equal(confirmTrustedPayment(w.db, paidEvidence, { now: NOW }).outcome, 'confirmed')
+    const alteredAcceptedEvidence = { ...paidEvidence, amountCents: paidEvidence.amountCents - 1 }
+    assertLocalError('payment_confirmation_conflict', () => confirmTrustedPayment(w.db, alteredAcceptedEvidence, { now: NOW }))
+    const acceptedConflict = w.db.select().from(paymentReviewExceptions)
+      .where(eq(paymentReviewExceptions.dedupeKey, 'accepted-then-rejected')).get()
+    assert.equal(acceptedConflict?.kind, 'transaction_conflict')
+    assert.equal(acceptedConflict?.amountCents, alteredAcceptedEvidence.amountCents)
+
+    // Exact conflict replay reuses its anomaly row; it does not grow the queue.
+    assertLocalError('payment_confirmation_conflict', () => confirmTrustedPayment(w.db, alteredAcceptedEvidence, { now: NOW }))
+    assert.equal(count(w.db, paymentReviewExceptions), 3)
+    assert.equal(count(w.db, paymentEvents), 2)
+    assert.equal(count(w.db, paymentAttempts), 1)
+    assert.equal(count(w.db, paymentOutbox), 1)
+  } finally {
+    w.sqlite.close()
+  }
+})
+
+test('an accepted provider key cannot hide a different transaction id for the same intent', () => {
+  const w = world()
+  try {
+    const intent = createIntent(w)
+    const accepted = evidence(intent, {
+      dedupeKey: 'same-intent-reused-key',
+      providerTransactionId: 'provider-transaction-a',
+      providerEventRef: 'provider-event-a',
+    })
+    assert.equal(confirmTrustedPayment(w.db, accepted, { now: NOW }).outcome, 'confirmed')
+
+    const conflicting = {
+      ...accepted,
+      providerTransactionId: 'provider-transaction-b',
+      providerEventRef: 'provider-event-b',
+    }
+    assertLocalError('payment_confirmation_conflict', () => confirmTrustedPayment(w.db, conflicting, { now: NOW }))
+    const anomalies = w.db.select().from(paymentReviewExceptions)
+      .where(eq(paymentReviewExceptions.dedupeKey, accepted.dedupeKey)).all()
+    assert.equal(anomalies.length, 1)
+    assert.equal(anomalies[0]?.kind, 'transaction_conflict')
+    assert.equal(anomalies[0]?.providerTransactionId, 'provider-transaction-b')
+    assert.equal(anomalies[0]?.evidenceFingerprint?.length, 64)
+    const acceptedEvent = w.db.select().from(paymentEvents)
+      .where(eq(paymentEvents.dedupeKey, accepted.dedupeKey)).get()
+    assert.notEqual(anomalies[0]?.evidenceFingerprint, acceptedEvent?.evidenceFingerprint)
+
+    assertLocalError('payment_confirmation_conflict', () => confirmTrustedPayment(w.db, conflicting, { now: NOW }))
     assert.equal(count(w.db, paymentReviewExceptions), 1)
+    assert.equal(w.db.select().from(paymentIntents).get()?.status, 'paid')
+    assert.equal(count(w.db, paymentAttempts), 1)
     assert.equal(count(w.db, paymentEvents), 2)
     assert.equal(count(w.db, paymentOutbox), 1)
+  } finally {
+    w.sqlite.close()
+  }
+})
+
+test('an accepted provider key reused by another intent preserves the second intent evidence', () => {
+  const w = world()
+  try {
+    const firstIntent = createIntent(w)
+    const secondIntent = createIntent(w, 'second-intent', secondOrder(w))
+    const accepted = evidence(firstIntent, {
+      dedupeKey: 'cross-intent-reused-key',
+      providerTransactionId: 'cross-intent-transaction-a',
+    })
+    assert.equal(confirmTrustedPayment(w.db, accepted, { now: NOW }).outcome, 'confirmed')
+
+    const conflicting = evidence(secondIntent, {
+      dedupeKey: accepted.dedupeKey,
+      providerTransactionId: 'cross-intent-transaction-b',
+    })
+    assertLocalError('payment_confirmation_conflict', () => confirmTrustedPayment(w.db, conflicting, { now: NOW }))
+    const anomalies = w.db.select().from(paymentReviewExceptions)
+      .where(eq(paymentReviewExceptions.dedupeKey, accepted.dedupeKey)).all()
+    assert.equal(anomalies.length, 1)
+    assert.equal(anomalies[0]?.paymentIntentId, secondIntent.id)
+    assert.equal(anomalies[0]?.merchantOrderNo, secondIntent.merchantOrderNo)
+    assert.equal(anomalies[0]?.providerTransactionId, 'cross-intent-transaction-b')
+    assert.equal(w.db.select().from(paymentIntents).where(eq(paymentIntents.id, secondIntent.id)).get()?.status, 'pending')
+    assert.equal(count(w.db, paymentAttempts), 1)
+    assert.equal(count(w.db, paymentEvents), 3) // two intent_created + one accepted provider event
+    assert.equal(count(w.db, paymentOutbox), 1)
+  } finally {
+    w.sqlite.close()
+  }
+})
+
+test('accepted keys preserve altered amount and merchant evidence without a second paid fact', () => {
+  const w = world()
+  try {
+    const amountIntent = createIntent(w, 'accepted-amount')
+    const acceptedAmount = evidence(amountIntent, {
+      dedupeKey: 'accepted-amount-key',
+      providerTransactionId: 'accepted-amount-transaction',
+    })
+    assert.equal(confirmTrustedPayment(w.db, acceptedAmount, { now: NOW }).outcome, 'confirmed')
+    const alteredAmount = { ...acceptedAmount, amountCents: acceptedAmount.amountCents - 1 }
+    assertLocalError('payment_confirmation_conflict', () => confirmTrustedPayment(w.db, alteredAmount, { now: NOW }))
+    const amountAnomaly = w.db.select().from(paymentReviewExceptions)
+      .where(eq(paymentReviewExceptions.dedupeKey, acceptedAmount.dedupeKey)).get()
+    assert.equal(amountAnomaly?.amountCents, alteredAmount.amountCents)
+    assert.equal(amountAnomaly?.kind, 'transaction_conflict')
+
+    const merchantIntent = createIntent(w, 'accepted-merchant', secondOrder(w))
+    const acceptedMerchant = evidence(merchantIntent, {
+      dedupeKey: 'accepted-merchant-key',
+      providerTransactionId: 'accepted-merchant-transaction',
+    })
+    assert.equal(confirmTrustedPayment(w.db, acceptedMerchant, { now: NOW }).outcome, 'confirmed')
+    const alteredMerchant = {
+      ...acceptedMerchant,
+      merchantAppId: 'tampered-app',
+      merchantId: 'tampered-merchant',
+    }
+    assertLocalError('payment_confirmation_conflict', () => confirmTrustedPayment(w.db, alteredMerchant, { now: NOW }))
+    const merchantAnomaly = w.db.select().from(paymentReviewExceptions)
+      .where(eq(paymentReviewExceptions.dedupeKey, acceptedMerchant.dedupeKey)).get()
+    assert.equal(merchantAnomaly?.merchantAppId, 'tampered-app')
+    assert.equal(merchantAnomaly?.merchantId, 'tampered-merchant')
+
+    // Replaying either altered payload is idempotent at the anomaly layer.
+    assertLocalError('payment_confirmation_conflict', () => confirmTrustedPayment(w.db, alteredAmount, { now: NOW }))
+    assertLocalError('payment_confirmation_conflict', () => confirmTrustedPayment(w.db, alteredMerchant, { now: NOW }))
+    assert.equal(count(w.db, paymentReviewExceptions), 2)
+    assert.equal(count(w.db, paymentIntents), 2)
+    assert.equal(count(w.db, paymentAttempts), 2)
+    assert.equal(count(w.db, paymentEvents), 4)
+    assert.equal(count(w.db, paymentOutbox), 2)
   } finally {
     w.sqlite.close()
   }
@@ -772,6 +904,10 @@ test('outbox and review evidence reject deletes and identity mutation', () => {
     const intent = createIntent(w)
     assert.equal(confirmTrustedPayment(w.db, evidence(intent), { now: NOW }).outcome, 'confirmed')
     const outbox = w.db.select().from(paymentOutbox).get()!
+    const channelEvent = w.db.select().from(paymentEvents)
+      .where(eq(paymentEvents.eventType, 'payment.channel_notification')).get()!
+    assert.throws(() => w.sqlite.prepare('UPDATE payment_events SET evidence_fingerprint = ? WHERE id = ?')
+      .run('f'.repeat(64), channelEvent.id))
     assert.throws(() => w.sqlite.prepare('DELETE FROM payment_outbox WHERE id = ?').run(outbox.id))
     assert.throws(() => w.sqlite.prepare('UPDATE payment_outbox SET payload_json = ? WHERE id = ?')
       .run('{}', outbox.id))
@@ -789,6 +925,8 @@ test('outbox and review evidence reject deletes and identity mutation', () => {
       .run(exception.id))
     assert.throws(() => w.sqlite.prepare('UPDATE payment_review_exceptions SET merchant_id = ? WHERE id = ?')
       .run('other-merchant', exception.id))
+    assert.throws(() => w.sqlite.prepare('UPDATE payment_review_exceptions SET evidence_fingerprint = ? WHERE id = ?')
+      .run('f'.repeat(64), exception.id))
     assert.doesNotThrow(() => w.sqlite.prepare(`UPDATE payment_review_exceptions
       SET status = 'resolved', resolved_at = ? WHERE id = ?`).run(NOW.getTime(), exception.id))
   } finally {
@@ -863,6 +1001,7 @@ test('notification and query races across processes produce one paid fact', asyn
     )
     assert.equal(w.db.select().from(paymentIntents).get()?.status, 'paid')
     assert.equal(count(w.db, paymentAttempts), 1)
+    assert.equal(count(w.db, paymentEvents), 3) // intent_created + both provider observations
     assert.equal(count(w.db, paymentOutbox), 1)
   } finally {
     w.sqlite.close()

@@ -232,6 +232,13 @@
       "when": 1794772800000,
       "tag": "0032_payment_confirmations",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1794776400000,
+      "tag": "0033_payment_event_evidence_fingerprint",
+      "breakpoints": true
     }
   ]
 }

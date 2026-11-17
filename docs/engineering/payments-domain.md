@@ -81,7 +81,7 @@ PAY-02 依赖本卡：
 - 证据必须携带：商户订单号、渠道、渠道结果、渠道交易号（paid 必填）、金额分、币种、商户 AppID/商户号、观察时间、来源（notification/query）与去重键。
 - 服务端按 `merchant_order_no` 查找既有支付意图，绝不创建第二张支付单；校验 `kind='channel'`、渠道一致、商户上下文一致、金额等于冻结的净应付、币种为 `CNY`，并重新读取本地订单确认居民/社区归属。
 - `wechat_jsapi` 证据必须携带真实 `merchantAppId` 与 `merchantId`；共享契约拒绝 null/空值，服务层同时拒绝持久化意图缺少商户身份。Mock 渠道才允许两者为 null，且不能把双重 null 当作“商户匹配”。
-- 同一 `dedupe_key` 一旦进入异常表，后续即使把证据改成合法金额也不能再声明成功；同一 key 已存在于成功事件表时，也不会再写入异常。事务内双向检查保证异常证据与成功事件不会同时占用同一个渠道事件身份。
+- 每个 provider `dedupe_key` 都绑定规范化证据的 SHA-256 指纹；只有指纹完全一致才算同一事件重放。已拒绝的 key 永久不能再声明成功；已接受 key 携带不同证据时拒绝并另存冲突快照，不覆盖原成功事实。
 - 金额、商户订单号、商户号、渠道、币种或归属不一致时，不写 `paid`，保存完整异常证据并返回通用冲突错误；不向调用方泄露内部字段。
 
 ### 状态与幂等收敛
@@ -92,7 +92,7 @@ PAY-02 依赖本卡：
 - **迟到成功**：支付意图已 `closed`/`failed` 后又收到 paid 证据时，**不回退状态、不写 paid attempt/outbox**，只把渠道证据保存为 `late_success_after_closed` / `late_success_after_failed`。
 - **终态冲突**：已 `paid` 后收到 failed/closed，或已终态 attempt 被要求回退，保存 `terminal_conflict` 并拒绝。
 - **渠道交易号复用**：同一 `provider_transaction_id` 已属于另一支付意图时保存 `transaction_conflict`，不确认第二张单。
-- 重复事件键优先返回原结果；重复事件键属于另一支付意图时保存 `transaction_conflict`。
+- 重复事件键只有在规范化证据指纹完全一致时才返回原结果；同 key 的不同证据（包括跨支付意图、交易号、金额或商户上下文变化）保存 `transaction_conflict` 快照并拒绝。
 - 所有状态写入仍由 SQLite 状态触发器兜底；服务层与数据库两层校验一致。
 
 ### Outbox 与下游
@@ -108,13 +108,13 @@ PAY-02 依赖本卡：
 
 `intent_not_found`、`amount_mismatch`、`merchant_mismatch`、`channel_mismatch`、`ownership_mismatch`、`transaction_conflict`、`late_success_after_closed`、`late_success_after_failed`、`terminal_conflict`、`unknown_evidence`。
 
-同一证据 `dedupe_key` 只保存一条异常，且该 key 与 `payment_events.dedupe_key` 跨表互斥。异常行不可变地保存规范化证据快照：商户订单号、渠道、渠道交易号、金额、商户 AppID/商户号、`observedAt`、来源、去重键、`providerEventRef`、`failureCode`、`failureMessage`、错误类型和明细；仅允许后续把 `status/resolved_at` 从 `open` 处理为 `reviewed/resolved`。异常与终态支付意图均不删除、不改写；后续 PAY-11 运营查单/处理界面在本卡之后实现。
+异常行按 `(dedupe_key, evidence_fingerprint)` 唯一：同一错误证据重放只保留一条快照；同一 key 携带不同内容时分别留档。已接受事件的原始指纹保存在 `payment_events.evidence_fingerprint`，不同内容的冲突快照允许与原事件共用 provider key，但绝不覆盖原事件。异常行不可变地保存规范化证据快照及 SHA-256 指纹：商户订单号、渠道、渠道交易号、金额、商户 AppID/商户号、`observedAt`、来源、去重键、`providerEventRef`、`failureCode`、`failureMessage`、错误类型和明细；仅允许后续把 `status/resolved_at` 从 `open` 处理为 `reviewed/resolved`。旧版本迁移数据没有指纹时按未知证据处理并 fail-closed。异常与终态支付意图均不删除、不改写；后续 PAY-11 运营查单/处理界面在本卡之后实现。
 
 ### 事务与并发证据
 
 - 确认使用 `BEGIN IMMEDIATE` 事务；意图、attempt、event、outbox 在同一事务中提交或全部回滚。
 - `payments-confirmation.test.ts` 使用真实 SQLite/Hono 验证成功、重复、通知/查单收敛、金额/商户/订单/终态冲突、迟到成功、outbox 重启恢复，以及“outbox 唯一冲突导致已写意图/attempt 全部回滚”的失败路径。
-- 跨连接/跨进程竞争由**两个独立 Node 进程、两个独立 better-sqlite3 连接**验证三组场景：同一证据并发确认收敛为一个 `confirmed`、一个 `already_confirmed`；通知与查单使用不同去重键但同一渠道交易号并发确认，同样只收敛为一条 paid attempt/事件/outbox；不同渠道交易号并发确认同一支付意图只允许一个 `confirmed`，另一请求得到 `payment_confirmation_conflict` 并留下 `transaction_conflict` 异常，仍只有一条 paid attempt/outbox。此证据不再沿用 PAY-02 同实例 `Promise.all` 的弱结论。
+- 跨连接/跨进程竞争由**两个独立 Node 进程、两个独立 better-sqlite3 连接**验证三组场景：同一证据并发确认收敛为一个 `confirmed`、一个 `already_confirmed`；通知与查单使用不同去重键但同一渠道交易号并发确认，会分别保留两条 provider observation，但只产生一条 paid 状态事实、attempt 与 outbox；不同渠道交易号并发确认同一支付意图只允许一个 `confirmed`，另一请求得到 `payment_confirmation_conflict` 并留下 `transaction_conflict` 异常，仍只有一条 paid attempt/outbox。此证据不再沿用 PAY-02 同实例 `Promise.all` 的弱结论。
 
 ## 5. 验证
 
