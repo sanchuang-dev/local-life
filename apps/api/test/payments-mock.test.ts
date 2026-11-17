@@ -26,6 +26,7 @@ import {
   paymentEvents,
   paymentOutbox,
   paymentReviewExceptions,
+  mockPaymentEventReservations,
 } from '../src/db/schema.js'
 import { LocalError } from '../src/local/shared.js'
 import {
@@ -236,11 +237,14 @@ async function runMockWorkers(input: {
   intentId: string
   action: MockPaymentAction
   sources: MockPaymentSource[]
-  now: string
+  now: string | string[]
 }): Promise<Array<{ code: number | null; output: string; error: string }>> {
   const workerPath = fileURLToPath(new URL('./helpers/mock-payment-worker.ts', import.meta.url))
   const cwd = fileURLToPath(new URL('..', import.meta.url))
-  return Promise.all(input.sources.map((source) => new Promise<{
+  return Promise.all(input.sources.map((source, index) => {
+    const workerNow = Array.isArray(input.now) ? input.now[index] : input.now
+    if (!workerNow) throw new Error('missing Mock worker clock')
+    return new Promise<{
     code: number | null
     output: string
     error: string
@@ -253,7 +257,7 @@ async function runMockWorkers(input: {
         MOCK_INTENT_ID: input.intentId,
         MOCK_ACTION: input.action,
         MOCK_SOURCE: source,
-        MOCK_NOW: input.now,
+        MOCK_NOW: workerNow,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
@@ -262,7 +266,8 @@ async function runMockWorkers(input: {
     child.stdout.on('data', (chunk) => { output += String(chunk) })
     child.stderr.on('data', (chunk) => { error += String(chunk) })
     child.on('close', (code) => resolve({ code, output, error }))
-  })))
+  }))
+  )
 }
 
 test('Mock success is driven through PAY-03 and remains visibly simulated', async () => {
@@ -459,6 +464,11 @@ test('Mock observedAt uses the execution clock and repeats reuse the first persi
     assert.equal(immediate.intent.paidAt, firstAt.toISOString())
     assert.ok(Date.parse(immediate.intent.paidAt!) <= firstAt.getTime())
 
+    // Simulate a payment event created before the reservation migration:
+    // the first replay must bootstrap the reservation from the immutable event.
+    world.sqlite.exec('DROP TRIGGER mock_payment_event_reservations_immutable_delete')
+    world.sqlite.prepare('DELETE FROM mock_payment_event_reservations WHERE dedupe_key = ?')
+      .run(`MOCK-EVT-${successIntent.id}-succeed-notification`)
     const laterAt = new Date(Date.parse(successIntent.createdAt) + 6 * 60_000)
     const replay = executeMockPaymentAction(
       world.db,
@@ -469,6 +479,11 @@ test('Mock observedAt uses the execution clock and repeats reuse the first persi
     assert.equal(replay.outcome, 'already_confirmed')
     assert.equal(replay.intent.paidAt, firstAt.toISOString())
     assert.equal(replay.attempt?.confirmedAt, firstAt.toISOString())
+    const bootstrappedReservation = world.db.select().from(mockPaymentEventReservations)
+      .where(eq(mockPaymentEventReservations.dedupeKey,
+        `MOCK-EVT-${successIntent.id}-succeed-notification`))
+      .get()
+    assert.equal(bootstrappedReservation?.observedAt.toISOString(), firstAt.toISOString())
 
     const cancelOrder = seedOrder(world.db, { ...scope, residentUserId: resident.userId })
     const cancelIntent = await createIntent(world, resident, cancelOrder)
@@ -554,6 +569,59 @@ test('notification and active-query races in two processes converge on one paid 
     assert.equal((await getIntent(world, resident, intent.id)).intent.status, 'paid')
     assert.equal(world.db.select().from(paymentAttempts).all().length, 1)
     assert.equal(world.db.select().from(paymentOutbox).all().length, 1)
+  } finally {
+    world.sqlite.close()
+    rmSync(tempDir, { recursive: true, force: true })
+  }
+})
+
+test('same Mock event reserves one first-seen clock across processes', async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'll-pay04-reservation-'))
+  const databasePath = join(tempDir, 'mock-reservation.sqlite')
+  const world = context(databasePath)
+  try {
+    const scope = seedCommunityAndProduct(world.db)
+    const resident = await loginResident(world.app, 'Mock 首次时间并发居民')
+    const orderId = seedOrder(world.db, { ...scope, residentUserId: resident.userId })
+    const intent = await createIntent(world, resident, orderId)
+    const firstAt = actionTime(intent, 1)
+    const secondAt = actionTime(intent, 2)
+    const results = await runMockWorkers({
+      databasePath,
+      intentId: intent.id,
+      action: 'succeed',
+      sources: ['notification', 'notification'],
+      now: [firstAt.toISOString(), secondAt.toISOString()],
+    })
+    const parsed = results.map((result) => {
+      assert.equal(result.code, 0, `worker failed: ${result.error}`)
+      return JSON.parse(result.output) as { ok: boolean; outcome: string }
+    })
+    assert.deepEqual(
+      parsed.map((item) => item.outcome).sort(),
+      ['already_confirmed', 'confirmed'],
+    )
+
+    const detail = await getIntent(world, resident, intent.id)
+    assert.equal(detail.intent.status, 'paid')
+    assert.ok([firstAt.toISOString(), secondAt.toISOString()].includes(detail.intent.paidAt!))
+    const reservation = world.db.select().from(mockPaymentEventReservations)
+      .where(eq(mockPaymentEventReservations.dedupeKey,
+        `MOCK-EVT-${intent.id}-succeed-notification`))
+      .get()
+    assert.ok(reservation)
+    assert.equal(reservation.observedAt.toISOString(), detail.intent.paidAt)
+    assert.equal(world.db.select().from(paymentReviewExceptions).all().length, 0)
+    assert.equal(world.db.select().from(paymentAttempts).all().length, 1)
+    assert.equal(world.db.select().from(paymentOutbox).all().length, 1)
+    assert.throws(
+      () => world.db.update(mockPaymentEventReservations)
+        .set({ observedAt: secondAt })
+        .where(eq(mockPaymentEventReservations.dedupeKey,
+          `MOCK-EVT-${intent.id}-succeed-notification`))
+        .run(),
+      /mock payment event reservation is immutable/u,
+    )
   } finally {
     world.sqlite.close()
     rmSync(tempDir, { recursive: true, force: true })

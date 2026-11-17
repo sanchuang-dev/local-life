@@ -13,6 +13,7 @@ import {
   paymentEvents,
   paymentIntents,
   paymentReviewExceptions,
+  mockPaymentEventReservations,
 } from '../db/schema.js'
 import { LocalError, type LocalActor } from '../local/shared.js'
 import { confirmTrustedPayment } from './confirmation.js'
@@ -70,54 +71,61 @@ function mockDedupeKey(
 }
 
 /**
- * Replay the original persisted observation time for the same provider event.
- * The provider event row is the durable multi-process source of truth; the
- * attempt/exception is used for cases where the event's createdAt is not the
- * original evidence time (notably timeout uses expiresAt, late success has only
- * a review exception). This avoids process-local caches.
+ * Reserve the first observation clock atomically across SQLite connections.
+ * Existing rows are read first so events created before this reservation table
+ * was introduced are upgraded without changing their evidence fingerprint.
  */
-function persistedMockObservedAt(
-  db: AppDatabase,
-  intent: IntentRow,
-  action: MockPaymentAction,
-  source: MockPaymentSource,
-): Date | null {
-  const event = db.select().from(paymentEvents)
-    .where(eq(paymentEvents.dedupeKey, mockDedupeKey(intent, action, source)))
-    .get()
-  if (event) {
-    if (action === 'timeout') {
-      const attempt = event.paymentAttemptId
-        ? db.select().from(paymentAttempts)
-          .where(eq(paymentAttempts.id, event.paymentAttemptId))
-          .get()
-        : null
-      return attempt?.closedAt ?? intent.closedAt ?? intent.expiresAt
-    }
-    // For success/fail/cancel/pending, PAY-03's channel event createdAt is the
-    // first confirmation clock (the same value supplied as observedAt).
-    return event.createdAt
-  }
-  const exception = db.select().from(paymentReviewExceptions)
-    .where(eq(paymentReviewExceptions.dedupeKey, mockDedupeKey(intent, action, source)))
-    .orderBy(desc(paymentReviewExceptions.createdAt), desc(paymentReviewExceptions.id))
-    .get()
-  return exception?.observedAt ?? null
-}
-
-function mockObservedAt(
+function reserveMockObservedAt(
   db: AppDatabase,
   intent: IntentRow,
   action: MockPaymentAction,
   source: MockPaymentSource,
   now: Date,
 ): Date {
-  const persisted = persistedMockObservedAt(db, intent, action, source)
-  if (persisted) return persisted
-  // Timeout occurs at the server-side expiry, never before it. Every other
-  // first observation carries the actual simulated clock instead of a value
-  // fabricated from intent.createdAt.
-  return action === 'timeout' ? (intent.closedAt ?? intent.expiresAt) : now
+  const dedupeKey = mockDedupeKey(intent, action, source)
+  return db.transaction((tx) => {
+    const reservation = tx.select().from(mockPaymentEventReservations)
+      .where(eq(mockPaymentEventReservations.dedupeKey, dedupeKey))
+      .get()
+    if (reservation) return reservation.observedAt
+
+    const event = tx.select().from(paymentEvents)
+      .where(eq(paymentEvents.dedupeKey, dedupeKey))
+      .get()
+    let persisted: Date | null = null
+    if (event) {
+      if (action === 'timeout') {
+        const attempt = event.paymentAttemptId
+          ? tx.select().from(paymentAttempts)
+            .where(eq(paymentAttempts.id, event.paymentAttemptId))
+            .get()
+          : null
+        persisted = attempt?.closedAt ?? intent.closedAt ?? intent.expiresAt
+      } else {
+        // PAY-03's event clock matches the original observedAt supplied by PAY-04.
+        persisted = event.createdAt
+      }
+    } else {
+      const exception = tx.select().from(paymentReviewExceptions)
+        .where(eq(paymentReviewExceptions.dedupeKey, dedupeKey))
+        .orderBy(desc(paymentReviewExceptions.createdAt), desc(paymentReviewExceptions.id))
+        .get()
+      persisted = exception?.observedAt ?? null
+    }
+
+    const observedAt = persisted
+      ?? (action === 'timeout' ? (intent.closedAt ?? intent.expiresAt) : now)
+    tx.insert(mockPaymentEventReservations)
+      .values({ dedupeKey, observedAt })
+      .onConflictDoNothing()
+      .run()
+
+    const reserved = tx.select().from(mockPaymentEventReservations)
+      .where(eq(mockPaymentEventReservations.dedupeKey, dedupeKey))
+      .get()
+    if (!reserved) throw new Error('Mock payment event time reservation was not persisted')
+    return reserved.observedAt
+  }, { behavior: 'immediate' })
 }
 
 function mockProviderStatus(action: MockPaymentAction): PaymentEvidence['providerStatus'] {
@@ -135,11 +143,10 @@ function mockProviderTransactionId(
 }
 
 function mockEvidence(
-  db: AppDatabase,
   intent: IntentRow,
   action: MockPaymentAction,
   source: MockPaymentSource,
-  now: Date,
+  observedAt: Date,
 ): PaymentEvidence {
   const providerStatus = mockProviderStatus(action)
   return {
@@ -154,7 +161,7 @@ function mockEvidence(
     currency: 'CNY',
     merchantAppId: null,
     merchantId: null,
-    observedAt: mockObservedAt(db, intent, action, source, now).toISOString(),
+    observedAt: observedAt.toISOString(),
     source,
     dedupeKey: mockDedupeKey(intent, action, source),
     providerEventRef: `MOCK-REF-${intent.id}-${action}-${source}`,
@@ -226,9 +233,10 @@ export function executeMockPaymentAction(
   if (parsed.action === 'timeout' && now.getTime() < intent.expiresAt.getTime()) {
     throw new LocalError(400, API_ERROR_CODES.invalidRequest, 'Mock 支付尚未到期，不能模拟超时')
   }
+  const observedAt = reserveMockObservedAt(db, intent, parsed.action, parsed.source, now)
   return confirmTrustedPayment(
     db,
-    mockEvidence(db, intent, parsed.action, parsed.source, now),
+    mockEvidence(intent, parsed.action, parsed.source, observedAt),
     { now },
   )
 }

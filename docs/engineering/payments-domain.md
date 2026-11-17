@@ -120,7 +120,7 @@ PAY-02 依赖本卡：
 
 - 代码入口：`apps/api/src/payments/mock-channel.ts`。只提供进程内 `createMockPayment` 与 `executeMockPaymentAction`，**不注册公网 HTTP 控制路由**。
 - 成功、失败、用户取消、超时、待确认、重复通知、通知+查单、关闭后迟到成功都先归一化为 `PaymentEvidence`，再调用 PAY-03 `confirmTrustedPayment`；没有第二套支付状态机。
-- 输入只有支付意图 UUID、action、source 和服务端时间；金额、商户订单号、商户身份、渠道交易号、证据由服务端派生，调用方不能提交。只有成功结果生成带 `MOCK-TXN-` 前缀的交易号；失败/取消/超时/pending 的交易号为 null。首次 observedAt 使用执行时钟（timeout 使用 expiresAt），重复事件从持久化事件/attempt/异常恢复首次时间；意图与 outbox 永久 `simulated=true`。
+- 输入只有支付意图 UUID、action、source 和服务端时间；金额、商户订单号、商户身份、渠道交易号、证据由服务端派生，调用方不能提交。只有成功结果生成带 `MOCK-TXN-` 前缀的交易号；失败/取消/超时/pending 的交易号为 null。首次 observedAt 在 Mock 专用预留表中通过 `BEGIN IMMEDIATE` 原子 insert-or-read；迁移前的事件从既有事件/attempt/异常恢复并补建预留，确保同一 dedupeKey 跨进程始终使用相同证据时间。意图与 outbox 永久 `simulated=true`。
 - Mock 驱动要求 `PAYMENT_MOCK_ENABLED=true` 且非 production；production/公开预览配置启用会 fail-closed。公开预览 `mvp` 的实际 installer 固定 `NODE_ENV=production`、`AUTH_DEV_ENABLED=false` 且未设置 Mock 开关；`apps/api/Dockerfile` 也固定 production。
 - 复跑命令：`pnpm --filter @sanchuang-dev/local-life-api exec tsx --test test/payments-mock.test.ts`。详细场景、排障和安全边界见 [payments-mock.md](payments-mock.md)。
 

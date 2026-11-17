@@ -37,14 +37,16 @@
 - `payment.paid.v1` outbox payload 永久携带 `simulated=true`；PAY-04 不写 `local_orders`、优惠券、`ledger_entries` 或人工 `payment_received`。
 - `timeout` 未到 `expiresAt` 时拒绝，不能提前伪造关闭。
 - 关闭/失败后的 `succeed` 只让 PAY-03 保存 `late_success_after_closed` / `late_success_after_failed` 异常，不会把终态改回 `paid`，也不会产生 paid attempt/outbox。
-- `succeed / fail / cancel / pending` 首次使用调用方的模拟时钟 `now` 作为 `observedAt`；`timeout` 使用 `expiresAt`。重复事件先从 `payment_events`、terminal attempt 或异常快照恢复首次时间，不重新取 `now`，因此 evidence fingerprint 和 PAY-03 幂等边界保持稳定。
+- `succeed / fail / cancel / pending` 首次使用调用方的模拟时钟 `now` 作为 `observedAt`；`timeout` 使用 `expiresAt`。首次时间在 Mock 专用预留表中通过 `BEGIN IMMEDIATE` 原子 insert-or-read，跨进程重放始终复用同一时间；迁移前的事件从既有事件/attempt/异常快照恢复并补建预留。
 - `providerTransactionId` 只在 `succeed` 时生成 `MOCK-TXN-<intentId>`；`fail / cancel / timeout / pending` 均为 null，pending 阶段不会提前占用交易号。
 
-### 并发首次生成边界
+### 并发首次生成与兼容迁移
 
-现有持久化事件、attempt 和异常快照能可靠覆盖“首次结果已落库后的重复通知/查单”。两个独立进程**同时首次**生成同一 `dedupeKey` 且传入不同 `now` 时，双方都读不到事件，可能以不同 observedAt 进入 PAY-03；PAY-03 会把后到者按证据指纹冲突处理。
-
-本卡没有为这个首次竞争偷偷新增支付状态机或表。若维护者要求彻底消除该窗口，最小方案是增加只用于 Mock 的 `(dedupe_key PK, observed_at)` 预留表，在调用 `confirmTrustedPayment` 前用 `BEGIN IMMEDIATE` 做 insert-or-read；这会新增迁移，需单独批准，不在本次 P2 返修范围内。
+- 每个 Mock 事件在进入 PAY-03 前，先写入 `mock_payment_event_reservations`，以 `dedupe_key` 为主键保存首次 `observed_at`。
+- 预留采用 SQLite `BEGIN IMMEDIATE` 事务执行 insert-or-read；两个独立进程即使传入不同 `now`，也只能使用先提交的同一时间，避免 evidence fingerprint 冲突。
+- 预留表不关联 `payment_events` 外键：即使 PAY-03 后续拒绝或进程中断，首次时间仍被保留，重试不会重新取时钟。数据库触发器禁止修改或删除预留。
+- 迁移前已经存在的事件不会批量伪造预留时间；首次重放时优先从既有 `payment_events.createdAt`、timeout terminal attempt 的 `closedAt` 或 `payment_review_exceptions.observedAt` 恢复，再原子写入预留表，保持旧 evidence fingerprint 不变。
+- 该表仅服务于隔离 Mock，不改变 PAY-03 的支付状态机、共享合同或真实支付链路。
 
 ## 3. 部署配置核验
 
@@ -72,7 +74,7 @@ pnpm --filter @sanchuang-dev/local-life-api exec tsx --test test/payments-mock.t
 - 成功、失败、用户取消、超时、待确认，以及 pending → success/fail/cancel。
 - 立即成功/取消的终态时间、延迟十分钟成功、重复通知复用首次 observedAt、timeout 复用 expiresAt。
 - 失败/取消/超时/pending 的 attempt 交易号为 null；pending → success 才生成 `MOCK-TXN-<intentId>`；成功 outbox 保留正确交易号。
-- 重复通知幂等；通知 + 查单双进程双 SQLite 连接竞争。
+- 重复通知幂等；通知 + 查单双进程双 SQLite 连接竞争；相同 dedupeKey、不同模拟时钟的双进程首次竞争收敛为同一 observedAt。
 - 关闭后的迟到成功只进入异常。
 - 进程重启后仍可查询 `paid` 和 pending outbox。
 - 内部输入篡改、未授权 HTTP、production/公开预览配置拒绝。
@@ -81,7 +83,7 @@ pnpm --filter @sanchuang-dev/local-life-api exec tsx --test test/payments-mock.t
 排障：
 
 1. 先确认 `PAYMENT_MOCK_ENABLED=true` 且不是 production；生产错误是预期的 fail-closed。
-2. 查询 `payment_intents`、`payment_attempts`、`payment_events`、`payment_outbox`、`payment_review_exceptions` 的同一 `payment_intent_id`。
+2. 查询 `payment_intents`、`payment_attempts`、`payment_events`、`payment_outbox`、`payment_review_exceptions`，并按事件 `dedupe_key` 检查 `mock_payment_event_reservations`。
 3. `timeout` 返回“尚未到期”时，传入 `{ now: expiresAt + ... }`，不要绕过服务端时间。
 4. 迟到成功返回 `payment_confirmation_conflict` 时，检查异常表并等待 PAY-11 查单/人工复核；不要手工改状态。
 5. 任何 Mock 数据只用于模拟业务演练；不能用其证明微信支付、银行到账或正式业绩。
