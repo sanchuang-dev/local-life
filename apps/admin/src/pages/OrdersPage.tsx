@@ -198,21 +198,22 @@ const initialFilters: OrderFilters = {
 }
 
 /**
- * Calendar dates are local (Asia/Shanghai in this console) while the API stores
- * UTC instants. The page owns this translation explicitly; the shared DataPanel
- * never guesses a time zone.
+ * Interpret DataPanel calendar days in Asia/Shanghai, matching the order-time
+ * display, regardless of the operator's browser time zone. SQLite/API compare
+ * absolute UTC instants; parsing an offset-less date would silently use the
+ * browser's local zone and shift the selected business-day window.
  */
-function localDateRangeToInstants(range: DateRangeValue | undefined): {
+export function localDateRangeToInstants(range: DateRangeValue | undefined): {
   createdFrom?: string
   createdTo?: string
 } {
   const result: { createdFrom?: string; createdTo?: string } = {}
   if (range?.start) {
-    const start = new Date(`${range.start}T00:00:00`)
+    const start = new Date(`${range.start}T00:00:00.000+08:00`)
     if (!Number.isNaN(start.getTime())) result.createdFrom = start.toISOString()
   }
   if (range?.end) {
-    const end = new Date(`${range.end}T23:59:59.999`)
+    const end = new Date(`${range.end}T23:59:59.999+08:00`)
     if (!Number.isNaN(end.getTime())) result.createdTo = end.toISOString()
   }
   return result

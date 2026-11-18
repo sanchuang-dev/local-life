@@ -15,7 +15,7 @@ import type {
 import { AdminAuthProvider } from '../app/auth-context'
 import { adminTheme } from '../app/theme'
 import type { AuthenticatedSession } from '../services/auth'
-import { OrdersPage } from './OrdersPage'
+import { OrdersPage, localDateRangeToInstants } from './OrdersPage'
 
 /**
  * These tests drive the real 订单管理 page with an explicitly stubbed `fetch`.
@@ -546,6 +546,29 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+
+describe('OrdersPage date-range boundaries (Asia/Shanghai)', () => {
+  it('maps an entire Beijing calendar day to the correct UTC instants', () => {
+    expect(localDateRangeToInstants({ start: '2026-11-18', end: '2026-11-18' })).toEqual({
+      createdFrom: '2026-11-17T16:00:00.000Z',
+      createdTo: '2026-11-18T15:59:59.999Z',
+    })
+  })
+
+  it('keeps inclusive date ranges and single-sided filters stable across year boundaries', () => {
+    expect(localDateRangeToInstants({ start: '2026-12-31', end: '2027-01-01' })).toEqual({
+      createdFrom: '2026-12-30T16:00:00.000Z',
+      createdTo: '2027-01-01T15:59:59.999Z',
+    })
+    expect(localDateRangeToInstants({ start: '2026-11-18' })).toEqual({
+      createdFrom: '2026-11-17T16:00:00.000Z',
+    })
+    expect(localDateRangeToInstants({ end: '2026-11-18' })).toEqual({
+      createdTo: '2026-11-18T15:59:59.999Z',
+    })
+    expect(localDateRangeToInstants(undefined)).toEqual({})
+  })
 })
 
 describe('OrdersPage permission boundary', () => {
