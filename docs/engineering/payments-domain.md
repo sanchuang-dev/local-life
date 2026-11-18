@@ -189,7 +189,7 @@ PAY-02 依赖本卡：
 
 ### 6.8 R1 人工/在线互斥硬边界（返修）
 
-- 判定规则只有一条：**只有“可信终结且确定未付款”的订单才可以走人工核验/人工实收**。具体条件是：该订单所有支付意图均为 `closed`/`failed`，且不存在完成事实、不存在 `online_payment` 账本实收、不存在 open 的迟到成功异常或 `late_success`/`consumer_exhausted`/`manual_online_double_collection` 订单级冲突。
+- 判定规则只有一条：**只有“可信终结且确定未付款”的订单才可以走人工核验/人工实收**。具体条件是：该订单所有支付意图均为 `closed`/`failed`，且不存在完成事实、不存在 `online_payment` 账本实收、不存在该订单关联的任何 open 支付审核异常，也不存在 open 的 `late_success`/`consumer_exhausted`/`manual_online_double_collection` 订单级冲突。金额、商户、交易号、终态等 provider evidence 一旦进入待复核，都表示系统尚不能证明“渠道未付款”，人工路径必须 fail-closed。
 - `pending`/`confirming` 以及任何未知/非终态一律视为“可能已付”，fail-closed；不把“查不到已付”当成“没付款”。
 - 边界实现在 `assertManualPaymentBoundary(tx, orderId)`，被 `verifyOrder`（`decision='verify'`）与 `recordPayment`（带 `orderId` 时）在**各自的 `BEGIN IMMEDIATE` 事务内、紧邻写入处**调用；只加路由校验或 UI 提示不算。拒绝分支 `decision='reject'` 不写核验事实，继续沿用现有“有活跃/已付意图时延迟释放券”的保护。
 - 反向竞态：已有人工实收的订单收到可信渠道 `paid` 时，PAY-03 仍保留支付事实与 outbox，PAY-05 消费者不写 completion/第二条实收/重复发券，而是落 open `manual_online_double_collection` 冲突（订单、支付单、渠道交易号、金额均在 `detail` 中）；`verifyOrder` 与 `recordPayment` 的服务层直接调用同样被挡住（稳定 409 `payment_online_completion_conflict`）。

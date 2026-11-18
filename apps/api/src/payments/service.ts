@@ -143,8 +143,12 @@ export function assertManualPaymentBoundary(tx: LocalTransaction, orderId: strin
     )
   }
 
-  const lateSuccess = tx
-    .select({ id: paymentReviewExceptions.id })
+  // Any unresolved provider-evidence anomaly means the server cannot prove that
+  // the channel is safely unpaid. This is intentionally broader than only
+  // late-success: amount/merchant/transaction/terminal conflicts can also carry
+  // a real provider observation and must be reviewed before manual collection.
+  const openReviewException = tx
+    .select({ id: paymentReviewExceptions.id, kind: paymentReviewExceptions.kind })
     .from(paymentReviewExceptions)
     .innerJoin(
       paymentIntents,
@@ -154,18 +158,14 @@ export function assertManualPaymentBoundary(tx: LocalTransaction, orderId: strin
       and(
         eq(paymentIntents.localOrderId, orderId),
         eq(paymentReviewExceptions.status, 'open'),
-        inArray(paymentReviewExceptions.kind, [
-          'late_success_after_closed',
-          'late_success_after_failed',
-        ]),
       ),
     )
     .get()
-  if (lateSuccess) {
+  if (openReviewException) {
     throw new LocalError(
       409,
       API_ERROR_CODES.paymentOnlineCompletionConflict,
-      '该订单存在支付终态后的可信成功证据，禁止人工核验/实收，请人工核对',
+      `该订单存在待复核的支付证据异常（${openReviewException.kind}），无法证明渠道未付款，禁止人工核验/实收`,
     )
   }
 }

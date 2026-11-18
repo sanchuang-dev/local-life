@@ -801,6 +801,40 @@ test('R1-A: an open late-success exception blocks verification even when the int
   }
 })
 
+test('R1-A: any open provider-evidence exception blocks manual collection even on a closed intent', async () => {
+  const w = await world()
+  try {
+    const order = await toPendingReview(w, await registerOrder(w))
+    const intent = await createIntent(w, order.id)
+    assert.equal((await confirmEvidence(w, statusEvidence(intent, 'closed'))).status, 200)
+
+    // The provider now reports a paid observation with the wrong amount. The
+    // intent remains closed, but the unresolved evidence means "unpaid" is no
+    // longer provable and the manual path must fail closed.
+    const suspiciousPaid = {
+      ...paidEvidence(intent),
+      amountCents: intent.netPayableCents + 1,
+      dedupeKey: `r1-open-review-${randomUUID()}`,
+    }
+    const rejectedEvidence = await confirmEvidence(w, suspiciousPaid)
+    assert.equal(rejectedEvidence.status, 409)
+    const exception = w.db.select().from(paymentReviewExceptions)
+      .where(eq(paymentReviewExceptions.paymentIntentId, intent.id))
+      .get()
+    assert.ok(exception)
+    assert.equal(exception.kind, 'amount_mismatch')
+    assert.equal(exception.status, 'open')
+
+    const refused = await verifyOrderHttp(w, order)
+    assert.equal(refused.status, 409)
+    assert.equal(await errorCode(refused), API_ERROR_CODES.paymentOnlineCompletionConflict)
+    assert.equal(orderRow(w, order.id).status, 'pending_review')
+    assert.equal(orderRow(w, order.id).verifiedAt, null)
+  } finally {
+    w.sqlite.close()
+  }
+})
+
 test('R1-E: closed/failed intents keep the legacy manual verification and receipt paths working', async () => {
   const w = await world()
   try {
