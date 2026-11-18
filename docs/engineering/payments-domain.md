@@ -1,6 +1,6 @@
 # 支付领域契约、持久化、居民创建/查询、可信确认与隔离 Mock（PAY-01 #276 / PAY-02 #277 / PAY-03 #278 / PAY-04 #279 / PAY-05 #280）
 
-> **PAY-01** 建立支付意图、尝试与事件的共享契约和 SQLite 真相源；**PAY-02** 增加居民创建/查询待支付意图的受控 API；**PAY-03** 增加可信渠道证据确认、状态收敛、下游 outbox 与冲突证据队列；**PAY-04** 增加进程内隔离 Mock 驱动，所有模拟结果仍走 `confirmTrustedPayment`。当前仍**没有**真实微信支付商户配置/回调验签（PAY-10/PAY-11）、公网 Mock 控制接口、订单交易完成、优惠券核销、账本投影或退款执行（PAY-05/PAY-06）。不得据此宣称在线支付已可用。
+> **PAY-01** 建立支付意图、尝试与事件的共享契约和 SQLite 真相源；**PAY-02** 增加居民创建/查询待支付意图的受控 API；**PAY-03** 增加可信渠道证据确认、状态收敛、下游 outbox 与冲突证据队列；**PAY-04** 增加进程内隔离 Mock 驱动，**PAY-05** 完成订单/零元券单 outbox 投影，**PAY-06** 将 `local_order_online_completions` 投影为独立线上实收、接入消费累计与既有发券。当前仍**没有**真实微信支付商户配置/回调验签（PAY-10/PAY-11）、公网 Mock 控制接口、H5/后台支付 UI、真实退款执行。不得据此宣称在线支付已可用。
 
 ## 1. 与既有事实的边界
 
@@ -174,8 +174,16 @@ PAY-02 依赖本卡：
 ### 6.6 与 PAY-06 的交接边界
 
 - PAY-05 **不写** `ledger_entries`、不做线上实收/分账/消费累计投影，`projectLocalOrderFacts` 的既有行为（只认 `verified` 人工核验）未修改。
-- 因此在线完成订单当前**不会**进入经营账本、结算候选或三人团消费累计；这需要 PAY-06 以 `local_order_online_completions`（+ `simulated` 标记）为唯一来源新增独立来源标识与幂等投影，并决定零元券单不计入实际净实付。PAY-06 不得复用人工 `payment_received` 语义，也不得把 `online_completed` 当成 `verified`。
+- PAY-06 现在以 `local_order_online_completions`（+ `simulated`）为唯一来源，投影独立 `online_payment` 实收并接入消费累计；零元券单不产生现金实收/消费贡献。PAY-06 不复用人工 `payment_received` 语义，也不把 `online_completed` 当成 `verified`。
 - 人工线下收款、既有锁定结算批次与历史账本完全不受影响。
+
+### 6.7 PAY-06 线上实收与消费累计（已落地）
+
+- 唯一上游仍是不可变 `local_order_online_completions`；投影为既有六类中的 `payment_received`，但使用独立 `source_system='online_payment'`、`evidence_kind='channel_payment'`、`source_id=completionId`、`evidence_ref=providerTransactionId`，不冒充人工收款。
+- 数据库来源唯一键 `(online_payment, completionId, payment_received)` 是最终幂等边界；重复扫描、重启、双连接/双进程只会得到一条实收。零元 completion 跳过，不写 0 元现金事实。
+- 真实与 Mock 都保留明细并驱动同一消费/发券路径；`simulated` 永久标记。正式 overview 仅将人工 + 真实线上计入 `receivedCents`，Mock 单列 `onlineSimulatedReceivedCents`；正式 reconciliation/CSV/结算金额排除 Mock。
+- `readContributions()` 统一读取人工净实收和线上 `online_payment` 净实收，零元/券抵扣不贡献现金；发券继续复用 #211 `tryIssueEligibleTeamCoupons`。人工 `recordPayment` 只接受 `verified`，线上订单不能补人工收款；在线 reversal/退款仍 unsupported。
+- 迁移 `0036_online_ledger_projection.sql` 重建账本表并保留历史行/索引/触发器；详细设计、迁移和测试见 [payments-ledger-projection.md](payments-ledger-projection.md)。
 
 ## 7. 验证
 
@@ -185,6 +193,7 @@ PAY-02 依赖本卡：
 - `apps/api/test/payments-confirmation.test.ts`：内部 token、证据校验、paid/pending/terminal 收敛、跨表去重、完整异常证据、outbox 事务/重启、同证据/通知查单/不同交易号三组跨进程双连接竞争、不可变证据与失败回滚。
 - `apps/api/test/payments-order-completion.test.ts`（22 例）：真实 SQLite + Hono 的在线完成一次、事件重放、双连接并发/租约恢复、崩溃尝试上限、损坏事件泊车、取消时延迟释放券、可信 close/failed 恰好释放一次、过期不释放、迟到成功先于返券时保持占券、迟到成功晚于返券时进入人工核对、返券与异常投影批次公平性、零元券单完成/重复/已释放券拒绝/非零拒绝、已核销与已冲正券拒绝、人工核验旧路径不变、注入故障后的重试/恢复、内部入口鉴权，以及 0033 历史库升级（行保留、`PRAGMA foreign_key_check` 为空、触发器重建、旧支付事件续跑完成）。
 - `apps/api/test/payments-mock.test.ts`：真实 Hono + SQLite 的 Mock 发起、成功/失败/取消/超时/待确认、重复通知、通知+查单双进程竞争、重启查询、迟到成功、非法输入与 production/公开预览 fail-closed。
+- `apps/api/test/payments-online-ledger.test.ts`：真实/Mock 线上 completion 投影、唯一实收、双进程竞争、outbox/sync 回填、券净额/零元、团队累计与三人券、人工/线上互斥、正式汇总/CSV 排除 Mock、锁后迟到投影、0035→0036 升级与重启恢复。
 
 ## 8. PAY-02 居民创建 / 查询 API
 
@@ -234,7 +243,7 @@ PAY-02 依赖本卡：
 
 - 未接真实微信支付商户 API、回调验签、证书/API v3 解密；PAY-11 才完成真实适配器。
 - PAY-04 Mock 是进程内测试/开发驱动，没有公网 HTTP 控制接口；所有模拟支付永久标记 `simulated=true`，不得被解释为真实微信扣款或银行到账。
-- 在线订单完成与消费券核销已由 PAY-05 落地，但**未**实现经营账本收款投影/消费累计（PAY-06）、H5/管理后台支付交互与运维 UI（PAY-07/PAY-08）、真实退款执行（策略未定）。在线完成订单因此暂不进入账本、结算候选或三人团累计。
+- 在线订单完成与消费券核销已由 PAY-05 落地，PAY-06 已增加经营账本线上实收/消费累计投影；尚未实现 H5/管理后台支付交互与运维 UI（PAY-07/PAY-08）、真实退款执行（策略未定）。线上订单仍不进入线下结算候选；Mock 不进入正式财务汇总/对账/CSV。
 - 消费者由内部 token 入口或运维调度驱动，本仓库尚未内置定时器/常驻 worker；生产部署需要运维侧按 `POST /internal/payments/outbox/consume` 或进程内调用 `runPaymentOutboxConsumer` 安排触发。
 - 长期 `pending/confirming` 的支付意图需要 PAY-11 的可信查单/关单能力收敛；在渠道给出可信终态前，PAY-05 会一直保留其消费券占用（延迟释放），不会按过期时间猜测失败。
 - `mock` 支付只用于隔离契约测试；其 outbox 永久带 `simulated=true`，后续消费方不得把它当正式收款。

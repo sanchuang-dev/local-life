@@ -70,6 +70,7 @@ function entry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
     entryId: ENTRY_REGISTERED,
     factKind: 'order_registered',
     sourceSystem: 'local_order',
+    simulated: false,
     sourceId: 'local-order-0001',
     sourceDisplayNo: 'ORD-20261101-0001',
     communityId: COMMUNITY_A.id,
@@ -100,6 +101,7 @@ function paymentEntry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
     entryId: ENTRY_PAYMENT,
     factKind: 'payment_received',
     sourceSystem: 'manual',
+    simulated: false,
     sourceId: 'manual-receipt-0001',
     sourceDisplayNo: 'RCPT-0001',
     productId: null,
@@ -532,6 +534,7 @@ describe('LedgerPage list and detail', () => {
               localOrder: { scanned: 2, created: 1, skipped: 1 },
               crmServiceOrder: { scanned: 1, created: 1, skipped: 0 },
               activityRewardGrant: { scanned: 1, created: 0, skipped: 1 },
+              onlineCompletion: { scanned: 0, created: 0, skipped: 0 },
             },
           })
         },

@@ -78,7 +78,13 @@ function overview(overrides: Partial<LedgerOverview> = {}): LedgerOverview {
     attributed: { entryCount: 4, amountCents: 15920 },
     pendingAttribution: { entryCount: 1, amountCents: 1500 },
     openAnomalies: { count: 1 },
-    payment: { receivedCents: 3980, reversedCents: 0 },
+    payment: {
+      receivedCents: 3980,
+      reversedCents: 0,
+      manualReceivedCents: 3980,
+      onlineRealReceivedCents: 0,
+      onlineSimulatedReceivedCents: 0,
+    },
     reward: { costCents: 1500, reversedCents: 0 },
     ...overrides,
   }
@@ -98,7 +104,13 @@ function emptyOverview(): LedgerOverview {
     attributed: { entryCount: 0, amountCents: 0 },
     pendingAttribution: { entryCount: 0, amountCents: 0 },
     openAnomalies: { count: 0 },
-    payment: { receivedCents: 0, reversedCents: 0 },
+    payment: {
+      receivedCents: 0,
+      reversedCents: 0,
+      manualReceivedCents: 0,
+      onlineRealReceivedCents: 0,
+      onlineSimulatedReceivedCents: 0,
+    },
     reward: { costCents: 0, reversedCents: 0 },
   })
 }
@@ -418,6 +430,7 @@ describe('PerformancePage source sync', () => {
               localOrder: { scanned: 2, created: 1, skipped: 1 },
               crmServiceOrder: { scanned: 1, created: 1, skipped: 0 },
               activityRewardGrant: { scanned: 1, created: 0, skipped: 1 },
+              onlineCompletion: { scanned: 0, created: 0, skipped: 0 },
             },
           })
         },

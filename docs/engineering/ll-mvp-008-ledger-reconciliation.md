@@ -1,5 +1,7 @@
 # LL-MVP-008 · 统一经营流水、记账与对账契约、数据模型与迁移
 
+> **2026-11-18 PAY-06 补充**：`local_order_online_completions` 现在以独立 `online_payment` 来源投影为 `payment_received`，真实线上实收进入正式经营口径；`simulated=1` 保持明细可查但不进入正式汇总、对账批次/CSV 或结算金额。人工 `manual` 路径与冲正语义未变，线上退款仍 unsupported。详见 [payments-ledger-projection.md](payments-ledger-projection.md)。
+
 > **2026-11-16 第三批补充**：订单核验通过现在会在同一事务内自动投影该订单的 `order_registered` / `order_verified` 事实，社区有效业绩无需再逐笔手动同步；显式 `POST /admin/ledger/sync` 仍用于历史回填、CRM/奖励来源和运营核对。详见 [grid-order-verification.md](grid-order-verification.md)。
 >
 > **2026-11-07 合流说明（现行实现）**：微信后台工程先合入 `dev`，其迁移为 `0010_many_whirlwind.sql`；本卡账本迁移已按 Drizzle 当前 schema 重新生成并顺延为 **`0011_ledger_facts.sql`**，保留原账本不可变约束触发器。真实 API 现已注册来源事实同步及对账路由；来源同步由运营人员显式通过 `POST /admin/ledger/sync`（CSRF + 社区权限）触发，不是自动实时同步。以下历史 R3a-1 段落中提到的 `0010_ledger_facts`、未注册端点、未开发 UI 等只对应当时的阶段基线，不能作为现行代码或部署验收结论。合并后发布/浏览器联合验收仍由 #65 单独处理。

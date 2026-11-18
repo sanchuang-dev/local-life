@@ -2859,6 +2859,8 @@ export const ledgerEntries = sqliteTable(
     id: text('id').primaryKey(),
     factKind: text('fact_kind').$type<LedgerFactKind>().notNull(),
     sourceSystem: text('source_system').$type<LedgerSourceSystem>().notNull(),
+    /** PAY-04/PAY-06: only online-payment facts may be simulated; never formal cash. */
+    simulated: integer('simulated', { mode: 'boolean' }).notNull().default(false),
     /** Machine key of the source row; deduped per (source_system, source_id, fact_kind). */
     sourceId: text('source_id').notNull(),
     /** Human reference of the source (order no, grant id, receipt no). */
@@ -2917,15 +2919,17 @@ export const ledgerEntries = sqliteTable(
     ),
     check(
       'ledger_entries_source_system_check',
-      sql`${table.sourceSystem} IN ('local_order', 'crm_service_order', 'activity_reward_grant', 'manual')`,
+      sql`${table.sourceSystem} IN ('local_order', 'crm_service_order', 'activity_reward_grant',
+        'manual', 'online_payment')`,
     ),
     check(
       'ledger_entries_source_kind_check',
       sql`(${table.factKind} = 'order_registered' AND ${table.sourceSystem} = 'local_order')
         OR (${table.factKind} = 'order_verified'
           AND ${table.sourceSystem} IN ('local_order', 'crm_service_order'))
-        OR (${table.factKind} IN ('payment_received', 'payment_reversed')
-          AND ${table.sourceSystem} = 'manual')
+        OR (${table.factKind} = 'payment_received'
+          AND ${table.sourceSystem} IN ('manual', 'online_payment'))
+        OR (${table.factKind} = 'payment_reversed' AND ${table.sourceSystem} = 'manual')
         OR (${table.factKind} IN ('reward_cost', 'reward_reversed')
           AND ${table.sourceSystem} = 'activity_reward_grant')`,
     ),
@@ -2955,15 +2959,29 @@ export const ledgerEntries = sqliteTable(
     check(
       'ledger_entries_evidence_kind_check',
       sql`${table.evidenceKind} IN ('manual_receipt', 'bank_transfer', 'crm_confirmation',
-        'order_verification', 'reward_grant', 'none')`,
+        'order_verification', 'reward_grant', 'channel_payment', 'none')`,
     ),
-    // 没有凭据不得计入实收（DB 层硬拦）。
+    // Manual money needs a human + proof; online money needs the channel evidence
+    // and must not impersonate a human receipt. Only online rows may be simulated.
     check(
       'ledger_entries_payment_evidence_check',
       sql`${table.factKind} NOT IN ('payment_received', 'payment_reversed')
-        OR (${table.evidenceRef} IS NOT NULL
+        OR (${table.factKind} = 'payment_received'
+          AND ${table.sourceSystem} = 'online_payment'
+          AND ${table.evidenceRef} IS NOT NULL
+          AND ${table.recordedByUserId} IS NULL
+          AND ${table.recordedByStaffId} IS NULL
+          AND ${table.evidenceKind} = 'channel_payment')
+        OR (${table.sourceSystem} = 'manual'
+          AND ${table.evidenceRef} IS NOT NULL
           AND ${table.recordedByStaffId} IS NOT NULL
-          AND ${table.evidenceKind} <> 'none')`,
+          AND ${table.evidenceKind} IN ('manual_receipt', 'bank_transfer')
+          AND ${table.simulated} = 0)`,
+    ),
+    check(
+      'ledger_entries_simulated_check',
+      sql`(${table.simulated} IN (0, 1)
+        AND (${table.simulated} = 0 OR ${table.sourceSystem} = 'online_payment'))`,
     ),
     check(
       'ledger_entries_counter_entry_check',
@@ -3037,7 +3055,8 @@ export const ledgerEntrySources = sqliteTable(
     ),
     check(
       'ledger_entry_sources_source_system_check',
-      sql`${table.sourceSystem} IN ('local_order', 'crm_service_order', 'activity_reward_grant', 'manual')`,
+      sql`${table.sourceSystem} IN ('local_order', 'crm_service_order', 'activity_reward_grant',
+        'manual', 'online_payment')`,
     ),
   ],
 )

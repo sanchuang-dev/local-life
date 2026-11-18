@@ -597,7 +597,7 @@ export const LEDGER_FACT_KIND_LABELS: Record<LedgerFactKind, string> = {
 export const LEDGER_FACT_KIND_NOTES: Record<LedgerFactKind, string> = {
   order_registered: '居民下单时登记的账面金额；不是实收，也不代表业务已办理。',
   order_verified: '运营人工核验通过的订单事实；只计入业绩口径，不是付款凭据。',
-  payment_received: '线下人工登记 · 含凭据（收据 / 转账 / CRM 确认）的实收；本 MVP 没有在线支付。',
+  payment_received: '实收独立成行；人工凭据与线上渠道实收由来源系统区分，模拟线上收款不进入正式财务口径。',
   payment_reversed: '收款冲正单独成行，不从实收里静默抵扣。',
   reward_cost: '活动奖励履约的实际成本；不是营收，也不抵扣业绩。',
   reward_reversed: '奖励成本冲正单独成行。',
@@ -608,6 +608,7 @@ export const LEDGER_SOURCE_SYSTEM_LABELS: Record<LedgerSourceSystem, string> = {
   crm_service_order: '广电 CRM',
   activity_reward_grant: '奖励履约',
   manual: '人工登记',
+  online_payment: '线上支付',
 }
 
 export const LEDGER_ANOMALY_KIND_LABELS: Record<LedgerAnomalyKind, string> = {
@@ -642,6 +643,7 @@ export const LEDGER_EVIDENCE_KIND_LABELS: Record<LedgerEvidenceKind, string> = {
   crm_confirmation: 'CRM 确认',
   order_verification: '订单核验记录',
   reward_grant: '奖励发放记录',
+  channel_payment: '渠道支付流水',
   none: '无凭据',
 }
 

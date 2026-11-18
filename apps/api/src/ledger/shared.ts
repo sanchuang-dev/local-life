@@ -215,6 +215,7 @@ export interface LedgerEntryRow {
   id: string
   factKind: LedgerFactKind
   sourceSystem: LedgerEntry['sourceSystem']
+  simulated: boolean
   sourceId: string
   sourceDisplayNo: string
   communityId: string
@@ -295,6 +296,7 @@ export function toLedgerEntry(
     entryId: row.id,
     factKind: row.factKind,
     sourceSystem: row.sourceSystem,
+    simulated: row.simulated,
     sourceId: row.sourceId,
     sourceDisplayNo: row.sourceDisplayNo,
     communityId: row.communityId,
@@ -324,6 +326,7 @@ export const ledgerEntrySelection = {
   id: ledgerEntries.id,
   factKind: ledgerEntries.factKind,
   sourceSystem: ledgerEntries.sourceSystem,
+  simulated: ledgerEntries.simulated,
   sourceId: ledgerEntries.sourceId,
   sourceDisplayNo: ledgerEntries.sourceDisplayNo,
   communityId: ledgerEntries.communityId,
@@ -374,7 +377,13 @@ export function emptyLedgerOverview(asOf: string): LedgerOverview {
     attributed: { entryCount: 0, amountCents: 0 },
     pendingAttribution: { entryCount: 0, amountCents: 0 },
     openAnomalies: { count: 0 },
-    payment: { receivedCents: 0, reversedCents: 0 },
+    payment: {
+      receivedCents: 0,
+      reversedCents: 0,
+      manualReceivedCents: 0,
+      onlineRealReceivedCents: 0,
+      onlineSimulatedReceivedCents: 0,
+    },
     reward: { costCents: 0, reversedCents: 0 },
   }
 }
@@ -449,7 +458,10 @@ export function getLedgerOverview(
   const conditions = scopeAndFilterConditions(db, actor, filters)
   if (conditions === null) return emptyLedgerOverview(asOf)
 
-  const where = combine(conditions)
+  // Formal financial overview: simulated online facts are detail-only evidence
+  // and never enter the operating totals. They are reported separately below.
+  const formalConditions = [...conditions, eq(ledgerEntries.simulated, false)]
+  const where = combine(formalConditions)
   const bucketRows = db
     .select({
       factKind: ledgerEntries.factKind,
@@ -490,8 +502,7 @@ export function getLedgerOverview(
 
   // Same narrowings as the report itself: an anomaly of a fact outside the
   // selected slice must not be counted into that slice's open-anomaly badge.
-  const anomalyConditions: SQL<unknown>[] =
-    scopeAndFilterConditions(db, actor, filters) ?? []
+  const anomalyConditions: SQL<unknown>[] = [...formalConditions]
   anomalyConditions.push(isNull(ledgerAnomalies.resolvedAt))
   const anomalyRow = db
     .select({ value: sql<number>`count(*)` })
@@ -499,6 +510,30 @@ export function getLedgerOverview(
     .innerJoin(ledgerEntries, eq(ledgerAnomalies.entryId, ledgerEntries.id))
     .where(combine(anomalyConditions))
     .get()
+
+  const paymentRows = db
+    .select({
+      sourceSystem: ledgerEntries.sourceSystem,
+      simulated: ledgerEntries.simulated,
+      amountCents: sql<number>`coalesce(sum(${ledgerEntries.amountCents}), 0)`.mapWith(Number),
+    })
+    .from(ledgerEntries)
+    .where(combine([
+      ...conditions,
+      eq(ledgerEntries.factKind, 'payment_received'),
+    ]))
+    .groupBy(ledgerEntries.sourceSystem, ledgerEntries.simulated)
+    .all()
+  let manualReceivedCents = 0
+  let onlineRealReceivedCents = 0
+  let onlineSimulatedReceivedCents = 0
+  for (const row of paymentRows) {
+    if (row.sourceSystem === 'manual') manualReceivedCents += row.amountCents
+    else if (row.sourceSystem === 'online_payment') {
+      if (row.simulated) onlineSimulatedReceivedCents += row.amountCents
+      else onlineRealReceivedCents += row.amountCents
+    }
+  }
 
   const totals = buckets.reduce(
     (accumulator, bucket) => ({
@@ -526,6 +561,9 @@ export function getLedgerOverview(
     payment: {
       receivedCents: bucketOf('payment_received'),
       reversedCents: bucketOf('payment_reversed'),
+      manualReceivedCents,
+      onlineRealReceivedCents,
+      onlineSimulatedReceivedCents,
     },
     reward: { costCents: bucketOf('reward_cost'), reversedCents: bucketOf('reward_reversed') },
   }
@@ -550,6 +588,9 @@ function listConditions(
 
   if (query.factKind) conditions.push(eq(ledgerEntries.factKind, query.factKind))
   if (query.sourceSystem) conditions.push(eq(ledgerEntries.sourceSystem, query.sourceSystem))
+  if (query.simulated !== undefined) {
+    conditions.push(eq(ledgerEntries.simulated, query.simulated))
+  }
   if (query.productId) conditions.push(eq(ledgerEntries.productId, query.productId))
   if (query.keyword) {
     const pattern = escapedLike(query.keyword)
