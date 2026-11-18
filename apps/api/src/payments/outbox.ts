@@ -416,14 +416,19 @@ export function recoverParkedPaymentOutboxEvent(
   const now = options.now ?? new Date()
   const maxAttempts = options.maxAttempts ?? PAYMENT_OUTBOX_MAX_ATTEMPTS
 
-  const reset = db.transaction((tx): { alreadyDelivered: boolean } => {
+  const reset = db.transaction((tx): {
+    alreadyDelivered: boolean
+    exhaustedConflictId: string | null
+  } => {
     const row = tx.select().from(paymentOutbox)
       .where(eq(paymentOutbox.id, outboxEventId))
       .get()
     if (!row) {
       throw new LocalError(404, API_ERROR_CODES.notFound, '支付事件不存在')
     }
-    if (row.status === 'delivered') return { alreadyDelivered: true }
+    if (row.status === 'delivered') {
+      return { alreadyDelivered: true, exhaustedConflictId: null }
+    }
     if (row.status !== 'failed') {
       // `pending`/`processing` already have an owner; replaying them here would
       // race the scheduler for no reason. Only a parked row is recoverable.
@@ -468,7 +473,10 @@ export function recoverParkedPaymentOutboxEvent(
         '该支付事件正在被其他恢复流程处理',
       )
     }
-    return { alreadyDelivered: false }
+    return {
+      alreadyDelivered: false,
+      exhaustedConflictId: exhaustedConflict.id,
+    }
   }, { behavior: 'immediate' })
 
   const processed = reset.alreadyDelivered
@@ -492,19 +500,32 @@ export function recoverParkedPaymentOutboxEvent(
 
   let conflictsResolved = 0
   if (finalRow.status === 'delivered') {
-    // Resolve the parking anomaly without deleting or rewriting the evidence: the
-    // immutability trigger keeps `kind`, `detail`, ids and `created_at` forever.
-    conflictsResolved = db.transaction((tx) => {
-      const result = tx.update(localOrderOnlineConflicts).set({
-        status: 'resolved',
-        resolvedAt: now,
-      }).where(and(
-        eq(localOrderOnlineConflicts.paymentOutboxId, outboxEventId),
-        eq(localOrderOnlineConflicts.kind, 'consumer_exhausted'),
-        eq(localOrderOnlineConflicts.status, 'open'),
-      )).run()
-      return result.changes
-    }, { behavior: 'immediate' })
+    if (reset.exhaustedConflictId) {
+      const exhaustedConflict = db.select({
+        status: localOrderOnlineConflicts.status,
+      }).from(localOrderOnlineConflicts)
+        .where(eq(localOrderOnlineConflicts.id, reset.exhaustedConflictId))
+        .get()
+
+      // The delivery transaction owns the authoritative open -> resolved
+      // transition. Count that resolution in this recovery response even though
+      // it already happened before control returned here.
+      if (exhaustedConflict?.status === 'resolved') {
+        conflictsResolved = 1
+      } else if (exhaustedConflict?.status === 'open') {
+        // Defensive fallback for older/partially upgraded code paths: preserve the
+        // public response contract without deleting or rewriting evidence.
+        const result = db.update(localOrderOnlineConflicts).set({
+          status: 'resolved',
+          resolvedAt: now,
+        }).where(and(
+          eq(localOrderOnlineConflicts.id, reset.exhaustedConflictId),
+          eq(localOrderOnlineConflicts.kind, 'consumer_exhausted'),
+          eq(localOrderOnlineConflicts.status, 'open'),
+        )).run()
+        conflictsResolved = result.changes
+      }
+    }
     // PAY-06 projection is unique-keyed; running it again is a no-op or the
     // missing receipt, never a second one.
     projectOnlineCompletionsToLedger(db, { now })
