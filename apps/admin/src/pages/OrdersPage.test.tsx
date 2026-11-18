@@ -981,20 +981,20 @@ describe('OrdersPage payment section (PAY-08)', () => {
 
     renderPage(ADMIN_SESSION)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'ÏêÇé' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'è¯¦æƒ…' }))
 
-    expect(await screen.findByText('Ö§¸¶Óë½áËã£¨Ö»¶Á£©')).toBeTruthy()
-    expect(screen.getAllByText('Ä£ÄâÖ§¸¶/²âÊÔ').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('ÇþµÀÖ§¸¶ÒÑÈ·ÈÏ').length).toBeGreaterThan(0)
-    expect(screen.getByText('ÒøÐÐ½áËã£ºÎ´ºËÊµ')).toBeTruthy()
-    expect(screen.getByText(/ÕæÊµÇþµÀÏßÉÏÊµÊÕºÏ¼Æ £¤0\.00/)).toBeTruthy()
-    expect(screen.getByText(/Ä£ÄâÖ§¸¶ÊµÊÕºÏ¼Æ £¤39\.80/)).toBeTruthy()
-    expect(screen.getByText('****d6c8', { exact: false })).toBeTruthy()
+    expect(await screen.findByText('æ”¯ä»˜ä¸Žç»“ç®—ï¼ˆåªè¯»ï¼‰')).toBeTruthy()
+    expect(screen.getAllByText('æ¨¡æ‹Ÿæ”¯ä»˜/æµ‹è¯•').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('æ¸ é“æ”¯ä»˜å·²ç¡®è®¤').length).toBeGreaterThan(0)
+    expect(screen.getByText('é“¶è¡Œç»“ç®—ï¼šæœªæ ¸å®ž')).toBeTruthy()
+    expect(screen.getByText(/çœŸå®žæ¸ é“çº¿ä¸Šå®žæ”¶åˆè®¡ Â¥0\.00/)).toBeTruthy()
+    expect(screen.getByText(/æ¨¡æ‹Ÿæ”¯ä»˜å®žæ”¶åˆè®¡ Â¥39\.80/)).toBeTruthy()
+    expect(screen.getAllByText(/äº¤æ˜“å· \*{4}d6c8/).length).toBeGreaterThan(0)
     // No raw channel reference and no fabricated settlement claim.
     expect(document.body.textContent).not.toMatch(/MOCK-TXN|RAW-TXN/)
-    expect(document.body.textContent).not.toMatch(/ÒÑµ½ÕË|ÒÑ½áËã/)
+    expect(document.body.textContent).not.toMatch(/å·²åˆ°è´¦|å·²ç»“ç®—/)
     // Read-only: no recovery/reconciliation action exists in this section.
-    expect(screen.queryByRole('button', { name: /×Ô¶¯|ÐÞ¸´|ÖØÐÂ¶ÔÕË/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /è‡ªåŠ¨|ä¿®å¤|é‡æ–°å¯¹è´¦/ })).toBeNull()
   })
 
   it('shows a legacy manual order without inventing an online payment', async () => {
@@ -1003,7 +1003,7 @@ describe('OrdersPage payment section (PAY-08)', () => {
       verification: {
         verifiedBy: REVIEWER,
         verifiedAt: '2026-11-05T04:00:00.000Z',
-        note: 'ÒÑµç»°Óë¾ÓÃñºË¶Ô',
+        note: 'å·²ç”µè¯ä¸Žå±…æ°‘æ ¸å¯¹',
       },
       paymentSection: manualPaymentSection(),
     })
@@ -1015,15 +1015,15 @@ describe('OrdersPage payment section (PAY-08)', () => {
 
     renderPage(ADMIN_SESSION)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'ÏêÇé' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'è¯¦æƒ…' }))
 
-    expect(await screen.findByText('ÈË¹¤ºËÑé / ÏßÏÂÊÕ¿î')).toBeTruthy()
-    expect(screen.getByText('ÈË¹¤ÊÕ¿îÆ¾¾Ý£¨ÏßÏÂ£©')).toBeTruthy()
+    expect(await screen.findByText('äººå·¥æ ¸éªŒ / çº¿ä¸‹æ”¶æ¬¾')).toBeTruthy()
+    expect(screen.getByText('äººå·¥æ”¶æ¬¾å‡­æ®ï¼ˆçº¿ä¸‹ï¼‰')).toBeTruthy()
     expect(screen.getByText(/BANK-4821/)).toBeTruthy()
-    expect(screen.getByText(/±¾µ¥Ã»ÓÐÖ§¸¶µ¥/)).toBeTruthy()
-    expect(screen.getByText('Î´·¢ÆðÔÚÏßÖ§¸¶¡£')).toBeTruthy()
-    expect(screen.queryByText('Ä£ÄâÖ§¸¶/²âÊÔ')).toBeNull()
-    expect(document.body.textContent).not.toMatch(/ÒÑµ½ÕË|ÒÑ½áËã/)
+    expect(screen.getByText(/æœ¬å•æ²¡æœ‰æ”¯ä»˜å•/)).toBeTruthy()
+    expect(screen.getByText('æœªå‘èµ·åœ¨çº¿æ”¯ä»˜ã€‚')).toBeTruthy()
+    expect(screen.queryByText('æ¨¡æ‹Ÿæ”¯ä»˜/æµ‹è¯•')).toBeNull()
+    expect(document.body.textContent).not.toMatch(/å·²åˆ°è´¦|å·²ç»“ç®—/)
   })
 
   it('lists existing exception kinds read-only, including double collection and exhaustion', async () => {
@@ -1048,15 +1048,15 @@ describe('OrdersPage payment section (PAY-08)', () => {
 
     renderPage(ADMIN_SESSION)
 
-    fireEvent.click(await screen.findByRole('button', { name: 'ÏêÇé' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'è¯¦æƒ…' }))
 
     expect(
-      await screen.findByText('ÈË¹¤ÏßÏÂÊµÊÕÓëÔÚÏßÇþµÀÊÕ¿îÍ¬Ê±´æÔÚ'),
+      await screen.findByText('äººå·¥çº¿ä¸‹å®žæ”¶ä¸Žåœ¨çº¿æ¸ é“æ”¶æ¬¾åŒæ—¶å­˜åœ¨'),
     ).toBeTruthy()
-    expect(screen.getByText('¶©µ¥Íê³ÉÏû·ÑÖØÊÔºÄ¾¡£¬´ýÈË¹¤»Ö¸´')).toBeTruthy()
-    expect(screen.getByText('Ö§¸¶µ¥¹Ø±ÕºóÊÕµ½ÇþµÀÈ·ÈÏ')).toBeTruthy()
-    expect(screen.getByText(/²»Ìá¹©×Ô¶¯»Ö¸´/)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /×Ô¶¯|ÐÞ¸´|ÖØÐÂ¶ÔÕË/ })).toBeNull()
+    expect(screen.getByText('è®¢å•å®Œæˆæ¶ˆè´¹é‡è¯•è€—å°½ï¼Œå¾…äººå·¥æ¢å¤')).toBeTruthy()
+    expect(screen.getByText('æ”¯ä»˜å•å…³é—­åŽæ”¶åˆ°æ¸ é“ç¡®è®¤')).toBeTruthy()
+    expect(screen.getByText(/ä¸æä¾›è‡ªåŠ¨æ¢å¤/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /è‡ªåŠ¨|ä¿®å¤|é‡æ–°å¯¹è´¦/ })).toBeNull()
   })
 
   it('sends the payment-status filter to the server query', async () => {
@@ -1064,21 +1064,31 @@ describe('OrdersPage payment section (PAY-08)', () => {
 
     renderPage(ADMIN_SESSION)
 
-    await screen.findByText('ÉçÇøÖúÅ©Êß²Ë°ü')
-    fireEvent.click(screen.getByRole('button', { name: '¸ü¶àÌõ¼þ' }))
-    fireEvent.mouseDown(await screen.findByLabelText('Ö§¸¶×´Ì¬'))
-    const option = (await screen.findAllByText('ÇþµÀÖ§¸¶ÒÑÈ·ÈÏ')).find((element) =>
+    await screen.findByText('ç¤¾åŒºåŠ©å†œè”¬èœåŒ…')
+    fireEvent.click(screen.getByRole('button', { name: 'æ›´å¤šæ¡ä»¶' }))
+    const paymentStatusSelect = (await screen.findAllByLabelText('æ”¯ä»˜çŠ¶æ€')).find(
+      (element) => element.id.includes('-inline-'),
+    )
+    expect(paymentStatusSelect).toBeTruthy()
+    fireEvent.mouseDown(paymentStatusSelect as Element)
+    const option = (await screen.findAllByText('æ¸ é“æ”¯ä»˜å·²ç¡®è®¤')).find((element) =>
       element.closest('.ant-select-item-option'),
     )
     expect(option).toBeTruthy()
     fireEvent.click(option as Element)
-    fireEvent.click(screen.getByRole('button', { name: '²éÑ¯' }))
+    // Submit the quick filter form directly: antd's open Select portal marks
+    // sibling content aria-hidden, so a role query for the æŸ¥è¯¢ button is not
+    // reliable while the dropdown is mounted.
+    const quickForm = document.querySelector('form.data-panel-form')
+    expect(quickForm).toBeTruthy()
+    fireEvent.submit(quickForm as Element)
 
     await waitFor(() => {
-      const filtered = calledUrls(calls).find((url) =>
+      const filtered = calledUrls(calls).filter((url) =>
         url.startsWith('/api/admin/local-orders?'),
       )
-      expect(filtered).toContain('paymentStatus=paid')
+      expect(filtered.at(-1)).toContain('paymentStatus=paid')
     })
   })
 })
+
