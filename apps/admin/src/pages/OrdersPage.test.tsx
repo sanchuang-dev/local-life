@@ -5,9 +5,10 @@ import { App as AntdApp, ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import type {
+  AdminLocalOrderDetail,
+  AdminOrderPaymentSection,
   LedgerEntry,
   LedgerOrderEvidence,
-  LocalOrderDetail,
   LocalOrderEvent,
   LocalOrderSummary,
 } from '@sanchuang-dev/local-life-contracts'
@@ -85,7 +86,7 @@ function summary(overrides: Partial<LocalOrderSummary> = {}): LocalOrderSummary 
   }
 }
 
-function detail(overrides: Partial<LocalOrderDetail> = {}): LocalOrderDetail {
+function detail(overrides: Partial<AdminLocalOrderDetail> = {}): AdminLocalOrderDetail {
   return {
     ...summary(),
     residentContact: { phone: '13800000000', address: null },
@@ -94,12 +95,211 @@ function detail(overrides: Partial<LocalOrderDetail> = {}): LocalOrderDetail {
     onlineConflicts: [],
     statusNote: null,
     events: [orderEvent()],
+    paymentSection: emptyPaymentSection(),
     ...overrides,
   }
 }
 
+function emptyPaymentSection(
+  overrides: Partial<AdminOrderPaymentSection> = {},
+): AdminOrderPaymentSection {
+  return {
+    amounts: {
+      grossAmountCents: 3980,
+      couponDiscountCents: 0,
+      netPayableCents: 3980,
+    },
+    manual: {
+      verified: false,
+      verifiedAt: null,
+      verifiedBy: null,
+      note: null,
+      receipts: [],
+    },
+    online: {
+      intents: [],
+      completion: null,
+      ledgerReceipts: [],
+      conflicts: [],
+      reviewExceptions: [],
+    },
+    receiptTotals: {
+      manualReceivedCents: 0,
+      onlineRealReceivedCents: 0,
+      onlineSimulatedReceivedCents: 0,
+    },
+    bankSettlement: { status: 'unverified' },
+    ...overrides,
+  }
+}
+
+/** A Mock online order: channel paid, completion, ledger receipt + an exception. */
+function mockOnlinePaymentSection(): AdminOrderPaymentSection {
+  const merchantOrderNo = 'PAY-20261116ABCDEF0123456789ABCD'
+  return emptyPaymentSection({
+    online: {
+      intents: [
+        {
+          id: '123e4567-e89b-42d3-a456-4266141740c1',
+          kind: 'channel',
+          channel: 'mock',
+          simulated: true,
+          merchantOrderNo,
+          grossAmountCents: 3980,
+          discountCents: 0,
+          netPayableCents: 3980,
+          status: 'paid',
+          expiresAt: '2026-11-04T02:15:00.000Z',
+          paidAt: '2026-11-04T02:01:00.000Z',
+          closedAt: null,
+          failedAt: null,
+          failureCode: null,
+          failureMessage: null,
+          createdAt: '2026-11-04T02:00:00.000Z',
+          updatedAt: '2026-11-04T02:01:00.000Z',
+          attempts: [
+            {
+              id: '123e4567-e89b-42d3-a456-4266141740c2',
+              attemptNo: 1,
+              status: 'paid',
+              providerTransactionIdMasked: '****d6c8',
+              createdAt: '2026-11-04T02:00:30.000Z',
+              updatedAt: '2026-11-04T02:01:00.000Z',
+              confirmedAt: '2026-11-04T02:01:00.000Z',
+              closedAt: null,
+              failedAt: null,
+              failureCode: null,
+              failureMessage: null,
+            },
+          ],
+          events: [
+            {
+              id: '123e4567-e89b-42d3-a456-4266141740c3',
+              eventType: 'payment.status_changed',
+              source: 'channel',
+              fromStatus: 'pending',
+              toStatus: 'paid',
+              createdAt: '2026-11-04T02:01:00.000Z',
+            },
+          ],
+        },
+      ],
+      completion: {
+        paymentIntentId: '123e4567-e89b-42d3-a456-4266141740c1',
+        kind: 'channel',
+        simulated: true,
+        amountCents: 3980,
+        discountCents: 0,
+        providerTransactionIdMasked: '****d6c8',
+        completedAt: '2026-11-04T02:01:00.000Z',
+      },
+      ledgerReceipts: [
+        {
+          entryId: '123e4567-e89b-42d3-a456-4266141740c4',
+          factKind: 'payment_received',
+          sourceSystem: 'online_payment',
+          amountCents: 3980,
+          simulated: true,
+          providerTransactionIdMasked: '****d6c8',
+          occurredAt: '2026-11-04T02:01:00.000Z',
+          createdAt: '2026-11-04T02:01:00.000Z',
+        },
+      ],
+      conflicts: [],
+      reviewExceptions: [
+        {
+          id: '123e4567-e89b-42d3-a456-4266141740c5',
+          kind: 'terminal_conflict',
+          status: 'open',
+          channel: 'mock',
+          merchantOrderNo,
+          providerTransactionIdMasked: '****d6c8',
+          amountCents: 3980,
+          source: 'notification',
+          failureCode: null,
+          observedAt: '2026-11-04T02:02:00.000Z',
+          createdAt: '2026-11-04T02:02:00.000Z',
+          resolvedAt: null,
+        },
+      ],
+    },
+    receiptTotals: {
+      manualReceivedCents: 0,
+      onlineRealReceivedCents: 0,
+      onlineSimulatedReceivedCents: 3980,
+    },
+  })
+}
+
+/** A legacy order: human verification + one manual bank-transfer receipt. */
+function manualPaymentSection(): AdminOrderPaymentSection {
+  return emptyPaymentSection({
+    manual: {
+      verified: true,
+      verifiedAt: '2026-11-05T04:00:00.000Z',
+      verifiedBy: REVIEWER,
+      note: 'å·²ç”µè¯ä¸Žå±…æ°‘æ ¸å¯¹',
+      receipts: [
+        {
+          entryId: RECEIPT_ENTRY_ID,
+          factKind: 'payment_received',
+          amountCents: 3980,
+          evidenceKind: 'bank_transfer',
+          evidenceRef: 'BANK-4821',
+          occurredAt: '2026-11-05T04:00:00.000Z',
+          createdAt: '2026-11-05T04:00:00.000Z',
+          reversal: null,
+        },
+      ],
+    },
+    receiptTotals: {
+      manualReceivedCents: 3980,
+      onlineRealReceivedCents: 0,
+      onlineSimulatedReceivedCents: 0,
+    },
+  })
+}
+
+/** Durable exception fixtures: double collection + exhausted + late success. */
+function exceptionPaymentSection(): AdminOrderPaymentSection {
+  const section = mockOnlinePaymentSection()
+  section.online.conflicts = [
+    {
+      id: '123e4567-e89b-42d3-a456-4266141740d1',
+      kind: 'manual_online_double_collection',
+      status: 'open',
+      createdAt: '2026-11-04T03:00:00.000Z',
+      resolvedAt: null,
+    },
+    {
+      id: '123e4567-e89b-42d3-a456-4266141740d2',
+      kind: 'consumer_exhausted',
+      status: 'open',
+      createdAt: '2026-11-04T03:10:00.000Z',
+      resolvedAt: null,
+    },
+  ]
+  section.online.reviewExceptions = [
+    {
+      id: '123e4567-e89b-42d3-a456-4266141740d3',
+      kind: 'late_success_after_closed',
+      status: 'open',
+      channel: 'mock',
+      merchantOrderNo: 'PAY-20261116ABCDEF0123456789ABCD',
+      providerTransactionIdMasked: '****e9f0',
+      amountCents: 3980,
+      source: 'query',
+      failureCode: null,
+      observedAt: '2026-11-04T03:20:00.000Z',
+      createdAt: '2026-11-04T03:20:00.000Z',
+      resolvedAt: null,
+    },
+  ]
+  return section
+}
+
 /** A pending-review order carrying the reviewer's note the verify action records. */
-function verifiedDetail(): LocalOrderDetail {
+function verifiedDetail(): AdminLocalOrderDetail {
   return detail({
     status: 'verified',
     updatedAt: '2026-11-05T04:00:00.000Z',
@@ -755,5 +955,130 @@ describe('OrdersPage receipt evidence', () => {
       note: 'å±…æ°‘å‡ºç¤ºç½‘æ ¼å‘˜æŽ¨å¹¿ç™»è®°è®°å½•',
     })
     expect(await screen.findByText('ä¸šç»©å½’å±žå·²è¿½åŠ ç¡®è®¤è®°å½•ï¼Œä¸æ”¹å˜åŽŸå§‹æµæ°´ã€‚')).toBeTruthy()
+  })
+})
+
+describe('OrdersPage payment section (PAY-08)', () => {
+  it('layers mock channel payment, masks the transaction id and never claims bank settlement', async () => {
+    const online = detail({
+      status: 'online_completed',
+      onlineCompletion: {
+        paymentIntentId: '123e4567-e89b-42d3-a456-4266141740c1',
+        kind: 'channel',
+        simulated: true,
+        amountCents: 3980,
+        discountCents: 0,
+        providerTransactionId: '****d6c8',
+        completedAt: '2026-11-04T02:01:00.000Z',
+      },
+      paymentSection: mockOnlinePaymentSection(),
+    })
+    stubOrderApi([
+      communitiesRoute(),
+      ordersRoute([summary({ status: 'online_completed' })]),
+      [`/api/admin/local-orders/${ORDER_ID}`, () => json(online)],
+    ])
+
+    renderPage(ADMIN_SESSION)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'ÏêÇé' }))
+
+    expect(await screen.findByText('Ö§¸¶Óë½áËã£¨Ö»¶Á£©')).toBeTruthy()
+    expect(screen.getAllByText('Ä£ÄâÖ§¸¶/²âÊÔ').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('ÇþµÀÖ§¸¶ÒÑÈ·ÈÏ').length).toBeGreaterThan(0)
+    expect(screen.getByText('ÒøÐÐ½áËã£ºÎ´ºËÊµ')).toBeTruthy()
+    expect(screen.getByText(/ÕæÊµÇþµÀÏßÉÏÊµÊÕºÏ¼Æ £¤0\.00/)).toBeTruthy()
+    expect(screen.getByText(/Ä£ÄâÖ§¸¶ÊµÊÕºÏ¼Æ £¤39\.80/)).toBeTruthy()
+    expect(screen.getByText('****d6c8', { exact: false })).toBeTruthy()
+    // No raw channel reference and no fabricated settlement claim.
+    expect(document.body.textContent).not.toMatch(/MOCK-TXN|RAW-TXN/)
+    expect(document.body.textContent).not.toMatch(/ÒÑµ½ÕË|ÒÑ½áËã/)
+    // Read-only: no recovery/reconciliation action exists in this section.
+    expect(screen.queryByRole('button', { name: /×Ô¶¯|ÐÞ¸´|ÖØÐÂ¶ÔÕË/ })).toBeNull()
+  })
+
+  it('shows a legacy manual order without inventing an online payment', async () => {
+    const manual = detail({
+      status: 'verified',
+      verification: {
+        verifiedBy: REVIEWER,
+        verifiedAt: '2026-11-05T04:00:00.000Z',
+        note: 'ÒÑµç»°Óë¾ÓÃñºË¶Ô',
+      },
+      paymentSection: manualPaymentSection(),
+    })
+    stubOrderApi([
+      communitiesRoute(),
+      ordersRoute([summary({ status: 'verified' })]),
+      [`/api/admin/local-orders/${ORDER_ID}`, () => json(manual)],
+    ])
+
+    renderPage(ADMIN_SESSION)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'ÏêÇé' }))
+
+    expect(await screen.findByText('ÈË¹¤ºËÑé / ÏßÏÂÊÕ¿î')).toBeTruthy()
+    expect(screen.getByText('ÈË¹¤ÊÕ¿îÆ¾¾Ý£¨ÏßÏÂ£©')).toBeTruthy()
+    expect(screen.getByText(/BANK-4821/)).toBeTruthy()
+    expect(screen.getByText(/±¾µ¥Ã»ÓÐÖ§¸¶µ¥/)).toBeTruthy()
+    expect(screen.getByText('Î´·¢ÆðÔÚÏßÖ§¸¶¡£')).toBeTruthy()
+    expect(screen.queryByText('Ä£ÄâÖ§¸¶/²âÊÔ')).toBeNull()
+    expect(document.body.textContent).not.toMatch(/ÒÑµ½ÕË|ÒÑ½áËã/)
+  })
+
+  it('lists existing exception kinds read-only, including double collection and exhaustion', async () => {
+    const withExceptions = detail({
+      status: 'online_completed',
+      onlineCompletion: {
+        paymentIntentId: '123e4567-e89b-42d3-a456-4266141740c1',
+        kind: 'channel',
+        simulated: true,
+        amountCents: 3980,
+        discountCents: 0,
+        providerTransactionId: '****d6c8',
+        completedAt: '2026-11-04T02:01:00.000Z',
+      },
+      paymentSection: exceptionPaymentSection(),
+    })
+    stubOrderApi([
+      communitiesRoute(),
+      ordersRoute([summary({ status: 'online_completed' })]),
+      [`/api/admin/local-orders/${ORDER_ID}`, () => json(withExceptions)],
+    ])
+
+    renderPage(ADMIN_SESSION)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'ÏêÇé' }))
+
+    expect(
+      await screen.findByText('ÈË¹¤ÏßÏÂÊµÊÕÓëÔÚÏßÇþµÀÊÕ¿îÍ¬Ê±´æÔÚ'),
+    ).toBeTruthy()
+    expect(screen.getByText('¶©µ¥Íê³ÉÏû·ÑÖØÊÔºÄ¾¡£¬´ýÈË¹¤»Ö¸´')).toBeTruthy()
+    expect(screen.getByText('Ö§¸¶µ¥¹Ø±ÕºóÊÕµ½ÇþµÀÈ·ÈÏ')).toBeTruthy()
+    expect(screen.getByText(/²»Ìá¹©×Ô¶¯»Ö¸´/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /×Ô¶¯|ÐÞ¸´|ÖØÐÂ¶ÔÕË/ })).toBeNull()
+  })
+
+  it('sends the payment-status filter to the server query', async () => {
+    const calls = stubOrderApi([communitiesRoute(), ordersRoute()])
+
+    renderPage(ADMIN_SESSION)
+
+    await screen.findByText('ÉçÇøÖúÅ©Êß²Ë°ü')
+    fireEvent.click(screen.getByRole('button', { name: '¸ü¶àÌõ¼þ' }))
+    fireEvent.mouseDown(await screen.findByLabelText('Ö§¸¶×´Ì¬'))
+    const option = (await screen.findAllByText('ÇþµÀÖ§¸¶ÒÑÈ·ÈÏ')).find((element) =>
+      element.closest('.ant-select-item-option'),
+    )
+    expect(option).toBeTruthy()
+    fireEvent.click(option as Element)
+    fireEvent.click(screen.getByRole('button', { name: '²éÑ¯' }))
+
+    await waitFor(() => {
+      const filtered = calledUrls(calls).find((url) =>
+        url.startsWith('/api/admin/local-orders?'),
+      )
+      expect(filtered).toContain('paymentStatus=paid')
+    })
   })
 })

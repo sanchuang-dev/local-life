@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, count, desc, eq, gte, inArray, isNotNull, or, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, lte, or, sql, type SQL } from 'drizzle-orm'
 import {
   API_ERROR_CODES,
   LOCAL_ORDER_EVENT_SOURCE_TYPE,
@@ -11,6 +11,7 @@ import {
   localOrderListResponseSchema,
   localOrderSummarySchema,
   localOrderTeamOptionListResponseSchema,
+  type AdminLocalOrderListQuery,
   type CreateLocalOrderOnBehalfRequest,
   type CreateLocalOrderRequest,
   type LocalOrderCreateResponse,
@@ -957,6 +958,137 @@ export function listStaffOrders(
       )!,
     )
   }
+  return listOrders(db, conditions, query)
+}
+
+function emptyOrderPage(query: LocalOrderListQuery): LocalOrderListResponse {
+  return localOrderListResponseSchema.parse({
+    items: [],
+    total: 0,
+    page: query.page,
+    pageSize: query.pageSize,
+  })
+}
+
+/**
+ * PAY-08 (#283) payment-fact filters for the back-office list.
+ *
+ * Each condition is an `EXISTS` against the existing payment truth tables, so
+ * SQLite does the filtering and paging; the API never loads the whole table to
+ * filter in JS. `paymentMode` deliberately matches only orders that actually
+ * have a payment intent: a manual-only (legacy) order is neither simulated nor
+ * a real channel payment, and pretending otherwise would fabricate history.
+ */
+function adminPaymentConditions(query: AdminLocalOrderListQuery): SQL<unknown>[] {
+  const conditions: SQL<unknown>[] = []
+  if (query.merchantOrderNo) {
+    conditions.push(
+      sql`EXISTS (
+        SELECT 1 FROM payment_intents pi
+        WHERE pi.local_order_id = ${localOrders.id}
+          AND pi.merchant_order_no = ${query.merchantOrderNo}
+      )`,
+    )
+  }
+  if (query.providerTransactionId) {
+    conditions.push(
+      sql`(
+        EXISTS (
+          SELECT 1 FROM payment_attempts pa
+          JOIN payment_intents pi ON pa.payment_intent_id = pi.id
+          WHERE pi.local_order_id = ${localOrders.id}
+            AND pa.provider_transaction_id = ${query.providerTransactionId}
+        )
+        OR EXISTS (
+          SELECT 1 FROM local_order_online_completions loc
+          WHERE loc.local_order_id = ${localOrders.id}
+            AND loc.provider_transaction_id = ${query.providerTransactionId}
+        )
+      )`,
+    )
+  }
+  if (query.paymentStatus) {
+    conditions.push(
+      sql`EXISTS (
+        SELECT 1 FROM payment_intents pi
+        WHERE pi.local_order_id = ${localOrders.id}
+          AND pi.status = ${query.paymentStatus}
+      )`,
+    )
+  }
+  if (query.paymentChannel) {
+    conditions.push(
+      sql`EXISTS (
+        SELECT 1 FROM payment_intents pi
+        WHERE pi.local_order_id = ${localOrders.id}
+          AND pi.channel = ${query.paymentChannel}
+      )`,
+    )
+  }
+  if (query.paymentMode === 'simulated') {
+    conditions.push(
+      sql`EXISTS (
+        SELECT 1 FROM payment_intents pi
+        WHERE pi.local_order_id = ${localOrders.id}
+          AND pi.simulated = 1
+      )`,
+    )
+  } else if (query.paymentMode === 'real') {
+    conditions.push(
+      sql`EXISTS (
+        SELECT 1 FROM payment_intents pi
+        WHERE pi.local_order_id = ${localOrders.id}
+          AND pi.simulated = 0
+          AND pi.channel IS NOT NULL
+      )`,
+    )
+  }
+  return conditions
+}
+
+/**
+ * Back-office list (#283). Identical community scoping to `listStaffOrders`
+ * plus the payment-fact filters above; the response stays the shared
+ * `localOrderListResponseSchema` whose items already carry the latest payment
+ * intent summary. No payment data is returned for a community the caller
+ * cannot access, and an operator with no assignment gets an empty page.
+ */
+export function listAdminOrders(
+  db: AppDatabase,
+  actor: LocalActor,
+  query: AdminLocalOrderListQuery,
+): LocalOrderListResponse {
+  const scope = scopeCommunityIds(db, actor)
+  const conditions: SQL<unknown>[] = []
+  if (scope !== null) {
+    if (scope.length === 0) return emptyOrderPage(query)
+    conditions.push(inArray(localOrders.communityId, scope))
+  }
+  if (query.communityId) {
+    assertCommunityAccess(db, actor, query.communityId)
+    conditions.push(eq(localOrders.communityId, query.communityId))
+  }
+  if (query.orderId) conditions.push(eq(localOrders.id, query.orderId))
+  if (query.status) conditions.push(eq(localOrders.status, query.status))
+  if (query.productId) conditions.push(eq(localOrders.productId, query.productId))
+  if (query.residentUserId) conditions.push(eq(localOrders.residentUserId, query.residentUserId))
+  if (query.keyword) {
+    const pattern = escapedLike(query.keyword)
+    conditions.push(
+      or(
+        sql`${localOrders.id} LIKE ${pattern} ESCAPE '\\'`,
+        sql`${localOrders.productName} LIKE ${pattern} ESCAPE '\\'`,
+        sql`${localOrders.note} LIKE ${pattern} ESCAPE '\\'`,
+      )!,
+    )
+  }
+  if (query.createdFrom) {
+    conditions.push(gte(localOrders.createdAt, new Date(query.createdFrom)))
+  }
+  if (query.createdTo) {
+    conditions.push(lte(localOrders.createdAt, new Date(query.createdTo)))
+  }
+  conditions.push(...adminPaymentConditions(query))
   return listOrders(db, conditions, query)
 }
 

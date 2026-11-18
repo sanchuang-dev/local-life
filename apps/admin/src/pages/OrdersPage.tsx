@@ -16,16 +16,18 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   LOCAL_ORDER_STATUS_TRANSITIONS,
-  type LocalOrderDetail,
+  type AdminLocalOrderDetail,
   type LocalOrderEvent,
   type LocalOrderStatus,
   type LocalOrderSummary,
   type LocalOrderTransitionStatus,
+  type PaymentStatus,
 } from '@sanchuang-dev/local-life-contracts'
 import { useAdminAuth } from '../app/auth-context'
 import { PageHeader } from '../components/PageHeader'
 import {
   DataPanel,
+  type DateRangeValue,
   type PanelColumn,
   type PanelFilter,
   type PanelQuery,
@@ -39,6 +41,7 @@ import {
   useAdminFilterOptions,
 } from './useAdminFilterOptions'
 import { OrderReceiptSection } from '../components/OrderReceiptSection'
+import { OrderPaymentSection } from '../components/OrderPaymentSection'
 import {
   getAdminLocalOrder,
   listAdminLocalOrders,
@@ -72,6 +75,33 @@ const STATUS_OPTIONS = (Object.keys(ORDER_STATUS_META) as LocalOrderStatus[]).ma
   label: ORDER_STATUS_META[status].label,
   value: status,
 }))
+
+/**
+ * Payment status copy (PAY-08). `paid` is deliberately worded as a *channel*
+ * confirmation: it is not an order completion, not a manual collection and not
+ * a bank settlement.
+ */
+const PAYMENT_STATUS_META: Record<PaymentStatus, { label: string; color: string }> = {
+  pending: { label: '待支付', color: 'blue' },
+  confirming: { label: '渠道确认中', color: 'gold' },
+  paid: { label: '渠道支付已确认', color: 'green' },
+  closed: { label: '已关闭', color: 'default' },
+  failed: { label: '支付失败', color: 'red' },
+}
+
+const PAYMENT_STATUS_OPTIONS = (Object.keys(PAYMENT_STATUS_META) as PaymentStatus[]).map(
+  (status) => ({ label: PAYMENT_STATUS_META[status].label, value: status }),
+)
+
+const PAYMENT_MODE_OPTIONS = [
+  { label: '模拟支付（仅测试）', value: 'simulated' },
+  { label: '真实渠道', value: 'real' },
+] as const
+
+const CHANNEL_LABELS = {
+  mock: '模拟渠道',
+  wechat_jsapi: '微信 JSAPI',
+} as const
 
 const RECORD_SOURCE_META = {
   resident: '居民自助登记',
@@ -116,7 +146,7 @@ function formatDateTime(iso: string | null | undefined): string {
 }
 
 /** The attribution is frozen at registration; the console can only display it. */
-function describeSourceTeam(order: LocalOrderDetail): string {
+function describeSourceTeam(order: AdminLocalOrderDetail): string {
   if (!order.sourceTeam) return '不参与消费团'
   const activityTitle = order.sourceActivity?.title ?? '来源活动'
   const shortId =
@@ -146,6 +176,12 @@ interface OrderFilters {
   keyword?: string
   communityId?: string
   status?: LocalOrderStatus
+  /** PAY-08 payment-fact filters; all executed server-side. */
+  paymentStatus?: PaymentStatus
+  paymentMode?: 'simulated' | 'real'
+  merchantOrderNo?: string
+  providerTransactionId?: string
+  orderDate?: DateRangeValue
 }
 
 type OrderSortKey = never
@@ -154,6 +190,32 @@ const initialFilters: OrderFilters = {
   keyword: '',
   communityId: undefined,
   status: undefined,
+  paymentStatus: undefined,
+  paymentMode: undefined,
+  merchantOrderNo: undefined,
+  providerTransactionId: undefined,
+  orderDate: undefined,
+}
+
+/**
+ * Calendar dates are local (Asia/Shanghai in this console) while the API stores
+ * UTC instants. The page owns this translation explicitly; the shared DataPanel
+ * never guesses a time zone.
+ */
+function localDateRangeToInstants(range: DateRangeValue | undefined): {
+  createdFrom?: string
+  createdTo?: string
+} {
+  const result: { createdFrom?: string; createdTo?: string } = {}
+  if (range?.start) {
+    const start = new Date(`${range.start}T00:00:00`)
+    if (!Number.isNaN(start.getTime())) result.createdFrom = start.toISOString()
+  }
+  if (range?.end) {
+    const end = new Date(`${range.end}T23:59:59.999`)
+    if (!Number.isNaN(end.getTime())) result.createdTo = end.toISOString()
+  }
+  return result
 }
 
 export function OrdersPage() {
@@ -206,7 +268,7 @@ function OrderConsole({ session }: { session: AuthenticatedSession }) {
   const [actionError, setActionError] = useState<string | null>(null)
 
   const [detailOpen, setDetailOpen] = useState(false)
-  const [detail, setDetail] = useState<LocalOrderDetail | null>(null)
+  const [detail, setDetail] = useState<AdminLocalOrderDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null)
@@ -224,6 +286,7 @@ function OrderConsole({ session }: { session: AuthenticatedSession }) {
     const controller = new AbortController()
     setListLoading(true)
     setListError(null)
+    const dateRange = localDateRangeToInstants(query.filters.orderDate)
     listAdminLocalOrders(
       {
         page: query.page,
@@ -231,6 +294,11 @@ function OrderConsole({ session }: { session: AuthenticatedSession }) {
         communityId: query.filters.communityId,
         status: query.filters.status,
         keyword: query.filters.keyword?.trim() || undefined,
+        paymentStatus: query.filters.paymentStatus,
+        paymentMode: query.filters.paymentMode,
+        merchantOrderNo: query.filters.merchantOrderNo?.trim() || undefined,
+        providerTransactionId: query.filters.providerTransactionId?.trim() || undefined,
+        ...dateRange,
       },
       controller.signal,
     )
@@ -464,6 +532,30 @@ function OrderConsole({ session }: { session: AuthenticatedSession }) {
       ),
     },
     {
+      key: 'payment',
+      title: '支付',
+      render: (_value, row) => {
+        if (!row.payment) {
+          return <Typography.Text type="secondary">未发起在线支付</Typography.Text>
+        }
+        return (
+          <Space orientation="vertical" size={2}>
+            <Space wrap size={4}>
+              <Tag color={PAYMENT_STATUS_META[row.payment.status].color}>
+                {PAYMENT_STATUS_META[row.payment.status].label}
+              </Tag>
+              {row.payment.simulated ? <Tag color="purple">模拟/测试</Tag> : null}
+            </Space>
+            <Typography.Text type="secondary">
+              {row.payment.channel === null
+                ? '零元券单'
+                : CHANNEL_LABELS[row.payment.channel]}
+            </Typography.Text>
+          </Space>
+        )
+      },
+    },
+    {
       key: 'source',
       title: '登记来源',
       render: (_value, row) => (
@@ -491,6 +583,23 @@ function OrderConsole({ session }: { session: AuthenticatedSession }) {
     { key: 'keyword', label: '关键词', kind: 'text', placeholder: '商品名称或备注' },
     { key: 'communityId', label: '社区', kind: 'select', options: communityOptions },
     { key: 'status', label: '状态', kind: 'status', options: STATUS_OPTIONS },
+    { key: 'paymentStatus', label: '支付状态', kind: 'status', options: PAYMENT_STATUS_OPTIONS },
+    { key: 'paymentMode', label: '支付模式', kind: 'select', options: PAYMENT_MODE_OPTIONS },
+    {
+      key: 'merchantOrderNo',
+      label: '商户订单号',
+      kind: 'text',
+      advanced: true,
+      placeholder: '支付单的商户订单号',
+    },
+    {
+      key: 'providerTransactionId',
+      label: '渠道交易号',
+      kind: 'text',
+      advanced: true,
+      placeholder: '完整渠道交易号（服务端精确匹配）',
+    },
+    { key: 'orderDate', label: '登记日期', kind: 'dateRange', advanced: true },
   ]
 
   const canReview = detail?.status === 'pending_review'
@@ -499,7 +608,7 @@ function OrderConsole({ session }: { session: AuthenticatedSession }) {
     <div className="page">
       <PageHeader
         title="订单管理"
-        description="查询居民登记的本地商品订单、处理状态、人工核验与收款凭据。价格以登记时冻结的快照为准；「人工核验通过」只是对订单事实的人工确认，不代表收款或业务办理已完成。"
+        description="查询居民登记的本地商品订单、处理状态、人工核验与收款凭据。价格以登记时冻结的快照为准；「人工核验通过」只是对订单事实的人工确认，不代表收款或业务办理已完成。订单详情的支付信息为只读：人工线下收款与在线渠道支付分层展示，渠道支付已确认不代表企业银行结算到账。"
       />
 
       <div className="page-stack">
@@ -686,6 +795,8 @@ function OrderConsole({ session }: { session: AuthenticatedSession }) {
                 description="本平台不收款、不代办业务；「人工核验通过」是运营员对订单事实的人工确认。"
               />
             </section>
+
+            <OrderPaymentSection order={detail} />
 
             {allowedTransitions.length > 0 ? (
               <section className="local-section" aria-label="订单状态处理">
