@@ -29,6 +29,13 @@ export const PAYMENT_CENTS_MAX = Number.MAX_SAFE_INTEGER
 export const PAYMENT_ROUTES = {
   createIntent: '/payments/intents',
   myIntentDetail: '/payments/intents/:paymentIntentId',
+  /** Public, read-only payment-channel capability flags (never a status write). */
+  capabilities: '/payments/capabilities',
+  /**
+   * Resident-owned Mock action. Only available when the server explicitly
+   * advertises `mockAvailable`; it still goes through PAY-03 confirmation.
+   */
+  mockAction: '/payments/intents/:paymentIntentId/mock',
 } as const
 
 /** Internal adapter/test surface; requires a server-side token, never a resident session. */
@@ -42,6 +49,31 @@ export const PAYMENT_INTERNAL_ROUTES = {
    */
   consumeOutbox: '/internal/payments/outbox/consume',
 } as const
+
+/**
+ * Server capability truth for the resident payment UI. The browser must never
+ * infer a channel from its own build mode; only these flags and their reasons
+ * decide whether a payment button exists.
+ */
+export const paymentCapabilitiesSchema = z.strictObject({
+  mockAvailable: z.boolean(),
+  wechatJsapiAvailable: z.boolean(),
+  zeroAmountAvailable: z.boolean(),
+  mockUnavailableReason: z.enum(['mock_disabled']).nullable(),
+  wechatUnavailableReason: z.enum(['not_configured']).nullable(),
+})
+export type PaymentCapabilities = z.infer<typeof paymentCapabilitiesSchema>
+
+/** Mock-only UI actions. No amount, merchant, transaction id or raw evidence. */
+export const mockPaymentActionSchema = z.enum(['succeed', 'fail', 'cancel', 'timeout', 'pending'])
+export type MockPaymentAction = z.infer<typeof mockPaymentActionSchema>
+
+export const mockPaymentActionRequestSchema = z.strictObject({
+  action: mockPaymentActionSchema,
+  /** Defaults to a provider notification; query is useful for recovery replay. */
+  source: z.enum(['notification', 'query']).default('notification'),
+})
+export type MockPaymentActionRequest = z.infer<typeof mockPaymentActionRequestSchema>
 
 /** Non-negative integer cents; rejects floats, negatives and overflow. */
 export const paymentCentsSchema = z

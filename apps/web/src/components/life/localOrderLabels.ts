@@ -29,7 +29,7 @@ export const localOrderStatusLabels: Record<LocalOrderStatus, string> = {
 }
 
 export const localOrderStatusDescriptions: Record<LocalOrderStatus, string> = {
-  registered: '办理意向已登记，等待工作人员处理。本平台不收款。',
+  registered: '订单已登记，等待工作人员处理或完成支付；支付能力以页面实际显示为准。',
   processing: '工作人员正在处理你登记的办理意向。',
   pending_review: '等待当前片区网格员或运营人员电话核验登记信息。',
   verified: '订单事实已由片区网格员或运营人员人工核验；这不代表收款、业务办理或结算已完成。',

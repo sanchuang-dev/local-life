@@ -9,6 +9,8 @@ import { eq } from 'drizzle-orm'
 import test from 'node:test'
 import {
   PAYMENT_ROUTES,
+  localOrderDetailSchema,
+  paymentConfirmationResponseSchema,
   paymentIntentCreateResponseSchema,
   paymentIntentDetailResponseSchema,
   paymentPaidEventPayloadSchema,
@@ -24,6 +26,7 @@ import {
   localProducts,
   paymentAttempts,
   paymentEvents,
+  paymentIntents,
   paymentOutbox,
   paymentReviewExceptions,
   mockPaymentEventReservations,
@@ -671,7 +674,7 @@ test('a Mock payment result survives a process/database restart and remains quer
   }
 })
 
-test('Mock control is internal-only, fail-closed in production and rejects tampered input', async () => {
+test('legacy Mock control aliases stay unavailable, fail closed in production and reject tampered input', async () => {
   const world = context()
   try {
     const scope = seedCommunityAndProduct(world.db)
@@ -679,7 +682,7 @@ test('Mock control is internal-only, fail-closed in production and rejects tampe
     const orderId = seedOrder(world.db, { ...scope, residentUserId: resident.userId })
     const intent = await createIntent(world, resident, orderId)
 
-    // No public Mock control route exists.
+    // Legacy/unauthorized Mock control aliases do not exist.
     for (const path of ['/internal/payments/mock', '/payments/mock/execute']) {
       const response = await api(world.app, 'POST', path, {
         session: resident,
@@ -748,6 +751,198 @@ test('Mock control is internal-only, fail-closed in production and rejects tampe
     ), /Unrecognized key|unrecognized_keys/u)
     assert.equal((await getIntent(world, resident, intent.id)).intent.status, 'pending')
     assert.equal(world.db.select().from(paymentOutbox).all().length, 0)
+  } finally {
+    world.sqlite.close()
+  }
+})
+
+function mockActionPath(intentId: string): string {
+  return PAYMENT_ROUTES.mockAction.replace(':paymentIntentId', intentId)
+}
+
+function mockFacts(world: World, orderId: string, intentId: string) {
+  const intent = world.db
+    .select({ status: paymentIntents.status })
+    .from(paymentIntents)
+    .where(eq(paymentIntents.id, intentId))
+    .get()
+  const order = world.db
+    .select({ status: localOrders.status })
+    .from(localOrders)
+    .where(eq(localOrders.id, orderId))
+    .get()
+  return {
+    orderStatus: order?.status ?? null,
+    intentStatus: intent?.status ?? null,
+    events: world.db
+      .select()
+      .from(paymentEvents)
+      .where(eq(paymentEvents.paymentIntentId, intentId))
+      .all().length,
+    attempts: world.db
+      .select()
+      .from(paymentAttempts)
+      .where(eq(paymentAttempts.paymentIntentId, intentId))
+      .all().length,
+    outbox: world.db
+      .select()
+      .from(paymentOutbox)
+      .where(eq(paymentOutbox.paymentIntentId, intentId))
+      .all().length,
+  }
+}
+
+async function postMockAction(
+  app: App,
+  intentId: string,
+  options: {
+    session?: ResidentSession
+    body: unknown
+    csrf?: boolean
+    origin?: string | null
+    csrfToken?: string
+  },
+) {
+  const body = JSON.stringify(options.body)
+  if (options.csrfToken !== undefined) {
+    return app.request(mockActionPath(intentId), {
+      method: 'POST',
+      headers: {
+        ...(options.session ? { cookie: options.session.cookies } : {}),
+        'content-type': 'application/json',
+        'x-csrf-token': options.csrfToken,
+        ...(options.origin === null ? {} : { origin: options.origin ?? RESIDENT_ORIGIN }),
+      },
+      body,
+    })
+  }
+  return api(app, 'POST', mockActionPath(intentId), {
+    session: options.session,
+    body: options.body,
+    csrf: options.csrf,
+    origin: options.origin,
+  })
+}
+
+test('resident Mock HTTP route is authenticated, CSRF/origin bound, ownership-scoped and fail-closed', async () => {
+  const world = context()
+  try {
+    const scope = seedCommunityAndProduct(world.db)
+    const residentA = await loginResident(world.app, 'Mock HTTP A')
+    const residentB = await loginResident(world.app, 'Mock HTTP B')
+    const orderA = seedOrder(world.db, { ...scope, residentUserId: residentA.userId })
+    const orderB = seedOrder(world.db, { ...scope, residentUserId: residentB.userId })
+    const intentA = await createIntent(world, residentA, orderA)
+    const intentB = await createIntent(world, residentB, orderB)
+    const baselineA = mockFacts(world, orderA, intentA.id)
+    const baselineB = mockFacts(world, orderB, intentB.id)
+
+    // 1. Anonymous caller cannot change payment state.
+    const anonymous = await postMockAction(world.app, intentA.id, {
+      body: { action: 'succeed', source: 'notification' },
+    })
+    assert.equal(anonymous.status, 401)
+    assert.deepEqual(mockFacts(world, orderA, intentA.id), baselineA)
+
+    // 2. A resident session without CSRF is refused.
+    const missingCsrf = await postMockAction(world.app, intentA.id, {
+      session: residentA,
+      body: { action: 'succeed', source: 'notification' },
+      csrf: false,
+    })
+    assert.equal(missingCsrf.status, 403)
+    assert.deepEqual(mockFacts(world, orderA, intentA.id), baselineA)
+
+    // A wrong CSRF token is refused as well.
+    const wrongCsrf = await postMockAction(world.app, intentA.id, {
+      session: residentA,
+      body: { action: 'succeed', source: 'notification' },
+      csrfToken: 'not-the-session-token',
+    })
+    assert.equal(wrongCsrf.status, 403)
+    assert.deepEqual(mockFacts(world, orderA, intentA.id), baselineA)
+
+    // A valid CSRF token from an untrusted Origin is refused.
+    const badOrigin = await postMockAction(world.app, intentA.id, {
+      session: residentA,
+      body: { action: 'succeed', source: 'notification' },
+      origin: 'https://evil.example',
+    })
+    assert.equal(badOrigin.status, 403)
+    assert.deepEqual(mockFacts(world, orderA, intentA.id), baselineA)
+
+    // 3. Resident A gets an indistinguishable 404 for resident B's intent.
+    const crossOwner = await postMockAction(world.app, intentB.id, {
+      session: residentA,
+      body: { action: 'succeed', source: 'notification' },
+    })
+    assert.equal(crossOwner.status, 404)
+    assert.deepEqual(mockFacts(world, orderB, intentB.id), baselineB)
+
+    // 4. A disabled server switch fails closed even for a valid owner/CSRF.
+    const disabledApp = createApp({
+      db: world.db,
+      config: { ...world.config, paymentMockEnabled: false },
+      logRequests: false,
+    })
+    const disabled = await postMockAction(disabledApp, intentA.id, {
+      session: residentA,
+      body: { action: 'succeed', source: 'notification' },
+    })
+    assert.equal(disabled.status, 503)
+    assert.deepEqual(mockFacts(world, orderA, intentA.id), baselineA)
+
+    // 5. A production-misconfigured app cannot manufacture Mock facts either.
+    const productionApp = createApp({
+      db: world.db,
+      config: {
+        ...world.config,
+        nodeEnv: 'production' as const,
+        paymentMockEnabled: true,
+      },
+      logRequests: false,
+    })
+    const production = await postMockAction(productionApp, intentA.id, {
+      session: residentA,
+      body: { action: 'succeed', source: 'notification' },
+    })
+    assert.equal(production.status, 503)
+    assert.deepEqual(mockFacts(world, orderA, intentA.id), baselineA)
+
+    // Strict bodies cannot inject money facts. Each field is rejected before
+    // the driver, and the pending intent/order remain untouched.
+    for (const injected of [
+      { amount: 1 },
+      { paid: true },
+      { providerTransactionId: 'MOCK-TXN-forged' },
+    ]) {
+      const response = await postMockAction(world.app, intentA.id, {
+        session: residentA,
+        body: { action: 'succeed', ...injected },
+      })
+      assert.equal(response.status, 400, JSON.stringify(injected))
+      assert.deepEqual(mockFacts(world, orderA, intentA.id), baselineA)
+    }
+
+    // The only success path is the route -> PAY-03 -> PAY-05 pipeline. Read
+    // the order back from the server instead of trusting the action response.
+    const success = await postMockAction(world.app, intentA.id, {
+      session: residentA,
+      body: { action: 'succeed', source: 'notification' },
+    })
+    assert.equal(success.status, 200)
+    const confirmation = paymentConfirmationResponseSchema.parse(await success.json())
+    assert.equal(confirmation.intent.status, 'paid')
+
+    const orderResponse = await api(world.app, 'GET', `/local-orders/${orderA}`, {
+      session: residentA,
+    })
+    assert.equal(orderResponse.status, 200)
+    const completedOrder = localOrderDetailSchema.parse(await orderResponse.json())
+    assert.equal(completedOrder.status, 'online_completed')
+    assert.equal(completedOrder.payment?.status, 'paid')
+    assert.equal(completedOrder.onlineCompletion?.simulated, true)
+    assert.equal(mockFacts(world, orderA, intentA.id).orderStatus, 'online_completed')
   } finally {
     world.sqlite.close()
   }

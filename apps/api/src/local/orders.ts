@@ -36,6 +36,7 @@ import {
   localOrderOnlineCompletions,
   localOrderOnlineConflicts,
   localOrders,
+  paymentIntents,
   residentPhoneIdentities,
   residentProfiles,
   staffAccounts,
@@ -201,6 +202,23 @@ interface RefMaps {
   users: ReturnType<typeof userRefMap>
   staff: ReturnType<typeof staffRefMap>
   activities: ReturnType<typeof activityRefMap>
+  payments: Map<string, typeof paymentIntents.$inferSelect>
+}
+
+function latestPaymentMap(
+  db: AppDatabase,
+  orderIds: string[],
+): Map<string, typeof paymentIntents.$inferSelect> {
+  const map = new Map<string, typeof paymentIntents.$inferSelect>()
+  if (orderIds.length === 0) return map
+  const rows = db.select().from(paymentIntents)
+    .where(inArray(paymentIntents.localOrderId, orderIds))
+    .orderBy(desc(paymentIntents.updatedAt), desc(paymentIntents.id))
+    .all()
+  for (const row of rows) {
+    if (!map.has(row.localOrderId)) map.set(row.localOrderId, row)
+  }
+  return map
 }
 
 function refMaps(db: AppDatabase, rows: OrderRow[], events: Array<typeof localOrderEvents.$inferSelect> = []): RefMaps {
@@ -216,6 +234,7 @@ function refMaps(db: AppDatabase, rows: OrderRow[], events: Array<typeof localOr
       ...events.map((row) => row.actorStaffId),
     ]),
     activities: activityRefMap(db, rows.map((row) => row.sourceActivityId)),
+    payments: latestPaymentMap(db, rows.map((row) => row.id)),
   }
 }
 
@@ -279,6 +298,21 @@ function toSummary(row: OrderRow, maps: RefMaps): LocalOrderSummary {
         ? null
         : { id: row.sourceTeamId, activityId: row.sourceActivityId },
     note: row.note,
+    payment: (() => {
+      const payment = maps.payments.get(row.id)
+      return payment
+        ? {
+            intentId: payment.id,
+            status: payment.status,
+            channel: payment.channel,
+            simulated: payment.simulated,
+            netPayableCents: payment.netPayableCents,
+            expiresAt: iso(payment.expiresAt),
+            failureMessage: payment.failureMessage,
+            updatedAt: iso(payment.updatedAt),
+          }
+        : null
+    })(),
     createdAt: iso(row.createdAt),
     updatedAt: iso(row.updatedAt),
   })

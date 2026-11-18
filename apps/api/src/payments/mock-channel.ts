@@ -212,6 +212,24 @@ export function createMockPayment(
  * PAY-03's conflict error after persisting a review exception, without changing
  * the closed/failed terminal state.
  */
+export function executeOwnedMockPaymentAction(
+  db: AppDatabase,
+  config: MockConfig,
+  actor: LocalActor,
+  input: { paymentIntentId: string; action: MockPaymentAction; source: MockPaymentSource },
+  options: { now?: Date } = {},
+): PaymentConfirmationResponse {
+  const intent = db.select({ residentUserId: paymentIntents.residentUserId })
+    .from(paymentIntents)
+    .where(eq(paymentIntents.id, input.paymentIntentId))
+    .get()
+  // Another resident's intent is a 404, never an enumerable 403.
+  if (!intent || intent.residentUserId !== actor.userId) {
+    throw new LocalError(404, API_ERROR_CODES.notFound, '支付单不存在')
+  }
+  return executeMockPaymentAction(db, config, input, options)
+}
+
 export function executeMockPaymentAction(
   db: AppDatabase,
   config: MockConfig,
