@@ -23,6 +23,9 @@ import {
   localOrderTransitionStatusSchema,
   paymentOutboxConsumeRequestSchema,
   paymentOutboxConsumeResponseSchema,
+  paymentOutboxRecoveryRequestSchema,
+  paymentOutboxRecoveryResponseSchema,
+  paymentFailedOutboxListResponseSchema,
 } from '@sanchuang-dev/local-life-contracts'
 
 const NOW = '2026-11-16T02:00:00.000Z'
@@ -432,6 +435,8 @@ describe('PAY-05 online completion contracts', () => {
       'payment_state_invalid',
       'coupon_state_invalid',
       'late_success',
+      'manual_online_double_collection',
+      'consumer_exhausted',
     ]) {
       assert.equal(localOrderOnlineConflictSchema.safeParse({ ...conflict, kind }).success, true)
     }
@@ -468,5 +473,89 @@ describe('PAY-05 online completion contracts', () => {
     assert.equal(paymentOutboxConsumeRequestSchema.safeParse({}).success, true)
     assert.equal(paymentOutboxConsumeRequestSchema.safeParse({ limit: 51 }).success, false)
     assert.equal(paymentOutboxConsumeRequestSchema.safeParse({ limit: 0 }).success, false)
+  })
+
+  it('exposes the token-gated parked-event query and controlled recovery contracts', () => {
+    assert.equal(PAYMENT_INTERNAL_ROUTES.recoverOutbox, '/internal/payments/outbox/recover')
+    assert.equal(PAYMENT_INTERNAL_ROUTES.failedOutbox, '/internal/payments/outbox/failed')
+
+    const request = { outboxEventId: '123e4567-e89b-42d3-a456-426614174030' }
+    assert.equal(paymentOutboxRecoveryRequestSchema.safeParse(request).success, true)
+    assert.equal(
+      paymentOutboxRecoveryRequestSchema.safeParse({ ...request, outboxEventId: 'nope' }).success,
+      false,
+    )
+    assert.equal(
+      paymentOutboxRecoveryRequestSchema.safeParse({ ...request, outboxEventId: undefined }).success,
+      false,
+    )
+
+    const recovered = {
+      ...request,
+      outcome: 'recovered',
+      status: 'delivered',
+      localOrderId: '123e4567-e89b-42d3-a456-426614174002',
+      paymentIntentId: '123e4567-e89b-42d3-a456-426614174001',
+      orderStatus: 'online_completed',
+      conflictsResolved: 1,
+      asOf: NOW,
+    }
+    assert.equal(paymentOutboxRecoveryResponseSchema.safeParse(recovered).success, true)
+    for (const outcome of [
+      'already_completed',
+      'retry_scheduled',
+      'still_failed',
+    ]) {
+      assert.equal(
+        paymentOutboxRecoveryResponseSchema.safeParse({ ...recovered, outcome }).success,
+        true,
+      )
+    }
+    assert.equal(
+      paymentOutboxRecoveryResponseSchema.safeParse({ ...recovered, outcome: 'refunded' }).success,
+      false,
+    )
+    assert.equal(
+      paymentOutboxRecoveryResponseSchema.safeParse({ ...recovered, status: 'parked' }).success,
+      false,
+    )
+
+    const failedList = {
+      items: [
+        {
+          outboxEventId: request.outboxEventId,
+          paymentIntentId: recovered.paymentIntentId,
+          localOrderId: recovered.localOrderId,
+          orderStatus: 'pending_review',
+          topic: 'payment.paid.v1',
+          status: 'failed',
+          attempts: 5,
+          lastError: 'injected transient failure',
+          amountCents: 3980,
+          providerTransactionId: 'MOCK-TXN-1',
+          createdAt: NOW,
+          updatedAt: LATER,
+          conflicts: [
+            {
+              id: '123e4567-e89b-42d3-a456-426614174031',
+              kind: 'consumer_exhausted',
+              status: 'open',
+              detail: 'PAY-05 完成链重试耗尽',
+              createdAt: NOW,
+              resolvedAt: null,
+            },
+          ],
+        },
+      ],
+      asOf: NOW,
+    }
+    assert.equal(paymentFailedOutboxListResponseSchema.safeParse(failedList).success, true)
+    assert.equal(
+      paymentFailedOutboxListResponseSchema.safeParse({
+        ...failedList,
+        items: [{ ...failedList.items[0], status: 'delivered' }],
+      }).success,
+      false,
+    )
   })
 })

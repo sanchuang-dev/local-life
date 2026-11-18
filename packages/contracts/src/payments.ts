@@ -48,6 +48,10 @@ export const PAYMENT_INTERNAL_ROUTES = {
    * trust-bearing payment projections.
    */
   consumeOutbox: '/internal/payments/outbox/consume',
+  /** Only consumer-exhausted parked events are eligible for controlled replay. */
+  recoverOutbox: '/internal/payments/outbox/recover',
+  /** Internal bounded view of parked payment events and their durable anomalies. */
+  failedOutbox: '/internal/payments/outbox/failed',
 } as const
 
 /**

@@ -54,6 +54,7 @@ import {
 } from './shared.js'
 import { cutoffMsOf, membershipConditions } from './reconciliation-service.js'
 import { isOrderInLockedPeriod } from './payment-evidence.js'
+import { assertManualPaymentBoundary } from '../payments/service.js'
 import { tryIssueEligibleTeamCoupons } from '../purchase-reward/coupon-issuance.js'
 import { redeemCouponForOrder } from '../purchase-reward/coupon-usage.js'
 import { reconcileCouponRewardsAfterFullReversal } from '../purchase-reward/coupon-recovery.js'
@@ -987,6 +988,12 @@ export function recordPayment(
           throw new LocalError(409, API_ERROR_CODES.conflict,
             '用券订单实际收款必须等于券抵扣后的净应付金额')
         }
+        // R1 last line of defence: "verified" alone is a historical/manual fact,
+        // not proof that no online money exists. Re-check the payment boundary in
+        // this same transaction, immediately before any receipt or ledger link is
+        // written, so an intent/paid fact that appeared after verification still
+        // blocks double collection.
+        assertManualPaymentBoundary(tx, body.orderId)
         if (tx.select({ orderId: ledgerPaymentOrderLinks.orderId })
           .from(ledgerPaymentOrderLinks)
           .where(eq(ledgerPaymentOrderLinks.orderId, body.orderId)).get()) {

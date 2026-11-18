@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, desc, eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, notInArray } from 'drizzle-orm'
 import {
   API_ERROR_CODES,
   paymentAttemptSchema,
@@ -16,12 +16,21 @@ import {
 import type { ApiConfig } from '../config.js'
 import type { AppDatabase } from '../db/client.js'
 import {
+  ledgerEntrySources,
+  localOrderOnlineCompletions,
+  localOrderOnlineConflicts,
   localOrders,
   paymentAttempts,
   paymentEvents,
   paymentIntents,
+  paymentReviewExceptions,
 } from '../db/schema.js'
-import { LocalError, iso, type LocalActor } from '../local/shared.js'
+import {
+  LocalError,
+  iso,
+  type LocalActor,
+  type LocalTransaction,
+} from '../local/shared.js'
 
 const PAYMENT_INTENT_TTL_MS = 15 * 60 * 1000
 
@@ -38,6 +47,128 @@ export const PAYABLE_ORDER_STATUSES: Readonly<Record<string, true>> = {
 
 type PaymentIntentRow = typeof paymentIntents.$inferSelect
 type PaymentAttemptRow = typeof paymentAttempts.$inferSelect
+
+/** Conflict kinds that mean "a trusted payment may exist for this order". */
+const PAYMENT_BLOCKING_CONFLICT_KINDS = [
+  'late_success',
+  'consumer_exhausted',
+  'manual_online_double_collection',
+] as const
+
+/**
+ * R1 authoritative manual/online boundary.
+ *
+ * A manual verification or manual receipt asserts "a human settled this order".
+ * That assertion is only safe when the server can PROVE the order has no online
+ * money: every payment intent must be in a trusted terminal unpaid state
+ * (`closed`/`failed`), and there must be no completion, no `online_payment`
+ * ledger receipt and no open money anomaly. Anything else — including an
+ * in-flight `pending`/`confirming` intent whose channel outcome is still
+ * unknown — is treated as "possibly paid" and refused.
+ *
+ * This runs inside the caller's `BEGIN IMMEDIATE` transaction, beside the write
+ * it protects: SQLite serialises writers, so a trusted confirmation cannot slip
+ * between this check and the manual write. It is intentionally the single shared
+ * implementation for both `verifyOrder` and `recordPayment`; a UI hint or a
+ * route-level check is not a substitute.
+ */
+export function assertManualPaymentBoundary(tx: LocalTransaction, orderId: string): void {
+  const blockingIntent = tx
+    .select({
+      id: paymentIntents.id,
+      status: paymentIntents.status,
+      kind: paymentIntents.kind,
+    })
+    .from(paymentIntents)
+    .where(
+      and(
+        eq(paymentIntents.localOrderId, orderId),
+        notInArray(paymentIntents.status, ['closed', 'failed']),
+      ),
+    )
+    .orderBy(asc(paymentIntents.createdAt), asc(paymentIntents.id))
+    .get()
+  if (blockingIntent) {
+    throw new LocalError(
+      409,
+      API_ERROR_CODES.paymentOnlineCompletionConflict,
+      `该订单存在支付单 ${blockingIntent.id}（${blockingIntent.kind}/${blockingIntent.status}），资金可能已付或结果未定，禁止人工核验/实收`,
+    )
+  }
+
+  const completion = tx
+    .select({ id: localOrderOnlineCompletions.id })
+    .from(localOrderOnlineCompletions)
+    .where(eq(localOrderOnlineCompletions.localOrderId, orderId))
+    .get()
+  const onlineReceipt = tx
+    .select({ id: ledgerEntrySources.id })
+    .from(ledgerEntrySources)
+    .innerJoin(
+      localOrderOnlineCompletions,
+      eq(ledgerEntrySources.sourceId, localOrderOnlineCompletions.id),
+    )
+    .where(
+      and(
+        eq(ledgerEntrySources.sourceSystem, 'online_payment'),
+        eq(ledgerEntrySources.factKind, 'payment_received'),
+        eq(localOrderOnlineCompletions.localOrderId, orderId),
+      ),
+    )
+    .get()
+  if (completion || onlineReceipt) {
+    throw new LocalError(
+      409,
+      API_ERROR_CODES.paymentOnlineCompletionConflict,
+      '该订单已有在线完成或线上账本实收事实，禁止人工核验/实收',
+    )
+  }
+
+  const openConflict = tx
+    .select({ id: localOrderOnlineConflicts.id, kind: localOrderOnlineConflicts.kind })
+    .from(localOrderOnlineConflicts)
+    .where(
+      and(
+        eq(localOrderOnlineConflicts.localOrderId, orderId),
+        eq(localOrderOnlineConflicts.status, 'open'),
+        inArray(localOrderOnlineConflicts.kind, [...PAYMENT_BLOCKING_CONFLICT_KINDS]),
+      ),
+    )
+    .get()
+  if (openConflict) {
+    throw new LocalError(
+      409,
+      API_ERROR_CODES.paymentOnlineCompletionConflict,
+      `该订单存在待核对的支付异常（${openConflict.kind}），禁止人工核验/实收`,
+    )
+  }
+
+  // Any unresolved provider-evidence anomaly means the server cannot prove that
+  // the channel is safely unpaid. This is intentionally broader than only
+  // late-success: amount/merchant/transaction/terminal conflicts can also carry
+  // a real provider observation and must be reviewed before manual collection.
+  const openReviewException = tx
+    .select({ id: paymentReviewExceptions.id, kind: paymentReviewExceptions.kind })
+    .from(paymentReviewExceptions)
+    .innerJoin(
+      paymentIntents,
+      eq(paymentReviewExceptions.paymentIntentId, paymentIntents.id),
+    )
+    .where(
+      and(
+        eq(paymentIntents.localOrderId, orderId),
+        eq(paymentReviewExceptions.status, 'open'),
+      ),
+    )
+    .get()
+  if (openReviewException) {
+    throw new LocalError(
+      409,
+      API_ERROR_CODES.paymentOnlineCompletionConflict,
+      `该订单存在待复核的支付证据异常（${openReviewException.kind}），无法证明渠道未付款，禁止人工核验/实收`,
+    )
+  }
+}
 
 /**
  * PAY-02 creation policy. It creates only a pending intent for the explicitly

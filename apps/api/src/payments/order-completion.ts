@@ -10,6 +10,7 @@ import {
 import type { AppDatabase } from '../db/client.js'
 import {
   couponIssues,
+  ledgerEntries,
   ledgerPaymentOrderLinks,
   localOrderOnlineCompletions,
   localOrderOnlineConflicts,
@@ -96,6 +97,57 @@ function recordOrderConflict(
     resolvedAt: null,
   }).run()
   return true
+}
+
+/**
+ * R2: make a parked completion chain visible on the order itself.
+ *
+ * Called in the SAME transaction that flips the outbox row to `failed`, whether
+ * that happens because the retry budget was exhausted, because a transient error
+ * recurred, or because the row was abandoned by a dead consumer whose lease
+ * expired. The order is deliberately NOT completed and its status is untouched:
+ * the money fact is preserved in a locatable `open` conflict (order, intent,
+ * outbox, channel transaction, amount, reason, time) instead of disappearing into
+ * an internal outbox row. The immutable-evidence trigger keeps the original
+ * reason even after a controlled replay resolves the conflict.
+ */
+export function recordParkedOutboxConflict(
+  tx: LocalTransaction,
+  input: {
+    outboxId: string
+    paymentIntentId: string
+    reason: string
+    now: Date
+  },
+): boolean {
+  const intent = tx.select().from(paymentIntents)
+    .where(eq(paymentIntents.id, input.paymentIntentId))
+    .get()
+  if (!intent) return false
+  const order = tx.select({ id: localOrders.id }).from(localOrders)
+    .where(eq(localOrders.id, intent.localOrderId))
+    .get()
+  if (!order) return false
+  const paidAttempt = tx.select({ providerTransactionId: paymentAttempts.providerTransactionId })
+    .from(paymentAttempts)
+    .where(and(
+      eq(paymentAttempts.paymentIntentId, intent.id),
+      eq(paymentAttempts.status, 'paid'),
+    ))
+    .get()
+  return recordOrderConflict(tx, {
+    orderId: order.id,
+    paymentIntentId: intent.id,
+    paymentOutboxId: input.outboxId,
+    dedupeKey: `consumer_exhausted:${input.outboxId}`,
+    kind: 'consumer_exhausted',
+    detail: `PAY-05 完成链在 ${input.now.toISOString()} 泊车：${input.reason}；支付单 ${
+      intent.id
+    }，渠道交易号 ${paidAttempt?.providerTransactionId ?? '未知'}，金额 ${
+      intent.netPayableCents
+    } 分。订单保持未完成，等待受控恢复`,
+    now: input.now,
+  })
 }
 
 /**
@@ -232,21 +284,50 @@ export function consumePaidOutboxEvent(
     }
   }
   if (!PAYABLE_ORDER_STATUSES[order.status]) {
+    // R1 reverse race: the order may already carry a manual receipt (a human
+    // asserted the money). The trusted channel payment is still a real money
+    // fact, so it is preserved as its own explicit open conflict with the
+    // order/intent/channel-reference/amount; it is never turned into a second
+    // completion, a second ledger receipt or a second reward grant.
+    const manualReceipt = tx.select({ entryId: ledgerPaymentOrderLinks.entryId })
+      .from(ledgerPaymentOrderLinks)
+      .innerJoin(ledgerEntries, eq(ledgerEntries.id, ledgerPaymentOrderLinks.entryId))
+      .where(and(
+        eq(ledgerPaymentOrderLinks.orderId, order.id),
+        eq(ledgerEntries.factKind, 'payment_received'),
+        eq(ledgerEntries.sourceSystem, 'manual'),
+      ))
+      .get()
+    const conflictKind: LocalOrderOnlineConflictKind = manualReceipt
+      ? 'manual_online_double_collection'
+      : 'order_not_payable'
     recordOrderConflict(tx, {
       orderId: order.id,
       paymentIntentId: intent.id,
       paymentOutboxId: outbox.id,
-      dedupeKey: `paid_event_order_not_payable:${intent.id}`,
-      kind: 'order_not_payable',
-      detail: `订单状态为 ${order.status}，不能在线完成；渠道交易号 ${
-        payload.providerTransactionId
-      } 的真实到账证据已保留，需人工核对/补偿`,
+      // Preserve the existing dedupe key for the historical kind so an upgraded
+      // database never records a duplicate row for the same evidence.
+      dedupeKey: manualReceipt
+        ? `manual_online_double_collection:${intent.id}`
+        : `paid_event_order_not_payable:${intent.id}`,
+      kind: conflictKind,
+      detail: manualReceipt
+        ? `订单已有人工实收（流水 ${manualReceipt.entryId}），又收到可信渠道成功：订单 ${order.id}，支付单 ${
+          intent.id
+        }，渠道交易号 ${payload.providerTransactionId}，金额 ${
+          payload.amountCents
+        } 分。两份资金事实均已保留，禁止自动完成/重复入账，需人工核对`
+        : `订单状态为 ${order.status}，不能在线完成；渠道交易号 ${
+          payload.providerTransactionId
+        } 的真实到账证据已保留，需人工核对/补偿`,
       now,
     })
     return {
       kind: 'conflict',
-      conflictKind: 'order_not_payable',
-      detail: `订单状态 ${order.status} 不允许在线完成，已保留待人工核对`,
+      conflictKind,
+      detail: manualReceipt
+        ? '订单已有人工实收，可信在线支付证据已保留待人工核对'
+        : `订单状态 ${order.status} 不允许在线完成，已保留待人工核对`,
     }
   }
   if (order.couponId) {
