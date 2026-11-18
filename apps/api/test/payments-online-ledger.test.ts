@@ -483,10 +483,14 @@ test('zero-amount coupon completion creates no cash or consumption fact', () => 
 })
 
 test('zero-amount backlog cannot starve a later positive online completion', () => {
-  const w = makeWorld()
+  const w = makeWorld({ withTeam: true, couponDiscountCents: 500 })
   try {
     for (let index = 0; index < 200; index += 1) {
-      const zeroOrder = addOrder(w, { totalCents: 500, discountCents: 500 })
+      const zeroOrder = addOrder(w, {
+        totalCents: 500,
+        discountCents: 500,
+        couponId: w.couponId,
+      })
       addOnlineCompletion(w, zeroOrder, {
         kind: 'zero_amount',
         completedAtOffsetMs: 5_000,
