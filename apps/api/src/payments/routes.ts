@@ -8,6 +8,7 @@ import {
   mockPaymentActionRequestSchema,
   paymentEvidenceSchema,
   paymentOutboxConsumeRequestSchema,
+  paymentOutboxRecoveryRequestSchema,
   type CreatePaymentIntentRequest,
 } from '@sanchuang-dev/local-life-contracts'
 import type { ApiConfig } from '../config.js'
