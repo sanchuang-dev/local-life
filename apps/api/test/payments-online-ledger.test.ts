@@ -482,24 +482,26 @@ test('zero-amount coupon completion creates no cash or consumption fact', () => 
   }
 })
 
-test('zero-amount backlog cannot starve a later positive online completion', () => {
+test('zero-amount head of a bounded scan cannot starve a later positive completion', () => {
   const w = makeWorld({ withTeam: true, couponDiscountCents: 500 })
   try {
-    for (let index = 0; index < 200; index += 1) {
-      const zeroOrder = addOrder(w, {
-        totalCents: 500,
-        discountCents: 500,
-        couponId: w.couponId,
-      })
-      addOnlineCompletion(w, zeroOrder, {
-        kind: 'zero_amount',
-        completedAtOffsetMs: 5_000,
-      })
-    }
+    const zeroOrder = addOrder(w, {
+      totalCents: 500,
+      discountCents: 500,
+      couponId: w.couponId,
+    })
+    addOnlineCompletion(w, zeroOrder, {
+      kind: 'zero_amount',
+      completedAtOffsetMs: 5_000,
+    })
+
     const paidOrder = addOrder(w)
     const paid = addOnlineCompletion(w, paidOrder, { completedAtOffsetMs: 10_000 })
 
-    const result = projectOnlineCompletionsToLedger(w.db, { now: NOW, limit: 200 })
+    // With the old query, LIMIT 1 selected the earlier zero-amount completion
+    // and the projector made no progress. Positive-only filtering must happen
+    // before LIMIT so the later cash fact remains reachable.
+    const result = projectOnlineCompletionsToLedger(w.db, { now: NOW, limit: 1 })
     assert.equal(result.created, 1)
     const onlineRows = w.db.select().from(ledgerEntries)
       .where(eq(ledgerEntries.sourceSystem, 'online_payment'))
