@@ -374,8 +374,12 @@ export function createPaymentIntent(
       // retaining 112 bits of randomness while staying usable by PAY-10
       // without a second merchant-order-number generator.
       merchantOrderNo: `PAY-${id.replace(/-/gu, '').toUpperCase().slice(0, 28)}`,
-      merchantAppId: null,
-      merchantId: null,
+      // A real WeChat intent freezes the trusted single-merchant identity at
+      // creation. PAY-03 rejects wechat evidence unless these columns match the
+      // provider evidence, and the 0031 trigger makes them immutable afterwards,
+      // so they must be written here — never left null or filled in later.
+      merchantAppId: body.channel === 'wechat_jsapi' ? config.wechatPay?.appId ?? null : null,
+      merchantId: body.channel === 'wechat_jsapi' ? config.wechatPay?.mchid ?? null : null,
       grossAmountCents: order.totalCents,
       discountCents: order.couponDiscountCents,
       netPayableCents,
@@ -535,6 +539,16 @@ export async function createWechatJsapiPrepay(
       409,
       API_ERROR_CODES.paymentNotPayable,
       '支付单已关闭或失败，需经查单/关单确认后重新创建支付单',
+    )
+  }
+  // The frozen merchant identity must still match the configured merchant. A
+  // null (pre-repair/legacy) or rotated appid/mchid can never be confirmed by
+  // PAY-03, so refuse before any outbound payable order is created.
+  if (intent.merchantAppId !== runtime.appId || intent.merchantId !== runtime.mchid) {
+    throw new LocalError(
+      409,
+      API_ERROR_CODES.paymentNotPayable,
+      '支付单的商户身份与当前微信支付配置不一致，禁止发起预下单',
     )
   }
 

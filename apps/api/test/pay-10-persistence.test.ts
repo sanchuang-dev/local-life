@@ -11,6 +11,7 @@ import {
   paymentCapabilitiesSchema,
   paymentIntentCreateResponseSchema,
   paymentPrepayResponseSchema,
+  type PaymentEvidence,
 } from '@sanchuang-dev/local-life-contracts'
 import { createApp } from '../src/app.js'
 import { loadConfig } from '../src/config.js'
@@ -24,11 +25,13 @@ import {
   paymentAttempts,
   paymentEvents,
   paymentIntents,
+  paymentReviewExceptions,
   wechatIdentities,
   wechatPayPrepayAttempts,
 } from '../src/db/schema.js'
 import type { LocalActor } from '../src/local/shared.js'
-import { createWechatJsapiPrepay } from '../src/payments/service.js'
+import { confirmTrustedPayment } from '../src/payments/confirmation.js'
+import { createPaymentIntent, createWechatJsapiPrepay } from '../src/payments/service.js'
 import {
   TEST_APPID,
   TEST_MCHID,
@@ -62,6 +65,8 @@ interface World {
   directory: string
   server: FakeWechatServer | null
   resident: ResidentSession
+  communityId: string
+  productId: string
   orderId: string
   intentId: string
   openId: string
@@ -259,11 +264,46 @@ async function createWorld(
     directory,
     server,
     resident,
+    communityId,
+    productId,
     orderId,
     intentId,
     openId,
     config,
   }
+}
+
+function seedOrder(
+  db: AppDatabase,
+  input: { communityId: string; productId: string; residentUserId: string },
+): string {
+  const id = randomUUID()
+  db.insert(localOrders).values({
+    id,
+    communityId: input.communityId,
+    productId: input.productId,
+    residentUserId: input.residentUserId,
+    idempotencyKey: `pay-10-order-${id}`,
+    status: 'registered',
+    recordSource: 'resident',
+    productName: '本地生活测试商品',
+    unitPriceCents: 3_980,
+    quantity: 1,
+    totalCents: 3_980,
+    couponDiscountCents: 0,
+    couponId: null,
+    note: null,
+    createdByStaffId: null,
+    attributedStaffId: null,
+    sourceActivityId: null,
+    sourceTeamId: null,
+    verifiedByUserId: null,
+    verifiedAt: null,
+    verificationNote: null,
+    createdAt: ORDER_TIME,
+    updatedAt: ORDER_TIME,
+  }).run()
+  return id
 }
 
 function actorOf(world: World): LocalActor {
@@ -285,6 +325,13 @@ function errorCodeOf(response: Response): Promise<string> {
 
 test('PAY-10 prepay persists a verified prepay credential without any paid fact', async (t) => {
   const world = await createWorld(t, () => ({ status: 200, body: SUCCESS_BODY }))
+  // End-to-end reachability with complete merchant config: capability is true
+  // and the resident-owned prepay route is callable (not the old unconditional
+  // 503), while the response is still only JSAPI invocation parameters.
+  const capabilityResponse = await world.app.request(PAYMENT_ROUTES.capabilities)
+  const capabilities = paymentCapabilitiesSchema.parse(await capabilityResponse.json())
+  assert.equal(capabilities.wechatJsapiAvailable, true)
+  assert.equal(capabilities.wechatUnavailableReason, null)
   const response = await postPrepay(world)
   assert.equal(response.status, 201)
   const result = paymentPrepayResponseSchema.parse(await response.json())
@@ -332,8 +379,10 @@ test('PAY-10 prepay persists a verified prepay credential without any paid fact'
   assert.ok(intent)
   assert.equal(intent.status, 'pending')
   assert.equal(intent.paidAt, null)
-  assert.equal(intent.merchantAppId, null)
-  assert.equal(intent.merchantId, null)
+  // F1: PAY-03 requires the frozen merchant identity on the intent; leaving it
+  // null would make every real WeChat success unrecoverable merchant_mismatch.
+  assert.equal(intent.merchantAppId, TEST_APPID)
+  assert.equal(intent.merchantId, TEST_MCHID)
   assert.equal(world.db.select().from(paymentAttempts).all().length, 0)
   assert.equal(world.db.select().from(localOrderOnlineCompletions).all().length, 0)
   assert.equal(world.db.select().from(ledgerEntries).all().length, 0)
@@ -358,6 +407,104 @@ test('PAY-10 prepay persists a verified prepay credential without any paid fact'
   const rawDatabase = readFileSync(world.databasePath).toString('latin1')
   assert.equal(rawDatabase.includes('PRIVATE KEY'), false)
   assert.equal(rawDatabase.includes('BEGIN RSA'), false)
+})
+
+test('PAY-10 matching merchant evidence confirms the intent instead of merchant_mismatch', async (t) => {
+  const world = await createWorld(t, () => ({ status: 200, body: SUCCESS_BODY }))
+  const prepay = await postPrepay(world)
+  assert.equal(prepay.status, 201)
+  const [intent] = world.db
+    .select()
+    .from(paymentIntents)
+    .where(eq(paymentIntents.id, world.intentId))
+    .all()
+  assert.ok(intent)
+  assert.equal(intent.merchantAppId, TEST_APPID)
+  assert.equal(intent.merchantId, TEST_MCHID)
+
+  const evidence: PaymentEvidence = {
+    merchantOrderNo: intent.merchantOrderNo,
+    channel: 'wechat_jsapi',
+    providerStatus: 'paid',
+    providerTransactionId: '42000000002000000000000000000001',
+    amountCents: intent.netPayableCents,
+    currency: 'CNY',
+    merchantAppId: TEST_APPID,
+    merchantId: TEST_MCHID,
+    observedAt: new Date().toISOString(),
+    source: 'query',
+    dedupeKey: `PAY10-CONFIRM-${intent.id}`,
+    providerEventRef: null,
+    failureCode: null,
+    failureMessage: null,
+  }
+  const confirmation = confirmTrustedPayment(world.db, evidence)
+  assert.equal(confirmation.outcome, 'confirmed')
+  assert.equal(confirmation.intent.status, 'paid')
+  assert.equal(confirmation.intent.merchantAppId, TEST_APPID)
+  assert.equal(confirmation.intent.merchantId, TEST_MCHID)
+  assert.equal(confirmation.attempt?.providerTransactionId, evidence.providerTransactionId)
+  // PAY-03 must not have opened a merchant_mismatch review exception.
+  assert.equal(world.db.select().from(paymentReviewExceptions).all().length, 0)
+})
+
+test('PAY-10 prepay refuses an intent whose merchant identity differs from runtime config', async (t) => {
+  const world = await createWorld(t, () => ({ status: 200, body: SUCCESS_BODY }))
+  const alternateConfig = {
+    ...world.config,
+    wechatPay: {
+      ...world.config.wechatPay!,
+      appId: 'wx0123456789abcdef',
+    },
+  }
+  await assert.rejects(
+    createWechatJsapiPrepay(world.db, alternateConfig, actorOf(world), world.intentId),
+    (error: unknown) => {
+      assert.equal((error as { status?: number }).status, 409)
+      assert.equal((error as { code?: string }).code, 'payment_not_payable')
+      return true
+    },
+  )
+  assert.equal(world.server!.requests.length, 0)
+  assert.equal(world.db.select().from(wechatPayPrepayAttempts).all().length, 0)
+  const [intent] = world.db
+    .select()
+    .from(paymentIntents)
+    .where(eq(paymentIntents.id, world.intentId))
+    .all()
+  assert.equal(intent?.status, 'pending')
+  assert.equal(intent?.merchantAppId, TEST_APPID)
+})
+
+test('PAY-10 mock intent keeps merchant identity null while wechat intent freezes it', async (t) => {
+  const world = await createWorld(t, () => ({ status: 200, body: SUCCESS_BODY }))
+  const mockOrderId = seedOrder(world.db, {
+    communityId: world.communityId,
+    productId: world.productId,
+    residentUserId: world.resident.userId,
+  })
+  const mock = createPaymentIntent(
+    world.db,
+    { ...world.config, paymentMockEnabled: true },
+    actorOf(world),
+    {
+      localOrderId: mockOrderId,
+      channel: 'mock',
+      idempotencyKey: `pay-10-mock-${mockOrderId}`,
+    },
+  )
+  assert.equal(mock.created, true)
+  assert.equal(mock.intent.channel, 'mock')
+  assert.equal(mock.intent.merchantAppId, null)
+  assert.equal(mock.intent.merchantId, null)
+
+  const [wechatIntent] = world.db
+    .select()
+    .from(paymentIntents)
+    .where(eq(paymentIntents.id, world.intentId))
+    .all()
+  assert.equal(wechatIntent?.merchantAppId, TEST_APPID)
+  assert.equal(wechatIntent?.merchantId, TEST_MCHID)
 })
 
 test('PAY-10 duplicate prepay reuses the same provider credential without a second outbound call', async (t) => {

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { generateKeyPairSync } from 'node:crypto'
+import { createPublicKey, generateKeyPairSync } from 'node:crypto'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -16,13 +16,14 @@ import {
 } from '../src/wechat-pay/signing.js'
 import {
   TEST_APPID,
+  TEST_FIXED_VECTOR_PUBLIC_KEY,
   TEST_MCHID,
   TEST_MERCHANT_PRIVATE_KEY,
   TEST_MERCHANT_PRIVATE_KEY_PEM,
   TEST_MERCHANT_PUBLIC_KEY_PEM,
   TEST_MERCHANT_SERIAL,
+  TEST_OFFICIAL_PUBLIC_PAGE_KEY,
   TEST_PLATFORM_KEY_ID,
-  TEST_PLATFORM_PUBLIC_KEY,
   TEST_PLATFORM_PUBLIC_KEY_PEM,
 } from './fixtures/wechat-pay-test-support.js'
 
@@ -30,9 +31,13 @@ import {
  * Official known-answer vectors (WeChat Pay documentation, checked 2026-11-18):
  * - request signing example: /doc/v3/merchant/4012365334
  * - JSAPI invocation signing example: /doc/v3/merchant/4012365339
- * The documentation's response-verification example is not a paired vector
- * (its published signature does not verify against the published key), so the
- * response test uses a fixed local test vector with the documented algorithm.
+ *
+ * Response verification examples:
+ * - 4013053420 (平台证书页) signature verifies with that page's published
+ *   platform public key -> used as the official KAT below;
+ * - 4013053249 (微信支付公钥页) republishes the same signature with a different
+ *   public key that does NOT verify it -> used as an explicit negative vector.
+ * The local FIXED_RESPONSE vector stays as a deterministic unit vector.
  */
 const OFFICIAL_REQUEST_SIGNATURE =
   'Lc9VXxmeonkdV8Xk9tmigQFLhl0vRWTerdmoRu01aAnYwIrD/5nsSwE1WlmZGLRlAFTNQ3QsMa0+VRDlJp1Wp5p0nO8EK68b5sJBbjouxaFciIfq1zfDWWz+jqhcMoKXI1A6dPm1AW7D4d30WsMTNzp6g23OXakIsh9LO3lUmwvTuE0BY8ncf6tNGk4wKmvXwERd/ZpoQY3MAVKz+Nakwc+2XBmzT66KcUehU5kr4IvGa/lEU5RZb/q00zP9VLdBhC/jQSX3X1UcJLCtEc4gTmib4tnmAT+bHF/e17ZAuxDNcx6rqT8gNEXqaJGG+1OflMSTU2tpyG65G4dMKdFcoA=='
@@ -47,6 +52,26 @@ const FIXED_RESPONSE = {
   body: '{"prepay_id":"wx1234567890abcdef1234567890abcdef"}',
   signature:
     'FmrSIDlT9o2cx9YDo7zbm7w1y5jx5ihYxf1dywtkX3KH0FVlWqa+SkR19wutIxRGJ1yweWlYjg3WirS5+ROVaEQ63Qod2WCnU5shmnE2PyFnyfm7wthXLrv+/CPArtax3Uadfr1Hyx/a3BSaJfCDBDfcUlyHl99bud7tRDX1TkM7L3chWepcXAW9Vs6icwv9sicT4XRItztGJnlqQUAgDH9blA5JIpipZXAeoz4ss/MbDdvDQVNXlSCCw7vWSE36tp+r1W6nory28XXfYrEO6/wKPh8XqaJ1SFgiQJ7LyDG0WxTYO1vA3xSTIX0e/rEvJsFjDF5np5XU6vqnU7TSDw==',
+} as const
+
+// Official 4013053420 (平台证书验签页) example vector: same signature/body as
+// the 4013053249 page, but paired with the public key published on this page.
+const OFFICIAL_CERT_PAGE_PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwXNI6sdlknHBnK8Fu2U6
+Cwor9qY747jP8KAfeBMeveEt1TqaHkLfaSD07trZLhGpfs8/AHqjhgSMO1O10YQW
+OrrJ4hjIWPKqxbgrYMkBQc+mwdiWp4W3ByCqxBRagCveCXRWCmuJYovl9H/bsDI0
+iGbpVtEOghJtfciisYSgxcLufUDTRkvwxjIBK1pCRjk33jJ5YTBWTHMRtMAOcFLN
+F6hdEYdX8SPsgHHeLZ5Lv2T/686w1xtgCHef/sd4uSfWmyzsalQdHG/e4IyYmrhx
++O3VBoNDzE3nx23bFeV/RVNCG7cV6VhmYokJNHa/erIPkEmEFID6A5wQOXuxUkmJ
+WwIDAQAB
+-----END PUBLIC KEY-----`
+
+const OFFICIAL_CERT_PAGE_RESPONSE = {
+  timestamp: '1722850421',
+  nonce: 'd824f2e086d3c1df967785d13fcd22ef',
+  body: '{"code_url":"weixin://wxpay/bizpayurl?pr=JyC91EIz1"}',
+  signature:
+    'mfI1CPqvBrgcXfgXMFjdNIhBf27ACE2YyeWsWV9ZI7T7RU0vHvbQpu9Z32ogzc+k8ZC5n3kz7h70eWKjgqNdKQF0eRp8mVKlmfzMLBVHbssB9jEZEDXThOX1XFqX7s7ymia1hoHQxQagPGzkdWxtlZPZ4ZPvr1RiqkgAu6Is8MZgXXrRoBKqjmSdrP1N7uxzJ/cjfSiis9FiLjuADoqmQ1P7p2N876YPAol7Rn0+GswwAwxldbdLrmVSjfytfSBJFqTMHn4itojgxSWWN1byuckQt8hSTEv/Lg97QoeGniYP17T80pJeQyL3b+295FPHSO2AtvCgyIbKMZ0BALilAA==',
 } as const
 
 test('PAY-10 request signing matches the official WeChat test vector', () => {
@@ -156,7 +181,7 @@ test('PAY-10 response verification accepts only the configured trust anchor', ()
     nonceStr: FIXED_RESPONSE.nonce,
     serial: TEST_PLATFORM_KEY_ID,
     body: FIXED_RESPONSE.body,
-    platformPublicKey: TEST_PLATFORM_PUBLIC_KEY,
+    platformPublicKey: TEST_FIXED_VECTOR_PUBLIC_KEY,
     expectedSerial: TEST_PLATFORM_KEY_ID,
     now: new Date(Number(FIXED_RESPONSE.timestamp) * 1_000 + 30_000),
   }
@@ -196,6 +221,38 @@ test('PAY-10 response verification accepts only the configured trust anchor', ()
   const other = generateKeyPairSync('rsa', { modulusLength: 2048 }).publicKey
   assert.deepEqual(
     verifyWechatPayResponseSignature({ ...base, platformPublicKey: other }),
+    { ok: false, reason: 'invalid_signature' },
+  )
+})
+
+test('PAY-10 official 4013053420 platform-certificate vector verifies; 4013053249 key does not', () => {
+  const certPageKey = createPublicKey({
+    key: OFFICIAL_CERT_PAGE_PUBLIC_KEY_PEM,
+    format: 'pem',
+  })
+  const base = {
+    signature: OFFICIAL_CERT_PAGE_RESPONSE.signature,
+    timestamp: OFFICIAL_CERT_PAGE_RESPONSE.timestamp,
+    nonceStr: OFFICIAL_CERT_PAGE_RESPONSE.nonce,
+    serial: '4DF076AC5A7D968D4A8B0B9C59A74CB4CF8EE8A',
+    body: OFFICIAL_CERT_PAGE_RESPONSE.body,
+    expectedSerial: '4DF076AC5A7D968D4A8B0B9C59A74CB4CF8EE8A',
+    now: new Date(Number(OFFICIAL_CERT_PAGE_RESPONSE.timestamp) * 1_000 + 30_000),
+  }
+  assert.deepEqual(
+    verifyWechatPayResponseSignature({ ...base, platformPublicKey: certPageKey }),
+    { ok: true },
+  )
+  // The 4013053249 public-key page republishes this signature with a different
+  // key; it must fail. This is the precise finding, not "all official examples
+  // are unpaired".
+  assert.deepEqual(
+    verifyWechatPayResponseSignature({
+      ...base,
+      serial: 'PUB_KEY_ID_0000000000000024101100397200000006',
+      expectedSerial: 'PUB_KEY_ID_0000000000000024101100397200000006',
+      platformPublicKey: TEST_OFFICIAL_PUBLIC_PAGE_KEY,
+    }),
     { ok: false, reason: 'invalid_signature' },
   )
 })

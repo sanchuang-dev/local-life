@@ -1,15 +1,21 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
-import { createPrivateKey, createPublicKey, sign, type KeyObject } from 'node:crypto'
+import {
+  createPrivateKey,
+  createPublicKey,
+  generateKeyPairSync,
+  sign,
+  type KeyObject,
+} from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 /**
  * Test-only WeChat Pay fixtures and a controlled local HTTP server.
  *
- * The merchant key is the WeChat Pay documentation's public *test* key; it is
- * not a real merchant credential. The platform key pair is generated solely for
- * offline response-signature tests. No real merchant number, certificate,
- * AppSecret or APIv3 key is present anywhere in this repository.
+ * The merchant key is the WeChat Pay documentation's published *test* key; it
+ * is not a real merchant credential. The platform key used to sign fake
+ * responses is generated in-process on every test run and is never committed.
+ * No real merchant number, certificate, AppSecret or APIv3 key is present.
  */
 
 function fixture(name: string): string {
@@ -32,20 +38,40 @@ export const TEST_MERCHANT_SERIAL = '408B07E79B8269FEC3D5D3E6AB8ED163A6A380DB'
 export const TEST_MCHID = '1900007291'
 export const TEST_APPID = 'wx2421b1c4370ec43b'
 export const TEST_PLATFORM_KEY_ID = 'PUB_KEY_ID_TEST000000000000000000000001'
-export const TEST_PLATFORM_PUBLIC_KEY_PEM = readFileSync(
+
+/**
+ * Throwaway fake-response signing key. Generated per test process so no
+ * generated private key ever enters Git; only the public half leaves this
+ * module, and the fake server dies with the test run.
+ */
+const generatedPlatformPair = generateKeyPairSync('rsa', { modulusLength: 2_048 })
+export const TEST_PLATFORM_PRIVATE_KEY: KeyObject = generatedPlatformPair.privateKey
+export const TEST_PLATFORM_PUBLIC_KEY: KeyObject = generatedPlatformPair.publicKey
+export const TEST_PLATFORM_PUBLIC_KEY_PEM = generatedPlatformPair.publicKey
+  .export({ format: 'pem', type: 'spki' })
+  .toString()
+
+/**
+ * Public half of the fixed local response vector. Its private half is not
+ * committed; the constant signature in `pay-10-signing.test.ts` makes the
+ * verification vector deterministic.
+ */
+export const TEST_FIXED_VECTOR_PUBLIC_KEY_PEM = readFileSync(
   fixture('wechat-pay-test-platform-test-public-key.pem'),
   'utf8',
 )
-export const TEST_PLATFORM_PRIVATE_KEY_PEM = readFileSync(
-  fixture('wechat-pay-test-platform-private-key.pem'),
-  'utf8',
-)
-export const TEST_PLATFORM_PUBLIC_KEY = createPublicKey({
-  key: TEST_PLATFORM_PUBLIC_KEY_PEM,
+export const TEST_FIXED_VECTOR_PUBLIC_KEY = createPublicKey({
+  key: TEST_FIXED_VECTOR_PUBLIC_KEY_PEM,
   format: 'pem',
 })
-export const TEST_PLATFORM_PRIVATE_KEY: KeyObject = createPrivateKey({
-  key: TEST_PLATFORM_PRIVATE_KEY_PEM,
+
+/**
+ * Official 4013053249 "微信支付公钥" page example key. It is used as a
+ * negative vector because the example signature on that page does NOT verify
+ * with this key (the paired key is on the 4013053420 platform-certificate page).
+ */
+export const TEST_OFFICIAL_PUBLIC_PAGE_KEY = createPublicKey({
+  key: readFileSync(fixture('wechat-pay-test-platform-public-key.pem'), 'utf8'),
   format: 'pem',
 })
 

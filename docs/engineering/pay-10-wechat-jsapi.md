@@ -19,7 +19,7 @@
 | `prepay_id` 语义 | 预支付交易会话标识（官方 2 小时有效），仅用于调起收银台；**不是**交易号，也不能当付款成功 | <https://pay.weixin.qq.com/doc/v3/merchant/4012791856>、<https://pay.weixin.qq.com/doc/v3/merchant/4012791857> |
 | APIv3 Key | 只用于回调 `resource` 解密/平台证书解密；**不是** PAY-10 出站签名前置 | <https://pay.weixin.qq.com/doc/v3/merchant/4013070756> |
 
-> 官方“应答验签”示例文档中的签名值与随文公钥在本机程序化复核不匹配（同一签名在公钥/平台证书两篇文档各配了不同公钥却都写 `Verified OK`）。因此本卡**不照抄**该示例做 KAT，而是用官方**请求签名 / JSAPI paySign** 测试密钥向量做已知答案测试，并用固定本地测试密钥对为应答验签建立固定向量。该发现与 #285 早期调研“验签示例不是配对向量”的结论一致。
+> 官方两篇应答验签页的示例需要区分：`4013053420`（平台证书页）的示例签名与其随文平台公钥配对，验签成功，已作为本卡额外官方 KAT；`4013053249`（微信支付公钥页）用同一签名配了另一把公钥，本机复核验签失败，已作为显式负向向量。结论不是“所有官方验签示例都不是配对向量”。本地固定向量继续保留为确定性单测向量。
 
 ## 2. 服务端单商户配置（只读文件）
 
@@ -49,6 +49,7 @@
 `resident session + CSRF → payment intent(owner) → payable snapshot 复核 → (appid,userId) 可信 openid 映射 → APIv3 请求体 → 五行签名 → HTTPS → 原始应答验签/解析 → prepay 凭据持久化 → JSAPI 调起参数`
 
 - `out_trade_no` 直接复用 PAY-02 的 `payment_intents.merchant_order_no`（`PAY-` + 28 hex = 32 字符，符合微信 6–32 约束），不再造第二套单号。
+- 创建 `wechat_jsapi` 支付单时，`payment_intents.merchant_app_id/merchant_id` 由服务端写入 `config.wechatPay.appId/mchid` 并冻结（0031 触发器不可变）。PAY-03 会拒绝缺少或不同于证据的微信商户身份；留空会让真实付款永久卡在 `merchant_mismatch`。`mock` 保持两列为 `null`。预下单前还会再次校验已存商户身份与当前运行配置一致，不一致 fail-closed。
 - 金额只用 `payment_intents.net_payable_cents`（PAY-02 冻结快照），并再次与 `local_orders.total_cents - coupon_discount_cents` 对齐；浏览器不能传金额。
 - `openid` 只来自 `wechat_identities(appid, userId)` 可信映射；缺失即 409，不发请求。
 - `time_expire` = 意图 `expires_at`（RFC3339 `+08:00`），与 `prepay_expires_at` 独立维护；本地调起有效期 = `min(now+2h, intent.expires_at)`。剩余不足 1 分钟直接拒绝，避免微信把支付窗口自动延长到意图截止之后。
@@ -77,6 +78,8 @@
 | 意图 `closed/failed` | 409；只有经可信查单/关单确认未支付后，才允许走 PAY-02 新生命周期 |
 | 意图 `paid` | 409 `payment_already_paid`，永不重复调起 |
 
+> 升级提示：本卡之前创建的 `wechat_jsapi` intent 的 `merchant_app_id/merchant_id` 为 `null`，而 0031 触发器冻结这两列、无法补写。此类历史 intent 的 prepay 会 fail-closed；必须在可信查单/关单确认未支付后，按 PAY-02 创建新 intent。`createPaymentIntent` 在配置完整时新建的 wechat intent 已带正确商户身份。
+
 ## 6. 明确不做（PAY-11 及后续）
 
 微信通知接收/验签/`resource` 解密、主动查单、关单、退款、分账、账本投影、H5 页面、Admin 商户配置、真实资金部署、APIv3 Key 托管。`notify_url` 在本卡只是下单必填参数，PAY-10 不提供该回调端点。
@@ -91,9 +94,9 @@
 
 ## 8. 离线测试证据（真实结果见 PR）
 
-- `pay-10-signing.test.ts`：官方请求签名 KAT（含完整 Authorization）、官方 JSAPI paySign KAT、负例、固定应答验签向量及负例、nonce、配置 fail-closed 与密钥不泄漏。
+- `pay-10-signing.test.ts`：官方请求签名 KAT（含完整 Authorization）、官方 JSAPI paySign KAT、官方 `4013053420` 平台证书页应答验签 KAT（`4013053249` 公钥页同签名作为显式负向向量）、本地固定应答验签向量及负例、nonce、配置 fail-closed 与密钥不泄漏。
 - `pay-10-provider.test.ts`：受控 `127.0.0.1` HTTP server，逐字节断言 method/path/body/Authorization/timestamp/nonce/signature；覆盖有效签名、错签、缺签名头、超时、畸形 JSON、4xx 微信错误、HTTP 200 微信错误、5xx、网络错误、缺 `prepay_id`、序列号不匹配、时间戳过期。
-- `pay-10-persistence.test.ts`：真实 SQLite 文件 + 真实 Hono 路由：持久化、重启、重复请求复用、过期、确定性拒绝后重试、unknown 阻断、closed/paid 拒绝、缺 openid、未配置 capability/503；断言 intent 仍为 pending、无 payment_attempts/completion/ledger 事实、私钥不出现在 DB 文件。
+- `pay-10-persistence.test.ts`：真实 SQLite 文件 + 真实 Hono 路由：capability=true 且 prepay 可达、intent 创建即冻结配置商户身份、`confirmTrustedPayment` 用匹配证据确认成功且不产生 `merchant_mismatch`、运行配置与 intent 商户身份不一致时 fail-closed、mock intent 商户身份保持 null；以及持久化、重启、重复请求复用、过期、确定性拒绝后重试、unknown 阻断、closed/paid 拒绝、缺 openid、未配置 capability/503；断言 intent 未支付前无 payment_attempts/completion/ledger 事实、私钥不出现在 DB 文件。
 - `packages/contracts`：路由/请求/调起/响应 DTO 与“prepay 不是付款”的 strict 字段约束。
 
 ## 9. 未验证项与外部阻塞
