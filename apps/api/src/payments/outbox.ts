@@ -466,7 +466,9 @@ export function recoverParkedPaymentOutboxEvent(
       const current = tx.select({ status: paymentOutbox.status }).from(paymentOutbox)
         .where(eq(paymentOutbox.id, outboxEventId))
         .get()
-      if (current?.status === 'delivered') return { alreadyDelivered: true }
+      if (current?.status === 'delivered') {
+        return { alreadyDelivered: true, exhaustedConflictId: null }
+      }
       throw new LocalError(
         409,
         API_ERROR_CODES.paymentOutboxRecoveryConflict,
