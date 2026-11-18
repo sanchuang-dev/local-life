@@ -41,6 +41,19 @@ export const PAYMENT_INTERNAL_ROUTES = {
    * trust-bearing payment projections.
    */
   consumeOutbox: '/internal/payments/outbox/consume',
+  /**
+   * R2 controlled recovery. Only a parked (`failed`) outbox row may be replayed;
+   * the replay uses the same idempotent projection as the consumer, then marks
+   * the linked `open` order conflicts `resolved`. Repeating it, or replaying an
+   * already delivered event, is a safe no-op.
+   */
+  recoverOutbox: '/internal/payments/outbox/recover',
+  /**
+   * R2 query path for parked events. An operator sees the order, intent, amount,
+   * channel transaction, failure reason and time without reading SQLite by hand
+   * or running an UPDATE as the repair procedure.
+   */
+  failedOutbox: '/internal/payments/outbox/failed',
 } as const
 
 /** Non-negative integer cents; rejects floats, negatives and overflow. */

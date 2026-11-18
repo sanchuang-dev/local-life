@@ -125,6 +125,13 @@ export const API_ERROR_CODES = {
    * is preserved and an order-level conflict is opened for human review.
    */
   paymentOnlineCompletionConflict: 'payment_online_completion_conflict',
+  /**
+   * Manual/online hard boundary (R1) and parked-outbox recovery (R2). A manual
+   * verification/receipt is refused with `payment_online_completion_conflict`
+   * while any trusted payment fact may exist; a recovery request that targets a
+   * non-parked or concurrently recovered outbox row is refused here.
+   */
+  paymentOutboxRecoveryConflict: 'payment_outbox_recovery_conflict',
   paymentInternalUnauthorized: 'payment_internal_unauthorized',
   paymentInternalNotConfigured: 'payment_internal_not_configured',
   /**
@@ -1931,6 +1938,19 @@ export const localOrderOnlineConflictKindSchema = z.enum([
   'coupon_state_invalid',
   /** PAY-03 preserved a late success after the intent was already terminal. */
   'late_success',
+  /**
+   * R1: a trusted channel payment arrived for an order that already carries a
+   * manual receipt. The online money fact is preserved here; it is never turned
+   * into a second completion or a second ledger receipt.
+   */
+  'manual_online_double_collection',
+  /**
+   * R2: the PAY-05 completion chain exhausted its retry budget and parked the
+   * outbox row. The order is deliberately left uncompleted but visible, with the
+   * failure reason, channel reference and amounts, until the controlled replay
+   * resolves it.
+   */
+  'consumer_exhausted',
 ])
 export type LocalOrderOnlineConflictKind = z.infer<
   typeof localOrderOnlineConflictKindSchema
@@ -2016,6 +2036,108 @@ export const localOrderDetailSchema = localOrderSummarySchema
     }
   })
 export type LocalOrderDetail = z.infer<typeof localOrderDetailSchema>
+
+/* -------------------------------------------------------------------------- */
+/* R2 parked-outbox visibility and controlled recovery                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Threshold alert / runbook payload for the internal operations surface.
+ *
+ * R2 closes the "money arrived but the order was silently parked" gap: when the
+ * PAY-05 completion chain exhausts its retry budget, the outbox row stays
+ * `failed` and an `open` `consumer_exhausted` order conflict is written in the
+ * same transaction. This DTO is the token-gated query path an operator uses to
+ * locate the order, intent, channel transaction, amount and failure reason, and
+ * the id they may replay through the controlled recovery endpoint.
+ */
+export const paymentOutboxRecoveryRequestSchema = z.strictObject({
+  /** The durable `payment_outbox.id`; the payment intent is never the target. */
+  outboxEventId: z.string().uuid(),
+})
+export type PaymentOutboxRecoveryRequest = z.infer<
+  typeof paymentOutboxRecoveryRequestSchema
+>
+
+export const paymentOutboxRecoveryOutcomeSchema = z.enum([
+  /** The parked event was replayed and the outbox row is now `delivered`. */
+  'recovered',
+  /** The event was already delivered; replay is a safe no-op. */
+  'already_completed',
+  /** The replay failed transiently again and is scheduled for a later attempt. */
+  'retry_scheduled',
+  /** The replay produced a permanent conflict and parked the row again. */
+  'still_failed',
+])
+export type PaymentOutboxRecoveryOutcome = z.infer<
+  typeof paymentOutboxRecoveryOutcomeSchema
+>
+
+export const paymentOutboxStorageStatusSchema = z.enum([
+  'pending',
+  'processing',
+  'delivered',
+  'failed',
+])
+export type PaymentOutboxStorageStatus = z.infer<typeof paymentOutboxStorageStatusSchema>
+
+export const paymentOutboxRecoveryResponseSchema = z.strictObject({
+  outboxEventId: z.string().uuid(),
+  outcome: paymentOutboxRecoveryOutcomeSchema,
+  /** Persisted outbox state AFTER the replay attempt — never a client claim. */
+  status: paymentOutboxStorageStatusSchema,
+  /** Order/intent are null only when the parked row cannot be resolved to one. */
+  localOrderId: z.string().uuid().nullable(),
+  paymentIntentId: z.string().uuid().nullable(),
+  orderStatus: localOrderStatusSchema.nullable(),
+  /** Open conflicts for this outbox resolved by a successful replay. */
+  conflictsResolved: z.number().int().nonnegative(),
+  asOf: isoTimestamp,
+})
+export type PaymentOutboxRecoveryResponse = z.infer<
+  typeof paymentOutboxRecoveryResponseSchema
+>
+
+export const paymentFailedOutboxConflictSchema = z.strictObject({
+  id: z.string().uuid(),
+  kind: localOrderOnlineConflictKindSchema,
+  status: z.enum(['open', 'reviewed', 'resolved']),
+  /** Full persisted evidence; this payload is internal-token-only. */
+  detail: z.string().trim().min(1).max(500),
+  createdAt: isoTimestamp,
+  resolvedAt: isoTimestamp.nullable(),
+})
+export type PaymentFailedOutboxConflict = z.infer<
+  typeof paymentFailedOutboxConflictSchema
+>
+
+export const paymentFailedOutboxItemSchema = z.strictObject({
+  outboxEventId: z.string().uuid(),
+  paymentIntentId: z.string().uuid(),
+  localOrderId: z.string().uuid().nullable(),
+  orderStatus: localOrderStatusSchema.nullable(),
+  topic: z.string().trim().min(1).max(100),
+  status: z.literal('failed'),
+  attempts: z.number().int().nonnegative(),
+  lastError: z.string().trim().min(1).max(500).nullable(),
+  /** Frozen intent facts: what money the parked event is about. */
+  amountCents: z.number().int().nonnegative(),
+  providerTransactionId: z.string().trim().min(1).max(128).nullable(),
+  createdAt: isoTimestamp,
+  updatedAt: isoTimestamp,
+  conflicts: z.array(paymentFailedOutboxConflictSchema),
+})
+export type PaymentFailedOutboxItem = z.infer<
+  typeof paymentFailedOutboxItemSchema
+>
+
+export const paymentFailedOutboxListResponseSchema = z.strictObject({
+  items: z.array(paymentFailedOutboxItemSchema),
+  asOf: isoTimestamp,
+})
+export type PaymentFailedOutboxListResponse = z.infer<
+  typeof paymentFailedOutboxListResponseSchema
+>
 
 /**
  * Resident registration. Strict on purpose: the resident comes from the session,

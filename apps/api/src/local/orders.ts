@@ -61,6 +61,7 @@ import { requireProduct, type ProductRow } from './products.js'
 import { readCouponForOrder, reserveCouponForOrder, redeemCouponForOrder } from '../purchase-reward/coupon-usage.js'
 import { assertCouponStillReservedForOrder, releaseUnpaidOrderCoupon } from '../purchase-reward/coupon-recovery.js'
 import { projectLocalOrderFacts } from '../ledger/service.js'
+import { assertManualPaymentBoundary } from '../payments/service.js'
 
 /* ------------------------------- Selections ------------------------------- */
 
@@ -1115,6 +1116,14 @@ export function verifyOrder(
   const target: LocalOrderStatus = body.decision === 'verify' ? 'verified' : 'rejected'
   try {
     db.transaction((tx) => {
+      // R1: the manual "verified" fact may only be written when the server can
+      // prove no online money exists or is in flight. The check lives beside the
+      // write inside this BEGIN IMMEDIATE transaction so a concurrent trusted
+      // confirmation cannot interleave. Rejecting is not a payment assertion and
+      // keeps its existing deferred-coupon protection.
+      if (body.decision === 'verify') {
+        assertManualPaymentBoundary(tx, orderId)
+      }
       const result = tx
         .update(localOrders)
         .set(

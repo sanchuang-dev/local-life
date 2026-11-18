@@ -7,6 +7,7 @@ import {
   createPaymentIntentRequestSchema,
   paymentEvidenceSchema,
   paymentOutboxConsumeRequestSchema,
+  paymentOutboxRecoveryRequestSchema,
   type CreatePaymentIntentRequest,
 } from '@sanchuang-dev/local-life-contracts'
 import type { ApiConfig } from '../config.js'
@@ -15,7 +16,11 @@ import type { AppBindings, AppContext, AuthSession, HttpErrorStatus } from '../h
 import { constantTimeTextEqual } from '../auth/security.js'
 import { LocalError, type LocalActor } from '../local/shared.js'
 import { confirmTrustedPayment } from './confirmation.js'
-import { runPaymentOutboxConsumer } from './outbox.js'
+import {
+  listFailedPaymentOutboxEvents,
+  recoverParkedPaymentOutboxEvent,
+  runPaymentOutboxConsumer,
+} from './outbox.js'
 import { createPaymentIntent, getMyPaymentIntent } from './service.js'
 
 export interface PaymentRouteDeps {
@@ -32,6 +37,12 @@ export interface PaymentRouteDeps {
 }
 
 const paymentIntentIdSchema = z.string().uuid()
+
+/** Bounded internal list of parked events; the service also caps it server-side. */
+const outboxFailedListLimitSchema = z.preprocess(
+  (value) => (value === undefined || value === '' ? undefined : Number(value)),
+  z.number().int().min(1).max(200).optional(),
+)
 
 /**
  * Resident payment intent surface (PAY-02).
@@ -146,6 +157,51 @@ export function registerPaymentRoutes(
       const result = runPaymentOutboxConsumer(db, {
         ...(body.limit === undefined ? {} : { limit: body.limit }),
       })
+      c.header('Cache-Control', 'no-store')
+      return c.json(result)
+    } catch (error) {
+      return failWithPaymentError(c, error)
+    }
+  })
+
+  /**
+   * R2 parked-event query. Same internal token as every trust-bearing entry
+   * point. It exposes the order/intent/amount/channel reference/failure reason so
+   * an operator never has to read or UPDATE the outbox table by hand.
+   */
+  app.get(PAYMENT_INTERNAL_ROUTES.failedOutbox, (c) => {
+    const unauthorized = requireInternalToken(c)
+    if (unauthorized) return unauthorized
+    const limit = outboxFailedListLimitSchema.safeParse(c.req.query('limit') ?? undefined)
+    if (!limit.success) return fail(c, 400, API_ERROR_CODES.invalidRequest, '查询参数不正确')
+    try {
+      const result = listFailedPaymentOutboxEvents(db, {
+        ...(limit.data === undefined ? {} : { limit: limit.data }),
+      })
+      c.header('Cache-Control', 'no-store')
+      return c.json(result)
+    } catch (error) {
+      return failWithPaymentError(c, error)
+    }
+  })
+
+  /**
+   * R2 controlled recovery. Only a parked (`failed`) event is replayable; the
+   * replay goes through the same idempotent projection as the consumer and then
+   * marks the linked open conflicts `resolved`. Repeated/concurrent recovery and
+   * replay of an already delivered event are safe no-ops / explicit 409s, never a
+   * second completion.
+   */
+  app.post(PAYMENT_INTERNAL_ROUTES.recoverOutbox, async (c) => {
+    const unauthorized = requireInternalToken(c)
+    if (unauthorized) return unauthorized
+    const body = bodySchemaError(
+      await c.req.json().catch(() => null),
+      paymentOutboxRecoveryRequestSchema,
+    )
+    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '恢复参数不正确')
+    try {
+      const result = recoverParkedPaymentOutboxEvent(db, body.outboxEventId)
       c.header('Cache-Control', 'no-store')
       return c.json(result)
     } catch (error) {

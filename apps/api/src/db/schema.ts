@@ -2344,7 +2344,8 @@ export const localOrderOnlineConflicts = sqliteTable(
     check(
       'local_order_online_conflicts_kind_check',
       sql`${table.kind} IN ('order_not_payable', 'order_already_completed',
-        'payment_state_invalid', 'coupon_state_invalid', 'late_success')`,
+        'payment_state_invalid', 'coupon_state_invalid', 'late_success',
+        'manual_online_double_collection', 'consumer_exhausted')`,
     ),
     check(
       'local_order_online_conflicts_status_check',
