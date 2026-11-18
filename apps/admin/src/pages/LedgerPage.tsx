@@ -97,7 +97,7 @@ const FACT_KIND_OPTIONS = LEDGER_FACT_KINDS.map((kind) => ({
 }))
 
 const SOURCE_SYSTEM_OPTIONS = (
-  ['local_order', 'crm_service_order', 'activity_reward_grant', 'manual'] as const
+  ['local_order', 'crm_service_order', 'activity_reward_grant', 'manual', 'online_payment'] as const
 ).map((system) => ({ label: LEDGER_SOURCE_SYSTEM_LABELS[system], value: system }))
 
 /** Fact-kind tag colours: the four money kinds are never the same colour. */

@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, eq, gt, inArray, sql } from 'drizzle-orm'
 import {
   API_ERROR_CODES,
   PURCHASE_REWARD_TEAM_SIZE,
@@ -21,6 +21,7 @@ import {
   activityTeams,
   ledgerEntries,
   ledgerPaymentOrderLinks,
+  localOrderOnlineCompletions,
   localOrders,
   users,
 } from '../db/schema.js'
@@ -257,10 +258,52 @@ function readContributions(
     .groupBy(localOrders.sourceTeamId, localOrders.residentUserId)
     .all()
 
-  for (const row of rows) {
+  // PAY-06 online branch: the frozen completion is the source; the ledger
+  // projection must exist and its amount must equal the completion. Mock rows
+  // deliberately participate in this same reward drill so replay/idempotency can
+  // be exercised, but they never enter formal financial summaries.
+  const onlineRows = db
+    .select({
+      teamId: localOrders.sourceTeamId,
+      residentUserId: localOrders.residentUserId,
+      contributionCents: sql<number>`SUM(${localOrderOnlineCompletions.amountCents})`.mapWith(Number),
+    })
+    .from(localOrderOnlineCompletions)
+    .innerJoin(localOrders, eq(localOrders.id, localOrderOnlineCompletions.localOrderId))
+    .innerJoin(
+      activityParticipations,
+      and(
+        eq(activityParticipations.activityId, localOrders.sourceActivityId),
+        eq(activityParticipations.teamId, localOrders.sourceTeamId),
+        eq(activityParticipations.userId, localOrders.residentUserId),
+        sql`${activityParticipations.joinedAt} <= ${localOrders.createdAt}`,
+      ),
+    )
+    .innerJoin(
+      ledgerEntries,
+      and(
+        eq(ledgerEntries.sourceSystem, 'online_payment'),
+        eq(ledgerEntries.sourceId, localOrderOnlineCompletions.id),
+        eq(ledgerEntries.factKind, 'payment_received'),
+        eq(ledgerEntries.amountCents, localOrderOnlineCompletions.amountCents),
+      ),
+    )
+    .where(
+      and(
+        eq(localOrders.sourceActivityId, activityId),
+        inArray(localOrders.sourceTeamId, teamIds),
+        eq(localOrders.status, 'online_completed'),
+        gt(localOrderOnlineCompletions.amountCents, 0),
+      ),
+    )
+    .groupBy(localOrders.sourceTeamId, localOrders.residentUserId)
+    .all()
+
+  for (const row of [...rows, ...onlineRows]) {
     if (row.teamId === null || row.contributionCents <= 0) continue
     const teamContributions = byTeam.get(row.teamId) ?? new Map<string, number>()
-    teamContributions.set(row.residentUserId, row.contributionCents)
+    const current = teamContributions.get(row.residentUserId) ?? 0
+    teamContributions.set(row.residentUserId, current + row.contributionCents)
     byTeam.set(row.teamId, teamContributions)
   }
   return byTeam

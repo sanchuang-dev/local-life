@@ -253,6 +253,13 @@
       "when": 1794901138267,
       "tag": "0035_online_order_completion",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794901139267,
+      "tag": "0036_online_ledger_projection",
+      "breakpoints": true
     }
   ]
 }

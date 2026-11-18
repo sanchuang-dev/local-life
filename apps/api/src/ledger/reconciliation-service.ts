@@ -152,6 +152,7 @@ const SOURCE_SYSTEM_LABELS: Record<LedgerSourceSystem, string> = {
   crm_service_order: '广电CRM',
   activity_reward_grant: '奖励履约',
   manual: '人工收款',
+  online_payment: '线上支付',
 }
 
 const ATTRIBUTION_STATE_LABELS: Record<LedgerAttributionState, string> = {
@@ -331,6 +332,9 @@ export function membershipConditions(
 ): SQL<unknown>[] {
   const range = reconciliationPeriodRange(periodFrom, periodTo)
   const conditions: SQL<unknown>[] = [
+    // Mock online receipts are detail evidence only; they never enter a formal
+    // reconciliation statement, batch total or CSV.
+    eq(ledgerEntries.simulated, false),
     gte(ledgerEntries.occurredAt, new Date(range.startMs)),
     lt(ledgerEntries.occurredAt, new Date(range.endMs)),
   ]

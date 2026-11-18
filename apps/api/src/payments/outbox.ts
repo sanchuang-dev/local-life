@@ -5,6 +5,7 @@ import {
 } from '@sanchuang-dev/local-life-contracts'
 import type { AppDatabase } from '../db/client.js'
 import { paymentOutbox } from '../db/schema.js'
+import { projectOnlineCompletionsToLedger } from '../ledger/service.js'
 import {
   consumePaidOutboxEvent,
   projectPaymentExceptionsOntoOrders,
@@ -278,6 +279,9 @@ export function runPaymentOutboxConsumer(
   // and surface PAY-03's preserved late successes on the order.
   const couponsReleased = settleDeferredCouponReleases(db, now)
   const exceptionsProjected = projectPaymentExceptionsOntoOrders(db, now)
+  // PAY-06: project every newly completed order (and any pre-PAY-06 backlog)
+  // into the single operating ledger. Unique source keys make this replay-safe.
+  projectOnlineCompletionsToLedger(db, { now })
 
   return paymentOutboxConsumeResponseSchema.parse({
     claimed,

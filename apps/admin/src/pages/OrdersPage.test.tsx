@@ -188,6 +188,7 @@ function ledgerEntry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
     entryId: RECEIPT_ENTRY_ID,
     factKind: 'payment_received',
     sourceSystem: 'manual',
+    simulated: false,
     sourceId: 'manual-receipt-0001',
     sourceDisplayNo: 'RCPT-0001',
     communityId: COMMUNITY_A.id,
