@@ -56,7 +56,7 @@ export function LocalProductCard({
           <span className="text-[15px] font-semibold leading-none text-[#a96b2f]">
             {formatLocalPriceCents(product.priceCents)}
           </span>
-          <span className="text-[10px] text-slate-400">登记后由工作人员办理</span>
+          <span className="text-[10px] text-slate-400">下单后以页面状态为准</span>
         </span>
         <span className="mt-1 flex min-w-0 items-center gap-0.5 text-[10px] text-slate-400">
           <MapPin size={11} className="shrink-0" aria-hidden="true" />

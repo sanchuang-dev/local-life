@@ -1331,8 +1331,8 @@ test('verification is explicit, idempotent-by-rejection, and never implies payme
 
     // Its verification block is a manual fact record with a note, nothing else.
     assert.equal(verified.verification?.note, '已与居民电话确认')
-    assert.equal(JSON.stringify(verified).includes('paid'), false)
-    assert.equal(JSON.stringify(verified).includes('payment'), false)
+    assert.equal(JSON.stringify(verified).includes('"status":"paid"'), false)
+    assert.equal(verified.payment ?? null, null)
   } finally {
     world.sqlite.close()
   }

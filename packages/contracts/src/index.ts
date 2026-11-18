@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { activityRewardPlanSchema } from './rewards.js'
 import { publicPurchaseRewardSchema, purchaseRewardPlanSchema } from './purchase-reward.js'
 import { activityStatusSchema, authCommunitySchema, staffRoleSchema } from './identity.js'
+import { paymentStatusSchema } from './payments.js'
 
 /** Route identifiers shared by the API and every client that calls it. */
 export const API_ROUTES = {
@@ -1810,6 +1811,24 @@ export const localOrderTeamRefSchema = z.object({
 })
 export type LocalOrderTeamRef = z.infer<typeof localOrderTeamRefSchema>
 
+
+/**
+ * Latest payment intent projected onto a local order for resident read surfaces.
+ * A `pending/confirming/paid` intent is not an order completion by itself; only
+ * `online_completed` + `onlineCompletion` can claim a finished online trade.
+ */
+export const localOrderPaymentSummarySchema = z.strictObject({
+  intentId: z.string().uuid(),
+  status: paymentStatusSchema,
+  channel: z.enum(['mock', 'wechat_jsapi']).nullable(),
+  simulated: z.boolean(),
+  netPayableCents: z.number().int().nonnegative(),
+  expiresAt: isoTimestamp,
+  failureMessage: z.string().nullable(),
+  updatedAt: isoTimestamp,
+})
+export type LocalOrderPaymentSummary = z.infer<typeof localOrderPaymentSummarySchema>
+
 export const localOrderSummarySchema = z.object({
   id: z.string().uuid(),
   community: authCommunitySchema,
@@ -1828,6 +1847,8 @@ export const localOrderSummarySchema = z.object({
    */
   sourceTeam: localOrderTeamRefSchema.nullable(),
   note: z.string().nullable(),
+  /** Latest payment intent, if any; never inferred from `local_orders.status`. */
+  payment: localOrderPaymentSummarySchema.nullable().optional(),
   createdAt: isoTimestamp,
   updatedAt: isoTimestamp,
 })

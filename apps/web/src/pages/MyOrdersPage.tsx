@@ -9,11 +9,10 @@ import { FilterChipRow } from '../components/crm/FilterChips'
 import {
   formatLocalDateTime,
   formatLocalPriceCents,
-  localOrderStatusDescriptions,
   localOrderStatusLabels,
   localOrderStatusOrder,
-  localOrderStatusTone,
 } from '../components/life/localOrderLabels'
+import { localOrderPaymentDisplay } from '../components/life/localOrderPayment'
 import { useBackTarget } from '../hooks/useBackTarget'
 import { useMyLocalOrders } from '../hooks/useLocalOrders'
 import { useResidentAuth } from '../hooks/useResidentAuth'
@@ -33,7 +32,7 @@ const statusOptions = localOrderStatusOrder.map((status) => ({
 }))
 
 function OrderRow({ order, from }: { order: LocalOrderSummary; from: string }) {
-  const tone = localOrderStatusTone(order.status)
+  const display = localOrderPaymentDisplay(order)
   return (
     <li>
       <Link
@@ -54,9 +53,9 @@ function OrderRow({ order, from }: { order: LocalOrderSummary; from: string }) {
                 {order.snapshot.productName}
               </p>
               <span
-                className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${toneStyles[tone]}`}
+                className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${toneStyles[display.tone]}`}
               >
-                {localOrderStatusLabels[order.status]}
+                {display.label}
               </span>
             </div>
             <p className="mt-0.5 text-[11px] text-slate-400">
@@ -69,7 +68,7 @@ function OrderRow({ order, from }: { order: LocalOrderSummary; from: string }) {
               </span>
             </p>
             <p className="mt-1 break-words text-[10px] leading-4 text-slate-400">
-              {localOrderStatusDescriptions[order.status]}
+              {display.description}
             </p>
           </div>
         </div>
@@ -109,7 +108,7 @@ export function MyOrdersPage() {
         backLabel={backLabel}
         icon={ClipboardList}
         title="我的订单"
-        subtitle="本地商品 · 办理意向登记 · 处理进度"
+        subtitle="本地商品 · 支付与处理进度"
       />
 
       <section
@@ -118,7 +117,7 @@ export function MyOrdersPage() {
       >
         <p className="text-[12px] font-bold text-[#225c4c]">商品办理登记</p>
         <p className="mt-1 text-[11px] leading-[1.7] text-[#52786c]">
-          这里记录的是办理意向，不代表已付款或办理完成。
+          订单与支付状态以服务端为准；交易完成不代表企业银行已结算到账。
         </p>
       </section>
 
