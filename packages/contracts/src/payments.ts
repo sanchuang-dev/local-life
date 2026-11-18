@@ -34,6 +34,13 @@ export const PAYMENT_ROUTES = {
 /** Internal adapter/test surface; requires a server-side token, never a resident session. */
 export const PAYMENT_INTERNAL_ROUTES = {
   confirm: '/internal/payments/confirm',
+  /**
+   * PAY-05 downstream consumer trigger. It drains the durable `payment.paid.v1`
+   * outbox into order completion and settles deferred coupon releases. It is
+   * token-gated like `confirm`: a browser or resident session cannot drive
+   * trust-bearing payment projections.
+   */
+  consumeOutbox: '/internal/payments/outbox/consume',
 } as const
 
 /** Non-negative integer cents; rejects floats, negatives and overflow. */
@@ -487,3 +494,41 @@ export const paymentEventListResponseSchema = z.strictObject({
   items: z.array(paymentEventSchema),
 })
 export type PaymentEventListResponse = z.infer<typeof paymentEventListResponseSchema>
+
+/* -------------------------------------------------------------------------- */
+/* PAY-05 outbox consumer contract                                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One consumer run. The server caps the batch size; a client cannot ask for an
+ * unbounded drain. Every count is a per-run observation, not a ledger total.
+ */
+export const paymentOutboxConsumeRequestSchema = z.strictObject({
+  limit: z.number().int().min(1).max(50).optional(),
+})
+export type PaymentOutboxConsumeRequest = z.infer<
+  typeof paymentOutboxConsumeRequestSchema
+>
+
+export const paymentOutboxConsumeResponseSchema = z.strictObject({
+  /** Events claimed by this run (including ones that later conflicted). */
+  claimed: z.number().int().nonnegative(),
+  /** Trusted paid events that completed an order exactly once in this run. */
+  completed: z.number().int().nonnegative(),
+  /** Replays that found the same completion already present. */
+  alreadyCompleted: z.number().int().nonnegative(),
+  /** Events preserved as an order-level manual-review conflict. */
+  conflicts: z.number().int().nonnegative(),
+  /** Events left pending for a later retry (transient failure/backoff). */
+  retried: z.number().int().nonnegative(),
+  /** Events that exhausted the retry budget and are parked as `failed`. */
+  failed: z.number().int().nonnegative(),
+  /** Deferred coupon releases completed because payment is now terminal. */
+  couponsReleased: z.number().int().nonnegative(),
+  /** PAY-03 late-success exceptions projected onto their order. */
+  exceptionsProjected: z.number().int().nonnegative(),
+  asOf: z.string().datetime({ offset: true }),
+})
+export type PaymentOutboxConsumeResponse = z.infer<
+  typeof paymentOutboxConsumeResponseSchema
+>

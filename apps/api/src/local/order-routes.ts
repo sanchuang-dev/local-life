@@ -28,6 +28,7 @@ import {
 } from './orders.js'
 import { LocalError, type LocalActor } from './shared.js'
 import { ResidentCommunityError } from '../resident-community/service.js'
+import { completeZeroAmountOrder } from '../payments/order-completion.js'
 
 export interface LocalOrderRouteDeps {
   db: AppDatabase
@@ -173,6 +174,28 @@ export function registerLocalOrderRoutes(
     if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '登记信息不正确')
     try {
       const result = registerResidentOrder(db, guard.actor, body)
+      return c.json(result, result.created ? 201 : 200)
+    } catch (error) {
+      return failWithLocalError(c, error)
+    }
+  })
+
+  /**
+   * PAY-05 zero-amount completion: the only path that may complete a fully
+   * coupon-discounted order. It is not a payment endpoint — no channel call, no
+   * provider transaction id, no positive cash fact — and it is idempotent per
+   * order (a replay answers 200 with `created:false`).
+   */
+  app.post(LOCAL_ORDER_ROUTES.myZeroAmountCompletion, (c) => {
+    const guard = requireResident(c)
+    if (guard instanceof Response) return guard
+    const csrfFailure = requireCsrf(c, guard.session)
+    if (csrfFailure) return csrfFailure
+    const orderId = requireParam(c)
+    if (orderId instanceof Response) return orderId
+    try {
+      const result = completeZeroAmountOrder(db, guard.actor, orderId)
+      c.header('Cache-Control', 'no-store')
       return c.json(result, result.created ? 201 : 200)
     } catch (error) {
       return failWithLocalError(c, error)

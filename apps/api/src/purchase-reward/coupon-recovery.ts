@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import {
   API_ERROR_CODES,
   couponRewardDisputeListSchema,
@@ -16,6 +16,7 @@ import {
   couponTeamGrants,
   ledgerPaymentOrderLinks,
   localOrders,
+  paymentIntents,
 } from '../db/schema.js'
 import {
   LocalError,
@@ -26,6 +27,19 @@ import {
   type LocalTransaction,
 } from '../local/shared.js'
 import { readTeamProgressForIssuance } from './service.js'
+
+/**
+ * Possible outcomes of releasing an unpaid order's coupon reservation.
+ *
+ * `deferred` is the PAY-05 guard: the order is terminal, but a payment intent is
+ * still `pending`/`confirming` (the channel may still capture money) or already
+ * `paid` (it did capture money and the completion fact is not projected yet).
+ * Handing the coupon to another order in either case could produce "已付款却把券
+ * 给别人". The reservation is left in place; `settleDeferredCouponReleases`
+ * releases it only once PAY-03 records a trusted terminal channel result and no
+ * paid intent exists.
+ */
+export type UnpaidCouponRelease = 'released' | 'none' | 'void' | 'deferred'
 
 /**
  * Releasing an unpaid order is NOT a refund: no cash fact is written or erased.
@@ -41,7 +55,7 @@ export function releaseUnpaidOrderCoupon(
   tx: LocalTransaction,
   orderId: string,
   now: Date,
-): 'released' | 'none' | 'void' {
+): UnpaidCouponRelease {
   const order = tx.select({
     status: localOrders.status,
     couponId: localOrders.couponId,
@@ -50,6 +64,19 @@ export function releaseUnpaidOrderCoupon(
     throw new LocalError(409, API_ERROR_CODES.conflict, '只有已取消或拒绝的订单可以释放未付款消费券')
   }
   if (!order.couponId) return 'none'
+  // A payment intent that is still live (pending/confirming) means the channel may
+  // still capture the resident's money, and a `paid` intent means it already did.
+  // In both cases cancelling the order must NOT hand the same coupon to another
+  // order: that is exactly the "已付款却把券给别人" failure PAY-05 forbids. The
+  // reservation stays deferred until a human (or PAY-03/PAY-11 evidence) settles it.
+  const liveIntent = tx.select({ id: paymentIntents.id })
+    .from(paymentIntents)
+    .where(and(
+      eq(paymentIntents.localOrderId, orderId),
+      inArray(paymentIntents.status, ['pending', 'confirming', 'paid']),
+    ))
+    .get()
+  if (liveIntent) return 'deferred'
   if (tx.select({ orderId: ledgerPaymentOrderLinks.orderId })
       .from(ledgerPaymentOrderLinks).where(eq(ledgerPaymentOrderLinks.orderId, orderId)).get()) {
     throw new LocalError(409, API_ERROR_CODES.conflict, '已有实收关联的订单不得自动返券')

@@ -14,6 +14,15 @@ import {
   paymentConfirmationResponseSchema,
   PAYMENT_INTERNAL_ROUTES,
   paymentStatusSchema,
+  LOCAL_ORDER_ROUTES,
+  LOCAL_ORDER_STATUS_TRANSITIONS,
+  localOrderEventTypeSchema,
+  localOrderOnlineCompletionSchema,
+  localOrderOnlineConflictSchema,
+  localOrderStatusSchema,
+  localOrderTransitionStatusSchema,
+  paymentOutboxConsumeRequestSchema,
+  paymentOutboxConsumeResponseSchema,
 } from '@sanchuang-dev/local-life-contracts'
 
 const NOW = '2026-11-16T02:00:00.000Z'
@@ -352,5 +361,112 @@ describe('PAY-03 trusted evidence, outbox and review contracts', () => {
     }
     assert.equal(paymentConfirmationResponseSchema.safeParse(response).success, true)
     assert.equal(paymentConfirmationResponseSchema.safeParse({ ...response, outcome: 'client_says_paid' }).success, false)
+  })
+})
+
+describe('PAY-05 online completion contracts', () => {
+  it('declares the online completion state as a server-only terminal status', () => {
+    assert.equal(LOCAL_ORDER_STATUS_TRANSITIONS.registered.includes('online_completed'), true)
+    assert.equal(LOCAL_ORDER_STATUS_TRANSITIONS.processing.includes('online_completed'), true)
+    assert.equal(LOCAL_ORDER_STATUS_TRANSITIONS.pending_review.includes('online_completed'), true)
+    assert.deepEqual(LOCAL_ORDER_STATUS_TRANSITIONS.online_completed, [])
+    assert.equal(localOrderTransitionStatusSchema.safeParse('online_completed').success, false)
+    assert.equal(localOrderStatusSchema.safeParse('online_completed').success, true)
+    assert.equal(localOrderEventTypeSchema.safeParse('order.online_completed').success, true)
+  })
+
+  it('separates channel completion from the zero-amount coupon-only completion', () => {
+    const channel = {
+      paymentIntentId: '123e4567-e89b-42d3-a456-426614174020',
+      kind: 'channel',
+      simulated: false,
+      amountCents: 3480,
+      discountCents: 500,
+      providerTransactionId: 'wx-txn-1',
+      completedAt: NOW,
+    }
+    assert.equal(localOrderOnlineCompletionSchema.safeParse(channel).success, true)
+    // A channel completion can never claim zero cash or omit the channel reference.
+    assert.equal(localOrderOnlineCompletionSchema.safeParse({ ...channel, amountCents: 0 }).success, false)
+    assert.equal(
+      localOrderOnlineCompletionSchema.safeParse({ ...channel, providerTransactionId: null }).success,
+      false,
+    )
+
+    const zero = {
+      paymentIntentId: '123e4567-e89b-42d3-a456-426614174021',
+      kind: 'zero_amount',
+      simulated: false,
+      amountCents: 0,
+      discountCents: 3980,
+      providerTransactionId: null,
+      completedAt: NOW,
+    }
+    assert.equal(localOrderOnlineCompletionSchema.safeParse(zero).success, true)
+    // The coupon-only path must never carry cash, a channel reference or a mock flag.
+    assert.equal(localOrderOnlineCompletionSchema.safeParse({ ...zero, amountCents: 1 }).success, false)
+    assert.equal(
+      localOrderOnlineCompletionSchema.safeParse({ ...zero, providerTransactionId: 'fake' }).success,
+      false,
+    )
+    assert.equal(localOrderOnlineCompletionSchema.safeParse({ ...zero, simulated: true }).success, false)
+  })
+
+  it('keeps the durable manual-review conflict vocabulary explicit', () => {
+    const conflict = {
+      id: '123e4567-e89b-42d3-a456-426614174022',
+      kind: 'order_not_payable',
+      status: 'open',
+      createdAt: NOW,
+      resolvedAt: null,
+    }
+    assert.equal(localOrderOnlineConflictSchema.safeParse(conflict).success, true)
+    // The shared order DTO deliberately carries no free-text evidence detail.
+    assert.equal(
+      localOrderOnlineConflictSchema.safeParse({ ...conflict, detail: 'internal' }).success,
+      false,
+    )
+    for (const kind of [
+      'order_not_payable',
+      'order_already_completed',
+      'payment_state_invalid',
+      'coupon_state_invalid',
+      'late_success',
+    ]) {
+      assert.equal(localOrderOnlineConflictSchema.safeParse({ ...conflict, kind }).success, true)
+    }
+    assert.equal(localOrderOnlineConflictSchema.safeParse({ ...conflict, kind: 'refund' }).success, false)
+    assert.equal(localOrderOnlineConflictSchema.safeParse({ ...conflict, status: 'done' }).success, false)
+  })
+
+  it('exposes the token-gated consumer trigger and idempotent completion response', () => {
+    assert.equal(PAYMENT_INTERNAL_ROUTES.consumeOutbox, '/internal/payments/outbox/consume')
+    assert.equal(
+      LOCAL_ORDER_ROUTES.myZeroAmountCompletion,
+      '/local-orders/:localOrderId/zero-amount-completion',
+    )
+    const consumed = {
+      claimed: 1,
+      completed: 1,
+      alreadyCompleted: 0,
+      conflicts: 0,
+      retried: 0,
+      failed: 0,
+      couponsReleased: 0,
+      exceptionsProjected: 0,
+      asOf: NOW,
+    }
+    assert.equal(paymentOutboxConsumeResponseSchema.safeParse(consumed).success, true)
+    assert.equal(
+      paymentOutboxConsumeResponseSchema.safeParse({ ...consumed, completed: -1 }).success,
+      false,
+    )
+    assert.equal(
+      paymentOutboxConsumeResponseSchema.safeParse({ ...consumed, extra: true }).success,
+      false,
+    )
+    assert.equal(paymentOutboxConsumeRequestSchema.safeParse({}).success, true)
+    assert.equal(paymentOutboxConsumeRequestSchema.safeParse({ limit: 51 }).success, false)
+    assert.equal(paymentOutboxConsumeRequestSchema.safeParse({ limit: 0 }).success, false)
   })
 })

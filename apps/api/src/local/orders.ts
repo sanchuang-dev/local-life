@@ -33,6 +33,8 @@ import {
   activityTeams,
   communities,
   localOrderEvents,
+  localOrderOnlineCompletions,
+  localOrderOnlineConflicts,
   localOrders,
   residentPhoneIdentities,
   residentProfiles,
@@ -303,6 +305,17 @@ function toDetail(row: OrderRow, db: AppDatabase): LocalOrderDetail {
     .from(residentProfiles)
     .where(eq(residentProfiles.userId, row.residentUserId))
     .get()?.contactAddress ?? null
+  // PAY-05: the online completion projection is read from its own immutable
+  // table, never derived from `verified_*` (a manual fact check) or a receipt.
+  const completion = db.select()
+    .from(localOrderOnlineCompletions)
+    .where(eq(localOrderOnlineCompletions.localOrderId, row.id))
+    .get()
+  const conflicts = db.select()
+    .from(localOrderOnlineConflicts)
+    .where(eq(localOrderOnlineConflicts.localOrderId, row.id))
+    .orderBy(asc(localOrderOnlineConflicts.createdAt), asc(localOrderOnlineConflicts.id))
+    .all()
   return localOrderDetailSchema.parse({
     ...toSummary(row, maps),
     residentContact: { phone, address },
@@ -314,6 +327,24 @@ function toDetail(row: OrderRow, db: AppDatabase): LocalOrderDetail {
             note: row.verificationNote ?? '人工核验',
           }
         : null,
+    onlineCompletion: completion
+      ? {
+          paymentIntentId: completion.paymentIntentId,
+          kind: completion.kind,
+          simulated: completion.simulated,
+          amountCents: completion.amountCents,
+          discountCents: completion.discountCents,
+          providerTransactionId: completion.providerTransactionId,
+          completedAt: iso(completion.completedAt),
+        }
+      : null,
+    onlineConflicts: conflicts.map((conflict) => ({
+      id: conflict.id,
+      kind: conflict.kind,
+      status: conflict.status,
+      createdAt: iso(conflict.createdAt),
+      resolvedAt: conflict.resolvedAt ? iso(conflict.resolvedAt) : null,
+    })),
     statusNote: row.status === 'verified' ? null : lastNote,
     events: events.map((event) => toEvent(event, maps)),
   })
@@ -323,9 +354,21 @@ function detailById(db: AppDatabase, orderId: string): LocalOrderDetail {
   return toDetail(requireOrder(db, orderId), db)
 }
 
+/**
+ * Scoped order detail read for PAY-05 completion. The caller has already proven
+ * access; this only assembles the shared DTO after the write transaction commits.
+ */
+export function readLocalOrderDetail(db: AppDatabase, orderId: string): LocalOrderDetail {
+  return detailById(db, orderId)
+}
+
 /* ------------------------------- Audit / events --------------------------- */
 
-function insertOrderEvent(
+/**
+ * Append one timeline row. Exported for PAY-05 online completion, which writes
+ * `order.online_completed` in the same transaction as the completion fact.
+ */
+export function insertOrderEvent(
   tx: LocalTransaction,
   input: {
     orderId: string
@@ -927,6 +970,13 @@ export function updateOrderStatus(
       '订单已完成人工核验，不能再变更状态',
     )
   }
+  if (row.status === 'online_completed') {
+    throw new LocalError(
+      409,
+      API_ERROR_CODES.paymentOnlineCompletionConflict,
+      '订单已在线完成，不能再变更状态',
+    )
+  }
   const next = body.status as LocalOrderTransitionStatus
   if (!LOCAL_ORDER_STATUS_TRANSITIONS[row.status].includes(next)) {
     throw new LocalError(409, API_ERROR_CODES.conflict, '当前状态不允许该流转')
@@ -954,10 +1004,15 @@ export function updateOrderStatus(
       if (result.changes !== 1) {
         throw new LocalError(409, API_ERROR_CODES.conflict, '订单已被其他操作更新，请刷新后重试')
       }
+      let couponRelease: 'not_applicable' | 'released' | 'none' | 'void' | 'deferred' =
+        'not_applicable'
       if (next === 'cancelled' || next === 'rejected') {
         // Terminal unpaid orders release exactly one reservation, but never
         // delete the original coupon/order snapshot or mint a second coupon.
-        releaseUnpaidOrderCoupon(tx, orderId, now)
+        // PAY-05: if a trusted payment intent is still live or already paid, the
+        // release is deferred instead of handing the coupon to another order while
+        // the channel may still capture money (or already did).
+        couponRelease = releaseUnpaidOrderCoupon(tx, orderId, now)
       }
       insertOrderEvent(tx, {
         orderId,
@@ -975,7 +1030,7 @@ export function updateOrderStatus(
         next === 'rejected' ? 'local_order.rejected' : 'local_order.status_changed',
         orderId,
         now,
-        { fromStatus: row.status, toStatus: next },
+        { fromStatus: row.status, toStatus: next, couponRelease },
       )
     }, { behavior: 'immediate' })
   } catch (error) {
@@ -1043,6 +1098,13 @@ export function verifyOrder(
       '订单已核验，请勿重复核验',
     )
   }
+  if (row.status === 'online_completed') {
+    throw new LocalError(
+      409,
+      API_ERROR_CODES.paymentOnlineCompletionConflict,
+      '订单已在线完成，不能再用人工核验改变终态',
+    )
+  }
   if (row.status !== 'pending_review') {
     throw new LocalError(409, API_ERROR_CODES.conflict, '只有待核验订单可以核验')
   }
@@ -1087,8 +1149,10 @@ export function verifyOrder(
           '订单已被其他操作核验，请刷新后重试',
         )
       }
+      let couponRelease: 'not_applicable' | 'released' | 'none' | 'void' | 'deferred' =
+        'not_applicable'
       if (body.decision === 'reject') {
-        releaseUnpaidOrderCoupon(tx, orderId, now)
+        couponRelease = releaseUnpaidOrderCoupon(tx, orderId, now)
       } else {
         // Invalidated source coupons cannot be turned into a valid order by
         // a business verification after the grant was revoked.
@@ -1132,7 +1196,7 @@ export function verifyOrder(
         body.decision === 'verify' ? 'local_order.verified' : 'local_order.rejected',
         orderId,
         now,
-        { fromStatus: 'pending_review', toStatus: target, decision: body.decision },
+        { fromStatus: 'pending_review', toStatus: target, decision: body.decision, couponRelease },
       )
     }, { behavior: 'immediate' })
   } catch (error) {

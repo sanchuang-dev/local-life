@@ -61,6 +61,9 @@ const ORDER_STATUS_META: Record<LocalOrderStatus, { label: string; color: string
   processing: { label: '处理中', color: 'gold' },
   pending_review: { label: '待人工核验', color: 'orange' },
   verified: { label: '人工核验通过', color: 'green' },
+  // PAY-05: trusted server-side online payment completion; never a manual
+  // verification and never a bank-settlement statement.
+  online_completed: { label: '在线交易完成', color: 'cyan' },
   cancelled: { label: '已取消', color: 'default' },
   rejected: { label: '未通过', color: 'red' },
 }

@@ -1659,11 +1659,12 @@ test('a pre-0010 database upgrades in place, keeps its rows and becomes usable',
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
         .all()
         .map((row) => (row as { name: string }).name)
-      assert.equal(
-        upgradedTables.filter((name) => name.startsWith('local_')).length,
-        3,
-        'the local tables are untouched by 0010',
-      )
+      // 0010 must not create, drop or rewrite a local table. Later cards may add
+      // further `local_*` tables (PAY-05 adds the online-completion fact and its
+      // review conflicts), so the invariant is stated as existence, not a count.
+      for (const table of ['local_products', 'local_orders', 'local_order_events']) {
+        assert.ok(upgradedTables.includes(table), `the local table ${table} must survive 0010`)
+      }
       for (const table of [
         'ledger_entries',
         'ledger_entry_sources',

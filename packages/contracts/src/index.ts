@@ -118,6 +118,13 @@ export const API_ERROR_CODES = {
    */
   paymentEvidenceRejected: 'payment_evidence_rejected',
   paymentConfirmationConflict: 'payment_confirmation_conflict',
+  /**
+   * PAY-05 online order completion. A trusted paid fact could not be projected
+   * onto the order (terminal/non-payable order, coupon state conflict, or an
+   * inconsistent payment snapshot). Money is never silently dropped: the event
+   * is preserved and an order-level conflict is opened for human review.
+   */
+  paymentOnlineCompletionConflict: 'payment_online_completion_conflict',
   paymentInternalUnauthorized: 'payment_internal_unauthorized',
   paymentInternalNotConfigured: 'payment_internal_not_configured',
   /**
@@ -1548,6 +1555,13 @@ export const LOCAL_ORDER_ROUTES = {
    */
   myTeamOptions: '/local-orders/team-options',
   /**
+   * Resident: explicit zero-amount completion of a fully coupon-discounted order
+   * (PAY-05). It never creates a channel payment intent, never calls WeChat and
+   * never writes a positive cash fact; the server re-derives the amounts and the
+   * coupon reservation. Repeats are idempotent per order.
+   */
+  myZeroAmountCompletion: '/local-orders/:localOrderId/zero-amount-completion',
+  /**
    * Staff surface (all three roles, community-scoped). It exists separately from
    * `/admin/*` because `/admin/*` rejects grid workers by convention, while the
    * grid worker must be able to process orders for their assigned communities.
@@ -1679,17 +1693,24 @@ export type UpdateLocalProductRequest = z.infer<typeof updateLocalProductRequest
  * `processing`   a staff member is handling it
  * `pending_review` waiting for the operations manual verification
  * `verified`     operations manually verified the *fact* — NOT paid, NOT activated
+ * `online_completed` a trusted payment fact (channel success or the zero-amount
+ *                coupon-only path) completed this order. It is NOT a human
+ *                verification: `verifiedByUserId`/`verifiedAt` stay NULL and no
+ *                `order_verified` fact is produced.
  * `cancelled`    withdrawn
  * `rejected`     refused, with a reason
  *
- * The names deliberately differ from the carrier order names (`confirmed` means a
- * verified carrier deal) so neither domain can leak into the other.
+ * `verified` and `online_completed` are deliberately distinct terminal states:
+ * the manual fact-check path must never be able to claim online payment, and an
+ * online payment must never be recorded as a human verification or as a manual
+ * `payment_received` receipt.
  */
 export const localOrderStatusSchema = z.enum([
   'registered',
   'processing',
   'pending_review',
   'verified',
+  'online_completed',
   'cancelled',
   'rejected',
 ])
@@ -1698,17 +1719,20 @@ export type LocalOrderStatus = z.infer<typeof localOrderStatusSchema>
 /**
  * Frozen state machine. The server is the authority; clients may only use this
  * table for affordances. `verified` is reachable *exclusively* through the
- * operations verification endpoint, which is why it is absent from
- * `localOrderTransitionStatusSchema`.
+ * operations verification endpoint and `online_completed` exclusively through
+ * PAY-05 online completion, which is why neither appears in
+ * `localOrderTransitionStatusSchema`. A staff member can therefore never move an
+ * order into either terminal state by hand.
  */
 export const LOCAL_ORDER_STATUS_TRANSITIONS: Record<
   LocalOrderStatus,
   readonly LocalOrderStatus[]
 > = {
-  registered: ['processing', 'cancelled', 'rejected'],
-  processing: ['pending_review', 'cancelled', 'rejected'],
-  pending_review: ['verified', 'rejected'],
+  registered: ['processing', 'cancelled', 'rejected', 'online_completed'],
+  processing: ['pending_review', 'cancelled', 'rejected', 'online_completed'],
+  pending_review: ['verified', 'rejected', 'online_completed'],
   verified: [],
+  online_completed: [],
   cancelled: [],
   rejected: [],
 }
@@ -1736,6 +1760,8 @@ export const localOrderEventTypeSchema = z.enum([
   'order.status_changed',
   'order.verified',
   'order.rejected',
+  /** PAY-05: the one trusted online completion fact of this order. */
+  'order.online_completed',
 ])
 export type LocalOrderEventType = z.infer<typeof localOrderEventTypeSchema>
 
@@ -1825,10 +1851,116 @@ export const localOrderEventSchema = z.object({
 export type LocalOrderEvent = z.infer<typeof localOrderEventSchema>
 
 /**
+ * PAY-05 online completion projection of one order.
+ *
+ * `kind` separates the two legal ways an order can complete online:
+ * - `channel`: a trusted channel payment (PAY-03 `payment.paid.v1`);
+ * - `zero_amount`: a fully coupon-discounted order completed without any channel
+ *   payment. It carries `amountCents: 0` and no provider transaction id, so it
+ *   can never be read as real money.
+ *
+ * Neither kind means "settled to the company bank account", and neither produces
+ * a manual `order_verified` fact or a `payment_received` receipt.
+ */
+export const localOrderOnlineCompletionKindSchema = z.enum(['channel', 'zero_amount'])
+export type LocalOrderOnlineCompletionKind = z.infer<
+  typeof localOrderOnlineCompletionKindSchema
+>
+
+export const localOrderOnlineCompletionSchema = z
+  .strictObject({
+    paymentIntentId: z.string().uuid(),
+    kind: localOrderOnlineCompletionKindSchema,
+    /** True only for an isolated Mock channel fact; real wechat is never simulated. */
+    simulated: z.boolean(),
+    /** Actual cash paid for this order: the net payable, or 0 for the coupon-only path. */
+    amountCents: z.number().int().nonnegative(),
+    discountCents: z.number().int().nonnegative(),
+    /** Null for the zero-amount path; a real channel reference otherwise. */
+    providerTransactionId: z.string().trim().min(1).max(128).nullable(),
+    completedAt: isoTimestamp,
+  })
+  .superRefine((value, ctx) => {
+    if (value.kind === 'zero_amount') {
+      if (value.amountCents !== 0) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'zero_amount completion cannot carry cash',
+          path: ['amountCents'],
+        })
+      }
+      if (value.providerTransactionId !== null || value.simulated) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'zero_amount completion has no channel facts',
+          path: ['providerTransactionId'],
+        })
+      }
+      return
+    }
+    if (value.amountCents <= 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'channel completion requires positive net payable',
+        path: ['amountCents'],
+      })
+    }
+    if (value.providerTransactionId === null) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'channel completion requires a provider transaction id',
+        path: ['providerTransactionId'],
+      })
+    }
+  })
+export type LocalOrderOnlineCompletion = z.infer<typeof localOrderOnlineCompletionSchema>
+
+/**
+ * PAY-05 durable manual-review path. It never rewinds a payment, re-reserves a
+ * released coupon or completes an order; it only preserves the conflict so a
+ * human can reconcile it (PAY-11 query/close, refund policy decision).
+ */
+export const localOrderOnlineConflictKindSchema = z.enum([
+  /** A trusted paid event arrived for an order that is no longer payable. */
+  'order_not_payable',
+  /** The order was already completed by a different fact. */
+  'order_already_completed',
+  /** The payment intent/attempt/outbox payload is internally inconsistent. */
+  'payment_state_invalid',
+  /** The order's coupon is not reserved to this order or already void/redeemed. */
+  'coupon_state_invalid',
+  /** PAY-03 preserved a late success after the intent was already terminal. */
+  'late_success',
+])
+export type LocalOrderOnlineConflictKind = z.infer<
+  typeof localOrderOnlineConflictKindSchema
+>
+
+export const localOrderOnlineConflictSchema = z.strictObject({
+  id: z.string().uuid(),
+  kind: localOrderOnlineConflictKindSchema,
+  /**
+   * Deliberately no free-text `detail`: the durable row keeps the full evidence
+   * (including channel references) for authorized operations, while this shared
+   * order DTO — readable by the resident who owns the order — exposes only the
+   * fact that a human review is pending and why, in a closed vocabulary.
+   */
+  status: z.enum(['open', 'reviewed', 'resolved']),
+  createdAt: isoTimestamp,
+  resolvedAt: isoTimestamp.nullable(),
+})
+export type LocalOrderOnlineConflict = z.infer<typeof localOrderOnlineConflictSchema>
+
+/**
  * Order detail. `verification` exists only after a staff review (the current
  * territory grid worker, an operator or an admin), and the contract has no
  * payment/activation field at all: `verified` is a manual fact check by a human,
  * never "已付款" or "已开通".
+ *
+ * `onlineCompletion` is the strictly separate PAY-05 projection: it is present
+ * exactly when the order reached `online_completed`, and it is the only place
+ * that may claim an online payment. Verification and online completion can never
+ * both be present on the same order.
  */
 export const localOrderDetailSchema = localOrderSummarySchema
   .extend({
@@ -1848,6 +1980,10 @@ export const localOrderDetailSchema = localOrderSummarySchema
         note: z.string().min(2).max(500),
       })
       .nullable(),
+    /** Present exactly for `online_completed`; never for a manual verification. */
+    onlineCompletion: localOrderOnlineCompletionSchema.nullable(),
+    /** Open/resolved PAY-05 conflicts; empty for the ordinary happy path. */
+    onlineConflicts: z.array(localOrderOnlineConflictSchema),
     /**
      * Note of the most recent *status change* (derived from the append-only
      * timeline, not a mutable column). This is where a rejection reason stays
@@ -1869,6 +2005,13 @@ export const localOrderDetailSchema = localOrderSummarySchema
         code: 'custom',
         message: 'verification is only allowed on verified orders',
         path: ['verification'],
+      })
+    }
+    if ((value.status === 'online_completed') !== (value.onlineCompletion !== null)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'onlineCompletion must be present exactly for online_completed orders',
+        path: ['onlineCompletion'],
       })
     }
   })
@@ -1918,6 +2061,21 @@ export const localOrderCreateResponseSchema = z.object({
   order: localOrderDetailSchema,
 })
 export type LocalOrderCreateResponse = z.infer<typeof localOrderCreateResponseSchema>
+
+/**
+ * PAY-05 idempotent online completion result.
+ *
+ * `created: false` is the safe replay: this exact order already completed online
+ * (same payment intent, same coupon redemption, same completion fact). It never
+ * means "a second payment happened".
+ */
+export const localOrderOnlineCompletionResponseSchema = z.strictObject({
+  created: z.boolean(),
+  order: localOrderDetailSchema,
+})
+export type LocalOrderOnlineCompletionResponse = z.infer<
+  typeof localOrderOnlineCompletionResponseSchema
+>
 
 export const updateLocalOrderStatusRequestSchema = z
   .strictObject({
