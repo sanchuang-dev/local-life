@@ -27,7 +27,7 @@
 | --- | --- |
 | `orderId` | 本地订单 UUID 精确匹配 |
 | `merchantOrderNo` | 支付单商户订单号精确匹配（6–32 位渠道安全字符） |
-| `providerTransactionId` | 渠道交易号精确匹配（匹配 `payment_attempts` 或 `local_order_online_completions`） |
+| `providerTransactionId` | 渠道交易号精确匹配（匹配 `payment_attempts`、`local_order_online_completions` 或 `payment_review_exceptions`，后者覆盖只存在于异常表的迟到/金额/商户/渠道/终态冲突交易号） |
 | `paymentStatus` | `pending/confirming/paid/closed/failed`，订单存在该状态的支付单即命中 |
 | `paymentChannel` | `mock` / `wechat_jsapi` |
 | `paymentMode` | `simulated`：存在 `simulated=1` 支付单；`real`：存在 `simulated=0` 且带渠道的支付单 |
@@ -73,6 +73,7 @@ paymentSection
 ## 5. 口径
 
 - **Mock 永久标记**：`simulated=true` 的支付单、完成事实与账本实收均显示「模拟支付/测试」；`receiptTotals.onlineSimulatedReceivedCents` 单列，不并入 `onlineRealReceivedCents`，也不是企业实收。
+- **零元券单**：`kind='zero_amount'` 是唯一合法的 `channel=null` 支付单。详情与列表都按 `channel === null` 显示「零元券单（无渠道）/零元券单已完成（无现金）」，不出现「真实渠道」或把 `paid` 写成「渠道支付已确认」，也不展示渠道交易号；零元完成不产生 `online_payment` 实收，合计为 0。
 - **渠道已确认 ≠ 银行到账**：支付状态 `paid` 显示为「渠道支付已确认」；详情明确「银行结算：未核实」，DTO 的 `bankSettlement.status` 是字面量 `unverified`，客户端无法显示「已到账/已结算」。
 - **人工与在线分层**：人工核验/线下凭据、在线支付单、完成事实、线上账本实收各自成层，不存在一个混用的「已付款」字段。
 - **老人工订单**：没有支付单时 `online.intents=[]`、`completion=null`，仍展示人工核验与线下凭据，并明确「未发起在线支付」。
@@ -99,7 +100,8 @@ pnpm --filter @sanchuang-dev/local-life-admin test
 
 ## 8. 未实现 / 已知限制
 
-- 真实微信支付、回调验签、退款、银行结算/对账导出均不在本卡；`PAY-09` 才做对账差异与导出。
+- 真实微信支付、回调验签、退款、银行结算/对账导出均不在本卡；`PAY-09` 才做对账差异与导出。退款事实尚未在合同中定义，因此界面不展示「退款中/已退款」等占位状态（Issue #283 提到的退款占位需另立合同）。
+- 历史人工凭据若未通过 `ledger_payment_order_links` 关联到本单，详情只显示「暂无人工收款凭据」并提示到经营账本按凭据号核对，不做金额/时间猜测匹配。
 - 没有常驻查单/恢复按钮：异常只可定位，受控恢复仍走 PAY-03/PAY-05 的内部 token 接口或 PAY-11 运维流程。
 - `paymentMode=real` 只能命中已经存在的真实渠道支付单；PAY-10 未落地前，PAY-02 仍拒绝创建 `wechat_jsapi` 支付单，本卡不伪造真实渠道事实。
 - 未做浏览器真机视觉验收；以类型检查、组件测试与构建为本次证据，维护者按需再验关键交互。

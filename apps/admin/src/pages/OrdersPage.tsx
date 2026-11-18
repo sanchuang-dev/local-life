@@ -538,18 +538,27 @@ function OrderConsole({ session }: { session: AuthenticatedSession }) {
         if (!row.payment) {
           return <Typography.Text type="secondary">未发起在线支付</Typography.Text>
         }
+        const payment = row.payment
+        // `channel === null` is exactly the PAY-05 zero-amount completion path:
+        // no channel, no provider transaction, no cash. It must not be worded as
+        // a channel payment in the list either.
+        const zeroAmount = payment.channel === null
+        const channelLabel =
+          payment.channel === null ? null : CHANNEL_LABELS[payment.channel]
         return (
           <Space orientation="vertical" size={2}>
             <Space wrap size={4}>
-              <Tag color={PAYMENT_STATUS_META[row.payment.status].color}>
-                {PAYMENT_STATUS_META[row.payment.status].label}
+              <Tag color={zeroAmount ? 'cyan' : PAYMENT_STATUS_META[payment.status].color}>
+                {zeroAmount
+                  ? '零元券单已完成（无现金）'
+                  : PAYMENT_STATUS_META[payment.status].label}
               </Tag>
-              {row.payment.simulated ? <Tag color="purple">模拟/测试</Tag> : null}
+              {!zeroAmount && payment.simulated ? (
+                <Tag color="purple">模拟/测试</Tag>
+              ) : null}
             </Space>
             <Typography.Text type="secondary">
-              {row.payment.channel === null
-                ? '零元券单'
-                : CHANNEL_LABELS[row.payment.channel]}
+              {zeroAmount ? '零元券单（无渠道）' : channelLabel}
             </Typography.Text>
           </Space>
         )

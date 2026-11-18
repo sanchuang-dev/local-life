@@ -96,21 +96,34 @@ function modeTag(simulated: boolean) {
   )
 }
 
+/**
+ * `kind='zero_amount'` (the fully coupon-discounted path) is the only legal
+ * intent with no channel. It must never be rendered as a channel payment: it
+ * carries no provider transaction, no channel confirmation and no cash.
+ */
+function isZeroAmountIntent(intent: Pick<AdminPaymentIntentSummary, 'kind' | 'channel'>): boolean {
+  return intent.kind === 'zero_amount' || intent.channel === null
+}
+
 function IntentBlock({ intent }: { intent: AdminPaymentIntentSummary }) {
-  const channelLabel =
-    intent.channel === null
-      ? '零元券单（无渠道）'
-      : CHANNEL_LABELS[intent.channel]
+  const zeroAmount = isZeroAmountIntent(intent)
   return (
     <div className="local-payment-intent">
       <Space wrap size={6}>
         <Typography.Text strong>支付单 {intent.id.slice(0, 8)}</Typography.Text>
-        {modeTag(intent.simulated)}
-        <Tag>{channelLabel}</Tag>
-        <Tag color={intent.status === 'paid' ? 'green' : 'default'}>
-          {PAYMENT_STATUS_LABELS[intent.status]}
+        {zeroAmount ? (
+          <Tag color="cyan">零元券单（无渠道）</Tag>
+        ) : (
+          <>
+            {modeTag(intent.simulated)}
+            <Tag>{intent.channel === null ? '未知渠道' : CHANNEL_LABELS[intent.channel]}</Tag>
+          </>
+        )}
+        <Tag color={zeroAmount ? 'cyan' : intent.status === 'paid' ? 'green' : 'default'}>
+          {zeroAmount
+            ? '零元券单已完成（无现金）'
+            : PAYMENT_STATUS_LABELS[intent.status]}
         </Tag>
-        {intent.kind === 'zero_amount' ? <Tag color="cyan">零元券单完成路径</Tag> : null}
       </Space>
       <Descriptions size="small" column={1}>
         <Descriptions.Item label="商户订单号">{intent.merchantOrderNo}</Descriptions.Item>
@@ -124,7 +137,7 @@ function IntentBlock({ intent }: { intent: AdminPaymentIntentSummary }) {
           {formatDateTime(intent.createdAt)} / {formatDateTime(intent.updatedAt)}
         </Descriptions.Item>
         {intent.paidAt ? (
-          <Descriptions.Item label="渠道确认时间">
+          <Descriptions.Item label={zeroAmount ? '完成时间' : '渠道确认时间'}>
             {formatDateTime(intent.paidAt)}
           </Descriptions.Item>
         ) : null}
@@ -160,7 +173,9 @@ function IntentBlock({ intent }: { intent: AdminPaymentIntentSummary }) {
           ))}
         </div>
       ) : (
-        <Typography.Text type="secondary">暂无渠道尝试记录。</Typography.Text>
+        <Typography.Text type="secondary">
+          {zeroAmount ? '零元券单不产生渠道尝试。' : '暂无渠道尝试记录。'}
+        </Typography.Text>
       )}
       {intent.events.length > 0 ? (
         <div className="local-payment-events" aria-label={`支付单 ${intent.id.slice(0, 8)} 的事件`}>
@@ -279,7 +294,9 @@ export function OrderPaymentSection({ order }: { order: AdminLocalOrderDetail })
             ))}
           </div>
         ) : (
-          <Typography.Text type="secondary">暂无人工收款凭据。</Typography.Text>
+          <Typography.Text type="secondary">
+            暂无人工收款凭据。历史线下收款若未关联本单，请在经营账本按凭据号核对。
+          </Typography.Text>
         )}
         {!hasIntent ? (
           <Typography.Text type="secondary">
@@ -304,20 +321,24 @@ export function OrderPaymentSection({ order }: { order: AdminLocalOrderDetail })
         {hasCompletion && section.online.completion ? (
           <div className="local-payment-completion" aria-label="在线交易完成事实">
             <Space wrap size={6}>
-              {section.online.completion.simulated ? (
+              {section.online.completion.kind === 'zero_amount' ? (
+                <Tag color="cyan">零元券单（无渠道）</Tag>
+              ) : section.online.completion.simulated ? (
                 <Tag color="purple">模拟支付/测试</Tag>
               ) : (
                 <Tag color="blue">真实渠道</Tag>
               )}
               <span>
                 {section.online.completion.kind === 'zero_amount'
-                  ? '零元券单完成（无现金）'
+                  ? '零元券单已完成（无现金）'
                   : '在线交易完成（渠道支付已确认）'}
               </span>
               <span>实付 {formatPrice(section.online.completion.amountCents)}</span>
-              <span>
-                交易号 {section.online.completion.providerTransactionIdMasked ?? '—'}
-              </span>
+              {section.online.completion.kind === 'zero_amount' ? null : (
+                <span>
+                  交易号 {section.online.completion.providerTransactionIdMasked ?? '—'}
+                </span>
+              )}
               <Typography.Text type="secondary">
                 {formatDateTime(section.online.completion.completedAt)}
               </Typography.Text>
@@ -352,7 +373,7 @@ export function OrderPaymentSection({ order }: { order: AdminLocalOrderDetail })
             人工线下实收合计 {formatPrice(section.receiptTotals.manualReceivedCents)}
           </Typography.Text>
           <Typography.Text type="secondary">
-            真实渠道线上实收合计 {formatPrice(section.receiptTotals.onlineRealReceivedCents)}
+            真实线上实收合计 {formatPrice(section.receiptTotals.onlineRealReceivedCents)}
           </Typography.Text>
           <Typography.Text type="secondary">
             模拟支付实收合计 {formatPrice(section.receiptTotals.onlineSimulatedReceivedCents)}
@@ -400,7 +421,7 @@ export function OrderPaymentSection({ order }: { order: AdminLocalOrderDetail })
         <Space wrap size={8}>
           <Tag color="orange">银行结算：未核实</Tag>
           <Typography.Text type="secondary">
-            渠道支付已确认不等于企业银行结算到账；系统没有银行到账或结算证据，因此不展示到账/结算结论。
+            渠道确认成功不等于企业银行结算到账；系统没有银行到账或结算证据，因此不展示到账/结算结论。
           </Typography.Text>
         </Space>
       </div>

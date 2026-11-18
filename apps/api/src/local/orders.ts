@@ -1004,6 +1004,15 @@ function adminPaymentConditions(query: AdminLocalOrderListQuery): SQL<unknown>[]
           WHERE loc.local_order_id = ${localOrders.id}
             AND loc.provider_transaction_id = ${query.providerTransactionId}
         )
+        -- F2: late-success / amount / merchant / channel / terminal conflicts
+        -- carry the channel transaction id only in the review-exception table;
+        -- such an order has no paid attempt, so it must still be findable.
+        OR EXISTS (
+          SELECT 1 FROM payment_review_exceptions pre
+          JOIN payment_intents pi ON pre.payment_intent_id = pi.id
+          WHERE pi.local_order_id = ${localOrders.id}
+            AND pre.provider_transaction_id = ${query.providerTransactionId}
+        )
       )`,
     )
   }

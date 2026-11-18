@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { App as AntdApp, ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import { createMemoryRouter, RouterProvider } from 'react-router'
@@ -296,6 +296,60 @@ function exceptionPaymentSection(): AdminOrderPaymentSection {
     },
   ]
   return section
+}
+
+/** The fully coupon-discounted PAY-05 path: no channel, no cash, no receipt. */
+function zeroAmountPaymentSection(): AdminOrderPaymentSection {
+  const intentId = '123e4567-e89b-42d3-a456-4266141740e1'
+  return emptyPaymentSection({
+    amounts: {
+      grossAmountCents: 3980,
+      couponDiscountCents: 3980,
+      netPayableCents: 0,
+    },
+    online: {
+      intents: [
+        {
+          id: intentId,
+          kind: 'zero_amount',
+          channel: null,
+          simulated: false,
+          merchantOrderNo: 'PAY-ZERO-20261104ABCDEF012345',
+          grossAmountCents: 3980,
+          discountCents: 3980,
+          netPayableCents: 0,
+          status: 'paid',
+          expiresAt: '2026-11-04T02:15:00.000Z',
+          paidAt: '2026-11-04T02:01:00.000Z',
+          closedAt: null,
+          failedAt: null,
+          failureCode: null,
+          failureMessage: null,
+          createdAt: '2026-11-04T02:00:00.000Z',
+          updatedAt: '2026-11-04T02:01:00.000Z',
+          attempts: [],
+          events: [],
+        },
+      ],
+      completion: {
+        paymentIntentId: intentId,
+        kind: 'zero_amount',
+        simulated: false,
+        amountCents: 0,
+        discountCents: 3980,
+        providerTransactionIdMasked: null,
+        completedAt: '2026-11-04T02:01:00.000Z',
+      },
+      ledgerReceipts: [],
+      conflicts: [],
+      reviewExceptions: [],
+    },
+    receiptTotals: {
+      manualReceivedCents: 0,
+      onlineRealReceivedCents: 0,
+      onlineSimulatedReceivedCents: 0,
+    },
+  })
 }
 
 /** A pending-review order carrying the reviewer's note the verify action records. */
@@ -987,7 +1041,7 @@ describe('OrdersPage payment section (PAY-08)', () => {
     expect(screen.getAllByText('模拟支付/测试').length).toBeGreaterThan(0)
     expect(screen.getAllByText('渠道支付已确认').length).toBeGreaterThan(0)
     expect(screen.getByText('银行结算：未核实')).toBeTruthy()
-    expect(screen.getByText(/真实渠道线上实收合计 ¥0\.00/)).toBeTruthy()
+    expect(screen.getByText(/真实线上实收合计 ¥0\.00/)).toBeTruthy()
     expect(screen.getByText(/模拟支付实收合计 ¥39\.80/)).toBeTruthy()
     expect(screen.getAllByText(/交易号 \*{4}d6c8/).length).toBeGreaterThan(0)
     // No raw channel reference and no fabricated settlement claim.
@@ -1057,6 +1111,66 @@ describe('OrdersPage payment section (PAY-08)', () => {
     expect(screen.getByText('支付单关闭后收到渠道确认')).toBeTruthy()
     expect(screen.getByText(/不提供自动恢复/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: /自动|修复|重新对账/ })).toBeNull()
+  })
+
+  it('renders a zero-amount coupon completion without any channel payment wording', async () => {
+    const zero = detail({
+      status: 'online_completed',
+      onlineCompletion: {
+        paymentIntentId: '123e4567-e89b-42d3-a456-4266141740e1',
+        kind: 'zero_amount',
+        simulated: false,
+        amountCents: 0,
+        discountCents: 3980,
+        providerTransactionId: null,
+        completedAt: '2026-11-04T02:01:00.000Z',
+      },
+      paymentSection: zeroAmountPaymentSection(),
+    })
+    stubOrderApi([
+      communitiesRoute(),
+      ordersRoute([summary({ status: 'online_completed' })]),
+      [`/api/admin/local-orders/${ORDER_ID}`, () => json(zero)],
+    ])
+
+    renderPage(ADMIN_SESSION)
+
+    fireEvent.click(await screen.findByRole('button', { name: '详情' }))
+
+    const section = await screen.findByRole('region', { name: '支付信息（只读）' })
+    expect(within(section).getAllByText('零元券单（无渠道）').length).toBeGreaterThan(0)
+    expect(within(section).getAllByText('零元券单已完成（无现金）').length).toBeGreaterThan(0)
+    expect(within(section).queryByText('真实渠道')).toBeNull()
+    expect(within(section).queryByText(/渠道支付已确认/)).toBeNull()
+    expect(within(section).getByText(/真实线上实收合计 ¥0\.00/)).toBeTruthy()
+    expect(within(section).getByText(/模拟支付实收合计 ¥0\.00/)).toBeTruthy()
+    // No channel transaction reference is rendered for the zero-amount path.
+    expect(within(section).queryByText(/交易号 /)).toBeNull()
+  })
+
+  it('shows a zero-amount order in the list without claiming a channel payment', async () => {
+    const zeroRow = summary({
+      status: 'online_completed',
+      payment: {
+        intentId: '123e4567-e89b-42d3-a456-4266141740e1',
+        status: 'paid',
+        channel: null,
+        simulated: false,
+        netPayableCents: 0,
+        expiresAt: '2026-11-04T02:15:00.000Z',
+        failureMessage: null,
+        updatedAt: '2026-11-04T02:01:00.000Z',
+      },
+    })
+    stubOrderApi([communitiesRoute(), ordersRoute([zeroRow])])
+
+    renderPage(ADMIN_SESSION)
+
+    const list = await screen.findByRole('region', { name: '本地订单列表' })
+    expect(await within(list).findByText('零元券单已完成（无现金）')).toBeTruthy()
+    expect(within(list).getByText('零元券单（无渠道）')).toBeTruthy()
+    expect(within(list).queryByText('渠道支付已确认')).toBeNull()
+    expect(within(list).queryByText('真实渠道')).toBeNull()
   })
 
   it('sends the payment-status filter to the server query', async () => {

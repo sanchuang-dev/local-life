@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import test from 'node:test'
 import {
   LOCAL_ORDER_ROUTES,
@@ -22,7 +22,14 @@ import { createApp } from '../src/app.js'
 import { loadConfig } from '../src/config.js'
 import { createDatabase, type AppDatabase } from '../src/db/client.js'
 import {
+  activities,
+  activityParticipations,
+  activityRuleVersions,
+  activityTeams,
   communities,
+  couponIssues,
+  couponTeamGrants,
+  ledgerEntries,
   ledgerPaymentOrderLinks,
   localOrderOnlineCompletions,
   localOrderOnlineConflicts,
@@ -350,11 +357,17 @@ async function registerOrder(
   w: World,
   resident: Session,
   productId: string,
+  options: { couponId?: string } = {},
 ): Promise<LocalOrderDetail> {
   const response = await api(w.app, 'POST', LOCAL_ORDER_ROUTES.myOrders, {
     session: resident,
     origin: RESIDENT_ORIGIN,
-    body: { productId, quantity: 1, idempotencyKey: randomUUID() },
+    body: {
+      productId,
+      quantity: 1,
+      idempotencyKey: randomUUID(),
+      ...(options.couponId === undefined ? {} : { couponId: options.couponId }),
+    },
   })
   const text = await response.text()
   assert.equal(response.status, 201, `order registration must succeed: ${text}`)
@@ -529,6 +542,131 @@ function insertConsumerExhaustedConflict(
     .run()
 }
 
+/**
+ * Seed one available consumption coupon owned by the resident, so a fully
+ * discounted order can go through the real PAY-05 zero-amount path. Only the
+ * rows `readCouponForOrder` needs are written; no participation/reward is
+ * fabricated.
+ */
+function seedZeroAmountCoupon(
+  w: World,
+  residentUserId: string,
+  faceValueCents: number,
+  at: Date,
+): string {
+  const activityId = randomUUID()
+  const teamId = randomUUID()
+  const ruleVersionId = randomUUID()
+  const plan = {
+    thresholdCents: 1000,
+    couponFaceValueCents: faceValueCents,
+    maxRewardedTeams: 10,
+  }
+  w.db
+    .insert(activities)
+    .values({
+      id: activityId,
+      communityId: w.communityA,
+      title: 'PAY-08 零元券单活动',
+      summary: '零元券单读模型夹具',
+      description: '零元券单读模型夹具',
+      status: 'published',
+      startsAt: new Date(at.getTime() - 3_600_000),
+      endsAt: new Date(at.getTime() + 7 * 86_400_000),
+      location: '幸福社区',
+      budgetCapCents: 100_000,
+      prizeQuantityCap: 100,
+      publicRulesJson: '{}',
+      purchaseRewardPlanJson: JSON.stringify(plan),
+      currentRuleVersionId: null,
+      createdByUserId: w.adminUserId,
+      createdAt: at,
+      updatedAt: at,
+      publishedAt: at,
+      pausedAt: null,
+      endedAt: null,
+    })
+    .run()
+  w.db
+    .insert(activityRuleVersions)
+    .values({
+      id: ruleVersionId,
+      activityId,
+      version: 1,
+      snapshotJson: JSON.stringify({ purchaseRewardPlan: plan }),
+      createdByUserId: w.adminUserId,
+      createdAt: at,
+    })
+    .run()
+  w.db
+    .update(activities)
+    .set({ currentRuleVersionId: ruleVersionId })
+    .where(eq(activities.id, activityId))
+    .run()
+  w.db
+    .insert(activityTeams)
+    .values({
+      id: teamId,
+      activityId,
+      leaderUserId: residentUserId,
+      status: 'locked',
+      createdAt: at,
+      lockedAt: at,
+    })
+    .run()
+  // The coupon-issue trigger requires the holder to really be a member of the
+  // grant's team; no reward is minted beyond that one seat.
+  w.db
+    .insert(activityParticipations)
+    .values({
+      id: randomUUID(),
+      activityId,
+      teamId,
+      userId: residentUserId,
+      seatNo: 1,
+      role: 'leader',
+      inviteSource: 'self',
+      invitationId: null,
+      joinedAt: new Date(at.getTime() - 60_000),
+    })
+    .run()
+  const grantId = randomUUID()
+  w.db
+    .insert(couponTeamGrants)
+    .values({
+      id: grantId,
+      activityId,
+      teamId,
+      ruleVersionId,
+      faceValueCents,
+      totalValueCents: faceValueCents * 3,
+      grantedAt: at,
+    })
+    .run()
+  const couponId = randomUUID()
+  w.db
+    .insert(couponIssues)
+    .values({
+      id: couponId,
+      grantId,
+      activityId,
+      teamId,
+      userId: residentUserId,
+      seatNo: 1,
+      faceValueCents,
+      status: 'available',
+      issuedAt: at,
+      expiresAt: new Date(at.getTime() + 30 * 86_400_000),
+      reservedOrderId: null,
+      reservedAt: null,
+      redeemedAt: null,
+      voidedAt: null,
+      updatedAt: at,
+    })
+    .run()
+  return couponId
+}
+
 /* -------------------------------------------------------------------------- */
 /* Scenario                                                                   */
 /* -------------------------------------------------------------------------- */
@@ -544,6 +682,7 @@ interface Scenario {
   lateTransactionId: string
   cancelledOrder: AdminLocalOrderDetail
   exhaustedOrder: AdminLocalOrderDetail
+  zeroOrder: AdminLocalOrderDetail
   communityBOrder: AdminLocalOrderDetail
   createdAt: Date
 }
@@ -614,7 +753,30 @@ async function seedScenario(w: World): Promise<Scenario> {
   const realIntent = insertPendingChannelIntent(w, exhaustedBase, 'wechat_jsapi')
   insertConsumerExhaustedConflict(w, exhaustedBase, realIntent.id)
 
-  // G: another community for the operator/grid isolation negative tests.
+  // G: the fully coupon-discounted zero-amount path (PAY-05): no channel, no
+  // provider transaction, no online_payment ledger receipt.
+  const zeroCouponId = seedZeroAmountCoupon(w, w.residentA.userId, 3980, createdAt)
+  const zeroBase = await registerOrder(w, w.residentA, w.productA, {
+    couponId: zeroCouponId,
+  })
+  assert.equal(zeroBase.snapshot.netPayableCents, 0, 'coupon must fully cover the order')
+  assert.equal(zeroBase.snapshot.couponDiscountCents, 3980)
+  const zeroResponse = await api(
+    w.app,
+    'POST',
+    LOCAL_ORDER_ROUTES.myZeroAmountCompletion.replace(':localOrderId', zeroBase.id),
+    { session: w.residentA, origin: RESIDENT_ORIGIN },
+  )
+  const zeroText = await zeroResponse.text()
+  assert.equal(zeroResponse.status, 201, `zero-amount completion must succeed: ${zeroText}`)
+  const zeroBody = JSON.parse(zeroText) as { created: boolean; order: unknown }
+  assert.equal(zeroBody.created, true)
+  assert.equal(
+    localOrderDetailSchema.parse(zeroBody.order).status,
+    'online_completed',
+  )
+
+  // H: another community for the operator/grid isolation negative tests.
   const communityBBase = await registerOrder(w, w.residentB, w.productB)
 
   const detail = async (orderId: string) => {
@@ -637,6 +799,7 @@ async function seedScenario(w: World): Promise<Scenario> {
     lateTransactionId: latePaidEvidence.providerTransactionId as string,
     cancelledOrder: await detail(cancelledBase.id),
     exhaustedOrder: await detail(exhaustedBase.id),
+    zeroOrder: await detail(zeroBase.id),
     communityBOrder: await detail(communityBBase.id),
     createdAt,
   }
@@ -768,14 +931,77 @@ test('PAY-08 back-office payment read', async (t) => {
     assert.equal(scenario.onlineOrder.paymentSection.online.intents[0].status, 'paid')
   })
 
+  await t.test('zero-amount intent and completion never read as a channel payment', async () => {
+    const order = scenario.zeroOrder
+    assert.equal(order.status, 'online_completed')
+    assert.equal(order.paymentSection.amounts.grossAmountCents, 3980)
+    assert.equal(order.paymentSection.amounts.couponDiscountCents, 3980)
+    assert.equal(order.paymentSection.amounts.netPayableCents, 0)
+
+    const intents = order.paymentSection.online.intents
+    assert.equal(intents.length, 1)
+    const intent = intents[0]
+    assert.equal(intent.kind, 'zero_amount')
+    assert.equal(intent.channel, null)
+    assert.equal(intent.simulated, false)
+    assert.equal(intent.status, 'paid')
+    assert.equal(intent.netPayableCents, 0)
+    assert.equal(intent.attempts.length, 0)
+    // A zero-amount completion has no channel notification/query evidence.
+    assert.equal(
+      intent.events.some(
+        (event) =>
+          event.eventType === 'payment.channel_notification' ||
+          event.eventType === 'payment.channel_query',
+      ),
+      false,
+    )
+
+    const completion = order.paymentSection.online.completion
+    assert.ok(completion)
+    assert.equal(completion.kind, 'zero_amount')
+    assert.equal(completion.amountCents, 0)
+    assert.equal(completion.simulated, false)
+    assert.equal(completion.providerTransactionIdMasked, null)
+    assert.equal(order.paymentSection.online.ledgerReceipts.length, 0)
+    assert.deepEqual(order.paymentSection.receiptTotals, {
+      manualReceivedCents: 0,
+      onlineRealReceivedCents: 0,
+      onlineSimulatedReceivedCents: 0,
+    })
+
+    // The response must not carry channel-payment wording or a fabricated id.
+    const response = await api(
+      w.app,
+      'GET',
+      `/admin/local-orders/${order.id}`,
+      { session: w.admin },
+    )
+    const text = await response.text()
+    assert.equal(response.status, 200)
+    assert.equal(text.includes('真实渠道'), false)
+    assert.equal(text.includes('渠道支付已确认'), false)
+    assert.equal(text.includes('MOCK-TXN'), false)
+
+    // The list item preserves the only legal marker (`channel: null`) the UI
+    // turns into「零元券单」copy; it is neither simulated nor a real channel.
+    const list = await adminList({ orderId: order.id })
+    assert.equal(list.total, 1)
+    assert.equal(list.items[0]?.payment?.channel, null)
+    assert.equal(list.items[0]?.payment?.status, 'paid')
+    assert.equal(list.items[0]?.payment?.simulated, false)
+    assert.equal((await adminList({ paymentMode: 'simulated' })).total, 4)
+    assert.equal((await adminList({ paymentMode: 'real' })).total, 1)
+  })
+
   await t.test('server-side filters match only the real facts', async () => {
     const all = await adminList({})
-    assert.equal(all.total, 7)
+    assert.equal(all.total, 8)
     assert.equal(all.page, 1)
     assert.equal(all.pageSize, 20)
 
     const pageTwo = await adminList({ page: '2', pageSize: '2' })
-    assert.equal(pageTwo.total, 7)
+    assert.equal(pageTwo.total, 8)
     assert.equal(pageTwo.items.length, 2)
 
     const byOrderId = await adminList({ orderId: scenario.manualOrder.id })
@@ -794,8 +1020,17 @@ test('PAY-08 back-office payment read', async (t) => {
     assert.equal(byTransaction.total, 1)
     assert.equal(byTransaction.items[0]?.id, scenario.onlineOrder.id)
 
+    // F2: the late-success transaction id exists only in
+    // `payment_review_exceptions` (no paid attempt/completion), and must still
+    // locate its order through the server-side filter.
+    const byLateTransaction = await adminList({
+      providerTransactionId: scenario.lateTransactionId,
+    })
+    assert.equal(byLateTransaction.total, 1)
+    assert.equal(byLateTransaction.items[0]?.id, scenario.lateOrder.id)
+
     const paid = await adminList({ paymentStatus: 'paid' })
-    assert.equal(paid.total, 3)
+    assert.equal(paid.total, 4)
 
     const simulated = await adminList({ paymentMode: 'simulated' })
     assert.equal(simulated.total, 4)
@@ -815,7 +1050,7 @@ test('PAY-08 back-office payment read', async (t) => {
 
     const past = new Date(Date.now() - 60 * 60_000).toISOString()
     const allInWindow = await adminList({ createdFrom: past, createdTo: new Date().toISOString() })
-    assert.equal(allInWindow.total, 7)
+    assert.equal(allInWindow.total, 8)
   })
 
   await t.test('operator scope: assigned community only, cross-community denied', async () => {
@@ -824,7 +1059,7 @@ test('PAY-08 back-office payment read', async (t) => {
     })
     const listBody = localOrderListResponseSchema.parse(await list.json())
     assert.equal(list.status, 200)
-    assert.equal(listBody.total, 6)
+    assert.equal(listBody.total, 7)
     assert.equal(listBody.items.every((item) => item.community.id === w.communityA), true)
 
     const crossList = await api(
@@ -943,10 +1178,23 @@ test('PAY-08 back-office payment read', async (t) => {
       .select({ id: paymentReviewExceptions.id })
       .from(paymentReviewExceptions)
       .all()
-    assert.equal(completed.length, 1)
+    assert.equal(completed.length, 2)
     assert.equal(links.length, 2)
+    // Only the channel completion projects an `online_payment` receipt; the
+    // zero-amount completion must never fabricate 0-cash online money.
+    const onlineReceipts = w.db
+      .select({ id: ledgerEntries.id })
+      .from(ledgerEntries)
+      .where(
+        and(
+          eq(ledgerEntries.factKind, 'payment_received'),
+          eq(ledgerEntries.sourceSystem, 'online_payment'),
+        ),
+      )
+      .all()
+    assert.equal(onlineReceipts.length, 1)
     assert.equal(exceptions.length >= 1, true)
     // `local_orders` rows are never mutated by the read path.
-    assert.equal(w.db.select({ id: localOrders.id }).from(localOrders).all().length, 8)
+    assert.equal(w.db.select({ id: localOrders.id }).from(localOrders).all().length, 9)
   })
 })
