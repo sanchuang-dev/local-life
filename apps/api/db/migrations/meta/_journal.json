@@ -267,6 +267,13 @@
       "when": 1794901140267,
       "tag": "0037_manual_online_boundary",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794901141267,
+      "tag": "0038_wechat_pay_prepay",
+      "breakpoints": true
     }
   ]
 }

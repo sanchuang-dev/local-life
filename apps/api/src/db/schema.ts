@@ -58,6 +58,7 @@ import type {
   LocalProductStatus,
   WechatAccountType,
   WechatConfigStatus,
+  WechatPayPrepayStatus,
 } from '@sanchuang-dev/local-life-contracts'
 import { LOCAL_ORDER_EVENT_SOURCE_TYPE } from '@sanchuang-dev/local-life-contracts'
 
@@ -2226,6 +2227,138 @@ export const paymentReviewExceptions = sqliteTable('payment_review_exceptions', 
       AND (${table.failureCode} IS NULL OR length(trim(${table.failureCode})) BETWEEN 1 AND 64)
       AND (${table.failureMessage} IS NULL OR length(trim(${table.failureMessage})) BETWEEN 1 AND 500)
       AND ((${table.status} = 'resolved') = (${table.resolvedAt} IS NOT NULL))`,
+  ),
+])
+
+/* -------------------------------------------------------------------------- */
+/* PAY-10 WeChat Pay APIv3 JSAPI prepay outbound audit                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One server-to-WeChat JSAPI prepay request under an existing payment intent.
+ *
+ * This table is an outbound audit/idempotency record, NOT a second payment
+ * intent and NOT a payment fact:
+ * - `prepay_id` lives here, separated from `payment_attempts.provider_transaction_id`;
+ * - a `succeeded` row only proves WeChat allowed the client to invoke the
+ *   cashier; it never sets `payment_intents.status='paid'`;
+ * - `prepay_expires_at` is the conservative local invocation deadline
+ *   (min(official 2h, intent deadline)), persisted independently from the
+ *   intent's `expires_at` and from WeChat's `time_expire`;
+ * - `uncertain` rows block blind re-submission until PAY-11 query/close
+ *   converges the provider state;
+ * - request/response bodies are represented by SHA-256 (and a redacted body
+ *   with the payer openid hashed), so audit does not duplicate the OpenID.
+ */
+export const wechatPayPrepayAttempts = sqliteTable('wechat_pay_prepay_attempts', {
+  id: text('id').primaryKey(),
+  paymentIntentId: text('payment_intent_id')
+    .notNull()
+    .references(() => paymentIntents.id, { onDelete: 'restrict' }),
+  attemptNo: integer('attempt_no').notNull(),
+  status: text('status').$type<WechatPayPrepayStatus>().notNull(),
+  /** SHA-256 of `POST\nPATH\nBODY`; the safe idempotency key for one request. */
+  requestFingerprint: text('request_fingerprint').notNull(),
+  outTradeNo: text('out_trade_no').notNull(),
+  appid: text('appid').notNull(),
+  mchid: text('mchid').notNull(),
+  payerOpenidSha256: text('payer_openid_sha256').notNull(),
+  amountCents: integer('amount_cents').notNull(),
+  /** WeChat `time_expire` snapshot (order payment deadline). */
+  timeExpireAt: integer('time_expire_at', { mode: 'timestamp_ms' }).notNull(),
+  requestMethod: text('request_method').notNull(),
+  requestPath: text('request_path').notNull(),
+  requestBodySha256: text('request_body_sha256').notNull(),
+  requestBodyRedactedJson: text('request_body_redacted_json').notNull(),
+  requestCreatedAt: integer('request_created_at', { mode: 'timestamp_ms' }).notNull(),
+  responseStatus: integer('response_status'),
+  responseRequestId: text('response_request_id'),
+  responseBodySha256: text('response_body_sha256'),
+  /** Verified WeChat error code/message only; raw untrusted bodies are not stored. */
+  responseErrorCode: text('response_error_code'),
+  responseErrorMessage: text('response_error_message'),
+  prepayId: text('prepay_id'),
+  prepayExpiresAt: integer('prepay_expires_at', { mode: 'timestamp_ms' }),
+  failureCode: text('failure_code'),
+  failureMessage: text('failure_message'),
+  completedAt: integer('completed_at', { mode: 'timestamp_ms' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  uniqueIndex('wechat_pay_prepay_attempts_intent_no_uq').on(
+    table.paymentIntentId,
+    table.attemptNo,
+  ),
+  uniqueIndex('wechat_pay_prepay_attempts_prepay_uq')
+    .on(table.prepayId)
+    .where(sql`${table.prepayId} IS NOT NULL`),
+  index('wechat_pay_prepay_attempts_intent_status_idx').on(
+    table.paymentIntentId,
+    table.status,
+  ),
+  index('wechat_pay_prepay_attempts_intent_fingerprint_idx').on(
+    table.paymentIntentId,
+    table.requestFingerprint,
+  ),
+  index('wechat_pay_prepay_attempts_status_created_idx').on(
+    table.status,
+    table.createdAt,
+  ),
+  check(
+    'wechat_pay_prepay_attempts_status_check',
+    sql`${table.status} IN ('requesting', 'succeeded', 'rejected', 'uncertain')`,
+  ),
+  check('wechat_pay_prepay_attempts_attempt_no_check', sql`${table.attemptNo} >= 1`),
+  check('wechat_pay_prepay_attempts_amount_check', sql`${table.amountCents} > 0`),
+  check(
+    'wechat_pay_prepay_attempts_request_check',
+    sql`${table.requestMethod} = 'POST'
+      AND length(${table.requestPath}) BETWEEN 1 AND 128
+      AND length(${table.requestBodyRedactedJson}) > 0
+      AND length(${table.requestFingerprint}) = 64
+      AND ${table.requestFingerprint} NOT GLOB '*[^0-9a-f]*'
+      AND length(${table.requestBodySha256}) = 64
+      AND ${table.requestBodySha256} NOT GLOB '*[^0-9a-f]*'
+      AND length(${table.payerOpenidSha256}) = 64
+      AND ${table.payerOpenidSha256} NOT GLOB '*[^0-9a-f]*'`,
+  ),
+  check(
+    'wechat_pay_prepay_attempts_response_hash_check',
+    sql`${table.responseBodySha256} IS NULL OR (
+      length(${table.responseBodySha256}) = 64
+      AND ${table.responseBodySha256} NOT GLOB '*[^0-9a-f]*'
+    )`,
+  ),
+  check(
+    'wechat_pay_prepay_attempts_prepay_check',
+    sql`((${table.status} = 'succeeded') = (${table.prepayId} IS NOT NULL))
+      AND ((${table.status} = 'succeeded') = (${table.prepayExpiresAt} IS NOT NULL))
+      AND (${table.status} <> 'succeeded' OR ${table.responseStatus} = 200)
+      AND (${table.prepayId} IS NULL OR length(${table.prepayId}) BETWEEN 1 AND 128)
+      AND (${table.prepayExpiresAt} IS NULL OR ${table.prepayExpiresAt} > ${table.requestCreatedAt})`,
+  ),
+  check(
+    'wechat_pay_prepay_attempts_lifecycle_check',
+    sql`((${table.status} = 'requesting') = (${table.completedAt} IS NULL))
+      AND (${table.timeExpireAt} > ${table.requestCreatedAt})
+      AND ${table.updatedAt} >= ${table.createdAt}`,
+  ),
+  check(
+    'wechat_pay_prepay_attempts_failure_check',
+    sql`(${table.status} IN ('rejected', 'uncertain')
+        OR (${table.failureCode} IS NULL AND ${table.failureMessage} IS NULL))
+      AND (${table.failureCode} IS NULL OR length(trim(${table.failureCode})) BETWEEN 1 AND 64)
+      AND (${table.failureMessage} IS NULL OR length(trim(${table.failureMessage})) BETWEEN 1 AND 500)`,
+  ),
+  check(
+    'wechat_pay_prepay_attempts_text_check',
+    sql`length(trim(${table.outTradeNo})) BETWEEN 6 AND 32
+      AND length(trim(${table.appid})) BETWEEN 1 AND 64
+      AND length(trim(${table.mchid})) BETWEEN 1 AND 64
+      AND (${table.responseStatus} IS NULL OR ${table.responseStatus} BETWEEN 100 AND 599)
+      AND (${table.responseRequestId} IS NULL OR length(trim(${table.responseRequestId})) BETWEEN 1 AND 128)
+      AND (${table.responseErrorCode} IS NULL OR length(trim(${table.responseErrorCode})) BETWEEN 1 AND 64)
+      AND (${table.responseErrorMessage} IS NULL OR length(trim(${table.responseErrorMessage})) BETWEEN 1 AND 500)`,
   ),
 ])
 
