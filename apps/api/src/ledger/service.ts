@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { and, asc, eq, gte, inArray, lt, lte, notExists, sql, type SQL } from 'drizzle-orm'
+import { and, asc, eq, gt, gte, inArray, lt, lte, notExists, sql, type SQL } from 'drizzle-orm'
 import { z } from 'zod'
 import {
   API_ERROR_CODES,
@@ -389,6 +389,9 @@ function projectOnlineCompletions(
   } = {},
 ): SourceCounter {
   const conditions: SQL<unknown>[] = [
+    // Zero-amount coupon completions intentionally create no cash fact. Exclude
+    // them before LIMIT so an old zero-amount backlog cannot starve later money.
+    gt(localOrderOnlineCompletions.amountCents, 0),
     notExists(
       tx.select({ one: sql`1` }).from(ledgerEntrySources)
         .where(and(

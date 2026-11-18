@@ -172,7 +172,8 @@ export const LEDGER_ATTRIBUTION_CONFIRMED_EVENT = 'ledger.attribution.confirmed'
 const LEDGER_DERIVED_BATCH_ID = sql<string | null>`(
     SELECT b.id
     FROM reconciliation_batches b
-    WHERE date(ledger_entries.occurred_at / 1000, 'unixepoch', '+8 hours')
+    WHERE ledger_entries.simulated = 0
+      AND date(ledger_entries.occurred_at / 1000, 'unixepoch', '+8 hours')
           BETWEEN b.period_from AND b.period_to
       AND (b.status = 'open' OR ledger_entries.created_at <= b.locked_at)
     ORDER BY CASE b.status WHEN 'locked' THEN 0 ELSE 1 END,
@@ -184,7 +185,8 @@ const LEDGER_DERIVED_BATCH_ID = sql<string | null>`(
 const LEDGER_DERIVED_BATCH_STATUS = sql<'open' | 'locked' | null>`(
     SELECT b.status
     FROM reconciliation_batches b
-    WHERE date(ledger_entries.occurred_at / 1000, 'unixepoch', '+8 hours')
+    WHERE ledger_entries.simulated = 0
+      AND date(ledger_entries.occurred_at / 1000, 'unixepoch', '+8 hours')
           BETWEEN b.period_from AND b.period_to
       AND (b.status = 'open' OR ledger_entries.created_at <= b.locked_at)
     ORDER BY CASE b.status WHEN 'locked' THEN 0 ELSE 1 END,

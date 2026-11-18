@@ -283,7 +283,7 @@ function addOrder(
 function addOnlineCompletion(
   w: World,
   orderId: string,
-  options: { simulated?: boolean; kind?: 'channel' | 'zero_amount'; amountCents?: number } = {},
+  options: { simulated?: boolean; kind?: 'channel' | 'zero_amount'; amountCents?: number; completedAtOffsetMs?: number } = {},
 ): { intentId: string; completionId: string; transactionId: string | null; completedAt: Date } {
   const order = w.db.select().from(localOrders).where(eq(localOrders.id, orderId)).get()
   assert.ok(order)
@@ -292,7 +292,7 @@ function addOnlineCompletion(
   const simulated = options.simulated ?? false
   const intentId = randomUUID()
   const transactionId = kind === 'zero_amount' ? null : simulated ? `MOCK-TXN-${intentId}` : `WX-TXN-${intentId}`
-  const completedAt = new Date(Date.parse(order.createdAt.toISOString()) + 5_000)
+  const completedAt = new Date(Date.parse(order.createdAt.toISOString()) + (options.completedAtOffsetMs ?? 5_000))
   w.db.insert(paymentIntents).values({
     id: intentId,
     localOrderId: order.id,
@@ -417,6 +417,25 @@ test('mock online completion is queryable but excluded from formal totals and CS
     })
     assert.ok(csv.body.includes(real.transactionId!))
     assert.ok(!csv.body.includes(mock.transactionId!))
+
+    const mockInOpenPeriod = entries(w, true)[0]
+    assert.equal(mockInOpenPeriod?.reconciliationState, 'unreconciled')
+    assert.equal(mockInOpenPeriod?.batchId, null)
+
+    const locked = lockBatch(w.db, actor(w.adminUserId), batch.batchId, {
+      expectedUpdatedAt: batch.updatedAt,
+    }, { now: new Date(NOW.getTime() + 60_000) })
+    assert.equal(locked.status, 'locked')
+
+    const mockAfterLock = entries(w, true)[0]
+    assert.equal(mockAfterLock?.reconciliationState, 'unreconciled')
+    assert.equal(mockAfterLock?.batchId, null)
+    const realCompletionId = w.db.select().from(localOrderOnlineCompletions)
+      .where(eq(localOrderOnlineCompletions.localOrderId, realOrder)).get()?.id
+    const realAfterLock = entries(w, false)
+      .find((entry) => entry.sourceId === realCompletionId)
+    assert.equal(realAfterLock?.reconciliationState, 'reconciled')
+    assert.equal(realAfterLock?.batchId, batch.batchId)
   } finally {
     w.sqlite.close()
   }
@@ -458,6 +477,32 @@ test('zero-amount coupon completion creates no cash or consumption fact', () => 
     assert.equal(overview(w).payment.receivedCents, 0)
     const progress = getMyPurchaseRewardProgress(w.db, actor(w.residentId, null, null), w.activityId)
     assert.equal(progress.progress?.totalEffectivePaidCents, 0)
+  } finally {
+    w.sqlite.close()
+  }
+})
+
+test('zero-amount backlog cannot starve a later positive online completion', () => {
+  const w = makeWorld()
+  try {
+    for (let index = 0; index < 200; index += 1) {
+      const zeroOrder = addOrder(w, { totalCents: 500, discountCents: 500 })
+      addOnlineCompletion(w, zeroOrder, {
+        kind: 'zero_amount',
+        completedAtOffsetMs: 5_000,
+      })
+    }
+    const paidOrder = addOrder(w)
+    const paid = addOnlineCompletion(w, paidOrder, { completedAtOffsetMs: 10_000 })
+
+    const result = projectOnlineCompletionsToLedger(w.db, { now: NOW, limit: 200 })
+    assert.equal(result.created, 1)
+    const onlineRows = w.db.select().from(ledgerEntries)
+      .where(eq(ledgerEntries.sourceSystem, 'online_payment'))
+      .all()
+    assert.equal(onlineRows.length, 1)
+    assert.equal(onlineRows[0]?.sourceId, paid.completionId)
+    assert.equal(onlineRows[0]?.amountCents, 3980)
   } finally {
     w.sqlite.close()
   }
