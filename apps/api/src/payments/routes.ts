@@ -5,9 +5,9 @@ import {
   PAYMENT_INTERNAL_ROUTES,
   PAYMENT_ROUTES,
   createPaymentIntentRequestSchema,
+  mockPaymentActionRequestSchema,
   paymentEvidenceSchema,
   paymentOutboxConsumeRequestSchema,
-  paymentOutboxRecoveryRequestSchema,
   type CreatePaymentIntentRequest,
 } from '@sanchuang-dev/local-life-contracts'
 import type { ApiConfig } from '../config.js'
@@ -16,12 +16,13 @@ import type { AppBindings, AppContext, AuthSession, HttpErrorStatus } from '../h
 import { constantTimeTextEqual } from '../auth/security.js'
 import { LocalError, type LocalActor } from '../local/shared.js'
 import { confirmTrustedPayment } from './confirmation.js'
+import { executeOwnedMockPaymentAction } from './mock-channel.js'
 import {
   listFailedPaymentOutboxEvents,
   recoverParkedPaymentOutboxEvent,
   runPaymentOutboxConsumer,
 } from './outbox.js'
-import { createPaymentIntent, getMyPaymentIntent } from './service.js'
+import { createPaymentIntent, getMyPaymentIntent, getPaymentCapabilities } from './service.js'
 
 export interface PaymentRouteDeps {
   db: AppDatabase
@@ -97,6 +98,49 @@ export function registerPaymentRoutes(
     }
     return null
   }
+
+  app.get(PAYMENT_ROUTES.capabilities, (c) => {
+    c.header('Cache-Control', 'no-store')
+    return c.json(getPaymentCapabilities(config))
+  })
+
+  /**
+   * Resident-owned Mock action for the isolated H5 experience. The server
+   * capability flag is false in production, and this handler still requires a
+   * real resident session, CSRF/Origin and ownership of the Mock intent. It
+   * never accepts amount/merchant/transaction/evidence input and calls the same
+   * PAY-03 confirmation + PAY-05 consumer as any other Mock action.
+   */
+  app.post(PAYMENT_ROUTES.mockAction, async (c) => {
+    const guard = requireResident(c)
+    if (guard instanceof Response) return guard
+    if (!validCsrf(c, config, guard.session)) {
+      return fail(c, 403, API_ERROR_CODES.forbidden, 'CSRF 校验失败')
+    }
+    const intentId = paymentIntentIdSchema.safeParse(c.req.param('paymentIntentId'))
+    if (!intentId.success) return fail(c, 404, API_ERROR_CODES.notFound, '支付单不存在')
+    const body = bodySchemaError(
+      await c.req.json().catch(() => null),
+      mockPaymentActionRequestSchema,
+    )
+    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '模拟支付参数不正确')
+    try {
+      const result = executeOwnedMockPaymentAction(db, config, guard.actor, {
+        paymentIntentId: intentId.data,
+        action: body.action,
+        source: body.source,
+      })
+      if (result.intent.status === 'paid') {
+        // Complete the order through the existing PAY-05 consumer; no second
+        // state machine and no browser-supplied success flag.
+        runPaymentOutboxConsumer(db)
+      }
+      c.header('Cache-Control', 'no-store')
+      return c.json(result)
+    } catch (error) {
+      return failWithPaymentError(c, error)
+    }
+  })
 
   app.post(PAYMENT_ROUTES.createIntent, async (c) => {
     const guard = requireResident(c)

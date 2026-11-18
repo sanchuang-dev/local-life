@@ -179,6 +179,17 @@ function claimAndProjectCandidate(
           eq(paymentOutbox.id, row.id),
           eq(paymentOutbox.status, 'processing'),
         )).run()
+        // Delivery, not the recovery caller, owns resolution of a
+        // consumer-exhausted anomaly. This also closes the race where a normal
+        // scheduler consumer wins immediately after failed -> pending recovery.
+        tx.update(localOrderOnlineConflicts).set({
+          status: 'resolved',
+          resolvedAt: now,
+        }).where(and(
+          eq(localOrderOnlineConflicts.paymentOutboxId, row.id),
+          eq(localOrderOnlineConflicts.kind, 'consumer_exhausted'),
+          eq(localOrderOnlineConflicts.status, 'open'),
+        )).run()
         return { applied: 'delivered', outcomeKind: outcome.kind }
       }
       if (outcome.kind === 'conflict' || outcome.kind === 'failed') {
@@ -422,6 +433,21 @@ export function recoverParkedPaymentOutboxEvent(
         '只有已泊车的支付事件可以受控恢复',
       )
     }
+    const exhaustedConflict = tx.select({ id: localOrderOnlineConflicts.id })
+      .from(localOrderOnlineConflicts)
+      .where(and(
+        eq(localOrderOnlineConflicts.paymentOutboxId, outboxEventId),
+        eq(localOrderOnlineConflicts.kind, 'consumer_exhausted'),
+        eq(localOrderOnlineConflicts.status, 'open'),
+      ))
+      .get()
+    if (!exhaustedConflict) {
+      throw new LocalError(
+        409,
+        API_ERROR_CODES.paymentOutboxRecoveryConflict,
+        '该支付事件不是消费者耗尽泊车，不能通过恢复入口重放',
+      )
+    }
     const updated = tx.update(paymentOutbox).set({
       status: 'pending',
       attempts: 0,
@@ -474,6 +500,7 @@ export function recoverParkedPaymentOutboxEvent(
         resolvedAt: now,
       }).where(and(
         eq(localOrderOnlineConflicts.paymentOutboxId, outboxEventId),
+        eq(localOrderOnlineConflicts.kind, 'consumer_exhausted'),
         eq(localOrderOnlineConflicts.status, 'open'),
       )).run()
       return result.changes

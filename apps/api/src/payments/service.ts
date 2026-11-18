@@ -11,6 +11,7 @@ import {
   type PaymentIntent,
   type PaymentIntentCreateResponse,
   type PaymentIntentDetailResponse,
+  type PaymentCapabilities,
 } from '@sanchuang-dev/local-life-contracts'
 import type { ApiConfig } from '../config.js'
 import type { AppDatabase } from '../db/client.js'
@@ -195,6 +196,21 @@ function assertChannelAvailable(
     API_ERROR_CODES.paymentChannelUnavailable,
     '微信支付渠道尚未配置，暂时无法创建支付单',
   )
+}
+
+export function getPaymentCapabilities(
+  config: Pick<ApiConfig, 'paymentMockEnabled' | 'nodeEnv'>,
+): PaymentCapabilities {
+  const mockAvailable = config.paymentMockEnabled && config.nodeEnv !== 'production'
+  return {
+    mockAvailable,
+    // PAY-10/PAY-11 own the real WeChat merchant/client. Until those land, the
+    // server must explicitly say unavailable rather than let the H5 guess.
+    wechatJsapiAvailable: false,
+    zeroAmountAvailable: true,
+    mockUnavailableReason: mockAvailable ? null : 'mock_disabled',
+    wechatUnavailableReason: 'not_configured',
+  }
 }
 
 export function toIntent(row: PaymentIntentRow): PaymentIntent {

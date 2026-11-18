@@ -979,6 +979,19 @@ test('R1-C: a verified+received order keeps both money facts visible and never d
     assert.equal(await errorCode(secondReceipt), API_ERROR_CODES.paymentOnlineCompletionConflict)
     assert.equal(manualReceipts(w).length, 1)
     assert.equal(orderLinks(w).length, 1)
+
+    // A business-conflict failure is visible but is not a consumer-exhaustion
+    // retry. The recovery endpoint must not churn the same double-collection
+    // conflict or make it look operationally recoverable.
+    const recoverBusinessConflict = await api(w.app, 'POST', PAYMENT_INTERNAL_ROUTES.recoverOutbox, {
+      body: { outboxEventId: conflict.paymentOutboxId! },
+      headers: { authorization: `Bearer ${INTERNAL_TOKEN}` },
+    })
+    assert.equal(recoverBusinessConflict.status, 409)
+    assert.equal(await errorCode(recoverBusinessConflict), API_ERROR_CODES.paymentOutboxRecoveryConflict)
+    assert.equal(orderRow(w, order.id).status, 'verified')
+    assert.equal(completionsOf(w, order.id).length, 0)
+    assert.equal(conflictsOf(w, order.id)[0]?.status, 'open')
   } finally {
     w.sqlite.close()
   }
@@ -1367,6 +1380,37 @@ test('R2-C: recovery drives exactly one consumption contribution and one reward 
     assert.equal(replay.outcome, 'already_completed')
     assert.equal(w.db.select().from(couponTeamGrants).all().length, 1)
     assert.equal(w.db.select().from(couponIssues).all().length, 3)
+  } finally {
+    w.sqlite.close()
+  }
+})
+
+test('R2-C2: normal consumer delivery resolves a stale consumer-exhausted anomaly', async () => {
+  const w = await world()
+  try {
+    const order = await registerOrder(w)
+    const intent = await createIntent(w, order.id)
+    assert.equal((await confirmEvidence(w, paidEvidence(intent))).status, 200)
+    const outbox = await parkOrder(w, order.id)
+    dropCompletionFailure(w.sqlite)
+
+    // Simulate the handoff window after failed -> pending recovery, where the
+    // ordinary scheduler wins the claim before the recovery caller.
+    w.db.update(paymentOutbox).set({
+      status: 'pending',
+      attempts: 0,
+      availableAt: now(),
+      updatedAt: now(),
+    }).where(eq(paymentOutbox.id, outbox.id)).run()
+
+    const run = runPaymentOutboxConsumer(w.db, { now: now() })
+    assert.equal(run.completed, 1)
+    assert.equal(orderRow(w, order.id).status, 'online_completed')
+    assert.equal(completionsOf(w, order.id).length, 1)
+    const conflict = conflictsOf(w, order.id).find((item) => item.kind === 'consumer_exhausted')
+    assert.ok(conflict)
+    assert.equal(conflict.status, 'resolved')
+    assert.ok(conflict.resolvedAt)
   } finally {
     w.sqlite.close()
   }

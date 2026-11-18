@@ -1,6 +1,6 @@
-# 支付领域契约、持久化、居民创建/查询、可信确认与隔离 Mock（PAY-01 #276 / PAY-02 #277 / PAY-03 #278 / PAY-04 #279 / PAY-05 #280）
+# 支付领域契约、持久化、居民创建/查询、可信确认与隔离 Mock（PAY-01 #276 / PAY-02 #277 / PAY-03 #278 / PAY-04 #279 / PAY-05 #280 / PAY-07）
 
-> **PAY-01** 建立支付意图、尝试与事件的共享契约和 SQLite 真相源；**PAY-02** 增加居民创建/查询待支付意图的受控 API；**PAY-03** 增加可信渠道证据确认、状态收敛、下游 outbox 与冲突证据队列；**PAY-04** 增加进程内隔离 Mock 驱动，**PAY-05** 完成订单/零元券单 outbox 投影，**PAY-06** 将 `local_order_online_completions` 投影为独立线上实收、接入消费累计与既有发券。当前仍**没有**真实微信支付商户配置/回调验签（PAY-10/PAY-11）、公网 Mock 控制接口、H5/后台支付 UI、真实退款执行。不得据此宣称在线支付已可用。
+> **PAY-01** 建立支付意图、尝试与事件的共享契约和 SQLite 真相源；**PAY-02** 增加居民创建/查询待支付意图的受控 API；**PAY-03** 增加可信渠道证据确认、状态收敛、下游 outbox 与冲突证据队列；**PAY-04** 增加进程内隔离 Mock 驱动，**PAY-05** 完成订单/零元券单 outbox 投影，**PAY-06** 将 `local_order_online_completions` 投影为独立线上实收、接入消费累计与既有发券；**PAY-07** 增加居民 H5 支付状态、零元兑换与居民自有 Mock 演练入口。当前仍**没有**真实微信支付商户配置/回调验签（PAY-10/PAY-11）、未鉴权公网 Mock 控制接口、管理后台支付 UI（PAY-08）、真实退款执行。不得据此宣称真实微信在线支付已可用。
 
 ## 1. 与既有事实的边界
 
@@ -151,7 +151,7 @@ PAY-02 依赖本卡：
 - 消费对象只有 PAY-03 的 `payment.paid.v1`（`payment_outbox`），不重新实现支付确认。消费方在**同一 `BEGIN IMMEDIATE` 事务**内依次完成：读取并校验 outbox payload → 校验支付意图/paid attempt/渠道交易号/居民/社区/金额快照 → 写完成事实 → 投影订单状态 → 核销绑定的单张消费券 → 追加 `order.online_completed` 时间线 → 写审计 → 把 outbox 标记 `delivered`。
 - 任一校验不一致时不完成订单，而是把 outbox 泊为 `failed`（`lastError` 记录原因）并落一条订单级冲突记录；真实渠道证据仍保留在 PAY-03 的 outbox/异常表中，不被静默丢弃。
 - 重试耗尽/租约过期泊车（R2）：与 `status='failed'` **同一事务**写入订单级 `consumer_exhausted` 冲突（open，关联 `local_order_id`/`payment_intent_id`/`payment_outbox_id`，`detail` 保存失败原因、时间、渠道交易号与金额）。故障路径因此不再是“钱已到账但订单零次且不可见”，而是可查询、可恢复的显式异常。内部只读查询为 `GET /internal/payments/outbox/failed`。
-- 受控恢复（R2）：`POST /internal/payments/outbox/recover`（同一服务端 token）只接受 `failed` 行：条件 UPDATE `failed → pending` 后走与消费者完全相同的幂等投影；成功后 `delivered`、关联 open 冲突置 `resolved`（证据与失败原因因触发器保持不可变）、PAY-06 账本投影重放一次（唯一键保证不重复）。重复恢复/双进程并发恢复仍恰好完成一次；已 `delivered` 的重放是安全 no-op，不再产生第二次完成或第二个异常。
+- 受控恢复（R2）：`POST /internal/payments/outbox/recover`（同一服务端 token）只接受同时存在 open `consumer_exhausted` 的 `failed` 行：条件 UPDATE `failed → pending` 后走与消费者完全相同的幂等投影；业务冲突型 `failed` 不允许借恢复入口重放。任何 consumer 成功 `delivered` 后，对应 open `consumer_exhausted` 置 `resolved`（证据与失败原因因触发器保持不可变）、PAY-06 账本投影重放一次（唯一键保证不重复）。重复恢复/双进程并发恢复仍恰好完成一次；已 `delivered` 的重放是安全 no-op，不再产生第二次完成或第二个异常。
 - 重复消费：已 `delivered` 的 outbox 不再被领取；即使人工把同一行重新置为 `pending`，唯一完成事实也会让结果变成 `already_completed`，不会产生第二条完成事件或第二次核销。
 - 并发消费：领取（`pending → processing`）在独立事务内以条件 UPDATE 完成，`changes !== 1` 即放弃，因此两个消费者只有一个能投影同一事件。
 - 进程中断恢复：每次领取时原子递增 `attempts`，因此领取后崩溃也计入尝试次数；租约过期时，未达上限则重新入队，已达 `PAYMENT_OUTBOX_MAX_ATTEMPTS`（默认 5）则直接泊车，避免崩溃循环绕过上限。
@@ -205,6 +205,7 @@ PAY-02 依赖本卡：
 - `apps/api/test/payments-order-completion.test.ts`（22 例）：真实 SQLite + Hono 的在线完成一次、事件重放、双连接并发/租约恢复、崩溃尝试上限、损坏事件泊车、取消时延迟释放券、可信 close/failed 恰好释放一次、过期不释放、迟到成功先于返券时保持占券、迟到成功晚于返券时进入人工核对、返券与异常投影批次公平性、零元券单完成/重复/已释放券拒绝/非零拒绝、已核销与已冲正券拒绝、人工核验旧路径不变、注入故障后的重试/恢复、内部入口鉴权，以及 0033 历史库升级（行保留、`PRAGMA foreign_key_check` 为空、触发器重建、旧支付事件续跑完成）。
 - `apps/api/test/payments-mock.test.ts`：真实 Hono + SQLite 的 Mock 发起、成功/失败/取消/超时/待确认、重复通知、通知+查单双进程竞争、重启查询、迟到成功、非法输入与 production/公开预览 fail-closed。
 - `apps/api/test/payments-online-ledger.test.ts`：真实/Mock 线上 completion 投影、唯一实收、双进程竞争、outbox/sync 回填、券净额/零元、团队累计与三人券、人工/线上互斥、正式汇总/CSV 排除 Mock、锁后迟到投影、0035→0036 升级与重启恢复。
+- `apps/web/test/local-order-payment.test.mjs`：H5 只把 `online_completed` 显示为交易完成，paid 未完成订单显示确认中，失败/关闭/零元领取状态与能力开关文案不互相冒充。
 
 ## 8. PAY-02 居民创建 / 查询 API
 
@@ -214,8 +215,10 @@ PAY-02 依赖本卡：
 | --- | --- | --- |
 | `POST` | `/payments/intents` | 登录居民为自己的本地订单创建待支付意图 |
 | `GET` | `/payments/intents/:paymentIntentId` | 本人读取支付意图与历史尝试 |
+| `GET` | `/payments/capabilities` | 只读渠道能力；`mockAvailable` 由服务端配置决定 |
+| `POST` | `/payments/intents/:paymentIntentId/mock` | 本人 Mock 演练，要求会话、CSRF/Origin、归属及服务端 Mock 开关 |
 
-没有居民可调用的支付状态写入路由。`paid` 只能由 PAY-03 的内部可信确认产生。
+没有居民可直接写支付状态的路由。`POST .../mock` 只生成模拟渠道证据并走 PAY-03 可信确认及 PAY-05 consumer；请求体只有 `action/source`，不能提交金额、交易号或 `paid`。`paid` 仍只能由 PAY-03 的内部可信确认产生。
 
 ### 创建输入
 
@@ -253,10 +256,10 @@ PAY-02 依赖本卡：
 ## 9. 已知限制
 
 - 未接真实微信支付商户 API、回调验签、证书/API v3 解密；PAY-11 才完成真实适配器。
-- PAY-04 Mock 是进程内测试/开发驱动，没有公网 HTTP 控制接口；所有模拟支付永久标记 `simulated=true`，不得被解释为真实微信扣款或银行到账。
-- 在线订单完成与消费券核销已由 PAY-05 落地，PAY-06 已增加经营账本线上实收/消费累计投影；尚未实现 H5/管理后台支付交互与运维 UI（PAY-07/PAY-08）、真实退款执行（策略未定）。线上订单仍不进入线下结算候选；Mock 不进入正式财务汇总/对账/CSV。
+- PAY-04 Mock 是进程内测试/开发驱动；PAY-07 只增加居民会话、CSRF、归属校验后的 Mock 演练路由，不提供未鉴权公网控制面。所有模拟支付永久标记 `simulated=true`，不得被解释为真实微信扣款或银行到账。
+- 在线订单完成与消费券核销已由 PAY-05 落地，PAY-06 已增加经营账本线上实收/消费累计投影；居民 H5 已由 PAY-07 提供支付状态、零元兑换与 Mock 演练；尚未实现管理后台支付交互与运维 UI（PAY-08）、真实退款执行（策略未定）。线上订单仍不进入线下结算候选；Mock 不进入正式财务汇总/对账/CSV。
 - 消费者由内部 token 入口或运维调度驱动，本仓库尚未内置定时器/常驻 worker；生产部署需要运维侧按 `POST /internal/payments/outbox/consume` 或进程内调用 `runPaymentOutboxConsumer` 安排触发。
-- R2 受控恢复同样是内部 token 入口，不是常驻调度：生产仍需监控 `GET /internal/payments/outbox/failed` 并在出现 `consumer_exhausted` 时按 runbook 重放；恢复不会删除失败历史，也不会自动重试未泊车的行。
+- R2 受控恢复同样是内部 token 入口，不是常驻调度：生产仍需监控 `GET /internal/payments/outbox/failed`；只有带 open `consumer_exhausted` 异常的 `failed` 事件可重放，业务冲突不会被恢复接口反复“复活”。任何后续 consumer 成功交付该事件都会自动 resolve 对应 `consumer_exhausted`，失败历史仍保留。
 - 长期 `pending/confirming` 的支付意图需要 PAY-11 的可信查单/关单能力收敛；在渠道给出可信终态前，PAY-05 会一直保留其消费券占用（延迟释放），不会按过期时间猜测失败。
 - `mock` 支付只用于隔离契约测试；其 outbox 永久带 `simulated=true`，后续消费方不得把它当正式收款。
 - 内部 token 是服务端共享密钥，不是微信签名；泄露风险由部署密钥管理承担，未配置时接口保持关闭。

@@ -29,6 +29,13 @@ export const PAYMENT_CENTS_MAX = Number.MAX_SAFE_INTEGER
 export const PAYMENT_ROUTES = {
   createIntent: '/payments/intents',
   myIntentDetail: '/payments/intents/:paymentIntentId',
+  /** Public, read-only payment-channel capability flags (never a status write). */
+  capabilities: '/payments/capabilities',
+  /**
+   * Resident-owned Mock action. Only available when the server explicitly
+   * advertises `mockAvailable`; it still goes through PAY-03 confirmation.
+   */
+  mockAction: '/payments/intents/:paymentIntentId/mock',
 } as const
 
 /** Internal adapter/test surface; requires a server-side token, never a resident session. */
@@ -41,20 +48,36 @@ export const PAYMENT_INTERNAL_ROUTES = {
    * trust-bearing payment projections.
    */
   consumeOutbox: '/internal/payments/outbox/consume',
-  /**
-   * R2 controlled recovery. Only a parked (`failed`) outbox row may be replayed;
-   * the replay uses the same idempotent projection as the consumer, then marks
-   * the linked `open` order conflicts `resolved`. Repeating it, or replaying an
-   * already delivered event, is a safe no-op.
-   */
+  /** Only consumer-exhausted parked events are eligible for controlled replay. */
   recoverOutbox: '/internal/payments/outbox/recover',
-  /**
-   * R2 query path for parked events. An operator sees the order, intent, amount,
-   * channel transaction, failure reason and time without reading SQLite by hand
-   * or running an UPDATE as the repair procedure.
-   */
+  /** Internal bounded view of parked payment events and their durable anomalies. */
   failedOutbox: '/internal/payments/outbox/failed',
 } as const
+
+/**
+ * Server capability truth for the resident payment UI. The browser must never
+ * infer a channel from its own build mode; only these flags and their reasons
+ * decide whether a payment button exists.
+ */
+export const paymentCapabilitiesSchema = z.strictObject({
+  mockAvailable: z.boolean(),
+  wechatJsapiAvailable: z.boolean(),
+  zeroAmountAvailable: z.boolean(),
+  mockUnavailableReason: z.enum(['mock_disabled']).nullable(),
+  wechatUnavailableReason: z.enum(['not_configured']).nullable(),
+})
+export type PaymentCapabilities = z.infer<typeof paymentCapabilitiesSchema>
+
+/** Mock-only UI actions. No amount, merchant, transaction id or raw evidence. */
+export const mockPaymentActionSchema = z.enum(['succeed', 'fail', 'cancel', 'timeout', 'pending'])
+export type MockPaymentAction = z.infer<typeof mockPaymentActionSchema>
+
+export const mockPaymentActionRequestSchema = z.strictObject({
+  action: mockPaymentActionSchema,
+  /** Defaults to a provider notification; query is useful for recovery replay. */
+  source: z.enum(['notification', 'query']).default('notification'),
+})
+export type MockPaymentActionRequest = z.infer<typeof mockPaymentActionRequestSchema>
 
 /** Non-negative integer cents; rejects floats, negatives and overflow. */
 export const paymentCentsSchema = z
