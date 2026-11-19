@@ -18,6 +18,7 @@ import type { AppBindings, AppContext, AuthSession, HttpErrorStatus } from '../h
 import { constantTimeTextEqual } from '../auth/security.js'
 import { LocalError, type LocalActor } from '../local/shared.js'
 import { confirmTrustedPayment } from './confirmation.js'
+import { registerWechatPaymentRoutes } from '../wechat-pay/routes.js'
 import { executeOwnedMockPaymentAction } from './mock-channel.js'
 import {
   listFailedPaymentOutboxEvents,
@@ -105,6 +106,8 @@ export function registerPaymentRoutes(
     }
     return null
   }
+
+  registerWechatPaymentRoutes(app, deps, requireInternalToken)
 
   app.get(PAYMENT_ROUTES.capabilities, (c) => {
     c.header('Cache-Control', 'no-store')

@@ -64,6 +64,24 @@ export const PAYMENT_INTERNAL_ROUTES = {
   failedOutbox: '/internal/payments/outbox/failed',
 } as const
 
+/** PAY-11 provider-only routes. Only notify is reachable from the public web. */
+export const PAYMENT_WECHAT_ROUTES = {
+  notify: '/payments/wechat/notify',
+  query: '/internal/payments/wechat/:paymentIntentId/query',
+  close: '/internal/payments/wechat/:paymentIntentId/close',
+  recover: '/internal/payments/wechat/recover',
+} as const
+
+export const wechatRecoveryResultSchema = z.strictObject({
+  intentId: z.string().uuid(),
+  outcome: z.enum(['paid', 'closed', 'failed', 'pending', 'uncertain', 'needs_review']),
+  tradeState: z.string().nullable(),
+})
+export const wechatRecoveryBatchSchema = z.strictObject({
+  checked: z.number().int().nonnegative(),
+  results: z.array(wechatRecoveryResultSchema),
+})
+
 /**
  * Server capability truth for the resident payment UI. The browser must never
  * infer a channel from its own build mode; only these flags and their reasons

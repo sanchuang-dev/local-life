@@ -33,7 +33,7 @@
 | `WECHAT_PAY_MERCHANT_PRIVATE_KEY_FILE` | 商户 API 证书私钥 PEM **只读文件**，RSA ≥2048，不可带口令 |
 | `WECHAT_PAY_PLATFORM_PUBLIC_KEY_FILE` + `WECHAT_PAY_PLATFORM_PUBLIC_KEY_ID` | 微信支付公钥（推荐）及其 `PUB_KEY_ID_...` |
 | `WECHAT_PAY_PLATFORM_CERTIFICATE_FILE` | 备选：微信支付平台证书（与公钥二选一，序列号由证书导出） |
-| `WECHAT_PAY_NOTIFY_URL` | `https` 回调地址；PAY-10 只把它写入下单请求，回调处理归 PAY-11 |
+| `WECHAT_PAY_NOTIFY_URL` | `https` 回调地址；PAY-11 的公开 URL 为 `/api/payments/wechat/notify`，Hono 路由为 `/payments/wechat/notify` |
 | `WECHAT_PAY_API_BASE_URL` | 可选，默认官方主域名；仅测试可用 loopback `http://127.0.0.1` |
 | `WECHAT_PAY_TIMEOUT_MS` | 可选，1000–30000，默认 10000 |
 
@@ -82,14 +82,14 @@
 
 ## 6. 明确不做（PAY-11 及后续）
 
-微信通知接收/验签/`resource` 解密、主动查单、关单、退款、分账、账本投影、H5 页面、Admin 商户配置、真实资金部署、APIv3 Key 托管。`notify_url` 在本卡只是下单必填参数，PAY-10 不提供该回调端点。
+PAY-10 本身不实现微信通知接收/验签/`resource` 解密、主动查单、关单、退款、分账、账本投影、H5 页面、Admin 商户配置或真实资金部署。PAY-11 #286 单独实现只读文件 APIv3 Key、安全回调与查询/关单恢复；协议与运维见 [pay-11-wechat-recovery.md](pay-11-wechat-recovery.md)。本节描述 PAY-10 的历史交付范围。
 
 ## 7. 运维：密钥/证书更换与回滚
 
 1. 新私钥/证书按新文件名挂载为只读文件（服务用户可读，group/other 不可写）。
 2. 同步更新 `WECHAT_PAY_MERCHANT_SERIAL_NO`（及公钥文件/ID 或平台证书文件）。
 3. 滚动重启 API；启动校验失败则进程不启动，旧进程继续服务（失败关闭，不静默降级）。
-4. 回滚：恢复上一组文件与变量并重启；`wechat_pay_prepay_attempts` 为追加式审计，无需回滚数据。已发出的 `prepay_id` 到期自然失效，未决结果由 PAY-11 查单/关单处理。
+4. 回滚：恢复上一组文件与变量并重启；`wechat_pay_prepay_attempts` 为追加式审计，无需回滚数据。已发出的 `prepay_id` 到期自然失效；未决结果经 PAY-11 可信查单/关单确认处理，不可仅依据过期推断未扣款。
 5. 不做数据库私钥托管；不把私钥打进镜像/仓库。
 
 ## 8. 离线测试证据（真实结果见 PR）

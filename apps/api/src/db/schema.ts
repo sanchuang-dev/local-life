@@ -2363,6 +2363,32 @@ export const wechatPayPrepayAttempts = sqliteTable('wechat_pay_prepay_attempts',
 ])
 
 /* -------------------------------------------------------------------------- */
+/* PAY-11: append-only query/close audit, never a payment or settlement fact. */
+export const wechatPayRecoveryChecks = sqliteTable('wechat_pay_recovery_checks', {
+  id: text('id').primaryKey(),
+  paymentIntentId: text('payment_intent_id').notNull()
+    .references(() => paymentIntents.id, { onDelete: 'restrict' }),
+  operation: text('operation').$type<'query' | 'close' | 'post_close_query'>().notNull(),
+  result: text('result').$type<'verified' | 'uncertain' | 'request_sent'>().notNull(),
+  detailCode: text('detail_code').notNull(),
+  responseSha256: text('response_sha256'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  index('wechat_pay_recovery_checks_intent_created_idx').on(table.paymentIntentId, table.createdAt),
+  check('wechat_pay_recovery_checks_operation_check',
+    sql`${table.operation} IN ('query', 'close', 'post_close_query')`),
+  check('wechat_pay_recovery_checks_result_check',
+    sql`${table.result} IN ('verified', 'uncertain', 'request_sent')`),
+  check('wechat_pay_recovery_checks_detail_check',
+    sql`length(trim(${table.detailCode})) BETWEEN 1 AND 80`),
+  check('wechat_pay_recovery_checks_hash_check',
+    sql`${table.responseSha256} IS NULL OR (
+      length(${table.responseSha256}) = 64
+      AND ${table.responseSha256} NOT GLOB '*[^0-9a-f]*'
+    )`),
+])
+
+/* -------------------------------------------------------------------------- */
 /* PAY-05 online order completion: immutable completion fact + review conflicts*/
 /* -------------------------------------------------------------------------- */
 
