@@ -8,6 +8,7 @@ import type {
   PaymentDifference, PaymentDifferenceReason, PaymentDifferencesQuery,
 } from '@sanchuang-dev/local-life-contracts'
 import { OrderPaymentSection } from '../components/OrderPaymentSection'
+import { PageInfoAlert } from '../components/PageInfoHelp'
 import { describeLocalError } from '../services/localApi'
 import {
   downloadPaymentReconciliation, getPaymentReconciliationDetail,
@@ -154,12 +155,9 @@ export function PaymentReconciliationPanel() {
         title="支付异常核查 · 本地事实"
         extra={<Space wrap><Button onClick={() => setRefresh((v) => v + 1)}>刷新</Button><Button loading={exporting} onClick={() => void exportCurrent()}>导出当前筛选 CSV</Button></Space>}
       >
-        <Alert
-          type="info"
-          showIcon
+        <PageInfoAlert
           title="本地对账不等于微信渠道或银行账单核对"
           description="仅对比支付单、订单完成、渠道证据与既有经营账本；Mock 永不计为真实收款。没有微信渠道账单时，即使本地一致也不得称为微信对账通过。日期筛选按北京时间的支付单创建日计算。"
-          style={{ marginBottom: 12 }}
         />
         <Space wrap size={8} style={{ marginBottom: 12 }}>
           <Select<PaymentDifferencesQuery['status']>
