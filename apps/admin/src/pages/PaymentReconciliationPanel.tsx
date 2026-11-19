@@ -111,7 +111,7 @@ export function PaymentReconciliationPanel() {
       title: '订单 / 商户单号',
       key: 'order', width: 220,
       render: (_value, row) => (
-        <Space direction="vertical" size={2}>
+        <Space orientation="vertical" size={2}>
           <Typography.Text>{row.merchantOrderNo}</Typography.Text>
           <Typography.Text type="secondary">{row.businessDate} · {row.orderId.slice(0, 8)}</Typography.Text>
         </Space>
@@ -120,7 +120,7 @@ export function PaymentReconciliationPanel() {
     {
       title: '核查结论', key: 'reason', width: 215,
       render: (_value, row) => (
-        <Space direction="vertical" size={2}>
+        <Space orientation="vertical" size={2}>
           <Tag color={row.status === 'difference' ? 'orange' : row.status === 'consistent' ? 'green' : 'default'}>
             {REASONS[row.reason]}
           </Tag>
@@ -133,7 +133,7 @@ export function PaymentReconciliationPanel() {
     {
       title: '金额（元）', key: 'amount', width: 180,
       render: (_value, row) => (
-        <Space direction="vertical" size={1}>
+        <Space orientation="vertical" size={1}>
           <span>应付 {amount(row.netAmountCents)}</span>
           <Typography.Text type="secondary">完成 {amount(row.completionAmountCents)}</Typography.Text>
           <Typography.Text type="secondary">线上账本 {amount(row.ledgerAmountCents)}</Typography.Text>
@@ -245,7 +245,7 @@ export function PaymentReconciliationPanel() {
         {detailLoading && <Typography.Text>核查中…</Typography.Text>}
         {detailError && <Alert type="error" description={detailError}/>}
         {detail && (
-          <Space direction="vertical" style={{ width: '100%' }} size={12}>
+          <Space orientation="vertical" style={{ width: '100%' }} size={12}>
             <Alert
               type={detail.status === 'difference' ? 'warning' : 'info'}
               title={REASONS[detail.reason]}
