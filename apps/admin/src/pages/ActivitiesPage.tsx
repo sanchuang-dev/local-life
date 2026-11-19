@@ -1,5 +1,6 @@
 import { PageInfoAlert } from '../components/PageInfoHelp'
 import { PlusOutlined } from '@ant-design/icons'
+import { useLocation, useNavigate } from 'react-router'
 import {
   Alert,
   App as AntdApp,
@@ -598,6 +599,9 @@ function purchaseRewardPlanToForm(
  * plain-language validation instead of a raw contract error at submit time.
  */
 function RewardPlanFields() {
+  const [advancedOpen, setAdvancedOpen] = useState(false)
+  const claimRecipient = Form.useWatch('rewardClaimRecipient')
+  const redemptionHours = Form.useWatch('rewardRedemptionHours')
   return (
     <>
       <Form.Item
@@ -617,7 +621,7 @@ function RewardPlanFields() {
             name="rewardUnitCostYuan"
             label="单件成本（元）"
             rules={[{ required: true, message: '请填写单件成本' }]}
-            extra="库存与预算的金额都按 单件成本 × 数量 计算。"
+
           >
             <InputNumber
               min={0.01}
@@ -633,7 +637,7 @@ function RewardPlanFields() {
             name="rewardQuantityPerTeam"
             label="每团奖品数量"
             rules={[{ required: true, message: '请填写每团奖品数量' }]}
-            extra="按「团队」计，不是按人；一个达标团队领这么多份。"
+
           >
             <InputNumber
               min={1}
@@ -707,7 +711,7 @@ function RewardPlanFields() {
 
       <Form.Item
         name="rewardCheckinRange"
-        label="签到窗口（Asia/Shanghai，UTC+08:00）"
+        label="签到时间"
         rules={[
           {
             validator: async (_rule, value: unknown) => {
@@ -721,7 +725,7 @@ function RewardPlanFields() {
             },
           },
         ]}
-        extra="只有落在这个窗口内的签到会被接受；窗口通常应落在活动时间内。"
+
       >
         <DatePicker.RangePicker
           showTime={{ format: 'HH:mm' }}
@@ -732,13 +736,23 @@ function RewardPlanFields() {
         />
       </Form.Item>
 
+      <div className="activity-editor-disclosure">
+        <Button type="text" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen((v) => !v)}>
+          {advancedOpen ? '收起' : '展开'}更多设置
+        </Button>
+        <Typography.Text type="secondary">
+          {claimRecipient === 'any_member' ? '任意团员领取' : '仅队长领取'} ·
+          {typeof redemptionHours === 'number' ? ` 发码后 ${redemptionHours} 小时内核销` : ' 核销时效待填写'}
+        </Typography.Text>
+      </div>
+      <div style={{ display: advancedOpen ? undefined : 'none' }}>
       <Row gutter={12}>
         <Col xs={24} sm={12}>
           <Form.Item
             name="rewardClaimRecipient"
             label="领取人"
             rules={[{ required: true, message: '请选择领取人' }]}
-            extra="团队达标后由谁出面领取奖励。"
+
           >
             <Select
               options={[
@@ -753,7 +767,7 @@ function RewardPlanFields() {
             name="rewardRedemptionHours"
             label="核销有效期（小时）"
             rules={[{ required: true, message: '请填写核销有效期' }]}
-            extra="从发码时刻起算，过期后柜台需要重新签发。"
+
           >
             <InputNumber
               min={1}
@@ -774,12 +788,10 @@ function RewardPlanFields() {
         <Input.TextArea rows={2} maxLength={500} showCount placeholder="例如：奖品由社区仓库统一发放" />
       </Form.Item>
 
-      <PageInfoAlert inline
-        type="info"
-        showIcon
-        title="资格口径"
-        description="团队满 3 席且该团成员各自完成 3 条已核验签到才达标；自助签到在工作人员现场核验前不计入进度。奖励计划发布后随规则版本冻结，之后修改会生成新版本。"
-      />
+      </div>
+      <Typography.Paragraph type="secondary" className="activity-editor-tip">
+        团队满 3 人且每人完成 3 次已核验签到才达标。发布后奖励规则按版本冻结。
+      </Typography.Paragraph>
     </>
   )
 }
@@ -825,12 +837,9 @@ function PurchaseRewardBudgetHint({
     Number.isInteger(maxRewardedTeams)
   if (!hasInputs) {
     return (
-      <PageInfoAlert inline
-        type="info"
-        showIcon
-        title="团队券总预算（只读计算）"
-        description="填写每人券面额与奖励团队数量上限后自动计算：每人券额 × 3 人 × 团队数；最终由服务端约束。"
-      />
+      <Typography.Paragraph type="secondary" className="activity-editor-tip">
+        券总预算将随券面额及团队上限自动计算。
+      </Typography.Paragraph>
     )
   }
   const totalCents = purchaseRewardTotalBudgetCents({
@@ -839,16 +848,15 @@ function PurchaseRewardBudgetHint({
   })
   const overLimit = totalCents > PURCHASE_REWARD_MAX_TOTAL_BUDGET_CENTS
   return (
-    <Alert
-      type={overLimit ? 'warning' : 'info'}
-      showIcon
-      title="团队券总预算（只读计算）"
-      description={
-        overLimit
-          ? `当前为 ${formatCents(totalCents)}，超过共享契约上限 ${formatCents(PURCHASE_REWARD_MAX_TOTAL_BUDGET_CENTS)}；请降低每人券面额或团队数量上限。`
-          : `当前为 ${formatCents(totalCents)}（每人券额 × 3 人 × 团队数）；服务端保存时会再次校验。`
-      }
-    />
+    <div className={overLimit ? 'activity-editor-budget is-over-limit' : 'activity-editor-budget'}>
+      <span>团队券总预算</span>
+      <Typography.Text strong>{formatCents(totalCents)}</Typography.Text>
+      <Typography.Text type={overLimit ? 'danger' : 'secondary'}>
+        {overLimit
+          ? `超过 ${formatCents(PURCHASE_REWARD_MAX_TOTAL_BUDGET_CENTS)} 的上限，请调整配置`
+          : '每人券面额 × 3 人 × 奖励团队数'}
+      </Typography.Text>
+    </div>
   )
 }
 
@@ -869,7 +877,7 @@ function PurchaseRewardPlanFields() {
             name="purchaseThresholdYuan"
             label="团队实付门槛（元）"
             rules={[{ required: true, message: '请填写团队实付门槛' }]}
-            extra="团队三名成员自加入起累计实付达到该金额，整团才算达标。"
+
           >
             <InputNumber
               min={0.01}
@@ -885,7 +893,7 @@ function PurchaseRewardPlanFields() {
             name="purchaseCouponFaceValueYuan"
             label="每人券面额（元）"
             rules={[{ required: true, message: '请填写每人券面额' }]}
-            extra="达标团队的三名成员各获得一张同面额平台券。"
+
           >
             <InputNumber
               min={0.01}
@@ -925,7 +933,7 @@ function PurchaseRewardPlanFields() {
             },
           }),
         ]}
-        extra="达到上限后不再新增奖励团队；该值与每人券面额共同锁定团队券总预算。"
+
       >
         <InputNumber
           min={1}
@@ -951,12 +959,9 @@ function PurchaseRewardPlanFields() {
         )}
       </Form.Item>
 
-      <PageInfoAlert inline
-        type="info"
-        showIcon
-        title="消费奖励口径"
-        description="团队券总预算 = 每人券面额 × 3 人 × 奖励团队数量上限，由服务端校验。未启用消费组团奖励不影响既有签到奖励，也不会削弱已配置的签到奖。"
-      />
+      <Typography.Paragraph type="secondary" className="activity-editor-tip">
+        消费奖励与签到奖励独立，可同时启用；总预算由服务器校验。
+      </Typography.Paragraph>
     </>
   )
 }
@@ -1006,6 +1011,16 @@ export function ActivitiesPage() {
 
 function ActivityConsole({ session }: { session: AuthenticatedSession }) {
   const { message, modal } = AntdApp.useApp()
+  const location = useLocation()
+  const navigate = useNavigate()
+  // The same activity editor owns the three tabbed sections and one Form;
+  // routes are URL-addressable, but tab changes never remount or lose fields.
+  const editMatch = location.pathname.match(/^\/activities\/([^/]+)\/edit\/?$/u)
+  const editorOpen = location.pathname === '/activities/new' || Boolean(editMatch)
+  const editorMode: 'create' | 'edit' = editMatch ? 'edit' : 'create'
+  const editingActivityId = editMatch?.[1] ?? null
+  const [activeSection, setActiveSection] = useState<'info' | 'checkin' | 'purchase'>('info')
+  const [publicRulesOpen, setPublicRulesOpen] = useState(false)
   const [form] = Form.useForm<ActivityFormValues>()
   const role = session.staff.role
   const isAdmin = role === 'admin'
@@ -1038,14 +1053,11 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
   const [communitiesError, setCommunitiesError] = useState<string | null>(null)
   const [communitiesToken, setCommunitiesToken] = useState(0)
 
-  const [editorOpen, setEditorOpen] = useState(false)
-  const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create')
   const [detail, setDetail] = useState<AdminActivityDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [editingActivityId, setEditingActivityId] = useState<string | null>(null)
   const detailRequestRef = useRef(0)
 
   const [versionsOpen, setVersionsOpen] = useState(false)
@@ -1124,8 +1136,8 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
 
   useEffect(() => {
     if (!editorOpen || editorMode !== 'create') return
-    // Runs after the drawer's Form is mounted, so the reset and the operator's
-    // default community never touch a disconnected Form instance.
+    // The create-page Form is mounted before this effect, and tab changes
+    // never reset it; the initial community is set only on route entry.
     form.resetFields()
     const defaultCommunity = isAdmin
       ? communities[0]?.id
@@ -1137,8 +1149,8 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
       ...rewardPlanToForm(null),
       ...purchaseRewardPlanToForm(null),
     })
-    // Only the create-drawer opening should reset the form; later community
-    // refreshes must not wipe what the operator is typing.
+    // Only entering the create route resets; later community refreshes
+    // must not wipe what the operator is typing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editorOpen, editorMode])
 
@@ -1235,13 +1247,13 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
 
   function openCreate() {
     detailRequestRef.current += 1
-    setEditorMode('create')
-    setEditorOpen(true)
+    setActiveSection('info')
+    setPublicRulesOpen(false)
     setDetail(null)
     setDetailError(null)
     setDetailLoading(false)
     setSaveError(null)
-    setEditingActivityId(null)
+    navigate('/activities/new')
   }
 
   async function loadDetail(activityId: string) {
@@ -1263,22 +1275,30 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
     }
   }
 
-  function openEdit(row: AdminActivitySummary) {
-    setEditorMode('edit')
-    setEditorOpen(true)
+  // Direct links and list navigation share one loader; late replies from
+  // previous activity IDs are discarded by loadDetail's request guard.
+  useEffect(() => {
+    if (!editorOpen || editorMode !== 'edit' || !editingActivityId) return
+    setActiveSection('info')
+    setPublicRulesOpen(false)
     setSaveError(null)
-    setEditingActivityId(row.id)
-    void loadDetail(row.id)
+    void loadDetail(editingActivityId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editorMode, editorOpen, editingActivityId])
+
+  function openEdit(row: AdminActivitySummary) {
+    detailRequestRef.current += 1
+    setSaveError(null)
+    setActiveSection('info')
+    setPublicRulesOpen(false)
+    navigate('/activities/' + row.id + '/edit')
   }
 
   const closeEditor = () => {
     detailRequestRef.current += 1
-    setEditorOpen(false)
     setSaving(false)
-    // Closing must not leave the drawer spinner armed for the next open: a
-    // superseded detail GET is ignored and can never flip this back to true.
     setDetailLoading(false)
-    setEditingActivityId(null)
+    navigate('/activities')
   }
 
   async function loadVersions(activityId: string) {
@@ -1340,10 +1360,9 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
     try {
       const result = await operation()
       message.success(buildSuccessMessage(result))
-      setEditorOpen(false)
       setDetail(null)
-      setEditingActivityId(null)
       refreshList()
+      navigate('/activities')
     } catch (cause: unknown) {
       setSaveError(describeError(cause, '保存失败'))
       if (isActivityApiError(cause) && cause.status === 409) {
@@ -1545,6 +1564,8 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
           : '编辑活动'
 
   return (
+    <>
+      {!editorOpen ? (
     <div className="page">
       <PageHeader
         title="活动管理"
@@ -1652,15 +1673,47 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
           )}
         />
       </div>
+    </div>
+      ) : null}
 
-      <Drawer
-        title={drawerTitle}
-        size={560}
-        open={editorOpen}
-        onClose={closeEditor}
-        rootClassName="activity-drawer"
-        forceRender
-      >
+      {editorOpen ? (
+      <div className="page activity-editor-page">
+        <div className="activity-editor-heading">
+          <Button type="text" className="activity-editor-back" onClick={closeEditor}>
+            ← 返回活动列表
+          </Button>
+          <div className="activity-editor-heading-row">
+            <div>
+              <Typography.Title level={3} className="activity-editor-title">
+                {drawerTitle}
+              </Typography.Title>
+              <Typography.Text type="secondary">
+                {editorMode === 'create' ? '先保存草稿，确认奖励规则后再发布' : '活动资料与奖励独立管理，发布后受原有规则版本约束'}
+              </Typography.Text>
+            </div>
+            {detail ? <Tag color={ACTIVITY_STATUS_META[detail.status].color}>{ACTIVITY_STATUS_META[detail.status].label}</Tag> : null}
+          </div>
+        </div>
+        <nav className="activity-editor-tabs" role="tablist" aria-label="活动编辑区域">
+          {([
+            ['info', '活动信息'],
+            ['checkin', '签到奖励'],
+            ['purchase', '消费奖励'],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={activeSection === key}
+              aria-controls={'activity-editor-' + key}
+              className={activeSection === key ? 'activity-editor-tab is-active' : 'activity-editor-tab'}
+              onClick={() => setActiveSection(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+        <div className="activity-editor-content">
         {detailLoading ? (
           <div className="activity-drawer-loading">
             <Spin description="正在读取活动详情…" />
@@ -1742,6 +1795,16 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
             layout="vertical"
             className="activity-form"
             onFinish={submitEditor}
+            onFinishFailed={({ errorFields }) => {
+              const name = String(errorFields[0]?.name[0] ?? '')
+              const section = name.startsWith('reward') ? 'checkin'
+                : name.startsWith('purchase') ? 'purchase' : 'info'
+              setActiveSection(section)
+              if (section === 'info' && ['eligibility', 'checkin', 'purchase', 'prizeClaim', 'notes'].includes(name)) {
+                setPublicRulesOpen(true)
+              }
+              setSaveError('有必填项或格式需要检查，已为你切换到相应区域。')
+            }}
           >
             {saveError ? (
               <Alert
@@ -1753,7 +1816,14 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
               />
             ) : null}
 
-            <Form.Item
+                        <section
+              id="activity-editor-info"
+              role="tabpanel"
+              aria-label="活动信息"
+              style={{ display: activeSection === 'info' ? undefined : 'none' }}
+            >
+            <Typography.Title level={5} className="activity-editor-section-title">活动信息</Typography.Title>
+<Form.Item
               name="title"
               label="活动标题"
               rules={[
@@ -1784,7 +1854,7 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
 
             <Form.Item
               name="range"
-              label="活动时间（Asia/Shanghai，UTC+08:00）"
+              label="活动时间"
               rules={[
                 {
                   validator: async (_rule, value: unknown) => {
@@ -1852,9 +1922,13 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
               </Col>
             </Row>
 
-            <Typography.Text type="secondary" className="activity-form-section">
-              公开规则（居民端只读展示，四项均必填）
-            </Typography.Text>
+            <div className="activity-editor-disclosure">
+              <Button type="text" onClick={() => setPublicRulesOpen((v) => !v)} aria-expanded={publicRulesOpen}>
+                {publicRulesOpen ? '收起' : '展开'}参与说明（居民端展示）
+              </Button>
+              <Typography.Text type="secondary">参与资格、签到、购买与领取说明（居民端只读）</Typography.Text>
+            </div>
+            <div style={{ display: publicRulesOpen ? undefined : 'none' }}>
 
             <Form.Item
               name="eligibility"
@@ -1928,15 +2002,24 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
               <Input.TextArea rows={2} maxLength={500} showCount placeholder="补充说明，可留空" />
             </Form.Item>
 
-            <Typography.Text type="secondary" className="activity-form-section">
-              奖励履约计划（LL-MVP-006 · 发布后冻结为快照，居民签到与领奖依赖它）
-            </Typography.Text>
+            </div>
+            </section>
+
+            <section
+              id="activity-editor-checkin"
+              role="tabpanel"
+              aria-label="签到奖励"
+              style={{ display: activeSection === 'checkin' ? undefined : 'none' }}
+            >
+              <Typography.Title level={5} className="activity-editor-section-title">签到奖励</Typography.Title>
+              <Typography.Paragraph type="secondary" className="activity-editor-intro">
+                三人团队完成有效签到后，按活动配置领取实物奖励。
+              </Typography.Paragraph>
 
             <Form.Item
               name="rewardPlanEnabled"
-              label="配置正式奖励计划"
+              label="启用签到奖励"
               valuePropName="checked"
-              extra="关闭表示该活动没有正式奖品；居民端签到、达标与领取入口都会被服务端以 409 拒绝。只有打开并填写完整，才会计入奖励资格、库存与预算。"
             >
               <Switch checkedChildren="已配置" unCheckedChildren="未配置" />
             </Form.Item>
@@ -1952,27 +2035,27 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
                 getFieldValue('rewardPlanEnabled') ? (
                   <RewardPlanFields />
                 ) : (
-                  <PageInfoAlert inline
-                    type="info"
-                    showIcon
-                    title={
-                      getFieldValue('rewardPlanBaseline')
-                        ? '保存后该活动的奖励计划将被清空'
-                        : '未配置奖励计划'
-                    }
-                    description={
-                      getFieldValue('rewardPlanBaseline')
-                        ? '当前活动已冻结过奖励计划。关闭开关再保存会显式清空它，并生成新规则版本；已发放的奖励与凭据不受影响，但新的签到与领奖会立即关闭。'
-                        : '未配置奖励计划时，发布后居民签到、达标与领奖入口不可用，服务端返回 409 reward_unavailable。'
-                    }
-                  />
+                  <Typography.Paragraph type={getFieldValue('rewardPlanBaseline') ? 'danger' : 'secondary'}>
+                    {getFieldValue('rewardPlanBaseline')
+                      ? '注意：保存后会清空此活动的签到奖励计划，并关闭新的领奖资格；已发出的奖励不受影响。'
+                      : '未启用签到奖励；居民仍可查看活动，但不能参与该活动的奖励签到和领奖。'}
+                  </Typography.Paragraph>
                 )
               }
             </Form.Item>
 
-            <Typography.Text type="secondary" className="activity-form-section">
-              消费组团奖励（LL-PUR-002 · 与签到奖励独立，可同时配置）
-            </Typography.Text>
+            </section>
+
+            <section
+              id="activity-editor-purchase"
+              role="tabpanel"
+              aria-label="消费奖励"
+              style={{ display: activeSection === 'purchase' ? undefined : 'none' }}
+            >
+              <Typography.Title level={5} className="activity-editor-section-title">消费奖励</Typography.Title>
+              <Typography.Paragraph type="secondary" className="activity-editor-intro">
+                三人团队达成消费门槛后，每人领取一张同面额平台券。
+              </Typography.Paragraph>
 
             {editorMode === 'edit' && detail && detail.status !== 'draft' ? (
               <PageInfoAlert inline
@@ -1992,9 +2075,8 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
               <>
                 <Form.Item
                   name="purchaseRewardEnabled"
-                  label="配置消费组团奖励"
+                  label="启用消费奖励"
                   valuePropName="checked"
-                  extra="与签到奖励相互独立。关闭表示该活动不设消费组团奖励，不影响已配置的签到奖；发布后该规则随规则版本冻结。"
                 >
                   <Switch checkedChildren="已配置" unCheckedChildren="未配置" />
                 </Form.Item>
@@ -2010,20 +2092,11 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
                     getFieldValue('purchaseRewardEnabled') ? (
                       <PurchaseRewardPlanFields />
                     ) : (
-                      <PageInfoAlert inline
-                        type="info"
-                        showIcon
-                        title={
-                          getFieldValue('purchaseRewardPlanBaseline')
-                            ? '保存后该活动的消费组团奖励将被清空'
-                            : '未配置消费组团奖励'
-                        }
-                        description={
-                          getFieldValue('purchaseRewardPlanBaseline')
-                            ? '当前为草稿活动。关闭开关并保存会清空消费奖励配置；草稿修改不会生成规则版本，也不会影响既有签到奖励。'
-                            : '未启用消费组团奖励不影响既有签到奖励；发布后居民端只展示门槛与每人券面额。'
-                        }
-                      />
+                      <Typography.Paragraph type={getFieldValue('purchaseRewardPlanBaseline') ? 'danger' : 'secondary'}>
+                        {getFieldValue('purchaseRewardPlanBaseline')
+                          ? '注意：保存后会清空本活动的消费奖励配置。'
+                          : '未启用消费奖励，不影响签到奖励。'}
+                      </Typography.Paragraph>
                     )
                   }
                 </Form.Item>
@@ -2031,25 +2104,30 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
             )}
 
             {editorMode === 'edit' && detail?.status === 'draft' ? (
-              <PageInfoAlert inline
-                type="info"
-                showIcon
-                title="草稿阶段修改规则不会生成版本"
-                description="活动发布后规则将冻结为 v1；之后修改关键规则会生成新的版本。"
-              />
+              <Typography.Text type="secondary">
+                草稿修改不生成规则版本；发布后奖励规则按原有合同冻结。
+              </Typography.Text>
             ) : null}
+            </section>
 
-            <Space className="activity-form-actions">
+            <div className="activity-editor-footer">
+              <Typography.Text type="secondary" className="activity-editor-footer-hint">
+                {editorMode === 'create' ? '先保存草稿，发布操作仍在活动列表中进行' : '保存前会检查三个区域的全部必填项'}
+              </Typography.Text>
+              <Space className="activity-form-actions">
               <Button onClick={closeEditor} disabled={saving}>
                 取消
               </Button>
               <Button type="primary" htmlType="submit" loading={saving}>
                 {editorMode === 'create' ? '保存草稿' : '保存修改'}
               </Button>
-            </Space>
+              </Space>
+            </div>
           </Form>
         )}
-      </Drawer>
+        </div>
+      </div>
+      ) : null}
 
       <Drawer
         title={versionsActivity ? `规则版本 · ${versionsActivity.title}` : '规则版本'}
@@ -2224,6 +2302,6 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
         session={session}
         onClose={() => setDrawPoolActivity(null)}
       />
-    </div>
+    </>
   )
 }
