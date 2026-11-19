@@ -65,8 +65,8 @@ const environmentSchema = z
      * the capability endpoint reports `wechatJsapiAvailable=false` and payment
      * creation/prepay fail closed. A partially supplied group fails startup.
      *
-     * APIv3 Key is deliberately NOT part of this group: it only decrypts
-     * callback resources, which belongs to PAY-11.
+     * PAY-11 loads the optional APIv3 key from a protected file for
+     * signed callback decryption, never outbound PAY-10 signing.
      */
     WECHAT_PAY_MCHID: z
       .string()
@@ -93,6 +93,7 @@ const environmentSchema = z
     WECHAT_PAY_PLATFORM_CERTIFICATE_FILE: z.string().trim().min(1).optional(),
     WECHAT_PAY_NOTIFY_URL: z.string().url().optional(),
     WECHAT_PAY_API_BASE_URL: z.string().url().optional(),
+    WECHAT_PAY_API_V3_KEY_FILE: z.string().trim().min(1).optional(),
     WECHAT_PAY_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(30_000).default(10_000),
     // CRMEB integration (Issue #63). The three credentials are optional as a
     // group: when they are absent the adapter reports `not_configured` instead
@@ -188,7 +189,8 @@ const environmentSchema = z
       wechatPayGroup.some((name) => Boolean(value[name])) ||
       Boolean(value.WECHAT_PAY_PLATFORM_PUBLIC_KEY_FILE) ||
       Boolean(value.WECHAT_PAY_PLATFORM_PUBLIC_KEY_ID) ||
-      Boolean(value.WECHAT_PAY_PLATFORM_CERTIFICATE_FILE)
+      Boolean(value.WECHAT_PAY_PLATFORM_CERTIFICATE_FILE) ||
+      Boolean(value.WECHAT_PAY_API_V3_KEY_FILE)
     if (wechatPaySupplied) {
       for (const name of wechatPayGroup) {
         if (!value[name]) {

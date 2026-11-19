@@ -109,6 +109,18 @@ function factCte(db: AppDatabase, actor: LocalActor, q: PaymentDifferencesQuery,
         (SELECT COUNT(*) FROM wechat_pay_prepay_attempts pp
           WHERE pp.payment_intent_id = pi.id AND pp.status IN ('requesting','uncertain')
         ) AS uncertain_prepays,
+        (SELECT rc.operation FROM wechat_pay_recovery_checks rc
+          WHERE rc.payment_intent_id = pi.id
+          ORDER BY rc.created_at DESC, rc.rowid DESC LIMIT 1
+        ) AS last_recovery_operation,
+        (SELECT rc.result FROM wechat_pay_recovery_checks rc
+          WHERE rc.payment_intent_id = pi.id
+          ORDER BY rc.created_at DESC, rc.rowid DESC LIMIT 1
+        ) AS last_recovery_result,
+        (SELECT rc.detail_code FROM wechat_pay_recovery_checks rc
+          WHERE rc.payment_intent_id = pi.id
+          ORDER BY rc.created_at DESC, rc.rowid DESC LIMIT 1
+        ) AS last_recovery_detail,
         pi.expires_at AS expires_at
       FROM payment_intents pi
       JOIN local_orders lo ON lo.id = pi.local_order_id
@@ -120,6 +132,10 @@ function factCte(db: AppDatabase, actor: LocalActor, q: PaymentDifferencesQuery,
         CASE
           WHEN amount_exceptions > 0 THEN 'amount_mismatch'
           WHEN review_exceptions > 0 OR online_conflicts > 0 THEN 'provider_exception'
+          WHEN last_recovery_result IN ('uncertain','request_sent')
+            OR (last_recovery_operation = 'post_close_query'
+                AND last_recovery_detail NOT IN ('CLOSED','REVOKED'))
+            THEN 'provider_exception'
           WHEN repeated_channel_events > 0 THEN 'duplicate_provider_event'
           WHEN payment_status = 'paid' AND active_manual_receipts > 0 THEN 'manual_online_conflict'
           WHEN completion_amount_cents IS NOT NULL
@@ -216,9 +232,27 @@ export function paymentDifferenceDetail(
   const q: PaymentDifferencesQuery = { page: 1, pageSize: 1, status: 'all', source: 'all' }
   const raw = rawRows(db, actor, q, now, 1, 0, intentId)[0]
   if (!raw) throw new LocalError(404, API_ERROR_CODES.notFound, '支付核对记录不存在')
+  // Scope was already enforced by rawRows, including the 404 privacy guard.
+  // Expose the minimal audit reason/time, never raw response bodies or hashes.
+  const recoveryChecks = db.all(sql`
+    SELECT operation, result, detail_code AS detailCode, created_at AS createdAt
+    FROM wechat_pay_recovery_checks
+    WHERE payment_intent_id = ${intentId}
+    ORDER BY created_at DESC, rowid DESC LIMIT 20
+  `) as Array<{
+    operation: 'query' | 'close' | 'post_close_query'
+    result: 'verified' | 'uncertain' | 'request_sent'
+    detailCode: string
+    createdAt: number
+  }>
   return {
     ...toDifference(raw), asOf: now.toISOString(),
     order: getAdminLocalOrderDetail(db, actor, raw.order_id),
+    recoveryChecks: recoveryChecks.map((item) => ({
+      operation: item.operation, result: item.result,
+      detailCode: item.detailCode,
+      createdAt: new Date(item.createdAt).toISOString(),
+    })),
   }
 }
 

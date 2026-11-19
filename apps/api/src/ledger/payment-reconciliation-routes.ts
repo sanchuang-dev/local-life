@@ -4,6 +4,7 @@ import {
   API_ERROR_CODES,
   adminLocalOrderDetailSchema,
   paymentDifferenceSchema,
+  paymentRecoveryCheckSchema,
   paymentDifferencesQuerySchema,
   paymentDifferencesResponseSchema,
   paymentReconciliationRoutes,
@@ -56,11 +57,12 @@ export function registerPaymentReconciliationRoutes(app: Hono<AppBindings>, deps
     try {
       const detail = paymentDifferenceDetail(db, who, intentId.data, now())
       c.header('Cache-Control', 'no-store')
-      const { order, asOf, ...difference } = detail
+      const { order, asOf, recoveryChecks, ...difference } = detail
       return c.json({
         ...paymentDifferenceSchema.parse(difference),
         asOf,
         order: adminLocalOrderDetailSchema.parse(order),
+        recoveryChecks: recoveryChecks.map((v) => paymentRecoveryCheckSchema.parse(v)),
       })
     } catch (error) {
       return errorResponse(c, error)

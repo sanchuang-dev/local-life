@@ -66,3 +66,12 @@ export const paymentDifferencesResponseSchema = z.strictObject({
   asOf: z.string().datetime(),
 })
 export type PaymentDifferencesResponse = z.infer<typeof paymentDifferencesResponseSchema>
+
+/** PAY-11 scoped recovery audit projection; excludes raw merchant responses and tokens. */
+export const paymentRecoveryCheckSchema = z.strictObject({
+  operation: z.enum(['query', 'close', 'post_close_query']),
+  result: z.enum(['verified', 'uncertain', 'request_sent']),
+  detailCode: z.string().min(1).max(80),
+  createdAt: z.string().datetime(),
+})
+export type PaymentRecoveryCheck = z.infer<typeof paymentRecoveryCheckSchema>

@@ -55,6 +55,7 @@ beforeEach(() => {
   vi.mocked(getPaymentReconciliationDetail).mockResolvedValue({
     ...ITEM, asOf: '2026-11-19T00:00:00.000Z',
     order: {} as never,
+    recoveryChecks: [],
   })
 })
 afterEach(() => {
@@ -69,6 +70,24 @@ function show() {
     </ConfigProvider>,
   )
 }
+
+describe('PAY-11 recovery audit in PAY-09 payment detail', () => {
+  it('shows a sanitized recovery exception and never implies bank settlement', async () => {
+    vi.mocked(getPaymentReconciliationDetail).mockResolvedValueOnce({
+      ...ITEM, asOf: '2026-11-19T00:00:00.000Z', order: {} as never,
+      recoveryChecks: [{
+        operation: 'query', result: 'uncertain',
+        detailCode: 'refund_requires_manual_review',
+        createdAt: '2026-11-19T00:00:00.000Z',
+      }],
+    })
+    show()
+    await screen.findByText('已支付未形成订单完成')
+    fireEvent.click(screen.getByRole('button', { name: '核查详情' }))
+    expect(await screen.findByText(/refund_requires_manual_review/u)).toBeTruthy()
+    expect(screen.getAllByText('未核实').length).toBeGreaterThan(0)
+  })
+})
 
 describe('PAY-09 Admin payment reconciliation panel', () => {
   it('labels simulated money and internal-only discrepancy, without claiming WeChat settlement', async () => {

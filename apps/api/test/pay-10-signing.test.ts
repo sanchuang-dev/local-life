@@ -362,6 +362,10 @@ test('PAY-10 merchant configuration fails closed and never exposes key material'
       WEB_BASE_URL: 'https://local-life.example.test/',
     }
     delete production.WECHAT_PAY_API_BASE_URL
+    assert.throws(() => loadConfig(production), /WECHAT_PAY_API_V3_KEY_FILE/u)
+    const apiV3KeyPath = join(directory, 'api-v3-key')
+    writeFileSync(apiV3KeyPath, '0123456789ABCDEF0123456789ABCDEF')
+    production.WECHAT_PAY_API_V3_KEY_FILE = apiV3KeyPath
     assert.ok(loadConfig(production).wechatPay)
     assert.throws(
       () =>

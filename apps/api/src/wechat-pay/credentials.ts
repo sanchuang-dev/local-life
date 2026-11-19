@@ -1,5 +1,6 @@
 import {
   createPrivateKey,
+  createSecretKey,
   createPublicKey,
   X509Certificate,
   type KeyObject,
@@ -17,8 +18,8 @@ import { readFileSync, statSync } from 'node:fs'
  *   into the API config JSON (`JSON.stringify(new KeyObject)` cannot emit PEM).
  * - The WeChat Pay platform *public* key (recommended by the current official
  *   docs) or a platform *certificate* is the only trust anchor for verifying
- *   WeChat's HTTP responses. The APIv3 key is deliberately absent: it decrypts
- *   callback resources, which belongs to PAY-11, not to outbound signing.
+ *   WeChat's HTTP responses. PAY-11 optionally loads a separate APIv3 key
+ *   for inbound AES-GCM decryption, never outbound signing.
  * - All-or-nothing configuration: a partially supplied merchant group fails
  *   startup instead of silently advertising a channel that cannot work.
  * - Errors name the variable and the expected shape, never key material, its
@@ -36,6 +37,7 @@ export interface WechatPayEnvInput {
   WECHAT_PAY_NOTIFY_URL?: string
   WECHAT_PAY_API_BASE_URL?: string
   WECHAT_PAY_TIMEOUT_MS?: number
+  WECHAT_PAY_API_V3_KEY_FILE?: string
 }
 
 export interface WechatPayRuntimeConfig {
@@ -52,6 +54,8 @@ export interface WechatPayRuntimeConfig {
   notifyUrl: string
   apiBaseUrl: string
   timeoutMs: number
+  /** PAY-11 notification decryption only; optional for PAY-10 outbound prepay. */
+  apiV3Key?: KeyObject
 }
 
 export class WechatPayConfigError extends Error {
@@ -253,9 +257,16 @@ export function loadWechatPayRuntime(
     'WECHAT_PAY_PLATFORM_PUBLIC_KEY_FILE',
     'WECHAT_PAY_PLATFORM_PUBLIC_KEY_ID',
     'WECHAT_PAY_PLATFORM_CERTIFICATE_FILE',
+    'WECHAT_PAY_API_V3_KEY_FILE',
   ].some((name) => Boolean(value[name as keyof WechatPayEnvInput]))
 
   if (!supplied) return undefined
+
+  if (nodeEnv === 'production' && !value.WECHAT_PAY_API_V3_KEY_FILE) {
+    throw new WechatPayConfigError(
+      'WECHAT_PAY_API_V3_KEY_FILE is required when real WeChat Pay is enabled in production',
+    )
+  }
 
   const missing = REQUIRED_GROUP.filter((name) => !value[name])
   if (missing.length > 0) {
@@ -271,6 +282,12 @@ export function loadWechatPayRuntime(
   const notify = assertHttpUrl(notifyUrl, 'WECHAT_PAY_NOTIFY_URL', nodeEnv)
   if (notify.protocol !== 'https:') {
     throw new WechatPayConfigError('WECHAT_PAY_NOTIFY_URL must use https')
+  }
+  if (value.WECHAT_PAY_API_V3_KEY_FILE &&
+      !['/payments/wechat/notify', '/api/payments/wechat/notify'].includes(notify.pathname)) {
+    throw new WechatPayConfigError(
+      'WECHAT_PAY_NOTIFY_URL must point to the registered /api/payments/wechat/notify endpoint',
+    )
   }
 
   const apiBaseUrl = (value.WECHAT_PAY_API_BASE_URL ?? WECHAT_PAY_DEFAULT_API_BASE_URL)
@@ -292,6 +309,19 @@ export function loadWechatPayRuntime(
     value.WECHAT_PAY_MERCHANT_PRIVATE_KEY_FILE!.trim(),
   )
   const platform = loadPlatformPublicKey(value)
+  let apiV3Key: KeyObject | undefined
+  if (value.WECHAT_PAY_API_V3_KEY_FILE) {
+    // The official APIv3 key is a literal 32-byte ASCII string. Reject
+    // accidental base64/hex encoding, unicode or a trailing copied secret.
+    const keyText = readKeyFile(value.WECHAT_PAY_API_V3_KEY_FILE, 'WECHAT_PAY_API_V3_KEY_FILE')
+      .replace(/\r?\n$/u, '')
+    const bytes = Buffer.from(keyText, 'utf8')
+    if (bytes.length !== 32 || !/^[\x21-\x7e]{32}$/u.test(keyText)) {
+      throw new WechatPayConfigError('WECHAT_PAY_API_V3_KEY_FILE must contain exactly 32 printable ASCII bytes')
+    }
+    apiV3Key = createSecretKey(bytes)
+    bytes.fill(0)
+  }
 
   return {
     mchid,
@@ -304,5 +334,6 @@ export function loadWechatPayRuntime(
     notifyUrl: notifyUrl,
     apiBaseUrl,
     timeoutMs,
+    ...(apiV3Key ? { apiV3Key } : {}),
   }
 }
