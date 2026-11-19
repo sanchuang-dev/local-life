@@ -43,8 +43,9 @@ export async function getPaymentReconciliationDetail(
     throw new LocalApiError(200, 'invalid_response', '支付差异详情缺少原订单')
   }
   const record = payload as Record<string, unknown>
-  const item = parsePayload(paymentDifferenceSchema, record, '支付差异详情')
-  const order = parsePayload(adminLocalOrderDetailSchema, record.order, '支付订单详情')
+  const { order: rawOrder, asOf, ...rawItem } = record
+  const item = parsePayload(paymentDifferenceSchema, rawItem, '支付差异详情')
+  const order = parsePayload(adminLocalOrderDetailSchema, rawOrder, '支付订单详情')
   if (typeof record.asOf !== 'string') throw new LocalApiError(200, 'invalid_response', '支付差异详情时间不正确')
   return { ...item, order, asOf: record.asOf }
 }
