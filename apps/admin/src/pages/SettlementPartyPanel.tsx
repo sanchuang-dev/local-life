@@ -377,11 +377,19 @@ export function SettlementPartyPanel() {
           onClose={closeDrawer}
           rootClassName="local-drawer"
           destroyOnHidden
+          footer={
+            <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button onClick={closeDrawer} disabled={submitting}>取消</Button>
+              <Button type="primary" htmlType="submit" form="settlement-party-form" loading={submitting} disabled={submitting}>
+              提交登记
+              </Button>
+            </Space>
+          }
         >
           <Typography.Paragraph type="secondary">
             只登记真实、可核验的法人主体。核验依据是材料引用（例如合同或证照编号），提交它不等于服务端已核验；核验状态由服务端决定，本页不预填任何主体名称、费率或金额。
           </Typography.Paragraph>
-          <Form<PartyFormValues> form={form} layout="vertical" onFinish={(values) => void submit(values)}>
+          <Form<PartyFormValues> id="settlement-party-form" form={form} layout="vertical" onFinish={(values) => void submit(values)}>
             {submitError ? (
               <Alert
                 type="error"
@@ -428,14 +436,6 @@ export function SettlementPartyPanel() {
             >
               <Input maxLength={200} placeholder="例如合同编号或证照核对记录（可留空）" />
             </Form.Item>
-            <Space wrap>
-              <Button type="primary" htmlType="submit" loading={submitting} disabled={submitting}>
-                提交登记
-              </Button>
-              <Button onClick={closeDrawer} disabled={submitting}>
-                取消
-              </Button>
-            </Space>
           </Form>
         </Drawer>
       ) : null}

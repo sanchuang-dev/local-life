@@ -714,6 +714,29 @@ function OrderConsole({ session }: { session: AuthenticatedSession }) {
         onClose={closeDetail}
         rootClassName="local-drawer"
         destroyOnHidden
+        footer={
+          !detailLoading && !detailError && detail && (rejectOpen || canReview) ? (
+            <Space style={{ display: 'flex', justifyContent: 'flex-end' }} wrap>
+              {rejectOpen ? (
+                <>
+                  <Button disabled={transitioning} onClick={() => setRejectOpen(false)}>取消</Button>
+                  <Button danger type="primary" loading={transitioning} onClick={() => void submitRejection()}>
+                    确认标记未通过
+                  </Button>
+                </>
+              ) : canReview ? (
+                <>
+                  <Button danger loading={reviewing} disabled={transitioning} onClick={() => void performReview('reject')}>
+                    驳回
+                  </Button>
+                  <Button type="primary" loading={reviewing} disabled={transitioning} onClick={() => void performReview('verify')}>
+                    确认人工核验通过
+                  </Button>
+                </>
+              ) : null}
+            </Space>
+          ) : null
+        }
       >
         {detailLoading ? (
           <div className="local-drawer-loading">
@@ -843,17 +866,7 @@ function OrderConsole({ session }: { session: AuthenticatedSession }) {
                     {rejectError ? (
                       <Alert type="error" showIcon title="未提交" description={rejectError} />
                     ) : null}
-                    <div className="local-review-actions">
-                      <Button
-                        danger
-                        type="primary"
-                        loading={transitioning}
-                        onClick={() => void submitRejection()}
-                      >
-                        确认标记未通过
-                      </Button>
-                      <Button onClick={() => setRejectOpen(false)}>取消</Button>
-                    </div>
+
                   </div>
                 ) : null}
               </section>
@@ -902,24 +915,7 @@ function OrderConsole({ session }: { session: AuthenticatedSession }) {
                 {reviewError ? (
                   <Alert type="error" showIcon title="核验未提交" description={reviewError} />
                 ) : null}
-                <div className="local-review-actions">
-                  <Button
-                    type="primary"
-                    loading={reviewing}
-                    disabled={transitioning}
-                    onClick={() => void performReview('verify')}
-                  >
-                    确认人工核验通过
-                  </Button>
-                  <Button
-                    danger
-                    loading={reviewing}
-                    disabled={transitioning}
-                    onClick={() => void performReview('reject')}
-                  >
-                    驳回
-                  </Button>
-                </div>
+
               </section>
             ) : null}
 

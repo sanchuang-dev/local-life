@@ -615,6 +615,20 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
               closable={!saving}
               destroyOnHidden
               className="wechat-editor-drawer"
+              footer={
+                <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <Button onClick={closeEditor} disabled={saving}>取消</Button>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    form="wechat-credentials-form"
+                    loading={saving}
+                    disabled={!masterKeyAvailable}
+                  >
+                    保存凭证
+                  </Button>
+                </Space>
+              }
             >
               <div className="wechat-form-head">
                 <Typography.Title level={5}>{active ? '更换公众号' : '添加公众号'}</Typography.Title>
@@ -634,6 +648,7 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
               ) : null}
 
               <Form<SaveFormValues>
+                id="wechat-credentials-form"
                 form={form}
                 layout="vertical"
                 initialValues={{ accountType: 'official' }}
@@ -679,17 +694,6 @@ function WechatSettingsConsole({ session }: { session: AuthenticatedSession }) {
                     placeholder="输入公众号 AppSecret"
                   />
                 </Form.Item>
-                <Space>
-                  <Button
-                    type="primary"
-                    htmlType="submit"
-                    loading={saving}
-                    disabled={!masterKeyAvailable}
-                  >
-                    保存凭证
-                  </Button>
-                  <Button onClick={closeEditor} disabled={saving}>取消</Button>
-                </Space>
               </Form>
             </Drawer>
 

@@ -61,12 +61,6 @@
   margin-top: 12px;
 }
 
-.local-drawer .local-review-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
 .local-confirm-body p {
   margin: 4px 0;
 }

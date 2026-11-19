@@ -632,6 +632,7 @@ describe('CrmPage order list and manual review', () => {
     fireEvent.change(firstLabel('核验备注'), {
       target: { value: '已电话核验' },
     })
+    expect(screen.getByRole('button', { name: '确认有效成交' }).closest('.ant-drawer-footer')).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '确认有效成交' }))
 
     expect(

@@ -747,11 +747,19 @@ export function SettlementMappingPanel() {
           onClose={closeDrawer}
           rootClassName="local-drawer"
           destroyOnHidden
+          footer={
+            <Space style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button onClick={closeDrawer} disabled={submitting}>取消</Button>
+              <Button type="primary" htmlType="submit" form="settlement-mapping-form" loading={submitting} disabled={submitting}>
+              保存映射
+              </Button>
+            </Space>
+          }
         >
           <Typography.Paragraph type="secondary">
             新增即新版本：同一商品可以有多条映射记录，历史版本不会被覆盖。保存映射不会确认任何订单，也不会自动确认历史订单。本页不填写任何费率或金额。
           </Typography.Paragraph>
-          <Form<MappingFormValues>
+          <Form<MappingFormValues> id="settlement-mapping-form"
             form={form}
             layout="vertical"
             onFinish={(values) => void submitMapping(values)}
@@ -890,14 +898,6 @@ export function SettlementMappingPanel() {
             >
               <Input maxLength={10} placeholder="YYYY-MM-DD" />
             </Form.Item>
-            <Space wrap>
-              <Button type="primary" htmlType="submit" loading={submitting} disabled={submitting}>
-                保存映射
-              </Button>
-              <Button onClick={closeDrawer} disabled={submitting}>
-                取消
-              </Button>
-            </Space>
           </Form>
         </Drawer>
       ) : null}

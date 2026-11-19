@@ -194,6 +194,7 @@ describe('SettlementPartyPanel · 登记', () => {
     await chooseOption(screen.getByLabelText('主体角色'), '商品销售商户')
     fillPartyForm({ legalName: created.legalName, registryRef: created.registryRef })
 
+    expect(screen.getByRole('button', { name: '提交登记' }).closest('.ant-drawer-footer')).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '提交登记' }))
 
     await waitFor(() => expect(writes(calls)).toHaveLength(1))

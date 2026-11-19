@@ -438,7 +438,8 @@ describe('SettlementRulesPanel · 登记新版本', () => {
     await openRuleDrawer()
     await fillRuleForm()
 
-    fireEvent.click(within(ruleFormElement()).getByRole('button', { name: '提交登记' }))
+    expect(screen.getByRole('button', { name: '提交登记' }).closest('.ant-drawer-footer')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '提交登记' }))
 
     await waitFor(() => expect(writesOf(calls, RULES_ROUTE)).toHaveLength(1))
     const post = writesOf(calls, RULES_ROUTE)[0]!
@@ -478,7 +479,7 @@ describe('SettlementRulesPanel · 登记新版本', () => {
     // The live total must show the mismatch, not a client-side amount.
     expect(screen.getByText(/三方合计：9900 \/ 10000 bp/)).toBeTruthy()
 
-    fireEvent.click(within(ruleFormElement()).getByRole('button', { name: '提交登记' }))
+    fireEvent.click(screen.getByRole('button', { name: '提交登记' }))
 
     expect(
       (await screen.findAllByText('三方合约分配比例必须精确合计 10000 基点')).length,
@@ -494,7 +495,7 @@ describe('SettlementRulesPanel · 登记新版本', () => {
     await openRuleDrawer()
     await fillRuleForm({ approvalOn: '2026-12-01', effectiveFrom: '2026-11-05', effectiveTo: '2026-12-31' })
 
-    fireEvent.click(within(ruleFormElement()).getByRole('button', { name: '提交登记' }))
+    fireEvent.click(screen.getByRole('button', { name: '提交登记' }))
 
     expect(await screen.findByText('核准日期必须不晚于规则生效起始日')).toBeTruthy()
     expect(writesOf(calls, RULES_ROUTE)).toHaveLength(0)
@@ -509,7 +510,7 @@ describe('SettlementRulesPanel · 登记新版本', () => {
     // Zero fee but a concrete bearer.
     await fillRuleForm({ processorFeeBps: '0', processorFeeOwner: SETTLEMENT_PROCESSOR_FEE_OWNER_LABELS.seller })
 
-    fireEvent.click(within(ruleFormElement()).getByRole('button', { name: '提交登记' }))
+    fireEvent.click(screen.getByRole('button', { name: '提交登记' }))
     expect(
       await screen.findByText('手续费为 0 时必须选择「无手续费」；大于 0 时必须选择具体承担方'),
     ).toBeTruthy()
@@ -523,7 +524,7 @@ describe('SettlementRulesPanel · 登记新版本', () => {
       within(ruleFormElement()).getByLabelText('手续费承担方'),
       SETTLEMENT_PROCESSOR_FEE_OWNER_LABELS.none,
     )
-    fireEvent.click(within(ruleFormElement()).getByRole('button', { name: '提交登记' }))
+    fireEvent.click(screen.getByRole('button', { name: '提交登记' }))
     expect(
       (await screen.findAllByText('手续费为 0 时必须选择「无手续费」；大于 0 时必须选择具体承担方')).length,
     ).toBeGreaterThan(0)
@@ -558,7 +559,7 @@ describe('SettlementRulesPanel · 登记新版本', () => {
     await openRuleDrawer()
     await fillRuleForm()
 
-    fireEvent.click(within(ruleFormElement()).getByRole('button', { name: '提交登记' }))
+    fireEvent.click(screen.getByRole('button', { name: '提交登记' }))
 
     expect(
       await screen.findByText(/数据已被更新：该映射已存在覆盖同期间的规则版本/),
