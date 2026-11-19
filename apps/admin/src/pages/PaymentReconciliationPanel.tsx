@@ -162,7 +162,7 @@ export function PaymentReconciliationPanel() {
           style={{ marginBottom: 12 }}
         />
         <Space wrap size={8} style={{ marginBottom: 12 }}>
-          <Select
+          <Select<PaymentDifferencesQuery['status']>
             aria-label="核查状态"
             value={query.status}
             style={{ width: 140 }}
@@ -174,7 +174,7 @@ export function PaymentReconciliationPanel() {
             ]}
             onChange={(status) => update({ status })}
           />
-          <Select
+          <Select<PaymentDifferencesQuery['source']>
             aria-label="支付来源"
             value={query.source}
             style={{ width: 150 }}
@@ -186,16 +186,16 @@ export function PaymentReconciliationPanel() {
             ]}
             onChange={(source) => update({ source })}
           />
-          <Select
+          <Select<PaymentDifferenceReason>
             aria-label="差异类型"
             allowClear
             placeholder="全部差异类型"
             value={query.reason}
             style={{ width: 215 }}
             options={Object.entries(REASONS).map(([value, label]) => ({ value, label }))}
-            onChange={(reason?: PaymentDifferenceReason) => update({ reason })}
+            onChange={(reason) => update({ reason })}
           />
-          <Select
+          <Select<string>
             aria-label="社区"
             allowClear
             placeholder="全部授权社区"
