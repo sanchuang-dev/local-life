@@ -239,7 +239,7 @@ export function PaymentReconciliationPanel() {
         title="支付差异定位（只读）"
         open={detailId !== null}
         onClose={() => setDetailId(null)}
-        width={640}
+        size={640}
         destroyOnHidden
       >
         {detailLoading && <Typography.Text>核查中…</Typography.Text>}
