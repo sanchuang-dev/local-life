@@ -17,7 +17,7 @@
 - `awaiting_payment`：未超时的支付意图，不能认定异常或已支付。
 - `confirmation_timeout / outbound_uncertain`：超时、尚未确认或渠道预下单不确定，须 PAY-11 查单/关单，不得靠后台“修正状态”。
 - `paid_not_projected / ledger_missing / amount_mismatch / channel_evidence_missing`：支付、完成、账本、渠道成功尝试的内部记录缺失或不符。
-- `provider_exception / duplicate_provider_event / manual_online_conflict / order_state_conflict`：原异常队列、重复来源事件与订单事实冲突，保留人工核查入口。
+- `provider_exception / duplicate_provider_event / manual_online_conflict / order_state_conflict`：原异常队列、重复来源事件与订单事实冲突，保留人工核查入口。重复渠道事件仅在相同事件类型（通知对通知、查单对查单）且同一渠道引用下判定；同一交易的正常「通知 + 主动查单」不是重复。
 - `channelBill = not_connected`、`bankSettlement = unverified`：所有结果恒定如此。微信侧未接入渠道账单时，不得出现“微信账单匹配成功”；Mock 只报告测试事实，不合并进真实收款。零元券单无渠道现金也不计算线上实收。
 - 不根据 prepay_id、浏览器回调或未验证日志创建“已付款”事实；PAY-11 和总 PRD #275 承担真实资金端到端验证。
 

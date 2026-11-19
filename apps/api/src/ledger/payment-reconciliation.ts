@@ -92,7 +92,10 @@ function factCte(db: AppDatabase, actor: LocalActor, q: PaymentDifferencesQuery,
             AND pe.source = 'channel'
             AND pe.provider_event_ref IS NOT NULL
             AND pe.event_type IN ('payment.channel_notification', 'payment.channel_query')
-          GROUP BY pe.provider_event_ref HAVING COUNT(*) > 1
+          -- A notification and a later active query of the same transaction are
+          -- two legitimate kinds of observation; only repeats within the SAME
+          -- event kind should be flagged as duplicate evidence.
+          GROUP BY pe.event_type, pe.provider_event_ref HAVING COUNT(*) > 1
         )) AS repeated_channel_events,
         (SELECT COUNT(*) FROM ledger_payment_order_links mpl
           JOIN ledger_entries ml ON ml.id = mpl.entry_id

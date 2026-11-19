@@ -1309,6 +1309,40 @@ test('PAY-08 back-office payment read', async (t) => {
     assert.equal(duplicated.status, 200, dupText)
     const matches = paymentDifferencesResponseSchema.parse(JSON.parse(dupText))
     assert.ok(matches.items.some((value) => value.intentId === intent.id))
+
+    // The same provider reference observed once by a notification and once
+    // by a trusted active query is *not* a duplicated event. This is the
+    // normal recovery path once PAY-11 connects the two evidence sources.
+    const normalOrder = await registerOrder(w, w.residentA, w.productA)
+    const normalIntent = await createMockIntent(w, w.residentA, normalOrder)
+    for (const [i, eventType] of [
+      'payment.channel_notification',
+      'payment.channel_query',
+    ].entries()) {
+      w.db.insert(paymentEvents).values({
+        id: randomUUID(),
+        paymentIntentId: normalIntent.id,
+        paymentAttemptId: null,
+        eventType: eventType as 'payment.channel_notification' | 'payment.channel_query',
+        source: 'channel',
+        fromStatus: 'pending',
+        toStatus: 'pending',
+        providerEventRef: 'PAY09-ONE-REFERENCE-TWO-KINDS',
+        evidenceFingerprint: (i === 0 ? 'b' : 'c').repeat(64),
+        dedupeKey: 'pay09-query-vs-notify-' + i + '-' + normalIntent.id,
+        createdAt: at,
+      }).run()
+    }
+    const ordinary = await api(
+      w.app, 'GET', paymentReconciliationRoutes.list + '?source=mock&pageSize=100',
+      { session: w.admin },
+    )
+    assert.equal(ordinary.status, 200)
+    const ordinaryItems = paymentDifferencesResponseSchema.parse(await ordinary.json()).items
+    const result = ordinaryItems.find((value) => value.intentId === normalIntent.id)
+    assert.ok(result)
+    assert.equal(result.reason, 'awaiting_payment',
+      'notification plus query with the same reference are distinct observations')
   })
 
   await t.test('PAY-09: cross-community, grid and anonymous list/detail/export access denied', async () => {
