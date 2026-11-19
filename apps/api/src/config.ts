@@ -1,5 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { z } from 'zod'
+import {
+  WechatPayConfigError,
+  loadWechatPayRuntime,
+  type WechatPayRuntimeConfig,
+} from './wechat-pay/credentials.js'
 
 /** AES-256 requires exactly 32 key bytes; anything else is a config error. */
 const WECHAT_CONFIG_MASTER_KEY_BYTES = 32
@@ -38,6 +43,58 @@ const environmentSchema = z
     WEB_BASE_URL: z.string().url().optional(),
     TRUSTED_ORIGINS: z.string().default(''),
     AUTH_DEV_ENABLED: z.enum(['true', 'false']).default('false'),
+    /**
+     * PAY-02 creates Mock intents and PAY-04 provides the in-process Mock
+     * driver (no public control route) only when this is explicitly true.
+     * Production must keep it false; the config loader rejects true below.
+     */
+    PAYMENT_MOCK_ENABLED: z.enum(['true', 'false']).default('false'),
+    /**
+     * Shared secret for the PAY-03 internal provider-result endpoint. Absent
+     * keeps the HTTP surface closed; PAY-11 may still call the service
+     * in-process. This token is never sent to a browser and never substitutes
+     * for provider signature verification.
+     */
+    PAYMENT_INTERNAL_TOKEN: z.string().trim().min(32).max(200).optional(),
+    /**
+     * PAY-10 single-merchant WeChat Pay APIv3 JSAPI configuration.
+     *
+     * The merchant API private key and the WeChat Pay platform trust anchor are
+     * server-controlled read-only files, never SQLite rows, never browser
+     * values and never logged. The whole group is optional; when it is absent
+     * the capability endpoint reports `wechatJsapiAvailable=false` and payment
+     * creation/prepay fail closed. A partially supplied group fails startup.
+     *
+     * PAY-11 loads the optional APIv3 key from a protected file for
+     * signed callback decryption, never outbound PAY-10 signing.
+     */
+    WECHAT_PAY_MCHID: z
+      .string()
+      .trim()
+      .regex(/^[0-9A-Za-z]{6,32}$/u, 'must be 6-32 letters or digits')
+      .optional(),
+    WECHAT_PAY_APPID: z
+      .string()
+      .trim()
+      .regex(/^wx[0-9A-Za-z]{14,32}$/u, 'must be a WeChat public account appid')
+      .optional(),
+    WECHAT_PAY_MERCHANT_SERIAL_NO: z
+      .string()
+      .trim()
+      .regex(/^[0-9A-Fa-f]{16,64}$/u, 'must be the merchant API certificate serial (hex)')
+      .optional(),
+    WECHAT_PAY_MERCHANT_PRIVATE_KEY_FILE: z.string().trim().min(1).optional(),
+    WECHAT_PAY_PLATFORM_PUBLIC_KEY_FILE: z.string().trim().min(1).optional(),
+    WECHAT_PAY_PLATFORM_PUBLIC_KEY_ID: z
+      .string()
+      .trim()
+      .regex(/^PUB_KEY_ID_[0-9A-Za-z]{1,64}$/u, 'must be the WeChat Pay public key id')
+      .optional(),
+    WECHAT_PAY_PLATFORM_CERTIFICATE_FILE: z.string().trim().min(1).optional(),
+    WECHAT_PAY_NOTIFY_URL: z.string().url().optional(),
+    WECHAT_PAY_API_BASE_URL: z.string().url().optional(),
+    WECHAT_PAY_API_V3_KEY_FILE: z.string().trim().min(1).optional(),
+    WECHAT_PAY_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(30_000).default(10_000),
     // CRMEB integration (Issue #63). The three credentials are optional as a
     // group: when they are absent the adapter reports `not_configured` instead
     // of faking a working shop. A partially supplied group is a deployment
@@ -110,6 +167,82 @@ const environmentSchema = z
         message: 'Development authentication must never be enabled in production',
       })
     }
+    if (value.NODE_ENV === 'production' && value.PAYMENT_MOCK_ENABLED === 'true') {
+      context.addIssue({
+        code: 'custom',
+        path: ['PAYMENT_MOCK_ENABLED'],
+        message: 'Mock payment intents must never be enabled in production',
+      })
+    }
+
+    // PAY-10: the single-merchant WeChat Pay group is all-or-nothing. A partial
+    // group is a deployment mistake and must fail startup rather than leave a
+    // capability flag that claims a channel can work.
+    const wechatPayGroup = [
+      'WECHAT_PAY_MCHID',
+      'WECHAT_PAY_APPID',
+      'WECHAT_PAY_MERCHANT_SERIAL_NO',
+      'WECHAT_PAY_MERCHANT_PRIVATE_KEY_FILE',
+      'WECHAT_PAY_NOTIFY_URL',
+    ] as const
+    const wechatPaySupplied =
+      wechatPayGroup.some((name) => Boolean(value[name])) ||
+      Boolean(value.WECHAT_PAY_PLATFORM_PUBLIC_KEY_FILE) ||
+      Boolean(value.WECHAT_PAY_PLATFORM_PUBLIC_KEY_ID) ||
+      Boolean(value.WECHAT_PAY_PLATFORM_CERTIFICATE_FILE) ||
+      Boolean(value.WECHAT_PAY_API_V3_KEY_FILE)
+    if (wechatPaySupplied) {
+      for (const name of wechatPayGroup) {
+        if (!value[name]) {
+          context.addIssue({
+            code: 'custom',
+            path: [name],
+            message: `${name} is required when WeChat Pay is configured`,
+          })
+        }
+      }
+      const publicKeyFile = Boolean(value.WECHAT_PAY_PLATFORM_PUBLIC_KEY_FILE)
+      const certificateFile = Boolean(value.WECHAT_PAY_PLATFORM_CERTIFICATE_FILE)
+      if (publicKeyFile === certificateFile) {
+        context.addIssue({
+          code: 'custom',
+          path: ['WECHAT_PAY_PLATFORM_PUBLIC_KEY_FILE'],
+          message:
+            'Configure exactly one of WECHAT_PAY_PLATFORM_PUBLIC_KEY_FILE or WECHAT_PAY_PLATFORM_CERTIFICATE_FILE',
+        })
+      }
+      if (publicKeyFile && !value.WECHAT_PAY_PLATFORM_PUBLIC_KEY_ID) {
+        context.addIssue({
+          code: 'custom',
+          path: ['WECHAT_PAY_PLATFORM_PUBLIC_KEY_ID'],
+          message: 'WECHAT_PAY_PLATFORM_PUBLIC_KEY_ID is required with a public key file',
+        })
+      }
+      if (certificateFile && value.WECHAT_PAY_PLATFORM_PUBLIC_KEY_ID) {
+        context.addIssue({
+          code: 'custom',
+          path: ['WECHAT_PAY_PLATFORM_PUBLIC_KEY_ID'],
+          message: 'WECHAT_PAY_PLATFORM_PUBLIC_KEY_ID is only valid with a public key file',
+        })
+      }
+      if (value.WECHAT_PAY_NOTIFY_URL) {
+        try {
+          if (new URL(value.WECHAT_PAY_NOTIFY_URL).protocol !== 'https:') {
+            context.addIssue({
+              code: 'custom',
+              path: ['WECHAT_PAY_NOTIFY_URL'],
+              message: 'must use https',
+            })
+          }
+        } catch {
+          context.addIssue({
+            code: 'custom',
+            path: ['WECHAT_PAY_NOTIFY_URL'],
+            message: 'must be a valid absolute URL',
+          })
+        }
+      }
+    }
   })
 
 /**
@@ -150,6 +283,14 @@ export interface ApiConfig {
   trustedOrigins: string[]
   webBaseUrl: string
   authDevEnabled: boolean
+  /** PAY-02/PAY-04 isolated Mock driver availability; false in production by validation. */
+  paymentMockEnabled: boolean
+  paymentInternalToken?: string
+  /**
+   * PAY-10 single-merchant WeChat Pay runtime. Absent means "not configured":
+   * capability is false and intent creation/prepay answer 503, never Mock.
+   */
+  wechatPay?: WechatPayRuntimeConfig
   crmeb?: {
     baseUrl: string
     appId: string
@@ -287,6 +428,17 @@ export function loadConfig(env: NodeJS.ProcessEnv): ApiConfig {
   // Resolved before the rest of the object so a bad master key fails startup
   // with a specific ConfigError instead of surfacing later as a decrypt error.
   const wechatConfigMasterKey = loadWechatConfigMasterKey(value)
+  // PAY-10: read the merchant private key and platform trust anchor now. An
+  // unreadable/invalid credential is a startup failure, not a deferred 500.
+  let wechatPay: WechatPayRuntimeConfig | undefined
+  try {
+    wechatPay = loadWechatPayRuntime(value, value.NODE_ENV)
+  } catch (error) {
+    if (error instanceof WechatPayConfigError) {
+      throw new ConfigError(`Invalid API environment: ${error.message}`)
+    }
+    throw error
+  }
   const webBaseUrl = value.WEB_BASE_URL ?? 'http://localhost:5173/local-life/'
   let trustedOrigins: string[]
   try {
@@ -317,6 +469,9 @@ export function loadConfig(env: NodeJS.ProcessEnv): ApiConfig {
     trustedOrigins,
     webBaseUrl,
     authDevEnabled: value.AUTH_DEV_ENABLED === 'true',
+    paymentMockEnabled: value.PAYMENT_MOCK_ENABLED === 'true',
+    ...(value.PAYMENT_INTERNAL_TOKEN ? { paymentInternalToken: value.PAYMENT_INTERNAL_TOKEN } : {}),
+    ...(wechatPay ? { wechatPay } : {}),
     ...(value.CRMEB_BASE_URL && value.CRMEB_OUTAPI_APPID && value.CRMEB_OUTAPI_APPSECRET
       ? {
           crmeb: {

@@ -2,6 +2,7 @@ import type { Hono } from 'hono'
 import type { AppBindings } from '../http.js'
 import { registerLedgerRoutes, type LedgerRouteDeps } from '../ledger/routes.js'
 import { registerReconciliationRoutes } from '../ledger/reconciliation-routes.js'
+import { registerPaymentReconciliationRoutes } from '../ledger/payment-reconciliation-routes.js'
 import { registerSettlementPartyRoutes } from '../ledger/settlement-party-routes.js'
 import { registerSettlementCandidateRoutes } from '../ledger/settlement-candidate-routes.js'
 import { registerSettlementRuleRoutes } from '../ledger/settlement-rule-routes.js'
@@ -25,6 +26,7 @@ export function registerLedgerRouteGroup(
   deps: LedgerRouteDeps,
 ): void {
   registerReconciliationRoutes(app, deps)
+  registerPaymentReconciliationRoutes(app, deps)
 
   // Ledger skeleton: read-only views over facts projected from the order,
   // verification and reward sources.

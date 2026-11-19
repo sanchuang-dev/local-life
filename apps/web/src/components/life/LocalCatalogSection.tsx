@@ -63,7 +63,7 @@ export function LocalCatalogSection({ activityId = null }: { activityId?: string
               ))}
             </div>
             <p className="life-shelf-card__footer">
-              平台只登记办理意向，不直接收款；商品交付由社区工作人员跟进。
+              商品下单、支付能力与交易状态以商品页和服务端配置为准。
             </p>
           </>
         )}

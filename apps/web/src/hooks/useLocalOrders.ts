@@ -258,5 +258,11 @@ export function useMyLocalOrder({
   }, [orderId, sessionKey, authLoading, reloadToken])
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), [])
-  return { state, reload }
+  const refreshNow = useCallback(async (): Promise<LocalOrderDetail | null> => {
+    if (!orderId || !sessionKey) return null
+    const order = await getMyLocalOrder(orderId)
+    setState({ status: 'ready', order })
+    return order
+  }, [orderId, sessionKey])
+  return { state, reload, refreshNow }
 }

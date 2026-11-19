@@ -48,14 +48,6 @@
     min-height: 0;
   }
 
-  /* A long report's summary may exceed the viewport before its list begins.
-     Let the report page scroll while giving the nested DataPanel a real,
-     bounded body so the table and pinned footer remain usable. */
-  .app-content > .page.page--long-report {
-    height: auto;
-    min-height: 100%;
-  }
-
   .app-content > .page:has(.data-panel--fill) > .page-stack {
     flex: 1 1 auto;
     min-height: 0;
@@ -96,12 +88,6 @@
   .crm-list-layout > .ant-space-item > .data-panel--fill {
     flex: 1 1 auto;
     min-height: 0;
-  }
-
-  .page--long-report .data-panel--fill {
-    flex: 0 0 auto;
-    height: min(65dvh, 640px);
-    min-height: 340px;
   }
 
   .data-panel--fill .data-panel-toolbar-row {

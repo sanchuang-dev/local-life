@@ -22,6 +22,7 @@ import { useBackTarget } from '../hooks/useBackTarget'
 import { useLocalProduct } from '../hooks/useLocalCatalog'
 import { useCouponWallet } from '../hooks/useCouponWallet'
 import { useLocalOrderTeamOptions } from '../hooks/useLocalOrders'
+import { usePaymentCapabilities } from '../hooks/usePaymentCapabilities'
 import { useResidentAuth } from '../hooks/useResidentAuth'
 import { buildResidentLoginHref } from '../components/auth/residentLogin'
 import {
@@ -52,7 +53,8 @@ import {
   localOrderAmountLines,
   shortCouponId,
 } from '../components/life/localOrderCoupon'
-import { registerLocalOrder } from '../services/localOrders'
+import { getMyLocalOrder, registerLocalOrder } from '../services/localOrders'
+import { LocalOrderPaymentPanel } from '../components/life/LocalOrderPaymentPanel'
 import { describeLocalError, isLocalApiError, newIdempotencyKey } from '../services/localApi'
 
 const MAX_QUANTITY = 99
@@ -132,6 +134,7 @@ export function LocalProductPage() {
   const { backTo, backLabel } = useBackTarget('/life', '返回惠生活')
   const { state, reload } = useLocalProduct(productId ?? null)
   const auth = useResidentAuth()
+  const paymentCapabilities = usePaymentCapabilities()
 
   const [quantity, setQuantity] = useState(1)
   const [note, setNote] = useState('')
@@ -149,6 +152,27 @@ export function LocalProductPage() {
   const product = state.status === 'ready' ? state.product : null
   const totalCents = product ? product.priceCents * quantity : 0
   const session = auth.session
+  const capabilities =
+    paymentCapabilities.state.status === 'ready' ? paymentCapabilities.state.capabilities : null
+  const canStartOnlinePayment = Boolean(
+    capabilities && (capabilities.mockAvailable || capabilities.wechatJsapiAvailable),
+  )
+  const paymentIntro =
+    paymentCapabilities.state.status === 'loading'
+      ? '正在确认支付能力…'
+      : paymentCapabilities.state.status === 'error'
+        ? '暂时无法确认支付能力；提交订单后仍可在订单页查看真实状态。'
+        : capabilities?.mockAvailable
+          ? '提交订单后可进行模拟支付（隔离测试环境，不会发生真实微信扣款）。'
+          : capabilities?.wechatJsapiAvailable
+            ? '提交订单后可在微信内完成支付；支付结果以服务端确认和订单状态为准。'
+            : '当前支付服务暂未配置，仅登记办理意向，平台不收款。'
+  const refreshRegisteredOrder = async (): Promise<LocalOrderDetail | null> => {
+    if (!registeredOrder) return null
+    const fresh = await getMyLocalOrder(registeredOrder.id)
+    setRegisteredOrder(fresh)
+    return fresh
+  }
   const teamOptions = useLocalOrderTeamOptions({
     productId: product?.id ?? null,
     sessionKey: session?.user.id ?? null,
@@ -194,7 +218,9 @@ export function LocalProductPage() {
     netPayableCents: previewNetPayableCents,
   })
   const registeredAmounts = registeredOrder
-    ? localOrderAmountLines(registeredOrder.snapshot)
+    ? localOrderAmountLines(registeredOrder.snapshot, {
+        completed: registeredOrder.status === 'online_completed',
+      })
     : []
 
   const canRegister =
@@ -389,7 +415,7 @@ export function LocalProductPage() {
                   {product.community.name}
                 </span>
                 <span className="rounded-full bg-[#fff3e6] px-2 py-0.5 text-[10px] font-medium text-[#a96b2f]">
-                  登记办理意向
+                  {canStartOnlinePayment ? '可在线支付' : '登记办理意向'}
                 </span>
               </div>
 
@@ -428,7 +454,7 @@ export function LocalProductPage() {
               登记订单 / 提交办理意向
             </h2>
             <p className="mt-1.5 text-[12px] leading-5 text-slate-500">
-              只登记办理意向，平台不收款、不代下单；工作人员会按登记信息联系你。
+              {paymentIntro}
             </p>
 
             <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-[#f4f8f6] px-3.5 py-2.5">
@@ -467,7 +493,9 @@ export function LocalProductPage() {
                   <div
                     key={line.label}
                     className={`flex items-baseline justify-between gap-3 ${
-                      line.label === '待实际支付' ? 'border-t border-slate-200 pt-1.5' : ''
+                      line.label === '待实际支付'
+                          ? 'border-t border-slate-200 pt-1.5'
+                          : ''
                     }`}
                   >
                     <dt className="text-[12px] text-slate-500">{line.label}</dt>
@@ -486,7 +514,7 @@ export function LocalProductPage() {
                 ))}
               </dl>
               <p className="mt-2 text-[10px] leading-4 text-slate-400">
-                商品总额按参考单价计算；券抵扣与待实际支付以服务端登记结果为准。
+                商品总额按参考单价计算；券抵扣与应付/实付金额以服务端登记结果为准。
               </p>
             </div>
 
@@ -775,6 +803,7 @@ export function LocalProductPage() {
             />
 
             {registeredOrder ? (
+              <>
               <div
                 role="status"
                 className="mt-3 rounded-xl border border-teal-200 bg-[#eef7f2] px-3.5 py-3"
@@ -784,7 +813,11 @@ export function LocalProductPage() {
                   办理意向已登记
                 </p>
                 <p className="mt-1 break-words text-[11px] leading-5 text-[#52786c]">
-                  订单已提交，工作人员会按登记信息联系你。平台不收款，这也不代表业务已开通。
+                  {registeredOrder.status === 'online_completed'
+                    ? '订单已完成在线交易；交易结果以服务端确认与订单状态为准。'
+                    : canStartOnlinePayment
+                      ? '订单已提交。可在下方按实际支付能力继续付款；未完成服务端确认前不会显示交易完成。'
+                      : '订单已提交，工作人员会按登记信息联系你。当前支付服务暂未配置，这不代表业务已开通。'}
                 </p>
                 <p className="mt-1 break-words text-[11px] font-medium leading-5 text-[#225c4c]">
                   处理状态：{localOrderStatusLabels[registeredOrder.status]}
@@ -818,6 +851,11 @@ export function LocalProductPage() {
                   查看我的订单详情
                 </Link>
               </div>
+              <LocalOrderPaymentPanel
+                order={registeredOrder}
+                onRefresh={refreshRegisteredOrder}
+              />
+              </>
             ) : null}
 
             {submitError ? (

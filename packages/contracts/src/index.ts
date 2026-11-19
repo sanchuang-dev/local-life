@@ -3,6 +3,15 @@ import { z } from 'zod'
 import { activityRewardPlanSchema } from './rewards.js'
 import { publicPurchaseRewardSchema, purchaseRewardPlanSchema } from './purchase-reward.js'
 import { activityStatusSchema, authCommunitySchema, staffRoleSchema } from './identity.js'
+import { ledgerEvidenceKindSchema } from './ledger.js'
+import {
+  paymentChannelSchema,
+  paymentEventSourceSchema,
+  paymentEventTypeSchema,
+  paymentIntentKindSchema,
+  paymentReviewExceptionKindSchema,
+  paymentStatusSchema,
+} from './payments.js'
 
 /** Route identifiers shared by the API and every client that calls it. */
 export const API_ROUTES = {
@@ -101,6 +110,39 @@ export const API_ERROR_CODES = {
    * submission is a conflict, never an overwrite.
    */
   orderIdempotencyConflict: 'order_idempotency_conflict',
+  /**
+   * Payment intent creation (PAY-02). Refusals are explicit: an unavailable
+   * channel never falls back to a fake payment, and a conflicting idempotency
+   * key never overwrites the original intent.
+   */
+  paymentChannelUnavailable: 'payment_channel_unavailable',
+  paymentIdempotencyConflict: 'payment_idempotency_conflict',
+  paymentNotPayable: 'payment_not_payable',
+  paymentAlreadyPaid: 'payment_already_paid',
+  paymentActiveIntentConflict: 'payment_active_intent_conflict',
+  paymentZeroAmountUnavailable: 'payment_zero_amount_unavailable',
+  /**
+   * PAY-03 trusted confirmation. Only a server-side adapter result may reach
+   * these paths; conflicts preserve evidence instead of rewinding a payment.
+   */
+  paymentEvidenceRejected: 'payment_evidence_rejected',
+  paymentConfirmationConflict: 'payment_confirmation_conflict',
+  /**
+   * PAY-05 online order completion. A trusted paid fact could not be projected
+   * onto the order (terminal/non-payable order, coupon state conflict, or an
+   * inconsistent payment snapshot). Money is never silently dropped: the event
+   * is preserved and an order-level conflict is opened for human review.
+   */
+  paymentOnlineCompletionConflict: 'payment_online_completion_conflict',
+  /**
+   * Manual/online hard boundary (R1) and parked-outbox recovery (R2). A manual
+   * verification/receipt is refused with `payment_online_completion_conflict`
+   * while any trusted payment fact may exist; a recovery request that targets a
+   * non-parked or concurrently recovered outbox row is refused here.
+   */
+  paymentOutboxRecoveryConflict: 'payment_outbox_recovery_conflict',
+  paymentInternalUnauthorized: 'payment_internal_unauthorized',
+  paymentInternalNotConfigured: 'payment_internal_not_configured',
   /**
    * Ledger (LL-MVP-008, Issue #64). Every one of these is a *refusal*: the ledger
    * prefers an explicit "cannot do that" over a silently corrected number.
@@ -255,9 +297,23 @@ export const createCommunityRequestSchema = z.strictObject({
   location: communityLocationSchema.optional(),
 })
 
-/** Add an existing scoped operator/grid worker to a community, never create a new identity. */
+/**
+ * Add an existing scoped operator or grid worker to a community, never create a
+ * new identity. For a grid worker this is an operating-territory appointment;
+ * replacement uses the dedicated atomic route.
+ */
 export const linkCommunityStaffRequestSchema = z.strictObject({
   staffAccountId: z.string().uuid(),
+})
+
+/**
+ * Territory replacement is optimistic: the caller states which owner it saw.
+ * A concurrent replacement therefore receives a 409 instead of silently
+ * overwriting the administrator who saved first.
+ */
+export const gridWorkerAssignmentRequestSchema = z.strictObject({
+  staffAccountId: z.string().uuid(),
+  expectedStaffAccountId: z.string().uuid().nullable(),
 })
 
 export const createStaffAccountRequestSchema = z.object({
@@ -270,6 +326,23 @@ export const createStaffAccountRequestSchema = z.object({
     z.string().uuid().optional(),
   ),
   communityIds: z.array(z.string().uuid()).min(1).max(20),
+}).superRefine((value, ctx) => {
+  if (new Set(value.communityIds).size !== value.communityIds.length) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'communityIds must not contain duplicates',
+      path: ['communityIds'],
+    })
+  }
+  // A grid worker owns exactly one logical territory. Operators may keep the
+  // existing multi-community authorization model.
+  if (value.role === 'grid_worker' && value.communityIds.length !== 1) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'a grid worker must own exactly one territory',
+      path: ['communityIds'],
+    })
+  }
 })
 
 export const authUserSchema = z.object({
@@ -1498,6 +1571,13 @@ export const LOCAL_ORDER_ROUTES = {
    */
   myTeamOptions: '/local-orders/team-options',
   /**
+   * Resident: explicit zero-amount completion of a fully coupon-discounted order
+   * (PAY-05). It never creates a channel payment intent, never calls WeChat and
+   * never writes a positive cash fact; the server re-derives the amounts and the
+   * coupon reservation. Repeats are idempotent per order.
+   */
+  myZeroAmountCompletion: '/local-orders/:localOrderId/zero-amount-completion',
+  /**
    * Staff surface (all three roles, community-scoped). It exists separately from
    * `/admin/*` because `/admin/*` rejects grid workers by convention, while the
    * grid worker must be able to process orders for their assigned communities.
@@ -1505,6 +1585,7 @@ export const LOCAL_ORDER_ROUTES = {
   staffOrders: '/staff/local-orders',
   staffOrderDetail: '/staff/local-orders/:localOrderId',
   staffOrderStatus: '/staff/local-orders/:localOrderId/status',
+  staffOrderVerify: '/staff/local-orders/:localOrderId/verify',
   /** Back office: admin/operator only. */
   adminOrders: '/admin/local-orders',
   adminOrderDetail: '/admin/local-orders/:localOrderId',
@@ -1628,17 +1709,24 @@ export type UpdateLocalProductRequest = z.infer<typeof updateLocalProductRequest
  * `processing`   a staff member is handling it
  * `pending_review` waiting for the operations manual verification
  * `verified`     operations manually verified the *fact* — NOT paid, NOT activated
+ * `online_completed` a trusted payment fact (channel success or the zero-amount
+ *                coupon-only path) completed this order. It is NOT a human
+ *                verification: `verifiedByUserId`/`verifiedAt` stay NULL and no
+ *                `order_verified` fact is produced.
  * `cancelled`    withdrawn
  * `rejected`     refused, with a reason
  *
- * The names deliberately differ from the carrier order names (`confirmed` means a
- * verified carrier deal) so neither domain can leak into the other.
+ * `verified` and `online_completed` are deliberately distinct terminal states:
+ * the manual fact-check path must never be able to claim online payment, and an
+ * online payment must never be recorded as a human verification or as a manual
+ * `payment_received` receipt.
  */
 export const localOrderStatusSchema = z.enum([
   'registered',
   'processing',
   'pending_review',
   'verified',
+  'online_completed',
   'cancelled',
   'rejected',
 ])
@@ -1647,17 +1735,20 @@ export type LocalOrderStatus = z.infer<typeof localOrderStatusSchema>
 /**
  * Frozen state machine. The server is the authority; clients may only use this
  * table for affordances. `verified` is reachable *exclusively* through the
- * operations verification endpoint, which is why it is absent from
- * `localOrderTransitionStatusSchema`.
+ * operations verification endpoint and `online_completed` exclusively through
+ * PAY-05 online completion, which is why neither appears in
+ * `localOrderTransitionStatusSchema`. A staff member can therefore never move an
+ * order into either terminal state by hand.
  */
 export const LOCAL_ORDER_STATUS_TRANSITIONS: Record<
   LocalOrderStatus,
   readonly LocalOrderStatus[]
 > = {
-  registered: ['processing', 'cancelled', 'rejected'],
-  processing: ['pending_review', 'cancelled', 'rejected'],
-  pending_review: ['verified', 'rejected'],
+  registered: ['processing', 'cancelled', 'rejected', 'online_completed'],
+  processing: ['pending_review', 'cancelled', 'rejected', 'online_completed'],
+  pending_review: ['verified', 'rejected', 'online_completed'],
   verified: [],
+  online_completed: [],
   cancelled: [],
   rejected: [],
 }
@@ -1685,6 +1776,8 @@ export const localOrderEventTypeSchema = z.enum([
   'order.status_changed',
   'order.verified',
   'order.rejected',
+  /** PAY-05: the one trusted online completion fact of this order. */
+  'order.online_completed',
 ])
 export type LocalOrderEventType = z.infer<typeof localOrderEventTypeSchema>
 
@@ -1733,6 +1826,24 @@ export const localOrderTeamRefSchema = z.object({
 })
 export type LocalOrderTeamRef = z.infer<typeof localOrderTeamRefSchema>
 
+
+/**
+ * Latest payment intent projected onto a local order for resident read surfaces.
+ * A `pending/confirming/paid` intent is not an order completion by itself; only
+ * `online_completed` + `onlineCompletion` can claim a finished online trade.
+ */
+export const localOrderPaymentSummarySchema = z.strictObject({
+  intentId: z.string().uuid(),
+  status: paymentStatusSchema,
+  channel: z.enum(['mock', 'wechat_jsapi']).nullable(),
+  simulated: z.boolean(),
+  netPayableCents: z.number().int().nonnegative(),
+  expiresAt: isoTimestamp,
+  failureMessage: z.string().nullable(),
+  updatedAt: isoTimestamp,
+})
+export type LocalOrderPaymentSummary = z.infer<typeof localOrderPaymentSummarySchema>
+
 export const localOrderSummarySchema = z.object({
   id: z.string().uuid(),
   community: authCommunitySchema,
@@ -1751,6 +1862,8 @@ export const localOrderSummarySchema = z.object({
    */
   sourceTeam: localOrderTeamRefSchema.nullable(),
   note: z.string().nullable(),
+  /** Latest payment intent, if any; never inferred from `local_orders.status`. */
+  payment: localOrderPaymentSummarySchema.nullable().optional(),
   createdAt: isoTimestamp,
   updatedAt: isoTimestamp,
 })
@@ -1774,12 +1887,141 @@ export const localOrderEventSchema = z.object({
 export type LocalOrderEvent = z.infer<typeof localOrderEventSchema>
 
 /**
- * Order detail. `verification` exists only after an operations review, and the
- * contract has no payment/activation field at all: `verified` is a manual fact
- * check by a human operator, never "已付款" or "已开通".
+ * PAY-05 online completion projection of one order.
+ *
+ * `kind` separates the two legal ways an order can complete online:
+ * - `channel`: a trusted channel payment (PAY-03 `payment.paid.v1`);
+ * - `zero_amount`: a fully coupon-discounted order completed without any channel
+ *   payment. It carries `amountCents: 0` and no provider transaction id, so it
+ *   can never be read as real money.
+ *
+ * Neither kind means "settled to the company bank account", and neither produces
+ * a manual `order_verified` fact or a `payment_received` receipt.
+ */
+export const localOrderOnlineCompletionKindSchema = z.enum(['channel', 'zero_amount'])
+export type LocalOrderOnlineCompletionKind = z.infer<
+  typeof localOrderOnlineCompletionKindSchema
+>
+
+export const localOrderOnlineCompletionSchema = z
+  .strictObject({
+    paymentIntentId: z.string().uuid(),
+    kind: localOrderOnlineCompletionKindSchema,
+    /** True only for an isolated Mock channel fact; real wechat is never simulated. */
+    simulated: z.boolean(),
+    /** Actual cash paid for this order: the net payable, or 0 for the coupon-only path. */
+    amountCents: z.number().int().nonnegative(),
+    discountCents: z.number().int().nonnegative(),
+    /** Null for the zero-amount path; a real channel reference otherwise. */
+    providerTransactionId: z.string().trim().min(1).max(128).nullable(),
+    completedAt: isoTimestamp,
+  })
+  .superRefine((value, ctx) => {
+    if (value.kind === 'zero_amount') {
+      if (value.amountCents !== 0) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'zero_amount completion cannot carry cash',
+          path: ['amountCents'],
+        })
+      }
+      if (value.providerTransactionId !== null || value.simulated) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'zero_amount completion has no channel facts',
+          path: ['providerTransactionId'],
+        })
+      }
+      return
+    }
+    if (value.amountCents <= 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'channel completion requires positive net payable',
+        path: ['amountCents'],
+      })
+    }
+    if (value.providerTransactionId === null) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'channel completion requires a provider transaction id',
+        path: ['providerTransactionId'],
+      })
+    }
+  })
+export type LocalOrderOnlineCompletion = z.infer<typeof localOrderOnlineCompletionSchema>
+
+/**
+ * PAY-05 durable manual-review path. It never rewinds a payment, re-reserves a
+ * released coupon or completes an order; it only preserves the conflict so a
+ * human can reconcile it (PAY-11 query/close, refund policy decision).
+ */
+export const localOrderOnlineConflictKindSchema = z.enum([
+  /** A trusted paid event arrived for an order that is no longer payable. */
+  'order_not_payable',
+  /** The order was already completed by a different fact. */
+  'order_already_completed',
+  /** The payment intent/attempt/outbox payload is internally inconsistent. */
+  'payment_state_invalid',
+  /** The order's coupon is not reserved to this order or already void/redeemed. */
+  'coupon_state_invalid',
+  /** PAY-03 preserved a late success after the intent was already terminal. */
+  'late_success',
+  /**
+   * R1: a trusted channel payment arrived for an order that already carries a
+   * manual receipt. The online money fact is preserved here; it is never turned
+   * into a second completion or a second ledger receipt.
+   */
+  'manual_online_double_collection',
+  /**
+   * R2: the PAY-05 completion chain exhausted its retry budget and parked the
+   * outbox row. The order is deliberately left uncompleted but visible, with the
+   * failure reason, channel reference and amounts, until the controlled replay
+   * resolves it.
+   */
+  'consumer_exhausted',
+])
+export type LocalOrderOnlineConflictKind = z.infer<
+  typeof localOrderOnlineConflictKindSchema
+>
+
+export const localOrderOnlineConflictSchema = z.strictObject({
+  id: z.string().uuid(),
+  kind: localOrderOnlineConflictKindSchema,
+  /**
+   * Deliberately no free-text `detail`: the durable row keeps the full evidence
+   * (including channel references) for authorized operations, while this shared
+   * order DTO — readable by the resident who owns the order — exposes only the
+   * fact that a human review is pending and why, in a closed vocabulary.
+   */
+  status: z.enum(['open', 'reviewed', 'resolved']),
+  createdAt: isoTimestamp,
+  resolvedAt: isoTimestamp.nullable(),
+})
+export type LocalOrderOnlineConflict = z.infer<typeof localOrderOnlineConflictSchema>
+
+/**
+ * Order detail. `verification` exists only after a staff review (the current
+ * territory grid worker, an operator or an admin), and the contract has no
+ * payment/activation field at all: `verified` is a manual fact check by a human,
+ * never "已付款" or "已开通".
+ *
+ * `onlineCompletion` is the strictly separate PAY-05 projection: it is present
+ * exactly when the order reached `online_completed`, and it is the only place
+ * that may claim an online payment. Verification and online completion can never
+ * both be present on the same order.
  */
 export const localOrderDetailSchema = localOrderSummarySchema
   .extend({
+    /**
+     * Resident-supplied contact facts for the phone-verification workflow.
+     * The list intentionally carries no phone; only this scoped detail payload
+     * exposes the verified phone/address, and only to its owner or authorized staff.
+     */
+    residentContact: z.strictObject({
+      phone: z.string().regex(/^1\d{10}$/u).nullable(),
+      address: z.string().min(1).max(200).nullable(),
+    }),
     verification: z
       .object({
         verifiedBy: crmUserRefSchema.nullable(),
@@ -1787,6 +2029,10 @@ export const localOrderDetailSchema = localOrderSummarySchema
         note: z.string().min(2).max(500),
       })
       .nullable(),
+    /** Present exactly for `online_completed`; never for a manual verification. */
+    onlineCompletion: localOrderOnlineCompletionSchema.nullable(),
+    /** Open/resolved PAY-05 conflicts; empty for the ordinary happy path. */
+    onlineConflicts: z.array(localOrderOnlineConflictSchema),
     /**
      * Note of the most recent *status change* (derived from the append-only
      * timeline, not a mutable column). This is where a rejection reason stays
@@ -1810,8 +2056,117 @@ export const localOrderDetailSchema = localOrderSummarySchema
         path: ['verification'],
       })
     }
+    if ((value.status === 'online_completed') !== (value.onlineCompletion !== null)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'onlineCompletion must be present exactly for online_completed orders',
+        path: ['onlineCompletion'],
+      })
+    }
   })
 export type LocalOrderDetail = z.infer<typeof localOrderDetailSchema>
+
+/* -------------------------------------------------------------------------- */
+/* R2 parked-outbox visibility and controlled recovery                        */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Threshold alert / runbook payload for the internal operations surface.
+ *
+ * R2 closes the "money arrived but the order was silently parked" gap: when the
+ * PAY-05 completion chain exhausts its retry budget, the outbox row stays
+ * `failed` and an `open` `consumer_exhausted` order conflict is written in the
+ * same transaction. This DTO is the token-gated query path an operator uses to
+ * locate the order, intent, channel transaction, amount and failure reason, and
+ * the id they may replay through the controlled recovery endpoint.
+ */
+export const paymentOutboxRecoveryRequestSchema = z.strictObject({
+  /** The durable `payment_outbox.id`; the payment intent is never the target. */
+  outboxEventId: z.string().uuid(),
+})
+export type PaymentOutboxRecoveryRequest = z.infer<
+  typeof paymentOutboxRecoveryRequestSchema
+>
+
+export const paymentOutboxRecoveryOutcomeSchema = z.enum([
+  /** The parked event was replayed and the outbox row is now `delivered`. */
+  'recovered',
+  /** The event was already delivered; replay is a safe no-op. */
+  'already_completed',
+  /** The replay failed transiently again and is scheduled for a later attempt. */
+  'retry_scheduled',
+  /** The replay produced a permanent conflict and parked the row again. */
+  'still_failed',
+])
+export type PaymentOutboxRecoveryOutcome = z.infer<
+  typeof paymentOutboxRecoveryOutcomeSchema
+>
+
+export const paymentOutboxStorageStatusSchema = z.enum([
+  'pending',
+  'processing',
+  'delivered',
+  'failed',
+])
+export type PaymentOutboxStorageStatus = z.infer<typeof paymentOutboxStorageStatusSchema>
+
+export const paymentOutboxRecoveryResponseSchema = z.strictObject({
+  outboxEventId: z.string().uuid(),
+  outcome: paymentOutboxRecoveryOutcomeSchema,
+  /** Persisted outbox state AFTER the replay attempt — never a client claim. */
+  status: paymentOutboxStorageStatusSchema,
+  /** Order/intent are null only when the parked row cannot be resolved to one. */
+  localOrderId: z.string().uuid().nullable(),
+  paymentIntentId: z.string().uuid().nullable(),
+  orderStatus: localOrderStatusSchema.nullable(),
+  /** Open conflicts for this outbox resolved by a successful replay. */
+  conflictsResolved: z.number().int().nonnegative(),
+  asOf: isoTimestamp,
+})
+export type PaymentOutboxRecoveryResponse = z.infer<
+  typeof paymentOutboxRecoveryResponseSchema
+>
+
+export const paymentFailedOutboxConflictSchema = z.strictObject({
+  id: z.string().uuid(),
+  kind: localOrderOnlineConflictKindSchema,
+  status: z.enum(['open', 'reviewed', 'resolved']),
+  /** Full persisted evidence; this payload is internal-token-only. */
+  detail: z.string().trim().min(1).max(500),
+  createdAt: isoTimestamp,
+  resolvedAt: isoTimestamp.nullable(),
+})
+export type PaymentFailedOutboxConflict = z.infer<
+  typeof paymentFailedOutboxConflictSchema
+>
+
+export const paymentFailedOutboxItemSchema = z.strictObject({
+  outboxEventId: z.string().uuid(),
+  paymentIntentId: z.string().uuid(),
+  localOrderId: z.string().uuid().nullable(),
+  orderStatus: localOrderStatusSchema.nullable(),
+  topic: z.string().trim().min(1).max(100),
+  status: z.literal('failed'),
+  attempts: z.number().int().nonnegative(),
+  lastError: z.string().trim().min(1).max(500).nullable(),
+  /** Frozen intent facts: what money the parked event is about. */
+  amountCents: z.number().int().nonnegative(),
+  providerTransactionId: z.string().trim().min(1).max(128).nullable(),
+  createdAt: isoTimestamp,
+  updatedAt: isoTimestamp,
+  conflicts: z.array(paymentFailedOutboxConflictSchema),
+})
+export type PaymentFailedOutboxItem = z.infer<
+  typeof paymentFailedOutboxItemSchema
+>
+
+export const paymentFailedOutboxListResponseSchema = z.strictObject({
+  items: z.array(paymentFailedOutboxItemSchema),
+  asOf: isoTimestamp,
+})
+export type PaymentFailedOutboxListResponse = z.infer<
+  typeof paymentFailedOutboxListResponseSchema
+>
 
 /**
  * Resident registration. Strict on purpose: the resident comes from the session,
@@ -1858,6 +2213,21 @@ export const localOrderCreateResponseSchema = z.object({
 })
 export type LocalOrderCreateResponse = z.infer<typeof localOrderCreateResponseSchema>
 
+/**
+ * PAY-05 idempotent online completion result.
+ *
+ * `created: false` is the safe replay: this exact order already completed online
+ * (same payment intent, same coupon redemption, same completion fact). It never
+ * means "a second payment happened".
+ */
+export const localOrderOnlineCompletionResponseSchema = z.strictObject({
+  created: z.boolean(),
+  order: localOrderDetailSchema,
+})
+export type LocalOrderOnlineCompletionResponse = z.infer<
+  typeof localOrderOnlineCompletionResponseSchema
+>
+
 export const updateLocalOrderStatusRequestSchema = z
   .strictObject({
     expectedUpdatedAt: isoTimestamp,
@@ -1878,8 +2248,9 @@ export type UpdateLocalOrderStatusRequest = z.infer<
 >
 
 /**
- * Operations verification. `verify` is the only path to `verified` and always
+ * Scoped staff verification. `verify` is the only path to `verified` and always
  * records the reviewer and a note; `reject` moves the order to `rejected`.
+ * The caller's current territory/assignment is re-checked server-side.
  * Re-verifying an already verified order is an explicit 409
  * `order_already_verified`, never a silent second success.
  */
@@ -1914,6 +2285,268 @@ export const localOrderEventListResponseSchema = z.object({
   items: z.array(localOrderEventSchema),
 })
 export type LocalOrderEventListResponse = z.infer<typeof localOrderEventListResponseSchema>
+
+/* -------------------------------------------------------------------------- */
+/* PAY-08 back-office payment read model                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * PAY-08 read-only back-office payment view (#283).
+ *
+ * This is **not** a second payment truth source. Every field is projected from
+ * the existing facts:
+ * - `local_orders` (frozen snapshot + the manual `verified` fact check);
+ * - `payment_intents` / `payment_attempts` / `payment_events` (PAY-01–PAY-04);
+ * - `local_order_online_completions` / `local_order_online_conflicts` (PAY-05);
+ * - `payment_review_exceptions` (PAY-03);
+ * - `ledger_entries` + `ledger_entry_sources` (`manual` / `online_payment`).
+ *
+ * It adds no state, no transition and no write route. `bankSettlement` is a
+ * literal `unverified`: no settlement/bank-credit evidence exists for channel
+ * money in this code base, so the back office cannot claim 已到账/已结算.
+ */
+
+/** Provider references are displayed masked: `****` plus at most the last 4 characters. */
+export const adminMaskedProviderTransactionIdSchema = z
+  .string()
+  .regex(
+    /^\*{4}[A-Za-z0-9_-]{0,4}$/u,
+    'masked provider transaction id may only keep the last 4 characters',
+  )
+export type AdminMaskedProviderTransactionId = z.infer<
+  typeof adminMaskedProviderTransactionIdSchema
+>
+
+/**
+ * Back-office list query: the shared order filters plus payment facts.
+ *
+ * `paymentMode` filters orders that actually have a payment intent:
+ * - `simulated` -> at least one `simulated = 1` intent (Mock);
+ * - `real`      -> at least one `simulated = 0` intent.
+ * An order with no payment intent matches neither, which is the honest answer
+ * for the old manual path. All matching is executed by SQLite, server-side.
+ */
+export const adminLocalOrderListQuerySchema = localOrderListQuerySchema
+  .extend({
+    orderId: z.string().uuid().optional(),
+    merchantOrderNo: z
+      .string()
+      .trim()
+      .min(6)
+      .max(32)
+      .regex(/^[A-Za-z0-9_-]+$/u, 'merchant order number must be channel-safe')
+      .optional(),
+    providerTransactionId: z.string().trim().min(1).max(128).optional(),
+    paymentStatus: paymentStatusSchema.optional(),
+    paymentChannel: paymentChannelSchema.optional(),
+    paymentMode: z.enum(['simulated', 'real']).optional(),
+    /** Inclusive lower bound on `local_orders.created_at`. */
+    createdFrom: isoTimestamp.optional(),
+    /** Inclusive upper bound on `local_orders.created_at`. */
+    createdTo: isoTimestamp.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (
+      value.createdFrom !== undefined &&
+      value.createdTo !== undefined &&
+      Date.parse(value.createdFrom) > Date.parse(value.createdTo)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'createdFrom must not be after createdTo',
+        path: ['createdTo'],
+      })
+    }
+  })
+export type AdminLocalOrderListQuery = z.infer<typeof adminLocalOrderListQuerySchema>
+
+/** The frozen money layers of one order. Never recomputed from the channel. */
+export const adminPaymentAmountsSchema = z.strictObject({
+  grossAmountCents: z.number().int().nonnegative(),
+  couponDiscountCents: z.number().int().nonnegative(),
+  netPayableCents: z.number().int().nonnegative(),
+})
+export type AdminPaymentAmounts = z.infer<typeof adminPaymentAmountsSchema>
+
+export const adminPaymentAttemptSummarySchema = z.strictObject({
+  id: z.string().uuid(),
+  attemptNo: z.number().int().min(1),
+  status: paymentStatusSchema,
+  /** Masked only; the raw channel reference never leaves the server. */
+  providerTransactionIdMasked: adminMaskedProviderTransactionIdSchema.nullable(),
+  createdAt: isoTimestamp,
+  updatedAt: isoTimestamp,
+  confirmedAt: isoTimestamp.nullable(),
+  closedAt: isoTimestamp.nullable(),
+  failedAt: isoTimestamp.nullable(),
+  failureCode: z.string().nullable(),
+  failureMessage: z.string().nullable(),
+})
+export type AdminPaymentAttemptSummary = z.infer<typeof adminPaymentAttemptSummarySchema>
+
+/** Append-only payment event trail, with channel reference strings omitted. */
+export const adminPaymentEventSummarySchema = z.strictObject({
+  id: z.string().uuid(),
+  eventType: paymentEventTypeSchema,
+  source: paymentEventSourceSchema,
+  fromStatus: paymentStatusSchema.nullable(),
+  toStatus: paymentStatusSchema.nullable(),
+  createdAt: isoTimestamp,
+})
+export type AdminPaymentEventSummary = z.infer<typeof adminPaymentEventSummarySchema>
+
+/**
+ * One payment intent of the order with its attempts and event trail. Multiple
+ * intents per order are legal; at most one can be `paid` (database guarantee).
+ */
+export const adminPaymentIntentSummarySchema = z.strictObject({
+  id: z.string().uuid(),
+  kind: paymentIntentKindSchema,
+  channel: paymentChannelSchema.nullable(),
+  /** Permanent Mock marker; never promoted to a real-channel receipt. */
+  simulated: z.boolean(),
+  merchantOrderNo: z.string().trim().min(6).max(32),
+  grossAmountCents: z.number().int().nonnegative(),
+  discountCents: z.number().int().nonnegative(),
+  netPayableCents: z.number().int().nonnegative(),
+  status: paymentStatusSchema,
+  expiresAt: isoTimestamp,
+  paidAt: isoTimestamp.nullable(),
+  closedAt: isoTimestamp.nullable(),
+  failedAt: isoTimestamp.nullable(),
+  failureCode: z.string().nullable(),
+  failureMessage: z.string().nullable(),
+  createdAt: isoTimestamp,
+  updatedAt: isoTimestamp,
+  attempts: z.array(adminPaymentAttemptSummarySchema),
+  events: z.array(adminPaymentEventSummarySchema),
+})
+export type AdminPaymentIntentSummary = z.infer<typeof adminPaymentIntentSummarySchema>
+
+/** PAY-05 immutable completion, with the channel reference masked. */
+export const adminOnlineCompletionSummarySchema = z.strictObject({
+  paymentIntentId: z.string().uuid(),
+  kind: localOrderOnlineCompletionKindSchema,
+  simulated: z.boolean(),
+  amountCents: z.number().int().nonnegative(),
+  discountCents: z.number().int().nonnegative(),
+  providerTransactionIdMasked: adminMaskedProviderTransactionIdSchema.nullable(),
+  completedAt: isoTimestamp,
+})
+export type AdminOnlineCompletionSummary = z.infer<typeof adminOnlineCompletionSummarySchema>
+
+/** One `online_payment` ledger receipt projected from a completion. */
+export const adminOnlineLedgerReceiptSchema = z.strictObject({
+  entryId: z.string().uuid(),
+  factKind: z.literal('payment_received'),
+  sourceSystem: z.literal('online_payment'),
+  amountCents: z.number().int().nonnegative(),
+  simulated: z.boolean(),
+  providerTransactionIdMasked: adminMaskedProviderTransactionIdSchema.nullable(),
+  occurredAt: isoTimestamp,
+  createdAt: isoTimestamp,
+})
+export type AdminOnlineLedgerReceipt = z.infer<typeof adminOnlineLedgerReceiptSchema>
+
+/** Manual (human) receipt linked to the order, plus its reversal if any. */
+export const adminManualReceiptSchema = z.strictObject({
+  entryId: z.string().uuid(),
+  factKind: z.literal('payment_received'),
+  amountCents: z.number().int().nonnegative(),
+  evidenceKind: ledgerEvidenceKindSchema,
+  evidenceRef: z.string().nullable(),
+  occurredAt: isoTimestamp,
+  createdAt: isoTimestamp,
+  reversal: z
+    .strictObject({
+      entryId: z.string().uuid(),
+      amountCents: z.number().int().nonnegative(),
+      occurredAt: isoTimestamp,
+    })
+    .nullable(),
+})
+export type AdminManualReceipt = z.infer<typeof adminManualReceiptSchema>
+
+/**
+ * PAY-03 provider-evidence review exception. The free-text `detail` is
+ * deliberately absent (it may embed raw channel references); the closed
+ * `kind` vocabulary plus masked transaction id and amount are enough to locate
+ * and understand the case.
+ */
+export const adminPaymentReviewExceptionSummarySchema = z.strictObject({
+  id: z.string().uuid(),
+  kind: paymentReviewExceptionKindSchema,
+  status: z.enum(['open', 'reviewed', 'resolved']),
+  channel: paymentChannelSchema,
+  merchantOrderNo: z.string().trim().min(6).max(32),
+  providerTransactionIdMasked: adminMaskedProviderTransactionIdSchema.nullable(),
+  amountCents: z.number().int().nonnegative().nullable(),
+  source: z.enum(['notification', 'query']),
+  failureCode: z.string().nullable(),
+  observedAt: isoTimestamp,
+  createdAt: isoTimestamp,
+  resolvedAt: isoTimestamp.nullable(),
+})
+export type AdminPaymentReviewExceptionSummary = z.infer<
+  typeof adminPaymentReviewExceptionSummarySchema
+>
+
+/** The manual fact-check layer. `verified` never means paid. */
+export const adminManualPaymentStateSchema = z.strictObject({
+  verified: z.boolean(),
+  verifiedAt: isoTimestamp.nullable(),
+  verifiedBy: crmUserRefSchema.nullable(),
+  note: z.string().nullable(),
+  receipts: z.array(adminManualReceiptSchema),
+})
+export type AdminManualPaymentState = z.infer<typeof adminManualPaymentStateSchema>
+
+/**
+ * The online channel layer: intents/attempts/events, the PAY-05 completion, the
+ * PAY-06 `online_payment` receipts and both exception vocabularies. Read-only.
+ */
+export const adminOnlinePaymentStateSchema = z.strictObject({
+  intents: z.array(adminPaymentIntentSummarySchema),
+  completion: adminOnlineCompletionSummarySchema.nullable(),
+  ledgerReceipts: z.array(adminOnlineLedgerReceiptSchema),
+  conflicts: z.array(localOrderOnlineConflictSchema),
+  reviewExceptions: z.array(adminPaymentReviewExceptionSummarySchema),
+})
+export type AdminOnlinePaymentState = z.infer<typeof adminOnlinePaymentStateSchema>
+
+/** Display-only totals over the ledger rows above; never a settlement claim. */
+export const adminPaymentReceiptTotalsSchema = z.strictObject({
+  manualReceivedCents: z.number().int().nonnegative(),
+  onlineRealReceivedCents: z.number().int().nonnegative(),
+  onlineSimulatedReceivedCents: z.number().int().nonnegative(),
+})
+export type AdminPaymentReceiptTotals = z.infer<typeof adminPaymentReceiptTotalsSchema>
+
+/**
+ * Bank settlement can only be claimed with real settlement/bank evidence, which
+ * this code base does not have for channel money. The literal keeps every client
+ * honest: no API response can ever say 已到账/已结算.
+ */
+export const adminBankSettlementStateSchema = z.strictObject({
+  status: z.literal('unverified'),
+})
+export type AdminBankSettlementState = z.infer<typeof adminBankSettlementStateSchema>
+
+export const adminOrderPaymentSectionSchema = z.strictObject({
+  /** 商品金额 / 券抵扣 / 净应付, from the frozen order snapshot. */
+  amounts: adminPaymentAmountsSchema,
+  manual: adminManualPaymentStateSchema,
+  online: adminOnlinePaymentStateSchema,
+  receiptTotals: adminPaymentReceiptTotalsSchema,
+  bankSettlement: adminBankSettlementStateSchema,
+})
+export type AdminOrderPaymentSection = z.infer<typeof adminOrderPaymentSectionSchema>
+
+/** Back-office order detail = the existing detail DTO + the read-only section. */
+export const adminLocalOrderDetailSchema = localOrderDetailSchema.extend({
+  paymentSection: adminOrderPaymentSectionSchema,
+})
+export type AdminLocalOrderDetail = z.infer<typeof adminLocalOrderDetailSchema>
 
 /* -------------------------------------------------------------------------- */
 /* Resident participation & three-person team domain (#60 LL-MVP-004)         */
@@ -2303,6 +2936,8 @@ export * from './user-directory.js'
 export * from './resident-community.js'
 export * from './resident-profile.js'
 export * from './draw.js'
+export * from './payments.js'
+export * from './payment-reconciliation.js'
 
 /* -------------------------------------------------------------------------- */
 /* Phone (SMS one-time code) resident identity (#93 LL-H5-002)                 */

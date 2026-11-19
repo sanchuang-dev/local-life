@@ -88,18 +88,27 @@ function LocalOrdersView() {
                 : '正在读取…'}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={refresh}
-          className="inline-flex min-h-10 shrink-0 items-center gap-1 rounded-full px-2 text-[11px] font-medium text-slate-500"
-        >
-          <RefreshCw size={13} aria-hidden="true" />
-          刷新
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={() => updateFilter('status', 'pending_review')}
+            className="inline-flex min-h-10 items-center rounded-full bg-[#eef7f2] px-3 text-[11px] font-semibold text-[#2d725f]"
+          >
+            待核验
+          </button>
+          <button
+            type="button"
+            onClick={refresh}
+            className="inline-flex min-h-10 items-center gap-1 rounded-full px-2 text-[11px] font-medium text-slate-500"
+          >
+            <RefreshCw size={13} aria-hidden="true" />
+            刷新
+          </button>
+        </div>
       </div>
 
       <p className="mt-2 rounded-xl bg-[#fff7ec] px-3.5 py-2.5 text-[11px] leading-5 text-[#8a6132]">
-        仅显示你负责社区的登记订单。人工核验由运营人员完成。
+        仅显示你负责社区的登记订单。待核验订单可由当前片区网格员电话核实；核验不代表收款或业务办理完成。
       </p>
 
       <div className="mt-4 space-y-3">

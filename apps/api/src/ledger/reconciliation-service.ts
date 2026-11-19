@@ -152,6 +152,7 @@ const SOURCE_SYSTEM_LABELS: Record<LedgerSourceSystem, string> = {
   crm_service_order: '广电CRM',
   activity_reward_grant: '奖励履约',
   manual: '人工收款',
+  online_payment: '线上支付',
 }
 
 const ATTRIBUTION_STATE_LABELS: Record<LedgerAttributionState, string> = {
@@ -206,8 +207,8 @@ export function maskPhoneNumbers(value: string): string {
 }
 
 /** RFC 4180 cell: quote only when needed, double the quotes. */
-function csvCell(value: string): string {
-  const masked = maskPhoneNumbers(value)
+function csvCell(value: string, maskPhone = true): string {
+  const masked = maskPhone ? maskPhoneNumbers(value) : value
   // Quoting CSV is not sufficient to stop Excel interpreting formula cells.
   // Prefix a text marker even when whitespace/control characters precede it.
   const safe = /^[\u0000-\u0020]*[=+\-@]/u.test(masked) ? `'${masked}` : masked
@@ -331,6 +332,9 @@ export function membershipConditions(
 ): SQL<unknown>[] {
   const range = reconciliationPeriodRange(periodFrom, periodTo)
   const conditions: SQL<unknown>[] = [
+    // Mock online receipts are detail evidence only; they never enter a formal
+    // reconciliation statement, batch total or CSV.
+    eq(ledgerEntries.simulated, false),
     gte(ledgerEntries.occurredAt, new Date(range.startMs)),
     lt(ledgerEntries.occurredAt, new Date(range.endMs)),
   ]
@@ -1303,7 +1307,9 @@ export function buildReconciliationCsv(
       entry.batchNo ?? '',
       anomalyText,
     ]
-    lines.push(cells.map((cell) => csvCell(cell)).join(','))
+    // Column 0 is an immutable UUID, not a free-text field. Masking incidental
+    // phone-like digits in it corrupts the reconciliation join key.
+    lines.push(cells.map((cell, index) => csvCell(cell, index !== 0)).join(','))
   }
 
   const body = `\uFEFF${lines.join('\r\n')}\r\n`
