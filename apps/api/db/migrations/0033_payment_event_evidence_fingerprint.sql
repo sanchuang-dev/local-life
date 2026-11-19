@@ -11,7 +11,7 @@ DROP INDEX `payment_review_exceptions_dedupe_uq`;
 CREATE UNIQUE INDEX `payment_review_exceptions_dedupe_fingerprint_uq`
   ON `payment_review_exceptions` (`dedupe_key`, `evidence_fingerprint`);
 --> statement-breakpoint
-DROP TRIGGER `payment_review_exceptions_immutable_evidence`;
+DROP TRIGGER IF EXISTS `payment_review_exceptions_immutable_evidence`;
 --> statement-breakpoint
 CREATE TRIGGER `payment_review_exceptions_immutable_evidence`
 BEFORE UPDATE ON `payment_review_exceptions`
