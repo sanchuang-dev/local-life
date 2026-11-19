@@ -26,6 +26,12 @@ import {
   paymentOutboxRecoveryRequestSchema,
   paymentOutboxRecoveryResponseSchema,
   paymentFailedOutboxListResponseSchema,
+  PAYMENT_ROUTES,
+  WECHAT_JSAPI_SIGN_TYPE,
+  paymentPrepayRequestSchema,
+  paymentPrepayResponseSchema,
+  wechatJsapiInvocationSchema,
+  wechatPayPrepayStatusSchema,
 } from '@sanchuang-dev/local-life-contracts'
 
 const NOW = '2026-11-16T02:00:00.000Z'
@@ -555,6 +561,106 @@ describe('PAY-05 online completion contracts', () => {
         ...failedList,
         items: [{ ...failedList.items[0], status: 'delivered' }],
       }).success,
+      false,
+    )
+  })
+})
+
+describe('PAY-10 WeChat JSAPI prepay contracts', () => {
+  const invocation = {
+    appId: 'wx2421b1c4370ec43b',
+    timeStamp: '1554208460',
+    nonceStr: '593BEC0C930BF1AFEB40B4A08C8FB242',
+    package: 'prepay_id=wx201410272009395522657a690389285100',
+    signType: 'RSA',
+    paySign: 'mI35pfNEQV6777ke/1T+LJLQDNTm7yeoUJH+j/adPGhmCCi0PbgkvYQTRcXH0uibcLVtvFLdGLpmoYO9FV6lBBsTAjuhh5YOvQi0e2g3e0yytitiNET9FEuqM0pjnKfRW4K6LIZDdbWJv9KhZUx3DrJa5TL7OJ7VdADVivxVySIlPVKjGwuCXzuXSJes0UcILgWQUMyha5/3nYofuHtS7r+KYyMuxD+oJ9VM1Qdxk4UIG59CP5Y3wtYIFybyF3bdu1caHTRRX+DLyMXyYA/IrTmiW01c4RPjpHBX5Dk1sZyY1zVsWNsvMHr2e1NTWtBxKJ+qk5N61J7caYoepHFaxw==',
+  }
+
+  it('exposes one resident prepay route and no second capability surface', () => {
+    assert.equal(
+      PAYMENT_ROUTES.wechatJsapiPrepay,
+      '/payments/intents/:paymentIntentId/wechat-jsapi/prepay',
+    )
+    assert.equal(WECHAT_JSAPI_SIGN_TYPE, 'RSA')
+  })
+
+  it('accepts only server-generated JSAPI invocation fields', () => {
+    assert.equal(wechatJsapiInvocationSchema.safeParse(invocation).success, true)
+    assert.equal(
+      wechatJsapiInvocationSchema.safeParse({ ...invocation, signType: 'MD5' }).success,
+      false,
+    )
+    assert.equal(
+      wechatJsapiInvocationSchema.safeParse({ ...invocation, timeStamp: '1554208460000' }).success,
+      false,
+    )
+    assert.equal(
+      wechatJsapiInvocationSchema.safeParse({ ...invocation, package: 'prepay_id=' }).success,
+      false,
+    )
+    assert.equal(
+      wechatJsapiInvocationSchema.safeParse({ ...invocation, appId: '' }).success,
+      false,
+    )
+  })
+
+  it('rejects every browser-supplied merchant or payment field', () => {
+    assert.equal(paymentPrepayRequestSchema.safeParse({}).success, true)
+    for (const field of [
+      'appId',
+      'mchid',
+      'amount',
+      'openid',
+      'outTradeNo',
+      'package',
+      'paySign',
+      'prepayId',
+      'timeStamp',
+    ]) {
+      assert.equal(
+        paymentPrepayRequestSchema.safeParse({ [field]: 'x' }).success,
+        false,
+        `${field} must never be client input`,
+      )
+    }
+  })
+
+  it('keeps prepay separate from provider transaction and paid facts', () => {
+    assert.deepEqual(wechatPayPrepayStatusSchema.options, [
+      'requesting',
+      'succeeded',
+      'rejected',
+      'uncertain',
+    ])
+    const response = {
+      outcome: 'prepay_created',
+      paymentIntentId: '123e4567-e89b-42d3-a456-426614174001',
+      channel: 'wechat_jsapi',
+      prepayExpiresAt: LATER,
+      invocation,
+    }
+    assert.equal(paymentPrepayResponseSchema.safeParse(response).success, true)
+    assert.equal(
+      paymentPrepayResponseSchema.safeParse({
+        ...response,
+        paid: true,
+        providerTransactionId: '42000000002000000000000000000000',
+      }).success,
+      false,
+    )
+    assert.equal(
+      paymentPrepayResponseSchema.safeParse({ ...response, outcome: 'paid' }).success,
+      false,
+    )
+    assert.equal(
+      paymentPrepayResponseSchema.safeParse({
+        ...response,
+        invocation: { ...invocation, package: 'prepay_id=bad package' },
+      }).success,
+      false,
+    )
+    assert.equal(
+      paymentPrepayResponseSchema.safeParse({ ...response, prepayExpiresAt: 'not-a-date' }).success,
       false,
     )
   })

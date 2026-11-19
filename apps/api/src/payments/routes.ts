@@ -9,6 +9,7 @@ import {
   paymentEvidenceSchema,
   paymentOutboxConsumeRequestSchema,
   paymentOutboxRecoveryRequestSchema,
+  paymentPrepayRequestSchema,
   type CreatePaymentIntentRequest,
 } from '@sanchuang-dev/local-life-contracts'
 import type { ApiConfig } from '../config.js'
@@ -23,7 +24,12 @@ import {
   recoverParkedPaymentOutboxEvent,
   runPaymentOutboxConsumer,
 } from './outbox.js'
-import { createPaymentIntent, getMyPaymentIntent, getPaymentCapabilities } from './service.js'
+import {
+  createPaymentIntent,
+  createWechatJsapiPrepay,
+  getMyPaymentIntent,
+  getPaymentCapabilities,
+} from './service.js'
 
 export interface PaymentRouteDeps {
   db: AppDatabase
@@ -138,6 +144,41 @@ export function registerPaymentRoutes(
       }
       c.header('Cache-Control', 'no-store')
       return c.json(result)
+    } catch (error) {
+      return failWithPaymentError(c, error)
+    }
+  })
+
+  /**
+   * PAY-10 resident-owned WeChat JSAPI prepay.
+   *
+   * The request body is strictly empty: the intent id is the only client value.
+   * appId/mchid/amount/openid/out_trade_no/package/paySign are all derived from
+   * server state; the response is invocation parameters, never a paid fact.
+   */
+  app.post(PAYMENT_ROUTES.wechatJsapiPrepay, async (c) => {
+    const guard = requireResident(c)
+    if (guard instanceof Response) return guard
+    if (!validCsrf(c, config, guard.session)) {
+      return fail(c, 403, API_ERROR_CODES.forbidden, 'CSRF 校验失败')
+    }
+    const intentId = paymentIntentIdSchema.safeParse(c.req.param('paymentIntentId'))
+    if (!intentId.success) return fail(c, 404, API_ERROR_CODES.notFound, '支付单不存在')
+    const raw = await c.req.text().catch(() => '')
+    let parsedBody: unknown = {}
+    if (raw.trim() !== '') {
+      try {
+        parsedBody = JSON.parse(raw)
+      } catch {
+        parsedBody = null
+      }
+    }
+    const body = bodySchemaError(parsedBody, paymentPrepayRequestSchema)
+    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '预下单参数不正确')
+    try {
+      const result = await createWechatJsapiPrepay(db, config, guard.actor, intentId.data)
+      c.header('Cache-Control', 'no-store')
+      return c.json(result, result.outcome === 'prepay_created' ? 201 : 200)
     } catch (error) {
       return failWithPaymentError(c, error)
     }
