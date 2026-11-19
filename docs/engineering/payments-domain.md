@@ -1,6 +1,6 @@
 # 支付领域契约、持久化、居民创建/查询、可信确认与隔离 Mock（PAY-01 #276 / PAY-02 #277 / PAY-03 #278 / PAY-04 #279 / PAY-05 #280 / PAY-07）
 
-> **PAY-01** 建立支付意图、尝试与事件的共享契约和 SQLite 真相源；**PAY-02** 增加居民创建/查询待支付意图的受控 API；**PAY-03** 增加可信渠道证据确认、状态收敛、下游 outbox 与冲突证据队列；**PAY-04** 增加进程内隔离 Mock 驱动，**PAY-05** 完成订单/零元券单 outbox 投影，**PAY-06** 将 `local_order_online_completions` 投影为独立线上实收、接入消费累计与既有发券；**PAY-07** 增加居民 H5 支付状态、零元兑换与居民自有 Mock 演练入口。当前仍**没有**真实微信支付商户配置/回调验签（PAY-10/PAY-11）、未鉴权公网 Mock 控制接口、管理后台支付 UI（PAY-08）、真实退款执行。不得据此宣称真实微信在线支付已可用。
+> **PAY-01** 建立支付意图、尝试与事件的共享契约和 SQLite 真相源；**PAY-02** 增加居民创建/查询待支付意图的受控 API；**PAY-03** 增加可信渠道证据确认、状态收敛、下游 outbox 与冲突证据队列；**PAY-04** 增加进程内隔离 Mock 驱动，**PAY-05** 完成订单/零元券单 outbox 投影，**PAY-06** 将 `local_order_online_completions` 投影为独立线上实收、接入消费累计与既有发券；**PAY-07** 增加居民 H5 支付状态、零元兑换与居民自有 Mock 演练入口；**PAY-08** 扩展现有管理端本地订单列表/详情，提供只读支付流水、完成事实、线上实收与异常展示。当前仍**没有**真实微信支付商户配置/回调验签（PAY-10/PAY-11）、未鉴权公网 Mock 控制接口、支付对账差异与导出（PAY-09）、真实退款执行。不得据此宣称真实微信在线支付已可用。
 
 ## 1. 与既有事实的边界
 
@@ -206,6 +206,7 @@ PAY-02 依赖本卡：
 - `apps/api/test/payments-mock.test.ts`：真实 Hono + SQLite 的 Mock 发起、成功/失败/取消/超时/待确认、重复通知、通知+查单双进程竞争、重启查询、迟到成功、非法输入与 production/公开预览 fail-closed。
 - `apps/api/test/payments-online-ledger.test.ts`：真实/Mock 线上 completion 投影、唯一实收、双进程竞争、outbox/sync 回填、券净额/零元、团队累计与三人券、人工/线上互斥、正式汇总/CSV 排除 Mock、锁后迟到投影、0035→0036 升级与重启恢复。
 - `apps/web/test/local-order-payment.test.mjs`：H5 只把 `online_completed` 显示为交易完成，paid 未完成订单显示确认中，失败/关闭/零元领取状态与能力开关文案不互相冒充。
+- `apps/api/test/pay-08-admin-payments.test.ts` 与 `packages/contracts/test/payments-admin-contract.test.mjs`：管理端只读支付查询/详情，服务端过滤与真分页、admin/operator/grid/匿名权限正反例、交易号脱敏、Mock 与真实分列、异常（双收/迟到成功/取消后支付/consumer_exhausted/terminal_conflict）只读展示、无银行到账口径。边界详见 [payments-admin.md](payments-admin.md)。
 
 ## 8. PAY-02 居民创建 / 查询 API
 
@@ -257,7 +258,7 @@ PAY-02 依赖本卡：
 
 - 未接真实微信支付商户 API、回调验签、证书/API v3 解密；PAY-11 才完成真实适配器。
 - PAY-04 Mock 是进程内测试/开发驱动；PAY-07 只增加居民会话、CSRF、归属校验后的 Mock 演练路由，不提供未鉴权公网控制面。所有模拟支付永久标记 `simulated=true`，不得被解释为真实微信扣款或银行到账。
-- 在线订单完成与消费券核销已由 PAY-05 落地，PAY-06 已增加经营账本线上实收/消费累计投影；居民 H5 已由 PAY-07 提供支付状态、零元兑换与 Mock 演练；尚未实现管理后台支付交互与运维 UI（PAY-08）、真实退款执行（策略未定）。线上订单仍不进入线下结算候选；Mock 不进入正式财务汇总/对账/CSV。
+- 在线订单完成与消费券核销已由 PAY-05 落地，PAY-06 已增加经营账本线上实收/消费累计投影；居民 H5 已由 PAY-07 提供支付状态、零元兑换与 Mock 演练；管理后台已由 PAY-08 提供只读支付流水/详情与异常定位（不含任何支付写操作）；尚未实现支付对账差异与导出（PAY-09）、真实退款执行（策略未定）。线上订单仍不进入线下结算候选；Mock 不进入正式财务汇总/对账/CSV。
 - 消费者由内部 token 入口或运维调度驱动，本仓库尚未内置定时器/常驻 worker；生产部署需要运维侧按 `POST /internal/payments/outbox/consume` 或进程内调用 `runPaymentOutboxConsumer` 安排触发。
 - R2 受控恢复同样是内部 token 入口，不是常驻调度：生产仍需监控 `GET /internal/payments/outbox/failed`；只有带 open `consumer_exhausted` 异常的 `failed` 事件可重放，业务冲突不会被恢复接口反复“复活”。任何后续 consumer 成功交付该事件都会自动 resolve 对应 `consumer_exhausted`，失败历史仍保留。
 - 长期 `pending/confirming` 的支付意图需要 PAY-11 的可信查单/关单能力收敛；在渠道给出可信终态前，PAY-05 会一直保留其消费券占用（延迟释放），不会按过期时间猜测失败。

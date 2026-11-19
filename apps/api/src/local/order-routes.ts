@@ -3,6 +3,7 @@ import type { Hono } from 'hono'
 import {
   API_ERROR_CODES,
   LOCAL_ORDER_ROUTES,
+  adminLocalOrderListQuerySchema,
   createLocalOrderOnBehalfRequestSchema,
   createLocalOrderRequestSchema,
   localOrderListQuerySchema,
@@ -17,6 +18,7 @@ import type { AppBindings, AppContext, AuthSession, HttpErrorStatus } from '../h
 import {
   getMyOrder,
   getStaffOrder,
+  listAdminOrders,
   listMyOrders,
   listMyTeamOptions,
   listOrderEvents,
@@ -26,6 +28,7 @@ import {
   updateOrderStatus,
   verifyOrder,
 } from './orders.js'
+import { getAdminLocalOrderDetail, withAdminPaymentSection } from './admin-payment-read.js'
 import { LocalError, type LocalActor } from './shared.js'
 import { ResidentCommunityError } from '../resident-community/service.js'
 import { completeZeroAmountOrder } from '../payments/order-completion.js'
@@ -145,6 +148,10 @@ export function registerLocalOrderRoutes(
   }
 
   const parseQuery = (c: AppContext) => localOrderListQuerySchema.safeParse(queryObject(c))
+
+  /** PAY-08: the back-office list additionally filters on payment facts. */
+  const parseAdminQuery = (c: AppContext) =>
+    adminLocalOrderListQuerySchema.safeParse(queryObject(c))
 
   /* ------------------------------- Resident -------------------------------- */
 
@@ -323,12 +330,12 @@ export function registerLocalOrderRoutes(
   app.get(LOCAL_ORDER_ROUTES.adminOrders, (c) => {
     const guard = requireAdminSide(c)
     if (guard instanceof Response) return guard
-    const query = parseQuery(c)
+    const query = parseAdminQuery(c)
     if (!query.success) {
       return fail(c, 400, API_ERROR_CODES.invalidRequest, '查询参数不正确')
     }
     try {
-      return c.json(listStaffOrders(db, actorOf(guard), query.data))
+      return c.json(listAdminOrders(db, actorOf(guard), query.data))
     } catch (error) {
       return failWithLocalError(c, error)
     }
@@ -340,7 +347,7 @@ export function registerLocalOrderRoutes(
     const orderId = requireParam(c)
     if (orderId instanceof Response) return orderId
     try {
-      return c.json(getStaffOrder(db, actorOf(guard), orderId))
+      return c.json(getAdminLocalOrderDetail(db, actorOf(guard), orderId))
     } catch (error) {
       return failWithLocalError(c, error)
     }
@@ -359,7 +366,9 @@ export function registerLocalOrderRoutes(
     )
     if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '订单状态信息不正确')
     try {
-      return c.json(updateOrderStatus(db, actorOf(guard), orderId, body))
+      return c.json(
+        withAdminPaymentSection(db, updateOrderStatus(db, actorOf(guard), orderId, body)),
+      )
     } catch (error) {
       return failWithLocalError(c, error)
     }
@@ -378,7 +387,9 @@ export function registerLocalOrderRoutes(
     )
     if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '核验信息不正确')
     try {
-      return c.json(verifyOrder(db, actorOf(guard), orderId, body))
+      return c.json(
+        withAdminPaymentSection(db, verifyOrder(db, actorOf(guard), orderId, body)),
+      )
     } catch (error) {
       return failWithLocalError(c, error)
     }
