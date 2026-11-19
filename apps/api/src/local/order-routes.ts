@@ -3,6 +3,7 @@ import type { Hono } from 'hono'
 import {
   API_ERROR_CODES,
   LOCAL_ORDER_ROUTES,
+  adminLocalOrderListQuerySchema,
   createLocalOrderOnBehalfRequestSchema,
   createLocalOrderRequestSchema,
   localOrderListQuerySchema,
@@ -17,6 +18,7 @@ import type { AppBindings, AppContext, AuthSession, HttpErrorStatus } from '../h
 import {
   getMyOrder,
   getStaffOrder,
+  listAdminOrders,
   listMyOrders,
   listMyTeamOptions,
   listOrderEvents,
@@ -26,8 +28,10 @@ import {
   updateOrderStatus,
   verifyOrder,
 } from './orders.js'
+import { getAdminLocalOrderDetail, withAdminPaymentSection } from './admin-payment-read.js'
 import { LocalError, type LocalActor } from './shared.js'
 import { ResidentCommunityError } from '../resident-community/service.js'
+import { completeZeroAmountOrder } from '../payments/order-completion.js'
 
 export interface LocalOrderRouteDeps {
   db: AppDatabase
@@ -55,8 +59,9 @@ interface StaffGuard {
  * Three prefixes with three different guards, sharing one service layer:
  * - `/local-orders*`       resident session only; the resident is never in the URL/body
  * - `/staff/local-orders*` any staff role, community-scoped (grid workers included,
- *                          because `/admin/*` rejects them by convention)
- * - `/admin/local-orders*` admin/operator; verification lives exclusively here
+ *                          because `/admin/*` rejects them by convention); grid
+ *                          verification is limited to the current territory owner
+ * - `/admin/local-orders*` admin/operator back-office surface
  *
  * Session, CSRF double-submit + trusted Origin and the error envelope all come
  * from `createApp`; this module never builds a second auth implementation.
@@ -144,6 +149,10 @@ export function registerLocalOrderRoutes(
 
   const parseQuery = (c: AppContext) => localOrderListQuerySchema.safeParse(queryObject(c))
 
+  /** PAY-08: the back-office list additionally filters on payment facts. */
+  const parseAdminQuery = (c: AppContext) =>
+    adminLocalOrderListQuerySchema.safeParse(queryObject(c))
+
   /* ------------------------------- Resident -------------------------------- */
 
   app.get(LOCAL_ORDER_ROUTES.myOrders, (c) => {
@@ -172,6 +181,28 @@ export function registerLocalOrderRoutes(
     if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '登记信息不正确')
     try {
       const result = registerResidentOrder(db, guard.actor, body)
+      return c.json(result, result.created ? 201 : 200)
+    } catch (error) {
+      return failWithLocalError(c, error)
+    }
+  })
+
+  /**
+   * PAY-05 zero-amount completion: the only path that may complete a fully
+   * coupon-discounted order. It is not a payment endpoint — no channel call, no
+   * provider transaction id, no positive cash fact — and it is idempotent per
+   * order (a replay answers 200 with `created:false`).
+   */
+  app.post(LOCAL_ORDER_ROUTES.myZeroAmountCompletion, (c) => {
+    const guard = requireResident(c)
+    if (guard instanceof Response) return guard
+    const csrfFailure = requireCsrf(c, guard.session)
+    if (csrfFailure) return csrfFailure
+    const orderId = requireParam(c)
+    if (orderId instanceof Response) return orderId
+    try {
+      const result = completeZeroAmountOrder(db, guard.actor, orderId)
+      c.header('Cache-Control', 'no-store')
       return c.json(result, result.created ? 201 : 200)
     } catch (error) {
       return failWithLocalError(c, error)
@@ -271,17 +302,40 @@ export function registerLocalOrderRoutes(
     }
   })
 
+  /**
+   * Staff verification. The shared service re-checks the actor's CURRENT
+   * territory assignment, so this route is safe to expose to all staff roles.
+   */
+  app.post(LOCAL_ORDER_ROUTES.staffOrderVerify, async (c) => {
+    const guard = requireStaff(c)
+    if (guard instanceof Response) return guard
+    const csrfFailure = requireCsrf(c, guard.session)
+    if (csrfFailure) return csrfFailure
+    const orderId = requireParam(c)
+    if (orderId instanceof Response) return orderId
+    const body = bodySchemaError(
+      await c.req.json().catch(() => null),
+      localOrderVerifyRequestSchema,
+    )
+    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '核验信息不正确')
+    try {
+      return c.json(verifyOrder(db, actorOf(guard), orderId, body))
+    } catch (error) {
+      return failWithLocalError(c, error)
+    }
+  })
+
   /* ------------------------------ Back office ------------------------------- */
 
   app.get(LOCAL_ORDER_ROUTES.adminOrders, (c) => {
     const guard = requireAdminSide(c)
     if (guard instanceof Response) return guard
-    const query = parseQuery(c)
+    const query = parseAdminQuery(c)
     if (!query.success) {
       return fail(c, 400, API_ERROR_CODES.invalidRequest, '查询参数不正确')
     }
     try {
-      return c.json(listStaffOrders(db, actorOf(guard), query.data))
+      return c.json(listAdminOrders(db, actorOf(guard), query.data))
     } catch (error) {
       return failWithLocalError(c, error)
     }
@@ -293,7 +347,7 @@ export function registerLocalOrderRoutes(
     const orderId = requireParam(c)
     if (orderId instanceof Response) return orderId
     try {
-      return c.json(getStaffOrder(db, actorOf(guard), orderId))
+      return c.json(getAdminLocalOrderDetail(db, actorOf(guard), orderId))
     } catch (error) {
       return failWithLocalError(c, error)
     }
@@ -312,7 +366,9 @@ export function registerLocalOrderRoutes(
     )
     if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '订单状态信息不正确')
     try {
-      return c.json(updateOrderStatus(db, actorOf(guard), orderId, body))
+      return c.json(
+        withAdminPaymentSection(db, updateOrderStatus(db, actorOf(guard), orderId, body)),
+      )
     } catch (error) {
       return failWithLocalError(c, error)
     }
@@ -331,7 +387,9 @@ export function registerLocalOrderRoutes(
     )
     if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '核验信息不正确')
     try {
-      return c.json(verifyOrder(db, actorOf(guard), orderId, body))
+      return c.json(
+        withAdminPaymentSection(db, verifyOrder(db, actorOf(guard), orderId, body)),
+      )
     } catch (error) {
       return failWithLocalError(c, error)
     }

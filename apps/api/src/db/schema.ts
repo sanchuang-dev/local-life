@@ -1,6 +1,7 @@
 import { relations, sql } from 'drizzle-orm'
 import {
   check,
+  foreignKey,
   index,
   integer,
   primaryKey,
@@ -30,6 +31,14 @@ import type {
   ParticipationInviteSource,
   ParticipationRole,
   ParticipationTeamStatus,
+  PaymentChannel,
+  PaymentEventSource,
+  PaymentEventType,
+  PaymentEvidenceSource,
+  PaymentIntentKind,
+  PaymentOutboxStatus,
+  PaymentReviewExceptionKind,
+  PaymentStatus,
   PhoneOtpPurpose,
   ReconciliationBatchStatus,
   RewardCredentialStatus,
@@ -42,11 +51,14 @@ import type {
   ResidentCommunityStoredCandidateSource,
   SettlementAmountStatus,
   LocalOrderEventType,
+  LocalOrderOnlineCompletionKind,
+  LocalOrderOnlineConflictKind,
   LocalOrderRecordSource,
   LocalOrderStatus,
   LocalProductStatus,
   WechatAccountType,
   WechatConfigStatus,
+  WechatPayPrepayStatus,
 } from '@sanchuang-dev/local-life-contracts'
 import { LOCAL_ORDER_EVENT_SOURCE_TYPE } from '@sanchuang-dev/local-life-contracts'
 
@@ -142,6 +154,20 @@ export const staffAccounts = sqliteTable(
   (table) => [uniqueIndex('staff_username_uq').on(table.username)],
 )
 
+/**
+ * Staff-to-community relations with two deliberately different meanings:
+ *
+ * - `operator_scope`: an operator may manage several communities (many rows).
+ * - `grid_territory`: a grid worker owns at most ONE logical territory, and a
+ *   territory has at most ONE owner at a time. The partial unique indexes below
+ *   are the disk-level truth; routes also return a readable 409 before insert.
+ *
+ * Role is immutable in the current product, so the kind cannot drift through a
+ * supported API. Historical permissions, residents and orders are never moved
+ * when a territory row is deleted or reassigned.
+ */
+export type StaffAssignmentKind = 'operator_scope' | 'grid_territory'
+
 export const staffCommunityAssignments = sqliteTable(
   'staff_community_assignments',
   {
@@ -151,11 +177,20 @@ export const staffCommunityAssignments = sqliteTable(
     communityId: text('community_id')
       .notNull()
       .references(() => communities.id, { onDelete: 'cascade' }),
+    assignmentKind: text('assignment_kind').$type<StaffAssignmentKind>().notNull(),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.staffAccountId, table.communityId] }),
     index('staff_community_community_idx').on(table.communityId),
+    // A grid worker may own only one territory, regardless of row timing.
+    uniqueIndex('staff_community_grid_staff_uq')
+      .on(table.staffAccountId)
+      .where(sql`${table.assignmentKind} = 'grid_territory'`),
+    // A territory may have only one grid worker, regardless of row timing.
+    uniqueIndex('staff_community_grid_territory_uq')
+      .on(table.communityId)
+      .where(sql`${table.assignmentKind} = 'grid_territory'`),
   ],
 )
 
@@ -1803,6 +1838,13 @@ export const localOrders = sqliteTable(
       table.residentUserId,
       table.idempotencyKey,
     ),
+    // Parent key for the payment composite FK: a payment's order, resident and
+    // community must all come from the same local order row.
+    uniqueIndex('local_orders_payment_identity_uq').on(
+      table.id,
+      table.residentUserId,
+      table.communityId,
+    ),
     index('local_orders_community_status_idx').on(table.communityId, table.status),
     index('local_orders_resident_created_idx').on(table.residentUserId, table.createdAt),
     index('local_orders_product_idx').on(table.productId),
@@ -1822,7 +1864,7 @@ export const localOrders = sqliteTable(
     ),
     check(
       'local_orders_status_check',
-      sql`${table.status} IN ('registered', 'processing', 'pending_review', 'verified', 'cancelled', 'rejected')`,
+      sql`${table.status} IN ('registered', 'processing', 'pending_review', 'verified', 'online_completed', 'cancelled', 'rejected')`,
     ),
     check(
       'local_orders_record_source_check',
@@ -1831,6 +1873,653 @@ export const localOrders = sqliteTable(
   ],
 )
 
+
+/* -------------------------------------------------------------------------- */
+/* Payment intents / attempts / append-only events (PAY-01 #276)              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * PAY-01 payment truth source. It is separate from the local order and from the
+ * manual `payment_received` ledger fact. `status='paid'` means a trusted payment
+ * fact, never a bank settlement. At most one paid intent exists per local order
+ * via the partial unique index below; retries use new intents/attempts.
+ *
+ * `kind='zero_amount'` is the independent non-channel completion boundary for a
+ * fully coupon-discounted order. It has no channel, is not simulated, and is
+ * completed as paid with zero net payable.
+ */
+export const paymentIntents = sqliteTable('payment_intents', {
+  id: text('id').primaryKey(),
+  localOrderId: text('local_order_id').notNull(),
+  residentUserId: text('resident_user_id').notNull(),
+  communityId: text('community_id').notNull(),
+  kind: text('kind').$type<PaymentIntentKind>().notNull(),
+  channel: text('channel').$type<PaymentChannel>(),
+  simulated: integer('simulated', { mode: 'boolean' }).notNull(),
+  merchantOrderNo: text('merchant_order_no').notNull(),
+  merchantAppId: text('merchant_app_id'),
+  merchantId: text('merchant_id'),
+  grossAmountCents: integer('gross_amount_cents').notNull(),
+  discountCents: integer('discount_cents').notNull(),
+  netPayableCents: integer('net_payable_cents').notNull(),
+  status: text('status').$type<PaymentStatus>().notNull(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+  paidAt: integer('paid_at', { mode: 'timestamp_ms' }),
+  closedAt: integer('closed_at', { mode: 'timestamp_ms' }),
+  failedAt: integer('failed_at', { mode: 'timestamp_ms' }),
+  failureCode: text('failure_code'),
+  failureMessage: text('failure_message'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  foreignKey({
+    columns: [table.localOrderId, table.residentUserId, table.communityId],
+    foreignColumns: [localOrders.id, localOrders.residentUserId, localOrders.communityId],
+  }).onDelete('restrict'),
+  uniqueIndex('payment_intents_merchant_order_uq').on(table.merchantOrderNo),
+  uniqueIndex('payment_intents_idempotency_uq').on(table.idempotencyKey),
+  // The DB-level guarantee for "one business order, at most one paid fact".
+  uniqueIndex('payment_intents_one_paid_per_order_uq')
+    .on(table.localOrderId)
+    .where(sql`${table.status} = 'paid'`),
+  index('payment_intents_order_created_idx').on(table.localOrderId, table.createdAt),
+  index('payment_intents_status_created_idx').on(table.status, table.createdAt),
+  check(
+    'payment_intents_kind_channel_check',
+    sql`(${table.simulated} IN (0, 1))
+      AND (
+        (${table.kind} = 'channel'
+          AND ${table.channel} IN ('mock', 'wechat_jsapi')
+          AND ${table.netPayableCents} > 0
+          AND ((${table.channel} = 'mock' AND ${table.simulated} = 1)
+            OR (${table.channel} = 'wechat_jsapi' AND ${table.simulated} = 0)))
+        OR
+        (${table.kind} = 'zero_amount'
+          AND ${table.channel} IS NULL
+          AND ${table.simulated} = 0
+          AND ${table.netPayableCents} = 0
+          AND ${table.status} = 'paid'
+          AND ${table.paidAt} IS NOT NULL)
+      )`,
+  ),
+  check(
+    'payment_intents_amount_check',
+    sql`typeof(${table.grossAmountCents}) = 'integer'
+      AND typeof(${table.discountCents}) = 'integer'
+      AND typeof(${table.netPayableCents}) = 'integer'
+      AND ${table.grossAmountCents} >= 0
+      AND ${table.discountCents} >= 0
+      AND ${table.netPayableCents} >= 0
+      AND ${table.grossAmountCents} <= 9007199254740991
+      AND ${table.discountCents} <= 9007199254740991
+      AND ${table.netPayableCents} <= 9007199254740991
+      AND ${table.grossAmountCents} - ${table.discountCents} = ${table.netPayableCents}`,
+  ),
+  check(
+    'payment_intents_status_check',
+    sql`${table.status} IN ('pending', 'confirming', 'paid', 'closed', 'failed')`,
+  ),
+  check(
+    'payment_intents_terminal_time_check',
+    sql`((${table.status} = 'paid') = (${table.paidAt} IS NOT NULL))
+      AND ((${table.status} = 'closed') = (${table.closedAt} IS NOT NULL))
+      AND ((${table.status} = 'failed') = (${table.failedAt} IS NOT NULL))
+      AND (${table.status} = 'failed' OR (${table.failureCode} IS NULL AND ${table.failureMessage} IS NULL))`,
+  ),
+  check(
+    'payment_intents_time_order_check',
+    sql`${table.expiresAt} > ${table.createdAt} AND ${table.updatedAt} >= ${table.createdAt}`,
+  ),
+  check(
+    'payment_intents_text_check',
+    sql`length(trim(${table.merchantOrderNo})) BETWEEN 1 AND 64
+      AND length(trim(${table.idempotencyKey})) BETWEEN 8 AND 128
+      AND (${table.merchantAppId} IS NULL OR length(trim(${table.merchantAppId})) BETWEEN 1 AND 64)
+      AND (${table.merchantId} IS NULL OR length(trim(${table.merchantId})) BETWEEN 1 AND 64)
+      AND (${table.failureCode} IS NULL OR length(trim(${table.failureCode})) BETWEEN 1 AND 64)
+      AND (${table.failureMessage} IS NULL OR length(trim(${table.failureMessage})) BETWEEN 1 AND 500)`,
+  ),
+])
+
+/**
+ * One channel call/query attempt under a payment intent. Paid attempts are
+ * unique per intent (partial index) and provider transaction ids are globally
+ * unique, so a duplicated channel success cannot be recorded twice.
+ */
+export const paymentAttempts = sqliteTable('payment_attempts', {
+  id: text('id').primaryKey(),
+  paymentIntentId: text('payment_intent_id')
+    .notNull()
+    .references(() => paymentIntents.id, { onDelete: 'restrict' }),
+  attemptNo: integer('attempt_no').notNull(),
+  status: text('status').$type<PaymentStatus>().notNull(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  providerTransactionId: text('provider_transaction_id'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  confirmedAt: integer('confirmed_at', { mode: 'timestamp_ms' }),
+  closedAt: integer('closed_at', { mode: 'timestamp_ms' }),
+  failedAt: integer('failed_at', { mode: 'timestamp_ms' }),
+  failureCode: text('failure_code'),
+  failureMessage: text('failure_message'),
+}, (table) => [
+  uniqueIndex('payment_attempts_intent_no_uq').on(table.paymentIntentId, table.attemptNo),
+  uniqueIndex('payment_attempts_idempotency_uq').on(table.idempotencyKey),
+  uniqueIndex('payment_attempts_provider_txn_uq').on(table.providerTransactionId),
+  uniqueIndex('payment_attempts_one_paid_per_intent_uq')
+    .on(table.paymentIntentId)
+    .where(sql`${table.status} = 'paid'`),
+  // Parent key for the event -> attempt composite FK.
+  uniqueIndex('payment_attempts_id_intent_uq').on(table.id, table.paymentIntentId),
+  index('payment_attempts_intent_created_idx').on(table.paymentIntentId, table.createdAt),
+  check('payment_attempts_attempt_no_check', sql`${table.attemptNo} >= 1`),
+  check(
+    'payment_attempts_status_check',
+    sql`${table.status} IN ('pending', 'confirming', 'paid', 'closed', 'failed')`,
+  ),
+  check(
+    'payment_attempts_terminal_time_check',
+    sql`((${table.status} = 'paid') = (${table.confirmedAt} IS NOT NULL))
+      AND ((${table.status} = 'closed') = (${table.closedAt} IS NOT NULL))
+      AND ((${table.status} = 'failed') = (${table.failedAt} IS NOT NULL))
+      AND (${table.status} = 'failed' OR (${table.failureCode} IS NULL AND ${table.failureMessage} IS NULL))
+      AND (${table.status} <> 'paid' OR ${table.providerTransactionId} IS NOT NULL)`,
+  ),
+  check(
+    'payment_attempts_text_check',
+    sql`length(trim(${table.idempotencyKey})) BETWEEN 8 AND 128
+      AND (${table.providerTransactionId} IS NULL OR length(trim(${table.providerTransactionId})) BETWEEN 1 AND 128)
+      AND (${table.failureCode} IS NULL OR length(trim(${table.failureCode})) BETWEEN 1 AND 64)
+      AND (${table.failureMessage} IS NULL OR length(trim(${table.failureMessage})) BETWEEN 1 AND 500)`,
+  ),
+])
+
+/** Append-only event trail. UPDATE/DELETE are blocked by migration triggers. */
+export const paymentEvents = sqliteTable('payment_events', {
+  id: text('id').primaryKey(),
+  paymentIntentId: text('payment_intent_id')
+    .notNull()
+    .references(() => paymentIntents.id, { onDelete: 'restrict' }),
+  paymentAttemptId: text('payment_attempt_id'),
+  eventType: text('event_type').$type<PaymentEventType>().notNull(),
+  source: text('source').$type<PaymentEventSource>().notNull(),
+  fromStatus: text('from_status').$type<PaymentStatus>(),
+  toStatus: text('to_status').$type<PaymentStatus>(),
+  providerEventRef: text('provider_event_ref'),
+  dedupeKey: text('dedupe_key'),
+  evidenceFingerprint: text('evidence_fingerprint'),
+  note: text('note'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  foreignKey({
+    columns: [table.paymentAttemptId, table.paymentIntentId],
+    foreignColumns: [paymentAttempts.id, paymentAttempts.paymentIntentId],
+  }).onDelete('restrict'),
+  uniqueIndex('payment_events_dedupe_uq').on(table.dedupeKey),
+  index('payment_events_intent_created_idx').on(table.paymentIntentId, table.createdAt),
+  index('payment_events_attempt_idx').on(table.paymentAttemptId),
+  check(
+    'payment_events_type_check',
+    sql`${table.eventType} IN ('payment.intent_created', 'payment.attempt_created',
+      'payment.status_changed', 'payment.channel_notification', 'payment.channel_query')`,
+  ),
+  check(
+    'payment_events_source_check',
+    sql`${table.source} IN ('system', 'channel', 'admin', 'reconciliation')`,
+  ),
+  check(
+    'payment_events_status_check',
+    sql`(${table.fromStatus} IS NULL OR ${table.fromStatus} IN ('pending', 'confirming', 'paid', 'closed', 'failed'))
+      AND (${table.toStatus} IS NULL OR ${table.toStatus} IN ('pending', 'confirming', 'paid', 'closed', 'failed'))`,
+  ),
+  check(
+    'payment_events_text_check',
+    sql`(${table.providerEventRef} IS NULL OR length(trim(${table.providerEventRef})) BETWEEN 1 AND 128)
+      AND (${table.dedupeKey} IS NULL OR length(trim(${table.dedupeKey})) BETWEEN 1 AND 200)
+      AND (${table.note} IS NULL OR length(trim(${table.note})) BETWEEN 1 AND 500)`,
+  ),
+  check(
+    'payment_events_evidence_fingerprint_check',
+    sql`(
+      ${table.eventType} IN ('payment.channel_notification', 'payment.channel_query')
+      AND ${table.evidenceFingerprint} IS NOT NULL
+      AND length(${table.evidenceFingerprint}) = 64
+      AND ${table.evidenceFingerprint} NOT GLOB '*[^0-9a-f]*'
+    ) OR (
+      ${table.eventType} NOT IN ('payment.channel_notification', 'payment.channel_query')
+      AND ${table.evidenceFingerprint} IS NULL
+    )`,
+  ),
+])
+
+/**
+ * Durable downstream handoff created atomically with a trusted `paid` fact.
+ * PAY-03 owns persistence/dedupe; PAY-05/PAY-06 own consuming the business event.
+ */
+export const paymentOutbox = sqliteTable('payment_outbox', {
+  id: text('id').primaryKey(),
+  paymentIntentId: text('payment_intent_id')
+    .notNull()
+    .references(() => paymentIntents.id, { onDelete: 'restrict' }),
+  paymentEventId: text('payment_event_id')
+    .notNull()
+    .references(() => paymentEvents.id, { onDelete: 'restrict' }),
+  topic: text('topic').notNull(),
+  dedupeKey: text('dedupe_key').notNull(),
+  payloadJson: text('payload_json').notNull(),
+  status: text('status').$type<PaymentOutboxStatus>().notNull(),
+  attempts: integer('attempts').notNull(),
+  availableAt: integer('available_at', { mode: 'timestamp_ms' }).notNull(),
+  lastError: text('last_error'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  deliveredAt: integer('delivered_at', { mode: 'timestamp_ms' }),
+}, (table) => [
+  uniqueIndex('payment_outbox_event_uq').on(table.paymentEventId),
+  uniqueIndex('payment_outbox_dedupe_uq').on(table.dedupeKey),
+  index('payment_outbox_status_available_idx').on(table.status, table.availableAt),
+  index('payment_outbox_intent_idx').on(table.paymentIntentId),
+  check('payment_outbox_topic_check', sql`${table.topic} = 'payment.paid.v1'`),
+  check(
+    'payment_outbox_status_check',
+    sql`${table.status} IN ('pending', 'processing', 'delivered', 'failed')`,
+  ),
+  check('payment_outbox_attempts_check', sql`${table.attempts} >= 0`),
+  check(
+    'payment_outbox_delivery_check',
+    sql`((${table.status} = 'delivered') = (${table.deliveredAt} IS NOT NULL))`,
+  ),
+  check(
+    'payment_outbox_text_check',
+    sql`length(trim(${table.dedupeKey})) BETWEEN 1 AND 200
+      AND length(trim(${table.payloadJson})) > 0
+      AND (${table.lastError} IS NULL OR length(trim(${table.lastError})) BETWEEN 1 AND 500)`,
+  ),
+])
+
+/**
+ * First-observation clock reserved before PAY-03 confirmation. This table is
+ * Mock-only and intentionally has no payment-event FK: the reservation must
+ * survive a failed confirmation so retries keep the same evidence fingerprint.
+ */
+export const mockPaymentEventReservations = sqliteTable('mock_payment_event_reservations', {
+  dedupeKey: text('dedupe_key').primaryKey(),
+  observedAt: integer('observed_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  check(
+    'mock_payment_event_reservations_key_check',
+    sql`${table.dedupeKey} GLOB 'MOCK-EVT-*'
+      AND length(trim(${table.dedupeKey})) BETWEEN 1 AND 200`,
+  ),
+])
+
+/**
+ * Persistent conflict/late-payment evidence. An exception never rewrites a
+ * terminal intent; it preserves the channel facts for PAY-11's query/ops flow.
+ */
+export const paymentReviewExceptions = sqliteTable('payment_review_exceptions', {
+  id: text('id').primaryKey(),
+  paymentIntentId: text('payment_intent_id')
+    .references(() => paymentIntents.id, { onDelete: 'restrict' }),
+  merchantOrderNo: text('merchant_order_no').notNull(),
+  channel: text('channel').notNull(),
+  providerTransactionId: text('provider_transaction_id'),
+  amountCents: integer('amount_cents'),
+  merchantAppId: text('merchant_app_id'),
+  merchantId: text('merchant_id'),
+  observedAt: integer('observed_at', { mode: 'timestamp_ms' }).notNull(),
+  source: text('source').$type<PaymentEvidenceSource>().notNull(),
+  dedupeKey: text('dedupe_key').notNull(),
+  evidenceFingerprint: text('evidence_fingerprint').notNull().default(''),
+  providerEventRef: text('provider_event_ref'),
+  failureCode: text('failure_code'),
+  failureMessage: text('failure_message'),
+  kind: text('kind').$type<PaymentReviewExceptionKind>().notNull(),
+  detail: text('detail').notNull(),
+  status: text('status').$type<'open' | 'reviewed' | 'resolved'>().notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  resolvedAt: integer('resolved_at', { mode: 'timestamp_ms' }),
+}, (table) => [
+  uniqueIndex('payment_review_exceptions_dedupe_fingerprint_uq')
+    .on(table.dedupeKey, table.evidenceFingerprint),
+  index('payment_review_exceptions_status_created_idx').on(table.status, table.createdAt),
+  index('payment_review_exceptions_intent_idx').on(table.paymentIntentId),
+  check(
+    'payment_review_exceptions_channel_check',
+    sql`${table.channel} IN ('mock', 'wechat_jsapi')`,
+  ),
+  check(
+    'payment_review_exceptions_source_check',
+    sql`${table.source} IN ('notification', 'query')`,
+  ),
+  check(
+    'payment_review_exceptions_kind_check',
+    sql`${table.kind} IN ('intent_not_found', 'amount_mismatch', 'merchant_mismatch',
+      'channel_mismatch', 'ownership_mismatch', 'transaction_conflict',
+      'late_success_after_closed', 'late_success_after_failed', 'terminal_conflict',
+      'unknown_evidence')`,
+  ),
+  check(
+    'payment_review_exceptions_status_check',
+    sql`${table.status} IN ('open', 'reviewed', 'resolved')`,
+  ),
+  check(
+    'payment_review_exceptions_amount_check',
+    sql`${table.amountCents} IS NULL OR ${table.amountCents} >= 0`,
+  ),
+  check(
+    'payment_review_exceptions_fingerprint_check',
+    sql`${table.evidenceFingerprint} = '' OR (
+      length(${table.evidenceFingerprint}) = 64
+      AND ${table.evidenceFingerprint} NOT GLOB '*[^0-9a-f]*'
+    )`,
+  ),
+  check(
+    'payment_review_exceptions_text_check',
+    sql`length(trim(${table.merchantOrderNo})) BETWEEN 6 AND 32
+      AND length(trim(${table.dedupeKey})) BETWEEN 1 AND 200
+      AND length(trim(${table.detail})) BETWEEN 1 AND 500
+      AND (${table.providerTransactionId} IS NULL OR length(trim(${table.providerTransactionId})) BETWEEN 1 AND 128)
+      AND (${table.merchantAppId} IS NULL OR length(trim(${table.merchantAppId})) BETWEEN 1 AND 64)
+      AND (${table.merchantId} IS NULL OR length(trim(${table.merchantId})) BETWEEN 1 AND 64)
+      AND (${table.providerEventRef} IS NULL OR length(trim(${table.providerEventRef})) BETWEEN 1 AND 128)
+      AND (${table.failureCode} IS NULL OR length(trim(${table.failureCode})) BETWEEN 1 AND 64)
+      AND (${table.failureMessage} IS NULL OR length(trim(${table.failureMessage})) BETWEEN 1 AND 500)
+      AND ((${table.status} = 'resolved') = (${table.resolvedAt} IS NOT NULL))`,
+  ),
+])
+
+/* -------------------------------------------------------------------------- */
+/* PAY-10 WeChat Pay APIv3 JSAPI prepay outbound audit                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One server-to-WeChat JSAPI prepay request under an existing payment intent.
+ *
+ * This table is an outbound audit/idempotency record, NOT a second payment
+ * intent and NOT a payment fact:
+ * - `prepay_id` lives here, separated from `payment_attempts.provider_transaction_id`;
+ * - a `succeeded` row only proves WeChat allowed the client to invoke the
+ *   cashier; it never sets `payment_intents.status='paid'`;
+ * - `prepay_expires_at` is the conservative local invocation deadline
+ *   (min(official 2h, intent deadline)), persisted independently from the
+ *   intent's `expires_at` and from WeChat's `time_expire`;
+ * - `uncertain` rows block blind re-submission until PAY-11 query/close
+ *   converges the provider state;
+ * - request/response bodies are represented by SHA-256 (and a redacted body
+ *   with the payer openid hashed), so audit does not duplicate the OpenID.
+ */
+export const wechatPayPrepayAttempts = sqliteTable('wechat_pay_prepay_attempts', {
+  id: text('id').primaryKey(),
+  paymentIntentId: text('payment_intent_id')
+    .notNull()
+    .references(() => paymentIntents.id, { onDelete: 'restrict' }),
+  attemptNo: integer('attempt_no').notNull(),
+  status: text('status').$type<WechatPayPrepayStatus>().notNull(),
+  /** SHA-256 of `POST\nPATH\nBODY`; the safe idempotency key for one request. */
+  requestFingerprint: text('request_fingerprint').notNull(),
+  outTradeNo: text('out_trade_no').notNull(),
+  appid: text('appid').notNull(),
+  mchid: text('mchid').notNull(),
+  payerOpenidSha256: text('payer_openid_sha256').notNull(),
+  amountCents: integer('amount_cents').notNull(),
+  /** WeChat `time_expire` snapshot (order payment deadline). */
+  timeExpireAt: integer('time_expire_at', { mode: 'timestamp_ms' }).notNull(),
+  requestMethod: text('request_method').notNull(),
+  requestPath: text('request_path').notNull(),
+  requestBodySha256: text('request_body_sha256').notNull(),
+  requestBodyRedactedJson: text('request_body_redacted_json').notNull(),
+  requestCreatedAt: integer('request_created_at', { mode: 'timestamp_ms' }).notNull(),
+  responseStatus: integer('response_status'),
+  responseRequestId: text('response_request_id'),
+  responseBodySha256: text('response_body_sha256'),
+  /** Verified WeChat error code/message only; raw untrusted bodies are not stored. */
+  responseErrorCode: text('response_error_code'),
+  responseErrorMessage: text('response_error_message'),
+  prepayId: text('prepay_id'),
+  prepayExpiresAt: integer('prepay_expires_at', { mode: 'timestamp_ms' }),
+  failureCode: text('failure_code'),
+  failureMessage: text('failure_message'),
+  completedAt: integer('completed_at', { mode: 'timestamp_ms' }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  uniqueIndex('wechat_pay_prepay_attempts_intent_no_uq').on(
+    table.paymentIntentId,
+    table.attemptNo,
+  ),
+  uniqueIndex('wechat_pay_prepay_attempts_prepay_uq')
+    .on(table.prepayId)
+    .where(sql`${table.prepayId} IS NOT NULL`),
+  index('wechat_pay_prepay_attempts_intent_status_idx').on(
+    table.paymentIntentId,
+    table.status,
+  ),
+  index('wechat_pay_prepay_attempts_intent_fingerprint_idx').on(
+    table.paymentIntentId,
+    table.requestFingerprint,
+  ),
+  index('wechat_pay_prepay_attempts_status_created_idx').on(
+    table.status,
+    table.createdAt,
+  ),
+  check(
+    'wechat_pay_prepay_attempts_status_check',
+    sql`${table.status} IN ('requesting', 'succeeded', 'rejected', 'uncertain')`,
+  ),
+  check('wechat_pay_prepay_attempts_attempt_no_check', sql`${table.attemptNo} >= 1`),
+  check('wechat_pay_prepay_attempts_amount_check', sql`${table.amountCents} > 0`),
+  check(
+    'wechat_pay_prepay_attempts_request_check',
+    sql`${table.requestMethod} = 'POST'
+      AND length(${table.requestPath}) BETWEEN 1 AND 128
+      AND length(${table.requestBodyRedactedJson}) > 0
+      AND length(${table.requestFingerprint}) = 64
+      AND ${table.requestFingerprint} NOT GLOB '*[^0-9a-f]*'
+      AND length(${table.requestBodySha256}) = 64
+      AND ${table.requestBodySha256} NOT GLOB '*[^0-9a-f]*'
+      AND length(${table.payerOpenidSha256}) = 64
+      AND ${table.payerOpenidSha256} NOT GLOB '*[^0-9a-f]*'`,
+  ),
+  check(
+    'wechat_pay_prepay_attempts_response_hash_check',
+    sql`${table.responseBodySha256} IS NULL OR (
+      length(${table.responseBodySha256}) = 64
+      AND ${table.responseBodySha256} NOT GLOB '*[^0-9a-f]*'
+    )`,
+  ),
+  check(
+    'wechat_pay_prepay_attempts_prepay_check',
+    sql`((${table.status} = 'succeeded') = (${table.prepayId} IS NOT NULL))
+      AND ((${table.status} = 'succeeded') = (${table.prepayExpiresAt} IS NOT NULL))
+      AND (${table.status} <> 'succeeded' OR ${table.responseStatus} = 200)
+      AND (${table.prepayId} IS NULL OR length(${table.prepayId}) BETWEEN 1 AND 128)
+      AND (${table.prepayExpiresAt} IS NULL OR ${table.prepayExpiresAt} > ${table.requestCreatedAt})`,
+  ),
+  check(
+    'wechat_pay_prepay_attempts_lifecycle_check',
+    sql`((${table.status} = 'requesting') = (${table.completedAt} IS NULL))
+      AND (${table.timeExpireAt} > ${table.requestCreatedAt})
+      AND ${table.updatedAt} >= ${table.createdAt}`,
+  ),
+  check(
+    'wechat_pay_prepay_attempts_failure_check',
+    sql`(${table.status} IN ('rejected', 'uncertain')
+        OR (${table.failureCode} IS NULL AND ${table.failureMessage} IS NULL))
+      AND (${table.failureCode} IS NULL OR length(trim(${table.failureCode})) BETWEEN 1 AND 64)
+      AND (${table.failureMessage} IS NULL OR length(trim(${table.failureMessage})) BETWEEN 1 AND 500)`,
+  ),
+  check(
+    'wechat_pay_prepay_attempts_text_check',
+    sql`length(trim(${table.outTradeNo})) BETWEEN 6 AND 32
+      AND length(trim(${table.appid})) BETWEEN 1 AND 64
+      AND length(trim(${table.mchid})) BETWEEN 1 AND 64
+      AND (${table.responseStatus} IS NULL OR ${table.responseStatus} BETWEEN 100 AND 599)
+      AND (${table.responseRequestId} IS NULL OR length(trim(${table.responseRequestId})) BETWEEN 1 AND 128)
+      AND (${table.responseErrorCode} IS NULL OR length(trim(${table.responseErrorCode})) BETWEEN 1 AND 64)
+      AND (${table.responseErrorMessage} IS NULL OR length(trim(${table.responseErrorMessage})) BETWEEN 1 AND 500)`,
+  ),
+])
+
+/* -------------------------------------------------------------------------- */
+/* PAY-11: append-only query/close audit, never a payment or settlement fact. */
+export const wechatPayRecoveryChecks = sqliteTable('wechat_pay_recovery_checks', {
+  id: text('id').primaryKey(),
+  paymentIntentId: text('payment_intent_id').notNull()
+    .references(() => paymentIntents.id, { onDelete: 'restrict' }),
+  operation: text('operation').$type<'query' | 'close' | 'post_close_query'>().notNull(),
+  result: text('result').$type<'verified' | 'uncertain' | 'request_sent'>().notNull(),
+  detailCode: text('detail_code').notNull(),
+  responseSha256: text('response_sha256'),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (table) => [
+  index('wechat_pay_recovery_checks_intent_created_idx').on(table.paymentIntentId, table.createdAt),
+  check('wechat_pay_recovery_checks_operation_check',
+    sql`${table.operation} IN ('query', 'close', 'post_close_query')`),
+  check('wechat_pay_recovery_checks_result_check',
+    sql`${table.result} IN ('verified', 'uncertain', 'request_sent')`),
+  check('wechat_pay_recovery_checks_detail_check',
+    sql`length(trim(${table.detailCode})) BETWEEN 1 AND 80`),
+  check('wechat_pay_recovery_checks_hash_check',
+    sql`${table.responseSha256} IS NULL OR (
+      length(${table.responseSha256}) = 64
+      AND ${table.responseSha256} NOT GLOB '*[^0-9a-f]*'
+    )`),
+])
+
+/* -------------------------------------------------------------------------- */
+/* PAY-05 online order completion: immutable completion fact + review conflicts*/
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The single immutable "this order completed online" fact (PAY-05).
+ *
+ * It is deliberately separate from `local_orders.verified_*` (a human fact
+ * check) and from every ledger receipt: no finance projection is written here.
+ * The unique indexes are the idempotency authority:
+ * - one completion per order (`local_order_id` unique);
+ * - one completion per payment intent (`payment_intent_id` unique), which also
+ *   means a replay of the same trusted `payment.paid.v1` can never produce a
+ *   second completion;
+ * - one completion per provider transaction reference.
+ *
+ * `kind='zero_amount'` is the fully coupon-discounted path: no channel, no
+ * provider reference, `amount_cents = 0`, so it can never be read as cash.
+ */
+export const localOrderOnlineCompletions = sqliteTable(
+  'local_order_online_completions',
+  {
+    id: text('id').primaryKey(),
+    localOrderId: text('local_order_id')
+      .notNull()
+      .references(() => localOrders.id, { onDelete: 'restrict' }),
+    paymentIntentId: text('payment_intent_id')
+      .notNull()
+      .references(() => paymentIntents.id, { onDelete: 'restrict' }),
+    kind: text('kind').$type<LocalOrderOnlineCompletionKind>().notNull(),
+    simulated: integer('simulated', { mode: 'boolean' }).notNull(),
+    grossAmountCents: integer('gross_amount_cents').notNull(),
+    discountCents: integer('discount_cents').notNull(),
+    /** Net cash actually paid online: 0 for the coupon-only completion. */
+    amountCents: integer('amount_cents').notNull(),
+    providerTransactionId: text('provider_transaction_id'),
+    completedAt: integer('completed_at', { mode: 'timestamp_ms' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('local_order_online_completions_order_uq').on(table.localOrderId),
+    uniqueIndex('local_order_online_completions_intent_uq').on(table.paymentIntentId),
+    uniqueIndex('local_order_online_completions_provider_txn_uq')
+      .on(table.providerTransactionId)
+      .where(sql`${table.providerTransactionId} IS NOT NULL`),
+    index('local_order_online_completions_completed_idx').on(table.completedAt),
+    check(
+      'local_order_online_completions_kind_check',
+      sql`${table.kind} IN ('channel', 'zero_amount')`,
+    ),
+    check(
+      'local_order_online_completions_amount_check',
+      sql`${table.grossAmountCents} >= 0
+        AND ${table.discountCents} >= 0
+        AND ${table.amountCents} >= 0
+        AND ${table.grossAmountCents} - ${table.discountCents} = ${table.amountCents}`,
+    ),
+    check(
+      'local_order_online_completions_kind_facts_check',
+      sql`(
+        (${table.kind} = 'zero_amount'
+          AND ${table.amountCents} = 0
+          AND ${table.providerTransactionId} IS NULL
+          AND ${table.simulated} = 0)
+        OR
+        (${table.kind} = 'channel'
+          AND ${table.amountCents} > 0
+          AND ${table.providerTransactionId} IS NOT NULL)
+      )`,
+    ),
+    check(
+      'local_order_online_completions_text_check',
+      sql`${table.providerTransactionId} IS NULL
+        OR length(trim(${table.providerTransactionId})) BETWEEN 1 AND 128`,
+    ),
+  ],
+)
+
+/**
+ * PAY-05 durable manual-review path for an online payment that could not be
+ * projected onto its order. It never rewinds a payment, re-reserves a released
+ * coupon or completes a terminal order; it preserves the conflict so a human can
+ * reconcile it. `dedupeKey` makes re-consumption of the same evidence a no-op.
+ */
+export const localOrderOnlineConflicts = sqliteTable(
+  'local_order_online_conflicts',
+  {
+    id: text('id').primaryKey(),
+    localOrderId: text('local_order_id')
+      .notNull()
+      .references(() => localOrders.id, { onDelete: 'restrict' }),
+    paymentIntentId: text('payment_intent_id')
+      .references(() => paymentIntents.id, { onDelete: 'restrict' }),
+    paymentOutboxId: text('payment_outbox_id')
+      .references(() => paymentOutbox.id, { onDelete: 'restrict' }),
+    dedupeKey: text('dedupe_key').notNull(),
+    kind: text('kind').$type<LocalOrderOnlineConflictKind>().notNull(),
+    detail: text('detail').notNull(),
+    status: text('status').$type<'open' | 'reviewed' | 'resolved'>().notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    resolvedAt: integer('resolved_at', { mode: 'timestamp_ms' }),
+  },
+  (table) => [
+    uniqueIndex('local_order_online_conflicts_dedupe_uq').on(table.dedupeKey),
+    index('local_order_online_conflicts_order_created_idx').on(
+      table.localOrderId,
+      table.createdAt,
+    ),
+    index('local_order_online_conflicts_status_created_idx').on(
+      table.status,
+      table.createdAt,
+    ),
+    check(
+      'local_order_online_conflicts_kind_check',
+      sql`${table.kind} IN ('order_not_payable', 'order_already_completed',
+        'payment_state_invalid', 'coupon_state_invalid', 'late_success',
+        'manual_online_double_collection', 'consumer_exhausted')`,
+    ),
+    check(
+      'local_order_online_conflicts_status_check',
+      sql`${table.status} IN ('open', 'reviewed', 'resolved')`,
+    ),
+    check(
+      'local_order_online_conflicts_detail_check',
+      sql`length(trim(${table.detail})) BETWEEN 1 AND 500`,
+    ),
+    check(
+      'local_order_online_conflicts_resolved_check',
+      sql`((${table.status} = 'resolved') = (${table.resolvedAt} IS NOT NULL))`,
+    ),
+  ],
+)
 
 /* -------------------------------------------------------------------------- */
 /* Independently identified settlement parties and immutable sales provenance */
@@ -2231,7 +2920,7 @@ export const localOrderEvents = sqliteTable(
     ),
     check(
       'local_order_events_event_check',
-      sql`${table.event} IN ('order.registered', 'order.created_on_behalf', 'order.status_changed', 'order.verified', 'order.rejected')`,
+      sql`${table.event} IN ('order.registered', 'order.created_on_behalf', 'order.status_changed', 'order.verified', 'order.rejected', 'order.online_completed')`,
     ),
   ],
 )
@@ -2330,6 +3019,8 @@ export const ledgerEntries = sqliteTable(
     id: text('id').primaryKey(),
     factKind: text('fact_kind').$type<LedgerFactKind>().notNull(),
     sourceSystem: text('source_system').$type<LedgerSourceSystem>().notNull(),
+    /** PAY-04/PAY-06: only online-payment facts may be simulated; never formal cash. */
+    simulated: integer('simulated', { mode: 'boolean' }).notNull().default(false),
     /** Machine key of the source row; deduped per (source_system, source_id, fact_kind). */
     sourceId: text('source_id').notNull(),
     /** Human reference of the source (order no, grant id, receipt no). */
@@ -2388,15 +3079,17 @@ export const ledgerEntries = sqliteTable(
     ),
     check(
       'ledger_entries_source_system_check',
-      sql`${table.sourceSystem} IN ('local_order', 'crm_service_order', 'activity_reward_grant', 'manual')`,
+      sql`${table.sourceSystem} IN ('local_order', 'crm_service_order', 'activity_reward_grant',
+        'manual', 'online_payment')`,
     ),
     check(
       'ledger_entries_source_kind_check',
       sql`(${table.factKind} = 'order_registered' AND ${table.sourceSystem} = 'local_order')
         OR (${table.factKind} = 'order_verified'
           AND ${table.sourceSystem} IN ('local_order', 'crm_service_order'))
-        OR (${table.factKind} IN ('payment_received', 'payment_reversed')
-          AND ${table.sourceSystem} = 'manual')
+        OR (${table.factKind} = 'payment_received'
+          AND ${table.sourceSystem} IN ('manual', 'online_payment'))
+        OR (${table.factKind} = 'payment_reversed' AND ${table.sourceSystem} = 'manual')
         OR (${table.factKind} IN ('reward_cost', 'reward_reversed')
           AND ${table.sourceSystem} = 'activity_reward_grant')`,
     ),
@@ -2426,15 +3119,29 @@ export const ledgerEntries = sqliteTable(
     check(
       'ledger_entries_evidence_kind_check',
       sql`${table.evidenceKind} IN ('manual_receipt', 'bank_transfer', 'crm_confirmation',
-        'order_verification', 'reward_grant', 'none')`,
+        'order_verification', 'reward_grant', 'channel_payment', 'none')`,
     ),
-    // 没有凭据不得计入实收（DB 层硬拦）。
+    // Manual money needs a human + proof; online money needs the channel evidence
+    // and must not impersonate a human receipt. Only online rows may be simulated.
     check(
       'ledger_entries_payment_evidence_check',
       sql`${table.factKind} NOT IN ('payment_received', 'payment_reversed')
-        OR (${table.evidenceRef} IS NOT NULL
+        OR (${table.factKind} = 'payment_received'
+          AND ${table.sourceSystem} = 'online_payment'
+          AND ${table.evidenceRef} IS NOT NULL
+          AND ${table.recordedByUserId} IS NULL
+          AND ${table.recordedByStaffId} IS NULL
+          AND ${table.evidenceKind} = 'channel_payment')
+        OR (${table.sourceSystem} = 'manual'
+          AND ${table.evidenceRef} IS NOT NULL
           AND ${table.recordedByStaffId} IS NOT NULL
-          AND ${table.evidenceKind} <> 'none')`,
+          AND ${table.evidenceKind} IN ('manual_receipt', 'bank_transfer')
+          AND ${table.simulated} = 0)`,
+    ),
+    check(
+      'ledger_entries_simulated_check',
+      sql`(${table.simulated} IN (0, 1)
+        AND (${table.simulated} = 0 OR ${table.sourceSystem} = 'online_payment'))`,
     ),
     check(
       'ledger_entries_counter_entry_check',
@@ -2508,7 +3215,8 @@ export const ledgerEntrySources = sqliteTable(
     ),
     check(
       'ledger_entry_sources_source_system_check',
-      sql`${table.sourceSystem} IN ('local_order', 'crm_service_order', 'activity_reward_grant', 'manual')`,
+      sql`${table.sourceSystem} IN ('local_order', 'crm_service_order', 'activity_reward_grant',
+        'manual', 'online_payment')`,
     ),
   ],
 )
@@ -2877,4 +3585,5 @@ export const schema = {
   ledgerEntrySources,
   ledgerAnomalies,
   externalOffers,
+  mockPaymentEventReservations,
 }

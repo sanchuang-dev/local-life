@@ -1,18 +1,21 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { App as AntdApp, ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import type {
-  LocalOrderDetail,
+  AdminLocalOrderDetail,
+  AdminOrderPaymentSection,
+  LedgerEntry,
+  LedgerOrderEvidence,
   LocalOrderEvent,
   LocalOrderSummary,
 } from '@sanchuang-dev/local-life-contracts'
 import { AdminAuthProvider } from '../app/auth-context'
 import { adminTheme } from '../app/theme'
 import type { AuthenticatedSession } from '../services/auth'
-import { OrdersPage } from './OrdersPage'
+import { OrdersPage, localDateRangeToInstants } from './OrdersPage'
 
 /**
  * These tests drive the real 订单管理 page with an explicitly stubbed `fetch`.
@@ -26,6 +29,8 @@ const USER_ID = '123e4567-e89b-42d3-a456-426614174000'
 const STAFF_ID = '123e4567-e89b-42d3-a456-426614174001'
 const REVIEWER_ID = '123e4567-e89b-42d3-a456-426614174002'
 const RESIDENT_ID = '123e4567-e89b-42d3-a456-426614174003'
+const GRID_ID = '123e4567-e89b-42d3-a456-426614174009'
+const RECEIPT_ENTRY_ID = '123e4567-e89b-42d3-a456-4266141740aa'
 const COMMUNITY_A = { id: '123e4567-e89b-42d3-a456-4266141740a1', name: '幸福社区' }
 const COMMUNITY_B = { id: '123e4567-e89b-42d3-a456-4266141740b2', name: '阳光社区' }
 const PRODUCT_ID = '123e4567-e89b-42d3-a456-4266141740c3'
@@ -81,18 +86,274 @@ function summary(overrides: Partial<LocalOrderSummary> = {}): LocalOrderSummary 
   }
 }
 
-function detail(overrides: Partial<LocalOrderDetail> = {}): LocalOrderDetail {
+function detail(overrides: Partial<AdminLocalOrderDetail> = {}): AdminLocalOrderDetail {
   return {
     ...summary(),
+    residentContact: { phone: '13800000000', address: null },
     verification: null,
+    onlineCompletion: null,
+    onlineConflicts: [],
     statusNote: null,
     events: [orderEvent()],
+    paymentSection: emptyPaymentSection(),
     ...overrides,
   }
 }
 
+function emptyPaymentSection(
+  overrides: Partial<AdminOrderPaymentSection> = {},
+): AdminOrderPaymentSection {
+  return {
+    amounts: {
+      grossAmountCents: 3980,
+      couponDiscountCents: 0,
+      netPayableCents: 3980,
+    },
+    manual: {
+      verified: false,
+      verifiedAt: null,
+      verifiedBy: null,
+      note: null,
+      receipts: [],
+    },
+    online: {
+      intents: [],
+      completion: null,
+      ledgerReceipts: [],
+      conflicts: [],
+      reviewExceptions: [],
+    },
+    receiptTotals: {
+      manualReceivedCents: 0,
+      onlineRealReceivedCents: 0,
+      onlineSimulatedReceivedCents: 0,
+    },
+    bankSettlement: { status: 'unverified' },
+    ...overrides,
+  }
+}
+
+/** A Mock online order: channel paid, completion, ledger receipt + an exception. */
+function mockOnlinePaymentSection(): AdminOrderPaymentSection {
+  const merchantOrderNo = 'PAY-20261116ABCDEF0123456789ABCD'
+  return emptyPaymentSection({
+    online: {
+      intents: [
+        {
+          id: '123e4567-e89b-42d3-a456-4266141740c1',
+          kind: 'channel',
+          channel: 'mock',
+          simulated: true,
+          merchantOrderNo,
+          grossAmountCents: 3980,
+          discountCents: 0,
+          netPayableCents: 3980,
+          status: 'paid',
+          expiresAt: '2026-11-04T02:15:00.000Z',
+          paidAt: '2026-11-04T02:01:00.000Z',
+          closedAt: null,
+          failedAt: null,
+          failureCode: null,
+          failureMessage: null,
+          createdAt: '2026-11-04T02:00:00.000Z',
+          updatedAt: '2026-11-04T02:01:00.000Z',
+          attempts: [
+            {
+              id: '123e4567-e89b-42d3-a456-4266141740c2',
+              attemptNo: 1,
+              status: 'paid',
+              providerTransactionIdMasked: '****d6c8',
+              createdAt: '2026-11-04T02:00:30.000Z',
+              updatedAt: '2026-11-04T02:01:00.000Z',
+              confirmedAt: '2026-11-04T02:01:00.000Z',
+              closedAt: null,
+              failedAt: null,
+              failureCode: null,
+              failureMessage: null,
+            },
+          ],
+          events: [
+            {
+              id: '123e4567-e89b-42d3-a456-4266141740c3',
+              eventType: 'payment.status_changed',
+              source: 'channel',
+              fromStatus: 'pending',
+              toStatus: 'paid',
+              createdAt: '2026-11-04T02:01:00.000Z',
+            },
+          ],
+        },
+      ],
+      completion: {
+        paymentIntentId: '123e4567-e89b-42d3-a456-4266141740c1',
+        kind: 'channel',
+        simulated: true,
+        amountCents: 3980,
+        discountCents: 0,
+        providerTransactionIdMasked: '****d6c8',
+        completedAt: '2026-11-04T02:01:00.000Z',
+      },
+      ledgerReceipts: [
+        {
+          entryId: '123e4567-e89b-42d3-a456-4266141740c4',
+          factKind: 'payment_received',
+          sourceSystem: 'online_payment',
+          amountCents: 3980,
+          simulated: true,
+          providerTransactionIdMasked: '****d6c8',
+          occurredAt: '2026-11-04T02:01:00.000Z',
+          createdAt: '2026-11-04T02:01:00.000Z',
+        },
+      ],
+      conflicts: [],
+      reviewExceptions: [
+        {
+          id: '123e4567-e89b-42d3-a456-4266141740c5',
+          kind: 'terminal_conflict',
+          status: 'open',
+          channel: 'mock',
+          merchantOrderNo,
+          providerTransactionIdMasked: '****d6c8',
+          amountCents: 3980,
+          source: 'notification',
+          failureCode: null,
+          observedAt: '2026-11-04T02:02:00.000Z',
+          createdAt: '2026-11-04T02:02:00.000Z',
+          resolvedAt: null,
+        },
+      ],
+    },
+    receiptTotals: {
+      manualReceivedCents: 0,
+      onlineRealReceivedCents: 0,
+      onlineSimulatedReceivedCents: 3980,
+    },
+  })
+}
+
+/** A legacy order: human verification + one manual bank-transfer receipt. */
+function manualPaymentSection(): AdminOrderPaymentSection {
+  return emptyPaymentSection({
+    manual: {
+      verified: true,
+      verifiedAt: '2026-11-05T04:00:00.000Z',
+      verifiedBy: REVIEWER,
+      note: '已电话与居民核对',
+      receipts: [
+        {
+          entryId: RECEIPT_ENTRY_ID,
+          factKind: 'payment_received',
+          amountCents: 3980,
+          evidenceKind: 'bank_transfer',
+          evidenceRef: 'BANK-4821',
+          occurredAt: '2026-11-05T04:00:00.000Z',
+          createdAt: '2026-11-05T04:00:00.000Z',
+          reversal: null,
+        },
+      ],
+    },
+    receiptTotals: {
+      manualReceivedCents: 3980,
+      onlineRealReceivedCents: 0,
+      onlineSimulatedReceivedCents: 0,
+    },
+  })
+}
+
+/** Durable exception fixtures: double collection + exhausted + late success. */
+function exceptionPaymentSection(): AdminOrderPaymentSection {
+  const section = mockOnlinePaymentSection()
+  section.online.conflicts = [
+    {
+      id: '123e4567-e89b-42d3-a456-4266141740d1',
+      kind: 'manual_online_double_collection',
+      status: 'open',
+      createdAt: '2026-11-04T03:00:00.000Z',
+      resolvedAt: null,
+    },
+    {
+      id: '123e4567-e89b-42d3-a456-4266141740d2',
+      kind: 'consumer_exhausted',
+      status: 'open',
+      createdAt: '2026-11-04T03:10:00.000Z',
+      resolvedAt: null,
+    },
+  ]
+  section.online.reviewExceptions = [
+    {
+      id: '123e4567-e89b-42d3-a456-4266141740d3',
+      kind: 'late_success_after_closed',
+      status: 'open',
+      channel: 'mock',
+      merchantOrderNo: 'PAY-20261116ABCDEF0123456789ABCD',
+      providerTransactionIdMasked: '****e9f0',
+      amountCents: 3980,
+      source: 'query',
+      failureCode: null,
+      observedAt: '2026-11-04T03:20:00.000Z',
+      createdAt: '2026-11-04T03:20:00.000Z',
+      resolvedAt: null,
+    },
+  ]
+  return section
+}
+
+/** The fully coupon-discounted PAY-05 path: no channel, no cash, no receipt. */
+function zeroAmountPaymentSection(): AdminOrderPaymentSection {
+  const intentId = '123e4567-e89b-42d3-a456-4266141740e1'
+  return emptyPaymentSection({
+    amounts: {
+      grossAmountCents: 3980,
+      couponDiscountCents: 3980,
+      netPayableCents: 0,
+    },
+    online: {
+      intents: [
+        {
+          id: intentId,
+          kind: 'zero_amount',
+          channel: null,
+          simulated: false,
+          merchantOrderNo: 'PAY-ZERO-20261104ABCDEF012345',
+          grossAmountCents: 3980,
+          discountCents: 3980,
+          netPayableCents: 0,
+          status: 'paid',
+          expiresAt: '2026-11-04T02:15:00.000Z',
+          paidAt: '2026-11-04T02:01:00.000Z',
+          closedAt: null,
+          failedAt: null,
+          failureCode: null,
+          failureMessage: null,
+          createdAt: '2026-11-04T02:00:00.000Z',
+          updatedAt: '2026-11-04T02:01:00.000Z',
+          attempts: [],
+          events: [],
+        },
+      ],
+      completion: {
+        paymentIntentId: intentId,
+        kind: 'zero_amount',
+        simulated: false,
+        amountCents: 0,
+        discountCents: 3980,
+        providerTransactionIdMasked: null,
+        completedAt: '2026-11-04T02:01:00.000Z',
+      },
+      ledgerReceipts: [],
+      conflicts: [],
+      reviewExceptions: [],
+    },
+    receiptTotals: {
+      manualReceivedCents: 0,
+      onlineRealReceivedCents: 0,
+      onlineSimulatedReceivedCents: 0,
+    },
+  })
+}
+
 /** A pending-review order carrying the reviewer's note the verify action records. */
-function verifiedDetail(): LocalOrderDetail {
+function verifiedDetail(): AdminLocalOrderDetail {
   return detail({
     status: 'verified',
     updatedAt: '2026-11-05T04:00:00.000Z',
@@ -135,6 +396,18 @@ const OPERATOR_SESSION: AuthenticatedSession = {
   },
 }
 
+const FILTER_OPTIONS = {
+  communities: [COMMUNITY_A, COMMUNITY_B],
+  staff: [
+    { id: STAFF_ID, displayName: '运营员甲', role: 'operator', communities: [COMMUNITY_A] },
+    { id: GRID_ID, displayName: '网格员甲', role: 'grid_worker', communities: [COMMUNITY_A] },
+  ],
+  leadStatuses: [],
+  leadSourceTypes: [],
+  businessTypes: [],
+  orderStatuses: [],
+}
+
 const GRID_SESSION: AuthenticatedSession = {
   ...ADMIN_SESSION,
   staff: {
@@ -143,6 +416,56 @@ const GRID_SESSION: AuthenticatedSession = {
     role: 'grid_worker',
     communities: [COMMUNITY_A],
   },
+}
+
+/** The receipt section always reads the ledger view of the order it is showing. */
+function receiptEvidence(overrides: Partial<LedgerOrderEvidence> = {}): LedgerOrderEvidence {
+  return {
+    orderId: ORDER_ID,
+    orderDisplayNo: ORDER_ID.slice(0, 8).toUpperCase(),
+    communityId: COMMUNITY_A.id,
+    productName: '社区助农蔬菜包',
+    orderStatus: 'registered',
+    registeredAmountCents: 3980,
+    couponDiscountCents: 0,
+    netPayableCents: 3980,
+    canRecord: false,
+    status: 'pending_order_review',
+    blockingReasons: ['订单尚未完成业务核验，不能登记收款关联'],
+    payment: null,
+    ...overrides,
+  }
+}
+
+function ledgerEntry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
+  return {
+    entryId: RECEIPT_ENTRY_ID,
+    factKind: 'payment_received',
+    sourceSystem: 'manual',
+    simulated: false,
+    sourceId: 'manual-receipt-0001',
+    sourceDisplayNo: 'RCPT-0001',
+    communityId: COMMUNITY_A.id,
+    productId: null,
+    occurredAt: '2026-11-05T04:00:00.000Z',
+    verifiedAt: null,
+    amountCents: 3980,
+    settlementAmountStatus: 'pending_rule',
+    attribution: {
+      state: 'pending',
+      staffId: null,
+      communityId: COMMUNITY_A.id,
+      basis: 'no_explicit_attribution',
+    },
+    evidence: { kind: 'bank_transfer', ref: 'BANK-4821' },
+    counterEntryId: null,
+    batchId: null,
+    reconciliationState: 'unreconciled',
+    recordedByUserId: null,
+    recordedByStaffId: STAFF_ID,
+    createdAt: '2026-11-05T04:00:00.000Z',
+    ...overrides,
+  }
 }
 
 function json(body: unknown, status = 200): Response {
@@ -170,6 +493,15 @@ function stubApi(routes: ReadonlyArray<readonly [string, Handler]>): FetchCall[]
   })
   vi.stubGlobal('fetch', fetchMock)
   return calls
+}
+
+/** Shared reads every order console performs, plus a default receipt view. */
+function stubOrderApi(routes: ReadonlyArray<readonly [string, Handler]>): FetchCall[] {
+  return stubApi([
+    ...routes,
+    ['/api/admin/crm/filter-options', () => json(FILTER_OPTIONS)],
+    ['/api/admin/ledger/orders/', () => json(receiptEvidence())],
+  ])
 }
 
 function communitiesRoute(
@@ -216,9 +548,32 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+describe('OrdersPage date-range boundaries (Asia/Shanghai)', () => {
+  it('maps an entire Beijing calendar day to the correct UTC instants', () => {
+    expect(localDateRangeToInstants({ start: '2026-11-18', end: '2026-11-18' })).toEqual({
+      createdFrom: '2026-11-17T16:00:00.000Z',
+      createdTo: '2026-11-18T15:59:59.999Z',
+    })
+  })
+
+  it('keeps inclusive date ranges and single-sided filters stable across year boundaries', () => {
+    expect(localDateRangeToInstants({ start: '2026-12-31', end: '2027-01-01' })).toEqual({
+      createdFrom: '2026-12-30T16:00:00.000Z',
+      createdTo: '2027-01-01T15:59:59.999Z',
+    })
+    expect(localDateRangeToInstants({ start: '2026-11-18' })).toEqual({
+      createdFrom: '2026-11-17T16:00:00.000Z',
+    })
+    expect(localDateRangeToInstants({ end: '2026-11-18' })).toEqual({
+      createdTo: '2026-11-18T15:59:59.999Z',
+    })
+    expect(localDateRangeToInstants(undefined)).toEqual({})
+  })
+})
+
 describe('OrdersPage permission boundary', () => {
   it('renders the grid-worker lockout page and issues zero admin order requests', async () => {
-    const calls = stubApi([
+    const calls = stubOrderApi([
       [
         '/api/',
         (url) => {
@@ -235,7 +590,7 @@ describe('OrdersPage permission boundary', () => {
   })
 
   it('shows the real 403 instead of an empty success list', async () => {
-    stubApi([
+    stubOrderApi([
       communitiesRoute(),
       [
         '/api/admin/local-orders?',
@@ -252,7 +607,7 @@ describe('OrdersPage permission boundary', () => {
 
 describe('OrdersPage list', () => {
   it('renders the frozen snapshot from the server, not a recomputed price', async () => {
-    stubApi([communitiesRoute(), ordersRoute()])
+    stubOrderApi([communitiesRoute(), ordersRoute()])
 
     renderPage(ADMIN_SESSION)
 
@@ -266,7 +621,7 @@ describe('OrdersPage list', () => {
   })
 
   it('scopes the operator to assigned communities and says so', async () => {
-    const calls = stubApi([communitiesRoute([COMMUNITY_A]), ordersRoute()])
+    const calls = stubOrderApi([communitiesRoute([COMMUNITY_A]), ordersRoute()])
 
     renderPage(OPERATOR_SESSION)
 
@@ -278,7 +633,7 @@ describe('OrdersPage list', () => {
   })
 
   it('reports the real detail error when the order cannot be read', async () => {
-    stubApi([
+    stubOrderApi([
       communitiesRoute(),
       ordersRoute(),
       [
@@ -299,7 +654,7 @@ describe('OrdersPage list', () => {
 describe('OrdersPage handling', () => {
   it('moves a registered order to processing through the PATCH status route', async () => {
     let statusCall: FetchCall | undefined
-    stubApi([
+    stubOrderApi([
       communitiesRoute(),
       ordersRoute(),
       [
@@ -335,7 +690,7 @@ describe('OrdersPage handling', () => {
 
   it('requires a reason before marking an order not passed, then posts it', async () => {
     let statusCall: FetchCall | undefined
-    stubApi([
+    stubOrderApi([
       communitiesRoute(),
       ordersRoute(),
       [
@@ -384,7 +739,7 @@ describe('OrdersPage handling', () => {
       status: 'pending_review',
       updatedAt: '2026-11-05T02:00:00.000Z',
     })
-    stubApi([
+    stubOrderApi([
       communitiesRoute(),
       ordersRoute([{ ...pending }]),
       [
@@ -435,7 +790,7 @@ describe('OrdersPage handling', () => {
       status: 'pending_review',
       updatedAt: '2026-11-05T02:00:00.000Z',
     })
-    stubApi([
+    stubOrderApi([
       communitiesRoute(),
       ordersRoute([{ ...pending }]),
       [
@@ -467,7 +822,7 @@ describe('OrdersPage handling', () => {
 
   it('never offers a direct "verified" status button', async () => {
     const draft = detail({ status: 'pending_review' })
-    stubApi([
+    stubOrderApi([
       communitiesRoute(),
       ordersRoute([summary({ status: 'pending_review' })]),
       [`/api/admin/local-orders/${ORDER_ID}`, () => json(draft)],
@@ -482,5 +837,394 @@ describe('OrdersPage handling', () => {
     expect(screen.queryByRole('button', { name: '确认通过' })).toBeNull()
     expect(screen.queryByRole('button', { name: '核验通过' })).toBeNull()
     expect(screen.getByRole('button', { name: '确认人工核验通过' })).toBeTruthy()
+  })
+})
+
+describe('OrdersPage receipt evidence', () => {
+  it('shows the receipt section for the selected order and offers no second order search', async () => {
+    stubOrderApi([
+      communitiesRoute(),
+      ordersRoute([summary({ status: 'verified' })]),
+      [`/api/admin/local-orders/${ORDER_ID}`, () => json(verifiedDetail())],
+      [
+        '/api/admin/ledger/orders/',
+        () =>
+          json(
+            receiptEvidence({
+              orderStatus: 'verified',
+              canRecord: true,
+              status: 'no_evidence',
+              blockingReasons: ['尚无实收证明，请登记真实收款凭据'],
+            }),
+          ),
+      ],
+    ])
+
+    renderPage(ADMIN_SESSION)
+
+    fireEvent.click(await screen.findByRole('button', { name: '详情' }))
+
+    expect(await screen.findByText('收款凭据与业绩归属')).toBeTruthy()
+    expect(
+      await screen.findByRole('button', { name: '记录凭据（不代表结算）' }),
+    ).toBeTruthy()
+    // The order is already selected: the old 搜索订单 → 再次选择订单 flow is gone.
+    expect(screen.queryByPlaceholderText(/按商品名称/)).toBeNull()
+    expect(screen.queryByRole('button', { name: '查找订单' })).toBeNull()
+    expect(screen.queryByText('检索订单 / 登记凭据')).toBeNull()
+  })
+
+  it('records a receipt through the ledger API with CSRF and reloads its evidence', async () => {
+    let recordCall: FetchCall | undefined
+    let evidenceReads = 0
+    stubOrderApi([
+      communitiesRoute(),
+      ordersRoute([summary({ status: 'verified' })]),
+      [`/api/admin/local-orders/${ORDER_ID}`, () => json(verifiedDetail())],
+      [
+        '/api/admin/ledger/orders/',
+        () =>
+          json(
+            evidenceReads++ === 0
+              ? receiptEvidence({
+                  orderStatus: 'verified',
+                  canRecord: true,
+                  status: 'no_evidence',
+                  blockingReasons: ['尚无实收证明，请登记真实收款凭据'],
+                })
+              : receiptEvidence({
+                  orderStatus: 'verified',
+                  status: 'pending_attribution',
+                  blockingReasons: ['业绩归属尚未确认，不能作为结算依据'],
+                  payment: {
+                    entryId: RECEIPT_ENTRY_ID,
+                    amountCents: 3980,
+                    receivedAt: '2026-11-05T04:00:00.000Z',
+                    evidenceKind: 'bank_transfer',
+                    evidenceRef: 'BANK-4821',
+                    recordedByStaffId: STAFF_ID,
+                    attribution: {
+                      state: 'pending',
+                      staffId: null,
+                      communityId: COMMUNITY_A.id,
+                      basis: 'no_explicit_attribution',
+                    },
+                    reversedEntryId: null,
+                    confirmation: null,
+                  },
+                }),
+          ),
+      ],
+      [
+        '/api/admin/ledger/payments',
+        (url, init) => {
+          recordCall = { url, init }
+          return json(ledgerEntry(), 201)
+        },
+      ],
+    ])
+
+    renderPage(ADMIN_SESSION)
+
+    fireEvent.click(await screen.findByRole('button', { name: '详情' }))
+    await screen.findByText('收款凭据与业绩归属')
+
+    fireEvent.change(await screen.findByLabelText('凭据编号'), {
+      target: { value: 'BANK-4821' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '记录凭据（不代表结算）' }))
+
+    await waitFor(() => expect(recordCall).toBeTruthy())
+    const sent = recordCall!
+    expect(sent.url).toBe('/api/admin/ledger/payments')
+    expect(sent.init?.method).toBe('POST')
+    expect((sent.init!.headers as Record<string, string>)['x-csrf-token']).toBe(CSRF_TOKEN)
+    expect(JSON.parse(String(sent.init!.body))).toMatchObject({
+      communityId: COMMUNITY_A.id,
+      orderId: ORDER_ID,
+      amountCents: 3980,
+      evidenceKind: 'bank_transfer',
+      evidenceRef: 'BANK-4821',
+      staffId: STAFF_ID,
+    })
+    expect(
+      await screen.findByText('凭据已登记，仍需核对金额和业绩归属；不代表完成对账或付款。'),
+    ).toBeTruthy()
+    await waitFor(() => expect(screen.getByText('BANK-4821')).toBeTruthy())
+  })
+
+  it('confirms pending attribution as an append-only audit record', async () => {
+    let attributionCall: FetchCall | undefined
+    stubOrderApi([
+      communitiesRoute(),
+      ordersRoute([summary({ status: 'verified' })]),
+      [`/api/admin/local-orders/${ORDER_ID}`, () => json(verifiedDetail())],
+      [
+        '/api/admin/ledger/orders/',
+        () =>
+          json(
+            receiptEvidence({
+              orderStatus: 'verified',
+              status: 'pending_attribution',
+              blockingReasons: ['业绩归属尚未确认，不能作为结算依据'],
+              payment: {
+                entryId: RECEIPT_ENTRY_ID,
+                amountCents: 3980,
+                receivedAt: '2026-11-05T04:00:00.000Z',
+                evidenceKind: 'bank_transfer',
+                evidenceRef: 'BANK-4821',
+                recordedByStaffId: STAFF_ID,
+                attribution: {
+                  state: 'pending',
+                  staffId: null,
+                  communityId: COMMUNITY_A.id,
+                  basis: 'no_explicit_attribution',
+                },
+                reversedEntryId: null,
+                confirmation: null,
+              },
+            }),
+          ),
+      ],
+      [
+        '/api/admin/ledger/attributions',
+        (url, init) => {
+          attributionCall = { url, init }
+          return json(
+            ledgerEntry({
+              attribution: {
+                state: 'attributed',
+                staffId: GRID_ID,
+                communityId: COMMUNITY_A.id,
+                basis: 'confirmed_fact',
+              },
+            }),
+            201,
+          )
+        },
+      ],
+    ])
+
+    renderPage(ADMIN_SESSION)
+
+    fireEvent.click(await screen.findByRole('button', { name: '详情' }))
+    expect(await screen.findByText('确认业绩归属')).toBeTruthy()
+
+    fireEvent.mouseDown(screen.getByLabelText('实际推广贡献网格员'))
+    const option = (await screen.findAllByText('网格员甲（网格员）')).find((element) =>
+      element.closest('.ant-select-item-option'),
+    )
+    expect(option).toBeTruthy()
+    fireEvent.click(option as Element)
+
+    fireEvent.change(screen.getByLabelText('归属核验依据'), {
+      target: { value: '居民出示网格员推广登记记录' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '追加确认记录' }))
+
+    await waitFor(() => expect(attributionCall).toBeTruthy())
+    const sent = attributionCall!
+    expect(sent.url).toBe('/api/admin/ledger/attributions')
+    expect((sent.init!.headers as Record<string, string>)['x-csrf-token']).toBe(CSRF_TOKEN)
+    expect(JSON.parse(String(sent.init!.body))).toEqual({
+      entryId: RECEIPT_ENTRY_ID,
+      staffId: GRID_ID,
+      note: '居民出示网格员推广登记记录',
+    })
+    expect(await screen.findByText('业绩归属已追加确认记录，不改变原始流水。')).toBeTruthy()
+  })
+})
+
+describe('OrdersPage payment section (PAY-08)', () => {
+  it('layers mock channel payment, masks the transaction id and never claims bank settlement', async () => {
+    const online = detail({
+      status: 'online_completed',
+      onlineCompletion: {
+        paymentIntentId: '123e4567-e89b-42d3-a456-4266141740c1',
+        kind: 'channel',
+        simulated: true,
+        amountCents: 3980,
+        discountCents: 0,
+        providerTransactionId: '****d6c8',
+        completedAt: '2026-11-04T02:01:00.000Z',
+      },
+      paymentSection: mockOnlinePaymentSection(),
+    })
+    stubOrderApi([
+      communitiesRoute(),
+      ordersRoute([summary({ status: 'online_completed' })]),
+      [`/api/admin/local-orders/${ORDER_ID}`, () => json(online)],
+    ])
+
+    renderPage(ADMIN_SESSION)
+
+    fireEvent.click(await screen.findByRole('button', { name: '详情' }))
+
+    expect(await screen.findByText('支付与结算（只读）')).toBeTruthy()
+    expect(screen.getAllByText('模拟支付/测试').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('渠道支付已确认').length).toBeGreaterThan(0)
+    expect(screen.getByText('银行结算：未核实')).toBeTruthy()
+    expect(screen.getByText(/真实线上实收合计 ¥0\.00/)).toBeTruthy()
+    expect(screen.getByText(/模拟支付实收合计 ¥39\.80/)).toBeTruthy()
+    expect(screen.getAllByText(/交易号 \*{4}d6c8/).length).toBeGreaterThan(0)
+    // No raw channel reference and no fabricated settlement claim.
+    expect(document.body.textContent).not.toMatch(/MOCK-TXN|RAW-TXN/)
+    expect(document.body.textContent).not.toMatch(/已到账|已结算/)
+    // Read-only: no recovery/reconciliation action exists in this section.
+    expect(screen.queryByRole('button', { name: /自动|修复|重新对账/ })).toBeNull()
+  })
+
+  it('shows a legacy manual order without inventing an online payment', async () => {
+    const manual = detail({
+      status: 'verified',
+      verification: {
+        verifiedBy: REVIEWER,
+        verifiedAt: '2026-11-05T04:00:00.000Z',
+        note: '已电话与居民核对',
+      },
+      paymentSection: manualPaymentSection(),
+    })
+    stubOrderApi([
+      communitiesRoute(),
+      ordersRoute([summary({ status: 'verified' })]),
+      [`/api/admin/local-orders/${ORDER_ID}`, () => json(manual)],
+    ])
+
+    renderPage(ADMIN_SESSION)
+
+    fireEvent.click(await screen.findByRole('button', { name: '详情' }))
+
+    expect(await screen.findByText('人工核验 / 线下收款')).toBeTruthy()
+    expect(screen.getByText('人工收款凭据（线下）')).toBeTruthy()
+    expect(screen.getByText(/BANK-4821/)).toBeTruthy()
+    expect(screen.getByText(/本单没有支付单/)).toBeTruthy()
+    expect(screen.getByText('未发起在线支付。')).toBeTruthy()
+    expect(screen.queryByText('模拟支付/测试')).toBeNull()
+    expect(document.body.textContent).not.toMatch(/已到账|已结算/)
+  })
+
+  it('lists existing exception kinds read-only, including double collection and exhaustion', async () => {
+    const withExceptions = detail({
+      status: 'online_completed',
+      onlineCompletion: {
+        paymentIntentId: '123e4567-e89b-42d3-a456-4266141740c1',
+        kind: 'channel',
+        simulated: true,
+        amountCents: 3980,
+        discountCents: 0,
+        providerTransactionId: '****d6c8',
+        completedAt: '2026-11-04T02:01:00.000Z',
+      },
+      paymentSection: exceptionPaymentSection(),
+    })
+    stubOrderApi([
+      communitiesRoute(),
+      ordersRoute([summary({ status: 'online_completed' })]),
+      [`/api/admin/local-orders/${ORDER_ID}`, () => json(withExceptions)],
+    ])
+
+    renderPage(ADMIN_SESSION)
+
+    fireEvent.click(await screen.findByRole('button', { name: '详情' }))
+
+    expect(
+      await screen.findByText('人工线下实收与在线渠道收款同时存在'),
+    ).toBeTruthy()
+    expect(screen.getByText('订单完成消费重试耗尽，待人工恢复')).toBeTruthy()
+    expect(screen.getByText('支付单关闭后收到渠道确认')).toBeTruthy()
+    expect(screen.getByText(/不提供自动恢复/)).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /自动|修复|重新对账/ })).toBeNull()
+  })
+
+  it('renders a zero-amount coupon completion without any channel payment wording', async () => {
+    const zero = detail({
+      status: 'online_completed',
+      onlineCompletion: {
+        paymentIntentId: '123e4567-e89b-42d3-a456-4266141740e1',
+        kind: 'zero_amount',
+        simulated: false,
+        amountCents: 0,
+        discountCents: 3980,
+        providerTransactionId: null,
+        completedAt: '2026-11-04T02:01:00.000Z',
+      },
+      paymentSection: zeroAmountPaymentSection(),
+    })
+    stubOrderApi([
+      communitiesRoute(),
+      ordersRoute([summary({ status: 'online_completed' })]),
+      [`/api/admin/local-orders/${ORDER_ID}`, () => json(zero)],
+    ])
+
+    renderPage(ADMIN_SESSION)
+
+    fireEvent.click(await screen.findByRole('button', { name: '详情' }))
+
+    const section = await screen.findByRole('region', { name: '支付信息（只读）' })
+    expect(within(section).getAllByText('零元券单（无渠道）').length).toBeGreaterThan(0)
+    expect(within(section).getAllByText('零元券单已完成（无现金）').length).toBeGreaterThan(0)
+    expect(within(section).queryByText('真实渠道')).toBeNull()
+    expect(within(section).queryByText(/渠道支付已确认/)).toBeNull()
+    expect(within(section).getByText(/真实线上实收合计 ¥0\.00/)).toBeTruthy()
+    expect(within(section).getByText(/模拟支付实收合计 ¥0\.00/)).toBeTruthy()
+    // No channel transaction reference is rendered for the zero-amount path.
+    expect(within(section).queryByText(/交易号 /)).toBeNull()
+  })
+
+  it('shows a zero-amount order in the list without claiming a channel payment', async () => {
+    const zeroRow = summary({
+      status: 'online_completed',
+      payment: {
+        intentId: '123e4567-e89b-42d3-a456-4266141740e1',
+        status: 'paid',
+        channel: null,
+        simulated: false,
+        netPayableCents: 0,
+        expiresAt: '2026-11-04T02:15:00.000Z',
+        failureMessage: null,
+        updatedAt: '2026-11-04T02:01:00.000Z',
+      },
+    })
+    stubOrderApi([communitiesRoute(), ordersRoute([zeroRow])])
+
+    renderPage(ADMIN_SESSION)
+
+    const list = await screen.findByRole('region', { name: '本地订单列表' })
+    expect(await within(list).findByText('零元券单已完成（无现金）')).toBeTruthy()
+    expect(within(list).getByText('零元券单（无渠道）')).toBeTruthy()
+    expect(within(list).queryByText('渠道支付已确认')).toBeNull()
+    expect(within(list).queryByText('真实渠道')).toBeNull()
+  })
+
+  it('sends the payment-status filter to the server query', async () => {
+    const calls = stubOrderApi([communitiesRoute(), ordersRoute()])
+
+    renderPage(ADMIN_SESSION)
+
+    await screen.findByText('社区助农蔬菜包')
+    fireEvent.click(screen.getByRole('button', { name: '更多条件' }))
+    const paymentStatusSelect = (await screen.findAllByLabelText('支付状态')).find(
+      (element) => element.id.includes('-inline-'),
+    )
+    expect(paymentStatusSelect).toBeTruthy()
+    fireEvent.mouseDown(paymentStatusSelect as Element)
+    const option = (await screen.findAllByText('渠道支付已确认')).find((element) =>
+      element.closest('.ant-select-item-option'),
+    )
+    expect(option).toBeTruthy()
+    fireEvent.click(option as Element)
+    // Submit the quick filter form directly: antd's open Select portal marks
+    // sibling content aria-hidden, so a role query for the 查询 button is not
+    // reliable while the dropdown is mounted.
+    const quickForm = document.querySelector('form.data-panel-form')
+    expect(quickForm).toBeTruthy()
+    fireEvent.submit(quickForm as Element)
+
+    await waitFor(() => {
+      const filtered = calledUrls(calls).filter((url) =>
+        url.startsWith('/api/admin/local-orders?'),
+      )
+      expect(filtered.at(-1)).toContain('paymentStatus=paid')
+    })
   })
 })

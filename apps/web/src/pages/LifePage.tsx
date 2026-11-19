@@ -87,7 +87,7 @@ export function LifePage() {
           </Link>
         </div>
 
-        <p className="life-market__footnote">商品、优惠及办理状态以实际平台信息为准；本地商品由社区工作人员跟进，不在本页付款。</p>
+        <p className="life-market__footnote">商品、优惠及交易状态以商品/订单页为准；支付能力由服务端配置决定。</p>
       </div>
     </div>
   )

@@ -16,7 +16,7 @@ describe('DataPanel structural footer', () => {
   it('uses the same default DataPanel mode in all nine admin list instances', () => {
     const pages = [
       'ActivitiesPage', 'OrdersPage', 'UsersPage', 'ProductsPage',
-      'ExternalOffersPage', 'CrmPage', 'PerformancePage', 'ComponentPreviewPage',
+      'ExternalOffersPage', 'CrmPage', 'LedgerPage', 'ComponentPreviewPage',
     ]
     const total = pages.reduce((count, name) => {
       const file = readFileSync(join(import.meta.dirname, '../../pages', name + '.tsx'), 'utf8')
@@ -26,10 +26,9 @@ describe('DataPanel structural footer', () => {
     expect(total).toBe(9)
   })
 
-  it('supports CRM keep-alive tabs and a long report without clipping the footer', () => {
+  it('supports CRM keep-alive tabs without clipping the footer', () => {
     expect(styles).toMatch(/\.page-stack > \.crm-subview:not\(\[hidden\]\)/)
     expect(styles).toMatch(/\.crm-list-layout > \.ant-space-item:has\(> \.data-panel--fill\)/)
-    expect(styles).toMatch(/\.page--long-report \.data-panel--fill\s*\{[^}]*height: min\(65dvh, 640px\);/)
   })
 
   it('fills residual workspace without magic viewport offsets and leaves footer outside scrolling', () => {

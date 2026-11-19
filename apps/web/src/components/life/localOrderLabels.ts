@@ -1,5 +1,6 @@
 import {
   LOCAL_ORDER_STATUS_TRANSITIONS,
+  type LocalOrderDetail,
   type LocalOrderStatus,
   type LocalOrderTransitionStatus,
 } from '@sanchuang-dev/local-life-contracts'
@@ -17,23 +18,48 @@ export const localOrderStatusLabels: Record<LocalOrderStatus, string> = {
   processing: '处理中',
   pending_review: '待人工核验',
   verified: '人工核验通过',
+  /**
+   * PAY-05: a trusted server-side online payment completed this order. It is the
+   * online counterpart of `verified` and is deliberately worded differently: it
+   * never means a human verified the facts, and it never means bank settlement.
+   */
+  online_completed: '在线交易完成',
   cancelled: '已取消',
   rejected: '未通过',
 }
 
 export const localOrderStatusDescriptions: Record<LocalOrderStatus, string> = {
-  registered: '办理意向已登记，等待工作人员处理。本平台不收款。',
+  registered: '订单已登记，等待工作人员处理或完成支付；支付能力以页面实际显示为准。',
   processing: '工作人员正在处理你登记的办理意向。',
-  pending_review: '等待运营人员人工核验登记信息。',
-  verified: '运营人员已人工核验订单事实；这不代表收款或业务办理已完成。',
+  pending_review: '等待当前片区网格员或运营人员电话核验登记信息。',
+  verified: '订单事实已由片区网格员或运营人员人工核验；这不代表收款、业务办理或结算已完成。',
+  online_completed:
+    '支付渠道已由服务端可信确认，该订单在线交易已完成；这不代表已结算到商户银行账户。',
   cancelled: '该订单已取消。',
   rejected: '该订单未通过，原因见订单详情。',
+}
+
+
+/** Explain the online terminal fact without implying cash was always collected. */
+export function localOrderOnlineCompletionDescription(
+  completion: Pick<NonNullable<LocalOrderDetail['onlineCompletion']>, 'kind' | 'simulated'> | null,
+): string {
+  if (!completion) {
+    return '订单已完成在线交易；支付方式与实付金额暂不可用，请以服务端交易明细为准。'
+  }
+  if (completion.kind === 'zero_amount') {
+    return '已使用全额消费券抵扣，订单交易完成；本单没有渠道扣款或现金实付。'
+  }
+  if (completion.simulated) {
+    return '隔离模拟支付已由服务端确认，订单交易完成；这不是微信真实扣款，也不代表银行到账。'
+  }
+  return '支付渠道已由服务端可信确认，订单在线交易已完成；这不代表已结算到商户银行账户。'
 }
 
 type Tone = 'mint' | 'amber' | 'rose' | 'slate' | 'teal'
 
 export function localOrderStatusTone(status: LocalOrderStatus): Tone {
-  if (status === 'verified') return 'mint'
+  if (status === 'verified' || status === 'online_completed') return 'mint'
   if (status === 'pending_review' || status === 'processing') return 'amber'
   if (status === 'rejected') return 'rose'
   if (status === 'cancelled') return 'slate'
@@ -45,6 +71,7 @@ export const localOrderStatusOrder: LocalOrderStatus[] = [
   'processing',
   'pending_review',
   'verified',
+  'online_completed',
   'cancelled',
   'rejected',
 ]
@@ -60,10 +87,10 @@ export type LocalOrderTransitionAction = {
 /**
  * Workbench handling actions for one order.
  *
- * `verified` is filtered out by construction: it is absent from
- * `localOrderTransitionStatusSchema`, so the only way to reach it is the back
- * office's manual-verification endpoint. The H5 must never offer a button labelled
- * 「核验通过」 or 「完成」 here.
+ * `verified` is filtered out of ordinary transitions by construction: it is
+ * absent from `localOrderTransitionStatusSchema`. The H5 offers the dedicated
+ * verification form (including for the current territory grid worker), but this
+ * transition list must never smuggle `verified` in as a normal status update.
  */
 export function localOrderTransitionActions(
   current: LocalOrderStatus,

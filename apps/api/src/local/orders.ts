@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, count, desc, eq, gte, inArray, isNotNull, or, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, lte, or, sql, type SQL } from 'drizzle-orm'
 import {
   API_ERROR_CODES,
   LOCAL_ORDER_EVENT_SOURCE_TYPE,
@@ -11,6 +11,7 @@ import {
   localOrderListResponseSchema,
   localOrderSummarySchema,
   localOrderTeamOptionListResponseSchema,
+  type AdminLocalOrderListQuery,
   type CreateLocalOrderOnBehalfRequest,
   type CreateLocalOrderRequest,
   type LocalOrderCreateResponse,
@@ -33,8 +34,14 @@ import {
   activityTeams,
   communities,
   localOrderEvents,
+  localOrderOnlineCompletions,
+  localOrderOnlineConflicts,
   localOrders,
+  paymentIntents,
+  residentPhoneIdentities,
+  residentProfiles,
   staffAccounts,
+  staffCommunityAssignments,
   users,
 } from '../db/schema.js'
 import { assertResidentOfConfirmedCommunity } from '../resident-community/service.js'
@@ -55,6 +62,8 @@ import {
 import { requireProduct, type ProductRow } from './products.js'
 import { readCouponForOrder, reserveCouponForOrder, redeemCouponForOrder } from '../purchase-reward/coupon-usage.js'
 import { assertCouponStillReservedForOrder, releaseUnpaidOrderCoupon } from '../purchase-reward/coupon-recovery.js'
+import { projectLocalOrderFacts } from '../ledger/service.js'
+import { assertManualPaymentBoundary } from '../payments/service.js'
 
 /* ------------------------------- Selections ------------------------------- */
 
@@ -195,6 +204,23 @@ interface RefMaps {
   users: ReturnType<typeof userRefMap>
   staff: ReturnType<typeof staffRefMap>
   activities: ReturnType<typeof activityRefMap>
+  payments: Map<string, typeof paymentIntents.$inferSelect>
+}
+
+function latestPaymentMap(
+  db: AppDatabase,
+  orderIds: string[],
+): Map<string, typeof paymentIntents.$inferSelect> {
+  const map = new Map<string, typeof paymentIntents.$inferSelect>()
+  if (orderIds.length === 0) return map
+  const rows = db.select().from(paymentIntents)
+    .where(inArray(paymentIntents.localOrderId, orderIds))
+    .orderBy(desc(paymentIntents.updatedAt), desc(paymentIntents.id))
+    .all()
+  for (const row of rows) {
+    if (!map.has(row.localOrderId)) map.set(row.localOrderId, row)
+  }
+  return map
 }
 
 function refMaps(db: AppDatabase, rows: OrderRow[], events: Array<typeof localOrderEvents.$inferSelect> = []): RefMaps {
@@ -210,6 +236,7 @@ function refMaps(db: AppDatabase, rows: OrderRow[], events: Array<typeof localOr
       ...events.map((row) => row.actorStaffId),
     ]),
     activities: activityRefMap(db, rows.map((row) => row.sourceActivityId)),
+    payments: latestPaymentMap(db, rows.map((row) => row.id)),
   }
 }
 
@@ -273,6 +300,21 @@ function toSummary(row: OrderRow, maps: RefMaps): LocalOrderSummary {
         ? null
         : { id: row.sourceTeamId, activityId: row.sourceActivityId },
     note: row.note,
+    payment: (() => {
+      const payment = maps.payments.get(row.id)
+      return payment
+        ? {
+            intentId: payment.id,
+            status: payment.status,
+            channel: payment.channel,
+            simulated: payment.simulated,
+            netPayableCents: payment.netPayableCents,
+            expiresAt: iso(payment.expiresAt),
+            failureMessage: payment.failureMessage,
+            updatedAt: iso(payment.updatedAt),
+          }
+        : null
+    })(),
     createdAt: iso(row.createdAt),
     updatedAt: iso(row.updatedAt),
   })
@@ -291,8 +333,28 @@ function toDetail(row: OrderRow, db: AppDatabase): LocalOrderDetail {
   const events = eventRows(db, row.id)
   const maps = refMaps(db, [row], events)
   const lastNote = [...events].reverse().find((event) => event.note)?.note ?? null
+  const phone = db.select({ phone: residentPhoneIdentities.phone })
+    .from(residentPhoneIdentities)
+    .where(eq(residentPhoneIdentities.userId, row.residentUserId))
+    .get()?.phone ?? null
+  const address = db.select({ contactAddress: residentProfiles.contactAddress })
+    .from(residentProfiles)
+    .where(eq(residentProfiles.userId, row.residentUserId))
+    .get()?.contactAddress ?? null
+  // PAY-05: the online completion projection is read from its own immutable
+  // table, never derived from `verified_*` (a manual fact check) or a receipt.
+  const completion = db.select()
+    .from(localOrderOnlineCompletions)
+    .where(eq(localOrderOnlineCompletions.localOrderId, row.id))
+    .get()
+  const conflicts = db.select()
+    .from(localOrderOnlineConflicts)
+    .where(eq(localOrderOnlineConflicts.localOrderId, row.id))
+    .orderBy(asc(localOrderOnlineConflicts.createdAt), asc(localOrderOnlineConflicts.id))
+    .all()
   return localOrderDetailSchema.parse({
     ...toSummary(row, maps),
+    residentContact: { phone, address },
     verification:
       row.status === 'verified' && row.verifiedAt
         ? {
@@ -301,6 +363,24 @@ function toDetail(row: OrderRow, db: AppDatabase): LocalOrderDetail {
             note: row.verificationNote ?? '人工核验',
           }
         : null,
+    onlineCompletion: completion
+      ? {
+          paymentIntentId: completion.paymentIntentId,
+          kind: completion.kind,
+          simulated: completion.simulated,
+          amountCents: completion.amountCents,
+          discountCents: completion.discountCents,
+          providerTransactionId: completion.providerTransactionId,
+          completedAt: iso(completion.completedAt),
+        }
+      : null,
+    onlineConflicts: conflicts.map((conflict) => ({
+      id: conflict.id,
+      kind: conflict.kind,
+      status: conflict.status,
+      createdAt: iso(conflict.createdAt),
+      resolvedAt: conflict.resolvedAt ? iso(conflict.resolvedAt) : null,
+    })),
     statusNote: row.status === 'verified' ? null : lastNote,
     events: events.map((event) => toEvent(event, maps)),
   })
@@ -310,9 +390,21 @@ function detailById(db: AppDatabase, orderId: string): LocalOrderDetail {
   return toDetail(requireOrder(db, orderId), db)
 }
 
+/**
+ * Scoped order detail read for PAY-05 completion. The caller has already proven
+ * access; this only assembles the shared DTO after the write transaction commits.
+ */
+export function readLocalOrderDetail(db: AppDatabase, orderId: string): LocalOrderDetail {
+  return detailById(db, orderId)
+}
+
 /* ------------------------------- Audit / events --------------------------- */
 
-function insertOrderEvent(
+/**
+ * Append one timeline row. Exported for PAY-05 online completion, which writes
+ * `order.online_completed` in the same transaction as the completion fact.
+ */
+export function insertOrderEvent(
   tx: LocalTransaction,
   input: {
     orderId: string
@@ -869,6 +961,146 @@ export function listStaffOrders(
   return listOrders(db, conditions, query)
 }
 
+function emptyOrderPage(query: LocalOrderListQuery): LocalOrderListResponse {
+  return localOrderListResponseSchema.parse({
+    items: [],
+    total: 0,
+    page: query.page,
+    pageSize: query.pageSize,
+  })
+}
+
+/**
+ * PAY-08 (#283) payment-fact filters for the back-office list.
+ *
+ * Each condition is an `EXISTS` against the existing payment truth tables, so
+ * SQLite does the filtering and paging; the API never loads the whole table to
+ * filter in JS. `paymentMode` deliberately matches only orders that actually
+ * have a payment intent: a manual-only (legacy) order is neither simulated nor
+ * a real channel payment, and pretending otherwise would fabricate history.
+ */
+function adminPaymentConditions(query: AdminLocalOrderListQuery): SQL<unknown>[] {
+  const conditions: SQL<unknown>[] = []
+  if (query.merchantOrderNo) {
+    conditions.push(
+      sql`EXISTS (
+        SELECT 1 FROM payment_intents pi
+        WHERE pi.local_order_id = ${localOrders.id}
+          AND pi.merchant_order_no = ${query.merchantOrderNo}
+      )`,
+    )
+  }
+  if (query.providerTransactionId) {
+    conditions.push(
+      sql`(
+        EXISTS (
+          SELECT 1 FROM payment_attempts pa
+          JOIN payment_intents pi ON pa.payment_intent_id = pi.id
+          WHERE pi.local_order_id = ${localOrders.id}
+            AND pa.provider_transaction_id = ${query.providerTransactionId}
+        )
+        OR EXISTS (
+          SELECT 1 FROM local_order_online_completions loc
+          WHERE loc.local_order_id = ${localOrders.id}
+            AND loc.provider_transaction_id = ${query.providerTransactionId}
+        )
+        -- F2: late-success / amount / merchant / channel / terminal conflicts
+        -- carry the channel transaction id only in the review-exception table;
+        -- such an order has no paid attempt, so it must still be findable.
+        OR EXISTS (
+          SELECT 1 FROM payment_review_exceptions pre
+          JOIN payment_intents pi ON pre.payment_intent_id = pi.id
+          WHERE pi.local_order_id = ${localOrders.id}
+            AND pre.provider_transaction_id = ${query.providerTransactionId}
+        )
+      )`,
+    )
+  }
+  if (query.paymentStatus) {
+    conditions.push(
+      sql`EXISTS (
+        SELECT 1 FROM payment_intents pi
+        WHERE pi.local_order_id = ${localOrders.id}
+          AND pi.status = ${query.paymentStatus}
+      )`,
+    )
+  }
+  if (query.paymentChannel) {
+    conditions.push(
+      sql`EXISTS (
+        SELECT 1 FROM payment_intents pi
+        WHERE pi.local_order_id = ${localOrders.id}
+          AND pi.channel = ${query.paymentChannel}
+      )`,
+    )
+  }
+  if (query.paymentMode === 'simulated') {
+    conditions.push(
+      sql`EXISTS (
+        SELECT 1 FROM payment_intents pi
+        WHERE pi.local_order_id = ${localOrders.id}
+          AND pi.simulated = 1
+      )`,
+    )
+  } else if (query.paymentMode === 'real') {
+    conditions.push(
+      sql`EXISTS (
+        SELECT 1 FROM payment_intents pi
+        WHERE pi.local_order_id = ${localOrders.id}
+          AND pi.simulated = 0
+          AND pi.channel IS NOT NULL
+      )`,
+    )
+  }
+  return conditions
+}
+
+/**
+ * Back-office list (#283). Identical community scoping to `listStaffOrders`
+ * plus the payment-fact filters above; the response stays the shared
+ * `localOrderListResponseSchema` whose items already carry the latest payment
+ * intent summary. No payment data is returned for a community the caller
+ * cannot access, and an operator with no assignment gets an empty page.
+ */
+export function listAdminOrders(
+  db: AppDatabase,
+  actor: LocalActor,
+  query: AdminLocalOrderListQuery,
+): LocalOrderListResponse {
+  const scope = scopeCommunityIds(db, actor)
+  const conditions: SQL<unknown>[] = []
+  if (scope !== null) {
+    if (scope.length === 0) return emptyOrderPage(query)
+    conditions.push(inArray(localOrders.communityId, scope))
+  }
+  if (query.communityId) {
+    assertCommunityAccess(db, actor, query.communityId)
+    conditions.push(eq(localOrders.communityId, query.communityId))
+  }
+  if (query.orderId) conditions.push(eq(localOrders.id, query.orderId))
+  if (query.status) conditions.push(eq(localOrders.status, query.status))
+  if (query.productId) conditions.push(eq(localOrders.productId, query.productId))
+  if (query.residentUserId) conditions.push(eq(localOrders.residentUserId, query.residentUserId))
+  if (query.keyword) {
+    const pattern = escapedLike(query.keyword)
+    conditions.push(
+      or(
+        sql`${localOrders.id} LIKE ${pattern} ESCAPE '\\'`,
+        sql`${localOrders.productName} LIKE ${pattern} ESCAPE '\\'`,
+        sql`${localOrders.note} LIKE ${pattern} ESCAPE '\\'`,
+      )!,
+    )
+  }
+  if (query.createdFrom) {
+    conditions.push(gte(localOrders.createdAt, new Date(query.createdFrom)))
+  }
+  if (query.createdTo) {
+    conditions.push(lte(localOrders.createdAt, new Date(query.createdTo)))
+  }
+  conditions.push(...adminPaymentConditions(query))
+  return listOrders(db, conditions, query)
+}
+
 export function getStaffOrder(
   db: AppDatabase,
   actor: LocalActor,
@@ -914,6 +1146,13 @@ export function updateOrderStatus(
       '订单已完成人工核验，不能再变更状态',
     )
   }
+  if (row.status === 'online_completed') {
+    throw new LocalError(
+      409,
+      API_ERROR_CODES.paymentOnlineCompletionConflict,
+      '订单已在线完成，不能再变更状态',
+    )
+  }
   const next = body.status as LocalOrderTransitionStatus
   if (!LOCAL_ORDER_STATUS_TRANSITIONS[row.status].includes(next)) {
     throw new LocalError(409, API_ERROR_CODES.conflict, '当前状态不允许该流转')
@@ -941,10 +1180,15 @@ export function updateOrderStatus(
       if (result.changes !== 1) {
         throw new LocalError(409, API_ERROR_CODES.conflict, '订单已被其他操作更新，请刷新后重试')
       }
+      let couponRelease: 'not_applicable' | 'released' | 'none' | 'void' | 'deferred' =
+        'not_applicable'
       if (next === 'cancelled' || next === 'rejected') {
         // Terminal unpaid orders release exactly one reservation, but never
         // delete the original coupon/order snapshot or mint a second coupon.
-        releaseUnpaidOrderCoupon(tx, orderId, now)
+        // PAY-05: if a trusted payment intent is still live or already paid, the
+        // release is deferred instead of handing the coupon to another order while
+        // the channel may still capture money (or already did).
+        couponRelease = releaseUnpaidOrderCoupon(tx, orderId, now)
       }
       insertOrderEvent(tx, {
         orderId,
@@ -962,13 +1206,49 @@ export function updateOrderStatus(
         next === 'rejected' ? 'local_order.rejected' : 'local_order.status_changed',
         orderId,
         now,
-        { fromStatus: row.status, toStatus: next },
+        { fromStatus: row.status, toStatus: next, couponRelease },
       )
     }, { behavior: 'immediate' })
   } catch (error) {
     mapConstraintError(error)
   }
   return detailById(db, orderId)
+}
+
+/**
+ * Verification access is slightly narrower than ordinary staff reads:
+ *
+ * - admin: all communities;
+ * - operator: any community in `staff_community_assignments`;
+ * - grid worker: ONLY the community where they are the current
+ *   `grid_territory` owner, re-read from SQLite on every write. A stale session
+ *   that still lists an old community therefore cannot verify its orders.
+ */
+function assertVerificationCommunityAccess(
+  db: AppDatabase,
+  actor: LocalActor,
+  communityId: string,
+): void {
+  if (actor.role !== 'grid_worker') {
+    assertCommunityAccess(db, actor, communityId)
+    return
+  }
+  if (!actor.staffId) {
+    throw new LocalError(403, API_ERROR_CODES.forbidden, '无权核验该片区订单')
+  }
+  const current = db.select({ staffAccountId: staffCommunityAssignments.staffAccountId })
+    .from(staffCommunityAssignments)
+    .innerJoin(staffAccounts, eq(staffAccounts.id, staffCommunityAssignments.staffAccountId))
+    .where(and(
+      eq(staffCommunityAssignments.staffAccountId, actor.staffId),
+      eq(staffCommunityAssignments.communityId, communityId),
+      eq(staffCommunityAssignments.assignmentKind, 'grid_territory'),
+      eq(staffAccounts.status, 'active'),
+    ))
+    .get()
+  if (!current) {
+    throw new LocalError(403, API_ERROR_CODES.forbidden, '当前账号不是该片区的经营网格员')
+  }
 }
 
 /**
@@ -985,16 +1265,20 @@ export function verifyOrder(
   orderId: string,
   body: LocalOrderVerifyRequest,
 ): LocalOrderDetail {
-  if (actor.role === 'grid_worker' || !actor.role) {
-    throw new LocalError(403, API_ERROR_CODES.forbidden, '网格员无权执行人工核验')
-  }
   const row = requireOrder(db, orderId)
-  assertCommunityAccess(db, actor, row.communityId)
+  assertVerificationCommunityAccess(db, actor, row.communityId)
   if (row.status === 'verified') {
     throw new LocalError(
       409,
       API_ERROR_CODES.orderAlreadyVerified,
       '订单已核验，请勿重复核验',
+    )
+  }
+  if (row.status === 'online_completed') {
+    throw new LocalError(
+      409,
+      API_ERROR_CODES.paymentOnlineCompletionConflict,
+      '订单已在线完成，不能再用人工核验改变终态',
     )
   }
   if (row.status !== 'pending_review') {
@@ -1007,6 +1291,14 @@ export function verifyOrder(
   const target: LocalOrderStatus = body.decision === 'verify' ? 'verified' : 'rejected'
   try {
     db.transaction((tx) => {
+      // R1: the manual "verified" fact may only be written when the server can
+      // prove no online money exists or is in flight. The check lives beside the
+      // write inside this BEGIN IMMEDIATE transaction so a concurrent trusted
+      // confirmation cannot interleave. Rejecting is not a payment assertion and
+      // keeps its existing deferred-coupon protection.
+      if (body.decision === 'verify') {
+        assertManualPaymentBoundary(tx, orderId)
+      }
       const result = tx
         .update(localOrders)
         .set(
@@ -1041,8 +1333,10 @@ export function verifyOrder(
           '订单已被其他操作核验，请刷新后重试',
         )
       }
+      let couponRelease: 'not_applicable' | 'released' | 'none' | 'void' | 'deferred' =
+        'not_applicable'
       if (body.decision === 'reject') {
-        releaseUnpaidOrderCoupon(tx, orderId, now)
+        couponRelease = releaseUnpaidOrderCoupon(tx, orderId, now)
       } else {
         // Invalidated source coupons cannot be turned into a valid order by
         // a business verification after the grant was revoked.
@@ -1053,6 +1347,22 @@ export function verifyOrder(
       if (body.decision === 'verify' && row.couponId &&
           row.totalCents === row.couponDiscountCents) {
         redeemCouponForOrder(tx, orderId, now)
+      }
+      if (body.decision === 'verify') {
+        // Community-effective performance is projected in the same transaction:
+        // a verified order becomes visible to the ledger immediately, without a
+        // per-order attribution step or a second manual sync. The dedupe keys
+        // make a later source sync a no-op.
+        projectLocalOrderFacts(tx, {
+          id: row.id,
+          communityId: row.communityId,
+          productId: row.productId,
+          totalCents: row.totalCents,
+          createdAt: row.createdAt,
+          status: 'verified',
+          verifiedAt: now,
+          updatedAt,
+        }, now)
       }
       insertOrderEvent(tx, {
         orderId,
@@ -1070,7 +1380,7 @@ export function verifyOrder(
         body.decision === 'verify' ? 'local_order.verified' : 'local_order.rejected',
         orderId,
         now,
-        { fromStatus: 'pending_review', toStatus: target, decision: body.decision },
+        { fromStatus: 'pending_review', toStatus: target, decision: body.decision, couponRelease },
       )
     }, { behavior: 'immediate' })
   } catch (error) {

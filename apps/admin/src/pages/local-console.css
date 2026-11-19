@@ -107,3 +107,54 @@
 .local-snapshot-item-value {
   font-variant-numeric: tabular-nums;
 }
+
+/*
+ * PAY-08 payment section of the order drawer. Read-only layers separated by a
+ * dashed rule; all colours come from the antd theme tokens mounted by the admin
+ * provider, so this adds no second visual system.
+ */
+.local-drawer .local-payment {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.local-drawer .local-payment-layer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--ant-color-border-secondary, #e8f0ec);
+}
+
+.local-drawer .local-payment-layer:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.local-drawer .local-payment-intent,
+.local-drawer .local-payment-completion,
+.local-drawer .local-payment-exception,
+.local-drawer .local-payment-attempts,
+.local-drawer .local-payment-events,
+.local-drawer .local-payment-manual-receipt,
+.local-drawer .local-payment-online-receipt,
+.local-drawer .local-payment-exceptions,
+.local-drawer .local-payment-totals {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.local-drawer .local-payment-attempt,
+.local-drawer .local-payment-event {
+  font-variant-numeric: tabular-nums;
+}
+
+.local-drawer .local-payment-totals {
+  font-variant-numeric: tabular-nums;
+}
+
+.local-drawer .local-payment-settlement {
+  color: var(--ant-color-text-secondary, #475569);
+}

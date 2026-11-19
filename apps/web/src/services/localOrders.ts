@@ -4,6 +4,7 @@ import {
   localOrderDetailSchema,
   localOrderListResponseSchema,
   localOrderTeamOptionListResponseSchema,
+  localOrderVerifyRequestSchema,
   updateLocalOrderStatusRequestSchema,
   type CreateLocalOrderRequest,
   type LocalOrderDetail,
@@ -11,6 +12,7 @@ import {
   type LocalOrderListResponse,
   type LocalOrderTeamOptionListResponse,
   type LocalOrderTransitionStatus,
+  type LocalOrderVerifyRequest,
 } from '@sanchuang-dev/local-life-contracts'
 import { API_PREFIX, fillRoute, requestLocal, withQuery, type SafelyParsable } from './localApi'
 
@@ -170,5 +172,25 @@ export function updateStaffLocalOrderStatus(
     localOrderDetailSchema,
     '订单状态处理结果',
     { method: 'PATCH', csrfToken, body },
+  )
+}
+
+/**
+ * POST /staff/local-orders/:localOrderId/verify — the scoped verification write.
+ *
+ * The server re-checks that the caller is the CURRENT grid territory owner or an
+ * assigned operator/admin; a stale session cannot verify an old territory. The
+ * shared request schema keeps the optimistic token, decision and mandatory note.
+ */
+export function verifyStaffLocalOrder(
+  csrfToken: string,
+  orderId: string,
+  request: LocalOrderVerifyRequest,
+): Promise<LocalOrderDetail> {
+  return requestLocal(
+    `${API_PREFIX}${fillRoute(LOCAL_ORDER_ROUTES.staffOrderVerify, ':localOrderId', orderId)}`,
+    localOrderDetailSchema,
+    '订单核验结果',
+    { method: 'POST', csrfToken, body: localOrderVerifyRequestSchema.parse(request) },
   )
 }

@@ -211,6 +211,83 @@
       "when": 1794542400000,
       "tag": "0029_resident_profile",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1794600000000,
+      "tag": "0030_grid_territory",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1794686400000,
+      "tag": "0031_payments",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1794772800000,
+      "tag": "0032_payment_confirmations",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1794776400000,
+      "tag": "0033_payment_event_evidence_fingerprint",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1794901137267,
+      "tag": "0034_mock_payment_event_reservations",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1794901138267,
+      "tag": "0035_online_order_completion",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794901139267,
+      "tag": "0036_online_ledger_projection",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1794901140267,
+      "tag": "0037_manual_online_boundary",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794901141267,
+      "tag": "0038_wechat_pay_prepay",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1795056000000,
+      "tag": "0039_wechat_pay_recovery",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1795063800000,
+      "tag": "0040_restore_payment_immutable_triggers",
+      "breakpoints": true
     }
   ]
 }

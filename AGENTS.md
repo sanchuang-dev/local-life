@@ -6,7 +6,8 @@
 
 - 自 [Issue #57](https://github.com/sanchuang-dev/local-life/issues/57) 起，本仓库进入 **Pre-MVP 真实工程基座**：pnpm workspace + 居民 H5 + 管理台 + Node API。
 - **居民 H5** 保留已评审页面、视觉和路由；居民主身份现已接入账户 API。微信网页授权只有在公众号 AppID、AppSecret、授权回调域名等真实配置齐备后才可使用；CRMEB 商品与购买跳转也只读取服务端真实配置，未配置时必须明确不可用。
-- **管理台与 API** 已具备管理员/运营员/网格员登录、退出、会话、社区分配和居民目录的服务端权限校验。`dev` 代码已经包含活动创建/发布/暂停与居民公开读取（LL-MVP-003）、三人团（LL-MVP-004）、网格员 CRM（LL-MVP-005）、签到与奖励履约（LL-MVP-006）、CRMEB adapter（LL-MVP-007）、统一经营流水/对账/结算（LL-MVP-008 及后续 SET 卡）、本地商品目录与居民订单（LL-MVP-010）、消费返券和抽奖（PUR/LOT 卡）等模块；每个模块的真实边界仍以 `docs/engineering/` 对应文档、当前代码和测试为准。
+- **管理台与 API** 已具备管理员/运营员/网格员登录、退出、会话、社区分配和居民目录的服务端权限校验；当前片区网格员可在 H5 工作台电话核验居民自助订单，核验通过会在同一事务内形成社区有效业绩，个人归属不再是社区统计的前置条件（见 [grid-order-verification.md](docs/engineering/grid-order-verification.md)）。`dev` 代码已经包含活动创建/发布/暂停与居民公开读取（LL-MVP-003）、三人团（LL-MVP-004）、网格员 CRM（LL-MVP-005）、签到与奖励履约（LL-MVP-006）、CRMEB adapter（LL-MVP-007）、统一经营流水/对账/结算（LL-MVP-008 及后续 SET 卡）、本地商品目录与居民订单（LL-MVP-010）、消费返券和抽奖（PUR/LOT 卡）等模块；每个模块的真实边界仍以 `docs/engineering/` 对应文档、当前代码和测试为准。
+- **支付边界**：当前支付实现包含 PAY-01 支付意图/尝试/事件契约与 SQLite 约束、PAY-02 居民创建/查询待支付意图的受控 API、PAY-03 仅接受服务端可信证据并写入 `payment.paid.v1` outbox、PAY-04 进程内隔离 Mock 驱动，以及 PAY-05 在线订单交易完成、零元券单、消费券核销/安全释放与迟到支付人工核对。PAY-05 的在线完成与人工 `verified` / `payment_received` 分离；PAY-06 以 `local_order_online_completions` 为唯一上游，将真实/模拟线上 completion 以独立 `online_payment` 来源投影为实收（Mock 永久标记、正式汇总排除），并接入既有消费累计与三人团发券。PAY-07/08 的 H5 付款入口与后台支付详情、PAY-09 本地支付差异核查、PAY-10 微信 JSAPI 预下单及 PAY-11 微信 APIv3 通知/查单/关单恢复均有 dev 代码与离线测试；**这些不等于生产商户已完成真实小额支付联调、微信渠道账单核对或银行入账验收**，且没有公网 Mock 控制接口、真实退款/冲正或机关结算自动付款。PAY-03 确认与 PAY-05 outbox 消费入口仅接受服务端 `PAYMENT_INTERNAL_TOKEN`；Mock 仅在显式 `PAYMENT_MOCK_ENABLED=true` 的非生产环境可用，production/公开预览默认关闭且配置误启用会 fail-closed。不得据此宣称微信支付或在线收款可用；契约与边界见 [payments-domain.md](docs/engineering/payments-domain.md)、[payments-mock.md](docs/engineering/payments-mock.md)。
 - **代码存在不等于线上可用**：`dev` 上的实现和测试不等于已部署到 `mvp`，也不等于真实微信、CRMEB 或支付依赖已经可用。`mvp` 的实际能力只以对应晋级部署的 SHA、健康检查和验收证据为准；在线支付、自动分账/自动佣金等仍未由现行代码证明可用。
 - **API** 使用 SQLite + Drizzle 持久化用户、微信身份、后台账户、社区范围、会话、OAuth state、限流与审计记录。数据库只允许落在 `apps/api` 内。
 - 所有未实现业务必须显式标注，不得用 Mock 成功、写死数据或假鉴权伪装。
@@ -65,7 +66,7 @@ pnpm --filter @sanchuang-dev/local-life-api bootstrap-admin  # 初始化首个�
 - SQLite + Drizzle 仅在 `apps/api` 内；schema 在 `apps/api/src/db/schema.ts`，迁移在 `apps/api/db/migrations/`，服务启动时执行迁移。不要在 H5/Admin 各自引入数据库或维护第二套数据。
 - 居民主用户 UUID 是平台主键；微信身份以 `(appid, openid)` 唯一映射，unionid 可选，不以手机号/OpenID/商城 UID 代替平台用户 ID。
 - 后台账号关联平台用户；管理员可将已完成微信授权的居民用户关联为运营员/网格员，重复关联必须拒绝，不能静默合并。
-- `admin` 可管理全体社区；`operator` 与 `grid_worker` 必须通过 `staff_community_assignments` 获得社区范围。CRM 查询必须在服务端检查归属，居民列表只返回当前必要字段。
+- `admin` 可管理全体社区；`operator` 与 `grid_worker` 必须通过 `staff_community_assignments` 获得社区范围。该表以 `assignment_kind` 区分运营员多社区授权（`operator_scope`）与网格员唯一片区（`grid_territory`），数据库部分唯一索引保证「一网格员一区、一区一网格员」；片区模型详见 [grid-territory.md](docs/engineering/grid-territory.md)。CRM 查询必须在服务端检查归属，居民列表只返回当前必要字段。
 - 会话使用随机不透明 Cookie，数据库只存 token hash；Cookie 为 HttpOnly + SameSite=Lax，生产环境 Secure。写请求要求 CSRF double-submit token 和可信 Origin。
 - 微信 OAuth 必须验证一次性 state、浏览器 nonce、有效期与重放；未配置公众号凭证时明确返回不可用，不得模拟成功。开发居民测试登录只有显式 `AUTH_DEV_ENABLED=true` 才开启，生产配置禁止开启。
 - 登录密码使用 scrypt 哈希；登录失败限流；审计日志不得记录密码、Cookie、OAuth code/token、openid 等凭证或敏感标识。

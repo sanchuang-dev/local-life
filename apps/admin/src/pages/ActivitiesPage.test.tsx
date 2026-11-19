@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { App as AntdApp, ConfigProvider } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import dayjs from 'dayjs'
+import { MemoryRouter, Route, Routes } from 'react-router'
 import { AdminAuthProvider } from '../app/auth-context'
 import { adminTheme } from '../app/theme'
 import type { AuthenticatedSession } from '../services/auth'
@@ -144,7 +145,11 @@ function renderPage(session: AuthenticatedSession) {
         <AdminAuthProvider
           value={{ session, busy: false, error: null, onLogout: async () => undefined }}
         >
-          <ActivitiesPage />
+          <MemoryRouter initialEntries={['/activities']}>
+            <Routes>
+              <Route path="/activities/*" element={<ActivitiesPage />} />
+            </Routes>
+          </MemoryRouter>
         </AdminAuthProvider>
       </AntdApp>
     </ConfigProvider>,
@@ -308,6 +313,64 @@ describe('ActivitiesPage real data rendering', () => {
   })
 })
 
+describe('Standalone activity editor routes', () => {
+  it('preserves a draft form across all three tabs and saves through the existing PATCH contract', async () => {
+    let patchBody: unknown
+    stubApi((url, init) => {
+      if (url.startsWith('/api/admin/communities')) return json({ items: [COMMUNITY_A] })
+      if (url.startsWith('/api/admin/activities?')) {
+        return json({
+          items: [summary({ status: 'draft', ruleVersion: null, publishedAt: null })],
+          total: 1, page: 1, pageSize: 20,
+        })
+      }
+      if (url === `/api/admin/activities/${ACTIVITY_ID}` && init?.method === 'PATCH') {
+        patchBody = JSON.parse(String(init.body))
+        return json(detail({
+          title: '社区活动新名称', status: 'draft', ruleVersion: null, publishedAt: null,
+        }))
+      }
+      if (url === `/api/admin/activities/${ACTIVITY_ID}`) {
+        return json(detail({ status: 'draft', ruleVersion: null, publishedAt: null }))
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+    renderPage(ADMIN_SESSION)
+    await screen.findByText('银发社区欢乐季')
+    fireEvent.click(screen.getByRole('button', { name: '编辑' }))
+    const title = await screen.findByLabelText('活动标题')
+    fireEvent.change(title, { target: { value: '社区活动新名称' } })
+    expect((title as HTMLInputElement).value).toBe('社区活动新名称')
+    fireEvent.click(screen.getByRole('tab', { name: '签到奖励' }))
+    expect(screen.getByRole('tab', { name: '签到奖励' }).getAttribute('aria-selected')).toBe('true')
+    fireEvent.click(screen.getByRole('tab', { name: '消费奖励' }))
+    expect(screen.getByRole('tab', { name: '消费奖励' }).getAttribute('aria-selected')).toBe('true')
+    fireEvent.click(screen.getByRole('tab', { name: '活动信息' }))
+    expect((screen.getByLabelText('活动标题') as HTMLInputElement).value).toBe('社区活动新名称')
+    fireEvent.click(screen.getByRole('button', { name: '保存修改' }))
+    await waitFor(() => expect(patchBody).toBeTruthy())
+    expect(patchBody).toMatchObject({ title: '社区活动新名称' })
+  })
+
+  it('opens a new activity as a full page without an activity drawer', async () => {
+    stubApi((url) => {
+      if (url.startsWith('/api/admin/communities')) return json({ items: [COMMUNITY_A] })
+      if (url.startsWith('/api/admin/activities?')) {
+        return json({ items: [], total: 0, page: 1, pageSize: 20 })
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+    renderPage(ADMIN_SESSION)
+    fireEvent.click(await screen.findByRole('button', { name: /新建活动/ }))
+    expect(await screen.findByText('新建活动草稿')).toBeTruthy()
+    expect(screen.getByRole('tablist', { name: '活动编辑区域' })).toBeTruthy()
+    expect(screen.getAllByRole('tab')).toHaveLength(3)
+    expect(document.querySelector('.activity-editor-page .ant-drawer')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '← 返回活动列表' }))
+    expect(await screen.findByText('活动管理')).toBeTruthy()
+  })
+})
+
 describe('ActivitiesPage compact action column', () => {
   it.each([
     { status: 'draft', primary: '发布', secondary: false },
@@ -461,9 +524,7 @@ describe('ActivitiesPage in-flight detail race', () => {
     fireEvent.click(screen.getByRole('button', { name: '编辑' }))
     expect(await screen.findByText('正在读取活动详情…')).toBeTruthy()
 
-    const close = document.querySelector('.ant-drawer-close')
-    expect(close).toBeTruthy()
-    fireEvent.click(close as Element)
+    fireEvent.click(screen.getByRole('button', { name: '← 返回活动列表' }))
 
     fireEvent.click(screen.getByRole('button', { name: /新建活动/ }))
 
@@ -727,8 +788,9 @@ describe('ActivitiesPage reward plan form (LL-MVP-006)', () => {
     expect(await screen.findByText('银发社区欢乐季')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '编辑' }))
 
-    expect(await screen.findByText('未配置奖励计划')).toBeTruthy()
-    expect(screen.getByText(/409 reward_unavailable/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: '签到奖励' }))
+    expect(await screen.findByText(/未启用签到奖励/)).toBeTruthy()
+    expect(screen.getByText(/不能参与该活动的奖励签到和领奖/)).toBeTruthy()
   })
 })
 
@@ -871,7 +933,7 @@ describe('ActivitiesPage purchase reward plan form (LL-PUR-002)', () => {
     expect(await screen.findByText('消费组团奖励已冻结')).toBeTruthy()
     expect(screen.getByText(/团队实付门槛 ¥200\.00 · 每人券面额 ¥20\.00/)).toBeTruthy()
     expect(screen.getByText(/团队券总预算 ¥3000\.00/)).toBeTruthy()
-    expect(screen.queryByText('配置消费组团奖励')).toBeNull()
+    expect(screen.queryByText('启用消费奖励')).toBeNull()
   })
 
   it('keeps the consumption fields editable for a draft', async () => {
@@ -902,9 +964,10 @@ describe('ActivitiesPage purchase reward plan form (LL-PUR-002)', () => {
     expect(await screen.findByText('银发社区欢乐季')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '编辑' }))
 
-    expect(await screen.findByText('配置消费组团奖励')).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: '消费奖励' }))
+    expect(await screen.findByText('启用消费奖励')).toBeTruthy()
     expect(screen.queryByText('消费组团奖励已冻结')).toBeNull()
-    expect(screen.getByText(/当前为 ¥3000\.00（每人券额 × 3 人 × 团队数）/)).toBeTruthy()
+    expect(screen.getByText('¥3000.00')).toBeTruthy()
   })
 
   it('saves a draft plan through the real PATCH payload', async () => {
@@ -951,7 +1014,8 @@ describe('ActivitiesPage purchase reward plan form (LL-PUR-002)', () => {
     expect(await screen.findByText('银发社区欢乐季')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '编辑' }))
 
-    fireEvent.click(await screen.findByRole('switch', { name: '配置消费组团奖励' }))
+    fireEvent.click(screen.getByRole('tab', { name: '消费奖励' }))
+    fireEvent.click(await screen.findByRole('switch', { name: '启用消费奖励' }))
     fireEvent.change(await screen.findByLabelText('团队实付门槛（元）'), {
       target: { value: '300' },
     })
