@@ -1228,4 +1228,3 @@ describe('OrdersPage payment section (PAY-08)', () => {
     })
   })
 })
-
