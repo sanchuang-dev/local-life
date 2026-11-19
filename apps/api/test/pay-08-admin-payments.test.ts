@@ -1255,10 +1255,11 @@ test('PAY-08 back-office payment read', async (t) => {
       paymentReconciliationRoutes.exportCsv + '?source=mock&status=consistent',
       { session: w.admin },
     )
-    const text = await csv.text()
+    const bytes = new Uint8Array(await csv.arrayBuffer())
+    const text = new TextDecoder().decode(bytes)
     assert.equal(csv.status, 200, text)
     assert.match(csv.headers.get('content-type') ?? '', /text\/csv/u)
-    assert.ok(text.startsWith('\uFEFF'))
+    assert.deepEqual([...bytes.slice(0, 3)], [0xef, 0xbb, 0xbf])
     assert.ok(text.includes('"净应付(分)"'))
     assert.ok(text.includes('"3980"'))
     assert.ok(text.includes('"仅测试"'))
@@ -1294,6 +1295,7 @@ test('PAY-08 back-office payment read', async (t) => {
         fromStatus: 'pending',
         toStatus: 'pending',
         providerEventRef: 'PAY09-DUPLICATE-EVENT',
+        evidenceFingerprint: 'a'.repeat(64),
         dedupeKey: 'pay09-duplicate-event-' + i + '-' + intent.id,
         createdAt: at,
       }).run()
@@ -1339,6 +1341,37 @@ test('PAY-08 back-office payment read', async (t) => {
     )
     assert.equal(invalid.status, 400)
     assert.match(invalid.headers.get('content-type') ?? '', /json/u)
+  })
+
+
+  await t.test('PAY-09: injected wrong amount stays visible; paid-but-unprojected never reads as complete', async () => {
+    const wrongOrder = await registerOrder(w, w.residentA, w.productA)
+    const wrongIntent = await createMockIntent(w, w.residentA, wrongOrder)
+    const wrongAmount = await confirmEvidence(
+      w, evidence(wrongIntent, 'paid', { amountCents: wrongIntent.netPayableCents + 1 }),
+    )
+    assert.equal(wrongAmount.status, 409, await wrongAmount.text())
+    const mismatches = await api(
+      w.app, 'GET', paymentReconciliationRoutes.list + '?reason=amount_mismatch',
+      { session: w.admin },
+    )
+    assert.equal(mismatches.status, 200)
+    const mismatchRows = paymentDifferencesResponseSchema.parse(await mismatches.json()).items
+    assert.ok(mismatchRows.some((row) => row.intentId === wrongIntent.id))
+
+    const paidOrder = await registerOrder(w, w.residentA, w.productA)
+    const paidIntent = await createMockIntent(w, w.residentA, paidOrder)
+    const paid = await confirmEvidence(w, evidence(paidIntent, 'paid'))
+    assert.equal(paid.status, 200, await paid.text())
+    // Deliberately do not consume PAY-05 outbox: a paid channel intent is NOT
+    // synonymous with a completed order or a projected online ledger entry.
+    const unprojected = await api(
+      w.app, 'GET', paymentReconciliationRoutes.list + '?reason=paid_not_projected',
+      { session: w.admin },
+    )
+    assert.equal(unprojected.status, 200)
+    const rows = paymentDifferencesResponseSchema.parse(await unprojected.json()).items
+    assert.ok(rows.some((row) => row.intentId === paidIntent.id))
   })
 
 })

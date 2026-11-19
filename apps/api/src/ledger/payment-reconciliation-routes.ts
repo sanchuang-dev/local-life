@@ -56,10 +56,11 @@ export function registerPaymentReconciliationRoutes(app: Hono<AppBindings>, deps
     try {
       const detail = paymentDifferenceDetail(db, who, intentId.data, now())
       c.header('Cache-Control', 'no-store')
+      const { order, asOf, ...difference } = detail
       return c.json({
-        ...paymentDifferenceSchema.parse(detail),
-        asOf: detail.asOf,
-        order: adminLocalOrderDetailSchema.parse(detail.order),
+        ...paymentDifferenceSchema.parse(difference),
+        asOf,
+        order: adminLocalOrderDetailSchema.parse(order),
       })
     } catch (error) {
       return errorResponse(c, error)

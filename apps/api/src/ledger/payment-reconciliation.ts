@@ -79,6 +79,10 @@ function factCte(db: AppDatabase, actor: LocalActor, q: PaymentDifferencesQuery,
         (SELECT COUNT(*) FROM payment_review_exceptions pre
           WHERE pre.payment_intent_id = pi.id AND pre.status <> 'resolved'
         ) AS review_exceptions,
+        (SELECT COUNT(*) FROM payment_review_exceptions pre
+          WHERE pre.payment_intent_id = pi.id AND pre.status <> 'resolved'
+            AND pre.kind = 'amount_mismatch'
+        ) AS amount_exceptions,
         (SELECT COUNT(*) FROM local_order_online_conflicts lc
           WHERE lc.local_order_id = pi.local_order_id AND lc.status <> 'resolved'
         ) AS online_conflicts,
@@ -111,6 +115,7 @@ function factCte(db: AppDatabase, actor: LocalActor, q: PaymentDifferencesQuery,
     classified AS (
       SELECT *,
         CASE
+          WHEN amount_exceptions > 0 THEN 'amount_mismatch'
           WHEN review_exceptions > 0 OR online_conflicts > 0 THEN 'provider_exception'
           WHEN repeated_channel_events > 0 THEN 'duplicate_provider_event'
           WHEN payment_status = 'paid' AND active_manual_receipts > 0 THEN 'manual_online_conflict'
