@@ -94,5 +94,6 @@ test('loadConfig applies explicit local defaults and keeps dev login disabled', 
     ],
     webBaseUrl: 'http://localhost:5173/local-life/',
     authDevEnabled: false,
+    paymentMockEnabled: false,
   })
 })

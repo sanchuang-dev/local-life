@@ -20,6 +20,8 @@ export const localEnvTemplate = [
   'DATABASE_PATH=' + localDatabase,
   'SESSION_TTL_HOURS=168',
   'AUTH_DEV_ENABLED=true',
+  '# PAY-04 isolated Mock driver; only local/test, keep false unless exercising Mock.',
+  'PAYMENT_MOCK_ENABLED=false',
   '',
   '# 微信公众号后台配置主密钥（Issue #113）：二选一，绝不提交真实密钥。',
   '# 缺省时 API 仍可启动，但后台配置功能 fail closed（不会假装可用）。',
@@ -38,7 +40,7 @@ const apiEnvironmentKeys = [
   // values leak into the local subprocess, even though the API now ignores them.
   'COOKIE_DOMAIN', 'WECHAT_APP_ID', 'WECHAT_APP_SECRET', 'WECHAT_REDIRECT_URI',
   'WECHAT_CONFIG_MASTER_KEY', 'WECHAT_CONFIG_MASTER_KEY_FILE', 'WECHAT_CONFIG_KEY_ID',
-  'WEB_BASE_URL', 'TRUSTED_ORIGINS', 'AUTH_DEV_ENABLED',
+  'WEB_BASE_URL', 'TRUSTED_ORIGINS', 'AUTH_DEV_ENABLED', 'PAYMENT_MOCK_ENABLED',
 ]
 
 export function assertLocalConfig(source) {

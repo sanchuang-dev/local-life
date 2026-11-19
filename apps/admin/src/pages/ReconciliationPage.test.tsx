@@ -104,6 +104,7 @@ function entry(overrides: Partial<LedgerEntry> = {}): LedgerEntry {
     entryId: ENTRY_ID,
     factKind: 'order_registered',
     sourceSystem: 'local_order',
+    simulated: false,
     sourceId: 'local-order-0001',
     sourceDisplayNo: 'ORD-20261101-0001',
     communityId: COMMUNITY_A.id,

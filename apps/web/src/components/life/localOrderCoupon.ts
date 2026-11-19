@@ -77,7 +77,7 @@ export function hasUnresolvedCouponSelection(
   return selectedCouponId !== null && resolved === null
 }
 
-export type LocalOrderAmountLabel = '商品总额' | '券抵扣' | '待实际支付'
+export type LocalOrderAmountLabel = '商品总额' | '券抵扣' | '待实际支付' | '实付金额'
 
 export interface LocalOrderAmountLine {
   label: LocalOrderAmountLabel
@@ -93,7 +93,7 @@ export function localOrderAmountLines(amounts: {
   totalCents: number
   couponDiscountCents: number
   netPayableCents: number
-}): LocalOrderAmountLine[] {
+}, options: { completed?: boolean } = {}): LocalOrderAmountLine[] {
   return [
     {
       label: '商品总额',
@@ -109,7 +109,7 @@ export function localOrderAmountLines(amounts: {
           : '未使用',
     },
     {
-      label: '待实际支付',
+      label: options.completed ? '实付金额' : '待实际支付',
       cents: amounts.netPayableCents,
       text: formatLocalPriceCents(amounts.netPayableCents),
     },

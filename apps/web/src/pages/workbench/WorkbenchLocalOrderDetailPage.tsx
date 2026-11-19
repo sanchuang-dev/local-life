@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useParams } from 'react-router'
-import { Info, StickyNote } from 'lucide-react'
+import { Info, Phone, StickyNote } from 'lucide-react'
 import type {
   LocalOrderDetail,
   LocalOrderEvent,
@@ -25,13 +25,18 @@ import { describeOrderAttribution } from '../../components/life/localOrderAttrib
 import {
   formatLocalDateTime,
   formatLocalPriceCents,
+  localOrderOnlineCompletionDescription,
   localOrderStatusDescriptions,
   localOrderStatusLabels,
   localOrderStatusTone,
   localOrderTransitionActions,
   type LocalOrderTransitionAction,
 } from '../../components/life/localOrderLabels'
-import { useStaffLocalOrder, useStaffOrderTransition } from '../../hooks/useStaffLocalOrders'
+import {
+  useStaffLocalOrder,
+  useStaffOrderTransition,
+  useStaffOrderVerification,
+} from '../../hooks/useStaffLocalOrders'
 import { useStaffSession } from '../../hooks/useStaffSession'
 import { describeLocalError, isLocalApiError } from '../../services/localApi'
 
@@ -39,8 +44,9 @@ const eventLabels: Record<LocalOrderEvent['event'], string> = {
   'order.registered': '居民登记订单',
   'order.created_on_behalf': '工作人员代录订单',
   'order.status_changed': '处理状态变更',
-  'order.verified': '运营人工核验通过',
+  'order.verified': '人工核验通过',
   'order.rejected': '订单未通过',
+  'order.online_completed': '在线交易完成',
 }
 
 function eventDescription(event: LocalOrderEvent): string | undefined {
@@ -52,6 +58,8 @@ function eventDescription(event: LocalOrderEvent): string | undefined {
       }`,
     )
   }
+  const actor = event.actorStaff?.displayName ?? event.actor?.displayName
+  if (actor) parts.push(`操作者：${actor}`)
   if (event.note) parts.push(event.note)
   return parts.length > 0 ? parts.join('；') : undefined
 }
@@ -59,13 +67,20 @@ function eventDescription(event: LocalOrderEvent): string | undefined {
 function OrderContent({ order, onUpdated }: { order: LocalOrderDetail; onUpdated: () => void }) {
   const { session } = useStaffSession()
   const { busy, transition } = useStaffOrderTransition(session?.csrfToken ?? null)
+  const { busy: verifying, verify } = useStaffOrderVerification(session?.csrfToken ?? null)
   const [draft, setDraft] = useState<LocalOrderTransitionAction | null>(null)
   const [reason, setReason] = useState('')
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [verifyNote, setVerifyNote] = useState('')
+  const [verifyError, setVerifyError] = useState<string | null>(null)
+  const [verifyDecision, setVerifyDecision] = useState<'verify' | 'reject' | null>(null)
+  const isGridWorker = session?.staff.role === 'grid_worker'
 
-  const actions = localOrderTransitionActions(order.status)
+  const actions = localOrderTransitionActions(order.status).filter((action) =>
+    !(isGridWorker && order.status === 'pending_review' && action.status === 'rejected'),
+  )
   const timeline = useMemo<TimelineEntry[]>(
     () =>
       [...order.events]
@@ -106,6 +121,36 @@ function OrderContent({ order, onUpdated }: { order: LocalOrderDetail; onUpdated
     }
   }
 
+  const submitVerification = async (decision: 'verify' | 'reject') => {
+    const note = verifyNote.trim()
+    if (note.length < 2) {
+      setVerifyError('核验备注必填（至少 2 个字符）；拒绝时必须写明原因。')
+      return
+    }
+    setVerifyError(null)
+    setVerifyDecision(decision)
+    setSuccess(null)
+    try {
+      await verify(order, {
+        expectedUpdatedAt: order.updatedAt,
+        decision,
+        note,
+      })
+      setVerifyNote('')
+      setSuccess(
+        decision === 'verify'
+          ? '订单已核验通过：仅确认订单事实，不代表收款、业务办理或结算已完成。'
+          : '订单已拒绝核验，原因已写入时间线。',
+      )
+      onUpdated()
+    } catch (cause) {
+      setVerifyError(describeLocalError(cause, '订单核验失败'))
+      if (isLocalApiError(cause) && cause.status === 409) onUpdated()
+    } finally {
+      setVerifyDecision(null)
+    }
+  }
+
   return (
     <>
       <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
@@ -126,13 +171,17 @@ function OrderContent({ order, onUpdated }: { order: LocalOrderDetail; onUpdated
           </CrmBadge>
         </div>
 
-        <div className="mt-3 rounded-xl bg-[#fff7ec] px-3.5 py-3 text-[11px] leading-5 text-[#8a6132]">
+        <div className="mt-3 border-l-2 border-[#e0b77a] pl-3 text-[11px] leading-5 text-[#8a6132]">
           <div className="flex items-start gap-2">
             <Info size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
             <div className="min-w-0">
-              <p className="font-semibold">{localOrderStatusDescriptions[order.status]}</p>
+              <p className="font-semibold">{order.status === 'online_completed'
+            ? localOrderOnlineCompletionDescription(order.onlineCompletion)
+            : localOrderStatusDescriptions[order.status]}</p>
               <p className="mt-1">
-                本平台只登记办理意向，不收款、不开通业务。「人工核验通过」只能由运营人员在后台完成，工作台不可直接设置。
+                {order.status === 'online_completed'
+                  ? '在线交易完成与人工核验是两种不同事实。'
+                  : '核验只确认订单事实，不代表收款、业务开通或结算完成。'}
               </p>
             </div>
           </div>
@@ -140,6 +189,25 @@ function OrderContent({ order, onUpdated }: { order: LocalOrderDetail; onUpdated
 
         <dl className="mt-3 divide-y divide-slate-100 border-t border-slate-100">
           <InfoRow label="登记居民" value={order.resident.displayName ?? '未命名居民'} />
+          <InfoRow
+            label="联系电话"
+            value={
+              order.residentContact.phone ? (
+                <a
+                  href={`tel:${order.residentContact.phone}`}
+                  className="inline-flex items-center gap-1 text-teal-700 underline underline-offset-2"
+                >
+                  <Phone size={13} aria-hidden="true" />
+                  {order.residentContact.phone}
+                </a>
+              ) : (
+                '居民未提供联系电话'
+              )
+            }
+          />
+          {order.residentContact.address ? (
+            <InfoRow label="联系地址" value={order.residentContact.address} />
+          ) : null}
           <InfoRow
             label="登记方式"
             value={order.recordSource === 'resident' ? '居民自助登记' : '工作人员代录'}
@@ -191,32 +259,82 @@ function OrderContent({ order, onUpdated }: { order: LocalOrderDetail; onUpdated
 
       {order.verification ? (
         <section className="mt-4 rounded-2xl border border-teal-200/70 bg-[#eef7f2] p-4">
-          <h2 className="text-[16px] font-semibold text-[#225c4c]">运营人工核验结果</h2>
+          <h2 className="text-[16px] font-semibold text-[#225c4c]">核验结果</h2>
           <dl className="mt-2 divide-y divide-[#d9ebe2]">
             <InfoRow
               label="核验人"
-              value={order.verification.verifiedBy?.displayName ?? '运营人员'}
+              value={order.verification.verifiedBy?.displayName ?? '工作人员'}
             />
             <InfoRow label="核验时间" value={formatLocalDateTime(order.verification.verifiedAt)} />
             <InfoRow label="核验备注" value={order.verification.note} />
           </dl>
           <p className="mt-2 text-[11px] leading-5 text-[#52786c]">
-            该结论仅为人工事实核验，不代表收款、成交或业务办理已完成。
+            仅为订单事实核验，不代表收款、成交或业务办理已完成。
           </p>
+        </section>
+      ) : null}
+
+      {isGridWorker && order.status === 'pending_review' ? (
+        <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+          <h2 className="text-[16px] font-semibold text-slate-900">电话核验</h2>
+          <p className="mt-1 text-[11px] leading-5 text-slate-400">
+            先电话联系居民确认订单事实，再记录核验结论。核验通过不等于收款或业务办理完成。
+          </p>
+          <Field label="核验备注" htmlFor="local-order-verify-note" required>
+            <textarea
+              id="local-order-verify-note"
+              rows={3}
+              maxLength={500}
+              value={verifyNote}
+              onChange={(event) => {
+                setVerifyNote(event.target.value)
+                setVerifyError(null)
+              }}
+              className={`${inputClassName} resize-none py-2.5`}
+              placeholder="记录电话核实结果；拒绝时必须写明原因"
+            />
+          </Field>
+          {verifyError ? (
+            <div className="mt-2">
+              <StatusNotice tone="error">{verifyError}</StatusNotice>
+            </div>
+          ) : null}
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              disabled={verifying}
+              onClick={() => void submitVerification('verify')}
+              className={`${primaryButtonClassName} flex-1`}
+            >
+              {verifying && verifyDecision === 'verify' ? '核验中…' : '核验通过'}
+            </button>
+            <button
+              type="button"
+              disabled={verifying}
+              onClick={() => void submitVerification('reject')}
+              className={`${secondaryButtonClassName} flex-1 border-rose-200 text-rose-600`}
+            >
+              {verifying && verifyDecision === 'reject' ? '提交中…' : '拒绝核验'}
+            </button>
+          </div>
         </section>
       ) : null}
 
       <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <h2 className="text-[16px] font-semibold text-slate-900">处理状态</h2>
         <p className="mt-1 text-[11px] leading-5 text-slate-400">
-          人工核验通过需由运营人员处理。
+          {order.status === 'pending_review'
+            ? '待核验订单请在上方完成电话核验；处理状态变更会写入订单时间线。'
+            : '处理状态变更会写入订单时间线。'}
         </p>
 
         {actions.length === 0 ? (
           <p className="mt-3 rounded-xl bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-500">
             {order.status === 'verified'
-              ? '已由运营人员人工核验通过，状态锁定，工作台不可再修改。'
-              : '当前状态为终态，不可再流转。'}
+              ? '订单已核验通过，状态锁定，工作台不可再修改。'
+              : order.status === 'pending_review'
+                ? '请在上方「电话核验」中完成核验通过或拒绝。'
+                : '当前状态为终态，不可再流转。'}
           </p>
         ) : (
           <div className="mt-3 flex flex-wrap gap-2">
@@ -357,9 +475,9 @@ function LocalOrderDetailView({ orderId }: { orderId: string }) {
  * `/workbench/local-orders/:localOrderId` — one order inside the worker's scope.
  *
  * Reading goes through `/staff/local-orders/:id` (all staff roles, community
- * scoped); an order outside the assignment answers 404 and is shown as such. The
- * status actions come from the shared transition table minus `verified`, so the
- * page can never offer a verification the worker is not allowed to perform.
+ * scoped). Ordinary status actions come from the shared transition table minus
+ * `verified`; the separate verification form is shown only for a grid worker on
+ * a pending order, and the server re-checks the current territory assignment.
  */
 export function WorkbenchLocalOrderDetailPage() {
   const { localOrderId } = useParams<{ localOrderId: string }>()

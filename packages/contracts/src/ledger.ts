@@ -160,15 +160,19 @@ export const LEDGER_FACT_KINDS = [
 ] as const satisfies readonly LedgerFactKind[]
 
 /**
- * Where one fact physically comes from. `manual` is the only producer of money
- * movement: there is no online payment integration in this MVP, so a
- * `payment_received` row is always a human-recorded receipt with evidence.
+ * Where one fact physically comes from.
+ *
+ * `manual` is a human-recorded receipt. `online_payment` is the PAY-06
+ * projection of one immutable `local_order_online_completions` fact; it is
+ * deliberately a different producer so online money can never impersonate a
+ * human receipt. `simulated` on the entry further separates Mock evidence.
  */
 export const ledgerSourceSystemSchema = z.enum([
   'local_order',
   'crm_service_order',
   'activity_reward_grant',
   'manual',
+  'online_payment',
 ])
 
 export type LedgerSourceSystem = z.infer<typeof ledgerSourceSystemSchema>
@@ -184,13 +188,16 @@ export const LEDGER_FACT_KIND_SOURCES: Record<
 > = {
   order_registered: ['local_order'],
   order_verified: ['local_order', 'crm_service_order'],
-  payment_received: ['manual'],
+  payment_received: ['manual', 'online_payment'],
   payment_reversed: ['manual'],
   reward_cost: ['activity_reward_grant'],
   reward_reversed: ['activity_reward_grant'],
 }
 
-/** Money movement that must carry evidence + a handling staff member. */
+/**
+ * Money movement. Manual rows must also name the handling staff member; online
+ * rows instead require the immutable completion/channel evidence identity.
+ */
 export function isLedgerPaymentFact(kind: LedgerFactKind): boolean {
   return kind === 'payment_received' || kind === 'payment_reversed'
 }
@@ -302,6 +309,7 @@ export const ledgerEvidenceKindSchema = z.enum([
   'crm_confirmation',
   'order_verification',
   'reward_grant',
+  'channel_payment',
   'none',
 ])
 export type LedgerEvidenceKind = z.infer<typeof ledgerEvidenceKindSchema>
@@ -350,6 +358,8 @@ export const ledgerEntrySchema = z
     entryId: uuid,
     factKind: ledgerFactKindSchema,
     sourceSystem: ledgerSourceSystemSchema,
+    /** True only for PAY-04/PAY-06 simulated online evidence; never formal cash. */
+    simulated: z.boolean(),
     sourceId: z.string().trim().min(1).max(200),
     sourceDisplayNo: z.string().trim().min(1).max(80),
     /** Owning community of the fact; always present (scope is community based). */
@@ -381,7 +391,30 @@ export const ledgerEntrySchema = z
       })
     }
 
-    if (isLedgerPaymentFact(entry.factKind)) {
+    if (entry.simulated && entry.sourceSystem !== 'online_payment') {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'only online payment facts may be simulated',
+        path: ['simulated'],
+      })
+    }
+
+    if (entry.factKind === 'payment_received' && entry.sourceSystem === 'online_payment') {
+      if (entry.recordedByStaffId !== null || entry.recordedByUserId !== null) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'an online payment must not impersonate a human receipt',
+          path: ['recordedByStaffId'],
+        })
+      }
+      if (entry.evidence.kind !== 'channel_payment' || entry.evidence.ref === null) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'an online payment requires channel_payment evidence',
+          path: ['evidence', 'kind'],
+        })
+      }
+    } else if (isLedgerPaymentFact(entry.factKind)) {
       if (entry.evidence.ref === null) {
         ctx.addIssue({
           code: 'custom',
@@ -389,10 +422,10 @@ export const ledgerEntrySchema = z
           path: ['evidence', 'ref'],
         })
       }
-      if (entry.evidence.kind === 'none') {
+      if (entry.evidence.kind !== 'manual_receipt' && entry.evidence.kind !== 'bank_transfer') {
         ctx.addIssue({
           code: 'custom',
-          message: 'a recorded payment requires a concrete evidence kind',
+          message: 'a manual payment requires manual_receipt or bank_transfer evidence',
           path: ['evidence', 'kind'],
         })
       }
@@ -1096,10 +1129,17 @@ export const ledgerOverviewSchema = z
       amountCents: cents,
     }),
     openAnomalies: z.strictObject({ count }),
-    /** 实收与收款冲正分列，禁止把冲正当负号静默抵消掉。 */
+    /**
+     * 实收与收款冲正分列，禁止把冲正当负号静默抵消掉。
+     * `receivedCents` 是正式口径（人工 + 真实线上），`onlineSimulatedReceivedCents`
+     * 单独列出且永不并入正式实收。
+     */
     payment: z.strictObject({
       receivedCents: cents,
       reversedCents: cents,
+      manualReceivedCents: cents,
+      onlineRealReceivedCents: cents,
+      onlineSimulatedReceivedCents: cents,
     }),
     reward: z.strictObject({
       costCents: cents,
@@ -1170,6 +1210,16 @@ export const ledgerOverviewSchema = z
       })
     }
     if (
+      overview.payment.manualReceivedCents + overview.payment.onlineRealReceivedCents !==
+        overview.payment.receivedCents
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'formal receivedCents must equal manual + onlineRealReceivedCents',
+        path: ['payment', 'receivedCents'],
+      })
+    }
+    if (
       overview.reward.costCents !== bucketOf('reward_cost') ||
       overview.reward.reversedCents !== bucketOf('reward_reversed')
     ) {
@@ -1207,6 +1257,7 @@ export const ledgerSyncResponseSchema = z.strictObject({
     localOrder: ledgerSyncSourceSchema,
     crmServiceOrder: ledgerSyncSourceSchema,
     activityRewardGrant: ledgerSyncSourceSchema,
+    onlineCompletion: ledgerSyncSourceSchema,
   }),
 })
 export type LedgerSyncResponse = z.infer<typeof ledgerSyncResponseSchema>
@@ -1235,6 +1286,8 @@ export const ledgerListQuerySchema = z
     factKind: ledgerFactKindSchema.optional(),
     productId: uuid.optional(),
     sourceSystem: ledgerSourceSystemSchema.optional(),
+    /** Explicit mock/real filter; absent returns both (detail must show the flag). */
+    simulated: queryFlag.optional(),
     /** `true` = only entries with an unresolved anomaly. */
     anomalyOnly: queryFlag.default(false),
     keyword: z.string().trim().min(1).max(80).optional(),

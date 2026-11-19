@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { and, eq, gte, inArray, lt, lte, sql, type SQL } from 'drizzle-orm'
+import { and, asc, eq, gt, gte, inArray, lt, lte, notExists, sql, type SQL } from 'drizzle-orm'
 import { z } from 'zod'
 import {
   API_ERROR_CODES,
@@ -29,6 +29,7 @@ import {
   ledgerEntries,
   ledgerEntrySources,
   ledgerPaymentOrderLinks,
+  localOrderOnlineCompletions,
   localOrders,
   reconciliationBatches,
   staffAccounts,
@@ -53,6 +54,7 @@ import {
 } from './shared.js'
 import { cutoffMsOf, membershipConditions } from './reconciliation-service.js'
 import { isOrderInLockedPeriod } from './payment-evidence.js'
+import { assertManualPaymentBoundary } from '../payments/service.js'
 import { tryIssueEligibleTeamCoupons } from '../purchase-reward/coupon-issuance.js'
 import { redeemCouponForOrder } from '../purchase-reward/coupon-usage.js'
 import { reconcileCouponRewardsAfterFullReversal } from '../purchase-reward/coupon-recovery.js'
@@ -171,6 +173,7 @@ export type LedgerSyncResult = LedgerSyncResponse
 interface FactInput {
   factKind: LedgerFactKind
   sourceSystem: LedgerSourceSystem
+  simulated?: boolean
   sourceId: string
   sourceDisplayNo: string
   communityId: string
@@ -237,6 +240,7 @@ function appendFact(
       id: entryId,
       factKind: input.factKind,
       sourceSystem: input.sourceSystem,
+      simulated: input.simulated ?? false,
       sourceId: input.sourceId,
       sourceDisplayNo: input.sourceDisplayNo,
       communityId: input.communityId,
@@ -271,6 +275,219 @@ function appendFact(
     })
     .run()
   return { entryId, created: true }
+}
+
+export interface LocalOrderFactSource {
+  id: string
+  communityId: string
+  productId: string
+  totalCents: number
+  createdAt: Date
+  status: string
+  verifiedAt: Date | null
+  updatedAt: Date
+}
+
+export interface LocalOrderFactProjection {
+  registeredCreated: boolean
+  verifiedAttempted: boolean
+  verifiedCreated: boolean
+}
+
+/**
+ * Projects one local order into the ledger inside the caller's transaction.
+ *
+ * Used by both the explicit source sync and the verification write, so a freshly
+ * verified order contributes its community-effective fact immediately and the
+ * same `(source_system, source_id, fact_kind)` keys make a later sync a no-op.
+ * Personal attribution stays `pending`: community performance comes from
+ * `communityId`, while the verifier is only an audit fact.
+ */
+export function projectLocalOrderFacts(
+  tx: LocalTransaction,
+  order: LocalOrderFactSource,
+  ingestedAt: Date,
+): LocalOrderFactProjection {
+  const registered = appendFact(tx, {
+    factKind: 'order_registered',
+    sourceSystem: 'local_order',
+    sourceId: order.id,
+    sourceDisplayNo: order.id,
+    communityId: order.communityId,
+    productId: order.productId,
+    attributedStaffId: null,
+    attributionState: 'pending',
+    attributionBasis: 'no_explicit_attribution',
+    amountCents: order.totalCents,
+    occurredAt: order.createdAt,
+    verifiedAt: null,
+    recordedByUserId: null,
+    recordedByStaffId: null,
+    counterEntryId: null,
+    evidenceKind: 'none',
+    evidenceRef: null,
+    createdAt: ingestedAt,
+  })
+
+  if (order.status !== 'verified') {
+    return {
+      registeredCreated: registered.created,
+      verifiedAttempted: false,
+      verifiedCreated: false,
+    }
+  }
+
+  const verifiedAt = order.verifiedAt ?? order.updatedAt
+  const verified = appendFact(tx, {
+    factKind: 'order_verified',
+    sourceSystem: 'local_order',
+    sourceId: order.id,
+    sourceDisplayNo: order.id,
+    communityId: order.communityId,
+    productId: order.productId,
+    attributedStaffId: null,
+    attributionState: 'pending',
+    attributionBasis: 'no_explicit_attribution',
+    amountCents: order.totalCents,
+    occurredAt: verifiedAt,
+    verifiedAt,
+    recordedByUserId: null,
+    recordedByStaffId: null,
+    counterEntryId: null,
+    evidenceKind: 'order_verification',
+    // The verification itself is the evidence; the order id is the human
+    // reference an auditor can look up.
+    evidenceRef: order.id,
+    createdAt: ingestedAt,
+  })
+
+  return {
+    registeredCreated: registered.created,
+    verifiedAttempted: true,
+    verifiedCreated: verified.created,
+  }
+}
+
+/**
+ * Project immutable PAY-05 online completions into the one operating ledger.
+ *
+ * The completion row is the only upstream money fact. This function does not
+ * recompute the amount from the product or order; it copies the frozen
+ * `amountCents` (gross - coupon). A zero-amount coupon-only completion has no
+ * cash fact and is intentionally skipped. The unique
+ * `(online_payment, completionId, payment_received)` source row is the final
+ * idempotency boundary; two connections/processes may race, but only one can
+ * append the receipt.
+ */
+function projectOnlineCompletions(
+  tx: LocalTransaction,
+  now: Date,
+  options: {
+    startMs?: number | null
+    endMs?: number | null
+    limit?: number
+    communityIds?: string[] | null
+  } = {},
+): SourceCounter {
+  const conditions: SQL<unknown>[] = [
+    // Zero-amount coupon completions intentionally create no cash fact. Exclude
+    // them before LIMIT so an old zero-amount backlog cannot starve later money.
+    gt(localOrderOnlineCompletions.amountCents, 0),
+    notExists(
+      tx.select({ one: sql`1` }).from(ledgerEntrySources)
+        .where(and(
+          eq(ledgerEntrySources.sourceSystem, 'online_payment'),
+          eq(ledgerEntrySources.sourceId, localOrderOnlineCompletions.id),
+          eq(ledgerEntrySources.factKind, 'payment_received'),
+        )),
+    ),
+  ]
+  if (options.startMs !== undefined && options.startMs !== null) {
+    conditions.push(gte(localOrderOnlineCompletions.completedAt, new Date(options.startMs)))
+  }
+  if (options.endMs !== undefined && options.endMs !== null) {
+    conditions.push(lt(localOrderOnlineCompletions.completedAt, new Date(options.endMs)))
+  }
+  if (options.communityIds !== undefined && options.communityIds !== null) {
+    if (options.communityIds.length === 0) return emptyCounter()
+    conditions.push(inArray(localOrders.communityId, options.communityIds))
+  }
+  const rows = tx.select({
+    completionId: localOrderOnlineCompletions.id,
+    localOrderId: localOrderOnlineCompletions.localOrderId,
+    amountCents: localOrderOnlineCompletions.amountCents,
+    simulated: localOrderOnlineCompletions.simulated,
+    providerTransactionId: localOrderOnlineCompletions.providerTransactionId,
+    completedAt: localOrderOnlineCompletions.completedAt,
+    communityId: localOrders.communityId,
+    productId: localOrders.productId,
+    sourceActivityId: localOrders.sourceActivityId,
+    sourceTeamId: localOrders.sourceTeamId,
+  }).from(localOrderOnlineCompletions)
+    .innerJoin(localOrders, eq(localOrders.id, localOrderOnlineCompletions.localOrderId))
+    .where(combine(conditions))
+    .orderBy(asc(localOrderOnlineCompletions.completedAt), asc(localOrderOnlineCompletions.id))
+    .limit(Math.min(Math.max(options.limit ?? 200, 1), 500))
+    .all()
+
+  const counter = emptyCounter()
+  for (const completion of rows) {
+    counter.scanned += 1
+    if (completion.amountCents <= 0) {
+      counter.skipped += 1
+      continue
+    }
+    if (!completion.providerTransactionId) {
+      // The completion table trigger already prevents this for a channel
+      // completion; fail closed rather than writing unverifiable money.
+      counter.skipped += 1
+      continue
+    }
+    const appended = appendFact(tx, {
+      factKind: 'payment_received',
+      sourceSystem: 'online_payment',
+      simulated: completion.simulated,
+      sourceId: completion.completionId,
+      sourceDisplayNo: completion.localOrderId,
+      communityId: completion.communityId,
+      productId: completion.productId,
+      attributedStaffId: null,
+      attributionState: 'pending',
+      attributionBasis: 'source_missing',
+      amountCents: completion.amountCents,
+      occurredAt: completion.completedAt,
+      verifiedAt: null,
+      recordedByUserId: null,
+      recordedByStaffId: null,
+      counterEntryId: null,
+      evidenceKind: 'channel_payment',
+      evidenceRef: completion.providerTransactionId,
+      createdAt: now,
+    })
+    if (!appended.created) {
+      counter.skipped += 1
+      continue
+    }
+    counter.created += 1
+    if (completion.sourceActivityId && completion.sourceTeamId) {
+      // Same existing #211 entry point as a manual receipt. The ledger fact,
+      // team cumulative query and the three-coupon grant share this transaction.
+      tryIssueEligibleTeamCoupons(tx, completion.sourceActivityId, completion.sourceTeamId, now)
+    }
+  }
+  return counter
+}
+
+/** Recovery-safe entry point for outbox consumers, backfills and tests. */
+export function projectOnlineCompletionsToLedger(
+  db: AppDatabase,
+  options: { now?: Date; limit?: number } = {},
+): SourceCounter {
+  const now = options.now ?? new Date()
+  return db.transaction(
+    (tx) => projectOnlineCompletions(tx, now, { limit: options.limit }),
+    { behavior: 'immediate' },
+  )
 }
 
 /** `application/x-www-form-urlencoded`-free helper: the business-date window. */
@@ -355,6 +572,7 @@ export function syncLedgerFacts(
         localOrder: emptyCounter(),
         crmServiceOrder: emptyCounter(),
         activityRewardGrant: emptyCounter(),
+        onlineCompletion: emptyCounter(),
       },
     }
   }
@@ -393,60 +611,13 @@ export function syncLedgerFacts(
 
       for (const order of orders) {
         localOrder.scanned += 1
-        // 登记金额：created_at 就是这笔登记发生的时间。
-        const registered = appendFact(tx, {
-          factKind: 'order_registered',
-          sourceSystem: 'local_order',
-          sourceId: order.id,
-          sourceDisplayNo: order.id,
-          communityId: order.communityId,
-          productId: order.productId,
-          // `local_orders.attributed_staff_id` is written unconditionally with the
-          // creator (`src/local/orders.ts`), so it can never distinguish an explicit
-          // attribution from creator backfill. Every local-order fact therefore
-          // enters the ledger as 待归属; only a human confirmation moves it.
-          attributedStaffId: null,
-          attributionState: 'pending',
-          attributionBasis: 'no_explicit_attribution',
-          amountCents: order.totalCents,
-          occurredAt: order.createdAt,
-          verifiedAt: null,
-          recordedByUserId: null,
-          recordedByStaffId: null,
-          counterEntryId: null,
-          evidenceKind: 'none',
-          evidenceRef: null,
-          createdAt,
-        })
-        if (registered.created) localOrder.created += 1
+        const projection = projectLocalOrderFacts(tx, order, createdAt)
+        if (projection.registeredCreated) localOrder.created += 1
         else localOrder.skipped += 1
 
-        if (order.status !== 'verified') continue
+        if (!projection.verifiedAttempted) continue
         localOrder.scanned += 1
-        const verifiedAt = order.verifiedAt ?? order.updatedAt
-        const verified = appendFact(tx, {
-          factKind: 'order_verified',
-          sourceSystem: 'local_order',
-          sourceId: order.id,
-          sourceDisplayNo: order.id,
-          communityId: order.communityId,
-          productId: order.productId,
-          attributedStaffId: null,
-          attributionState: 'pending',
-          attributionBasis: 'no_explicit_attribution',
-          amountCents: order.totalCents,
-          occurredAt: verifiedAt,
-          verifiedAt,
-          recordedByUserId: null,
-          recordedByStaffId: null,
-          counterEntryId: null,
-          evidenceKind: 'order_verification',
-          // The verification itself is the evidence; the order id is the human
-          // reference an auditor can look up.
-          evidenceRef: order.id,
-          createdAt,
-        })
-        if (verified.created) localOrder.created += 1
+        if (projection.verifiedCreated) localOrder.created += 1
         else localOrder.skipped += 1
       }
 
@@ -678,12 +849,22 @@ export function syncLedgerFacts(
         else activityRewardGrant.skipped += 1
       }
 
-      const counters = { localOrder, crmServiceOrder, activityRewardGrant }
+      const onlineCompletion = projectOnlineCompletions(tx, createdAt, {
+        startMs: window.startMs,
+        endMs: window.endMs,
+        communityIds: scope,
+      })
+      const counters = { localOrder, crmServiceOrder, activityRewardGrant, onlineCompletion }
       return {
         scanned:
-          localOrder.scanned + crmServiceOrder.scanned + activityRewardGrant.scanned,
-        created: localOrder.created + crmServiceOrder.created + activityRewardGrant.created,
-        skipped: localOrder.skipped + crmServiceOrder.skipped + activityRewardGrant.skipped,
+          localOrder.scanned + crmServiceOrder.scanned + activityRewardGrant.scanned +
+          onlineCompletion.scanned,
+        created:
+          localOrder.created + crmServiceOrder.created + activityRewardGrant.created +
+          onlineCompletion.created,
+        skipped:
+          localOrder.skipped + crmServiceOrder.skipped + activityRewardGrant.skipped +
+          onlineCompletion.skipped,
         sources: counters,
       }
     },
@@ -807,6 +988,12 @@ export function recordPayment(
           throw new LocalError(409, API_ERROR_CODES.conflict,
             '用券订单实际收款必须等于券抵扣后的净应付金额')
         }
+        // R1 last line of defence: "verified" alone is a historical/manual fact,
+        // not proof that no online money exists. Re-check the payment boundary in
+        // this same transaction, immediately before any receipt or ledger link is
+        // written, so an intent/paid fact that appeared after verification still
+        // blocks double collection.
+        assertManualPaymentBoundary(tx, body.orderId)
         if (tx.select({ orderId: ledgerPaymentOrderLinks.orderId })
           .from(ledgerPaymentOrderLinks)
           .where(eq(ledgerPaymentOrderLinks.orderId, body.orderId)).get()) {
@@ -936,11 +1123,11 @@ export function reversePayment(
         throw new LocalError(404, API_ERROR_CODES.notFound, '流水条目不存在')
       }
       assertCommunityAccess(db, actor, original.communityId)
-      if (original.factKind !== 'payment_received') {
+      if (original.factKind !== 'payment_received' || original.sourceSystem !== 'manual') {
         throw new LocalError(
           409,
           API_ERROR_CODES.ledgerEntryImmutable,
-          '只有人工收款记录可以冲正',
+          '只有人工收款记录可以冲正；在线退款/冲正尚未支持',
         )
       }
       const already = tx

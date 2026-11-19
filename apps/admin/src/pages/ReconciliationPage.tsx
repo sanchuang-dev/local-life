@@ -1,4 +1,5 @@
 import { PageInfoAlert } from '../components/PageInfoHelp'
+import { PaymentReconciliationPanel } from './PaymentReconciliationPanel'
 import {
   Alert,
   App as AntdApp,
@@ -619,6 +620,8 @@ function ReconciliationConsole({ session }: { session: AuthenticatedSession }) {
             title="口径与边界"
             description="批次成员按「对账期间 + 社区范围」从不可变流水派生，系统不会回写流水；锁定只让合计与归属冻结。锁定之后补录的流水会以「锁后补录」出现在差异页，绝不会静默并入已冻结账目。"
           />
+
+          <PaymentReconciliationPanel />
 
           {batchesError ? (
             <Alert

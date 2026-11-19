@@ -64,8 +64,18 @@ async function fixture() {
     }).run()
   }
   db.insert(staffCommunityAssignments).values([
-    { staffAccountId: staffIds.operator, communityId: communityA, createdAt: date },
-    { staffAccountId: staffIds.grid, communityId: communityA, createdAt: date },
+    {
+      staffAccountId: staffIds.operator,
+      communityId: communityA,
+      assignmentKind: 'operator_scope',
+      createdAt: date,
+    },
+    {
+      staffAccountId: staffIds.grid,
+      communityId: communityA,
+      assignmentKind: 'grid_territory',
+      createdAt: date,
+    },
   ]).run()
 
   const residents = Array.from({ length: totalA + 4 }, (_, index) => ({

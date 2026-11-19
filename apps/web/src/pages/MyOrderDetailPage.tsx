@@ -5,12 +5,13 @@ import { PageHeader } from '../components/PageHeader'
 import {
   formatLocalDateTime,
   formatLocalPriceCents,
-  localOrderStatusDescriptions,
+  localOrderOnlineCompletionDescription,
   localOrderStatusLabels,
-  localOrderStatusTone,
 } from '../components/life/localOrderLabels'
 import { describeOrderAttribution } from '../components/life/localOrderAttribution'
 import { localOrderAmountLines, shortCouponId } from '../components/life/localOrderCoupon'
+import { LocalOrderPaymentPanel } from '../components/life/LocalOrderPaymentPanel'
+import { localOrderPaymentDisplay } from '../components/life/localOrderPayment'
 import { useBackTarget } from '../hooks/useBackTarget'
 import { useMyLocalOrder } from '../hooks/useLocalOrders'
 import { useResidentAuth } from '../hooks/useResidentAuth'
@@ -22,10 +23,12 @@ const eventLabels: Record<LocalOrderEvent['event'], string> = {
   'order.status_changed': '处理状态变更',
   'order.verified': '运营人工核验通过',
   'order.rejected': '未通过',
+  'order.online_completed': '在线交易完成',
 }
 
 function StatusPill({ order }: { order: LocalOrderDetail }) {
-  const tone = localOrderStatusTone(order.status)
+  const display = localOrderPaymentDisplay(order)
+  const tone = display.tone
   const classes = {
     mint: 'bg-[#e8f6f0] text-[#388b77]',
     amber: 'bg-[#fff3e6] text-[#a96b2f]',
@@ -37,17 +40,26 @@ function StatusPill({ order }: { order: LocalOrderDetail }) {
     <span
       className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${classes}`}
     >
-      {localOrderStatusLabels[order.status]}
+      {display.label}
     </span>
   )
 }
 
-function OrderDetailBody({ order }: { order: LocalOrderDetail }) {
+function OrderDetailBody({
+  order,
+  refreshOrder,
+}: {
+  order: LocalOrderDetail
+  refreshOrder: () => Promise<LocalOrderDetail | null>
+}) {
+  const display = localOrderPaymentDisplay(order)
   const facts = [
     { label: '商品', value: order.snapshot.productName },
     { label: '单价', value: formatLocalPriceCents(order.snapshot.unitPriceCents) },
     { label: '数量', value: `${order.snapshot.quantity} 件` },
-    ...localOrderAmountLines(order.snapshot).map((line) => ({
+    ...localOrderAmountLines(order.snapshot, {
+      completed: order.status === 'online_completed',
+    }).map((line) => ({
       label: line.label,
       value: line.text,
     })),
@@ -76,7 +88,9 @@ function OrderDetailBody({ order }: { order: LocalOrderDetail }) {
           <StatusPill order={order} />
         </div>
         <p className="mt-2 break-words text-[12px] leading-5 text-slate-500">
-          {localOrderStatusDescriptions[order.status]}
+          {order.status === 'online_completed'
+            ? localOrderOnlineCompletionDescription(order.onlineCompletion)
+            : display.description}
         </p>
         {order.statusNote ? (
           <p className="mt-2 break-words rounded-xl bg-[#fff7ec] px-3 py-2 text-[11px] leading-5 text-[#8a6132]">
@@ -87,6 +101,8 @@ function OrderDetailBody({ order }: { order: LocalOrderDetail }) {
           订单编号 {order.id.slice(0, 8)}…（完整编号仅用于工作人员核对）
         </p>
       </section>
+
+      <LocalOrderPaymentPanel order={order} onRefresh={refreshOrder} />
 
       <section className="mt-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
         <h2 className="text-[15px] font-semibold text-slate-800">商品快照</h2>
@@ -104,7 +120,7 @@ function OrderDetailBody({ order }: { order: LocalOrderDetail }) {
           ))}
         </dl>
         <p className="mt-2 text-[10px] leading-4 text-slate-400">
-          券抵扣与待实际支付来自服务端冻结快照；订单登记成功不等于付款成功，平台不收款。
+          券抵扣与应付/实付金额来自服务端冻结快照；订单登记不等于付款成功，支付状态以服务端为准。
         </p>
         {order.note ? (
           <p className="mt-2 break-words rounded-xl bg-slate-50 px-3 py-2.5 text-[12px] leading-5 text-slate-500">
@@ -183,7 +199,7 @@ export function MyOrderDetailPage() {
   const { localOrderId } = useParams()
   const { backTo, backLabel } = useBackTarget('/me/orders', '返回我的订单')
   const auth = useResidentAuth()
-  const { state, reload } = useMyLocalOrder({
+  const { state, reload, refreshNow } = useMyLocalOrder({
     orderId: localOrderId ?? null,
     sessionKey: auth.session?.user.id ?? null,
     authLoading: auth.loading,
@@ -261,7 +277,7 @@ export function MyOrderDetailPage() {
 
       {state.status === 'ready' ? (
         <>
-          <OrderDetailBody order={state.order} />
+          <OrderDetailBody order={state.order} refreshOrder={refreshNow} />
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
