@@ -7,6 +7,8 @@ import {
   LOCAL_ORDER_ROUTES,
   PAYMENT_INTERNAL_ROUTES,
   PAYMENT_ROUTES,
+  paymentReconciliationRoutes,
+  paymentDifferencesResponseSchema,
   adminLocalOrderDetailSchema,
   localOrderDetailSchema,
   localOrderListResponseSchema,
@@ -36,6 +38,7 @@ import {
   localOrders,
   localProducts,
   paymentIntents,
+  paymentEvents,
   paymentReviewExceptions,
   staffAccounts,
   staffCommunityAssignments,
@@ -1197,4 +1200,141 @@ test('PAY-08 back-office payment read', async (t) => {
     // `local_orders` rows are never mutated by the read path.
     assert.equal(w.db.select({ id: localOrders.id }).from(localOrders).all().length, 9)
   })
+  await t.test('PAY-09: local Mock consistency, server paging, date and CSV facts', async () => {
+    // Deliberately create a clean payment after PAY-08's conflict-rich fixture,
+    // so a happy local match is demonstrable without calling it a WeChat match.
+    const order = await registerOrder(w, w.residentA, w.productA)
+    const intent = await createMockIntent(w, w.residentA, order)
+    const proof = evidence(intent, 'paid')
+    const confirmed = await confirmEvidence(w, proof)
+    assert.equal(confirmed.status, 200, await confirmed.text())
+    const projected = await consumeOutbox(w)
+    assert.equal(projected.status, 200, await projected.text())
+
+    const route = paymentReconciliationRoutes.list
+    const listResponse = await api(
+      w.app, 'GET', route + '?source=mock&status=consistent&pageSize=1', { session: w.admin },
+    )
+    assert.equal(listResponse.status, 200, await listResponse.text())
+    const list = paymentDifferencesResponseSchema.parse(await listResponse.json())
+    assert.ok(list.total >= 1)
+    assert.equal(list.pageSize, 1)
+    const clean = list.items.find((value) => value.intentId === intent.id)
+    assert.ok(clean, 'the clean Mock payment must be listed')
+    assert.equal(clean.reason, 'local_consistent')
+    assert.equal(clean.source, 'mock')
+    assert.equal(clean.simulated, true)
+    assert.equal(clean.netAmountCents, 3980)
+    assert.equal(clean.completionAmountCents, 3980)
+    assert.equal(clean.ledgerAmountCents, 3980)
+    assert.equal(clean.channelBill, 'not_connected')
+    assert.equal(clean.bankSettlement, 'unverified')
+
+    const detail = await api(
+      w.app, 'GET', paymentReconciliationRoutes.detail.replace(':intentId', intent.id),
+      { session: w.admin },
+    )
+    assert.equal(detail.status, 200, await detail.text())
+    const body = await detail.json() as { order: AdminLocalOrderDetail; reason: string }
+    assert.equal(body.reason, 'local_consistent')
+    assert.equal(adminLocalOrderDetailSchema.parse(body.order).paymentSection.bankSettlement.status, 'unverified')
+
+    const dateList = await api(
+      w.app, 'GET', route + '?from=' + clean.businessDate + '&to=' + clean.businessDate +
+        '&reason=local_consistent&source=mock',
+      { session: w.admin },
+    )
+    assert.equal(dateList.status, 200)
+    const onDay = paymentDifferencesResponseSchema.parse(await dateList.json())
+    assert.ok(onDay.items.some((value) => value.intentId === intent.id))
+
+    const csv = await api(
+      w.app, 'GET',
+      paymentReconciliationRoutes.exportCsv + '?source=mock&status=consistent',
+      { session: w.admin },
+    )
+    assert.equal(csv.status, 200, await csv.text())
+    assert.match(csv.headers.get('content-type') ?? '', /text\/csv/u)
+    const text = await csv.text()
+    assert.ok(text.startsWith('\uFEFF'))
+    assert.ok(text.includes('"净应付(分)"'))
+    assert.ok(text.includes('"3980"'))
+    assert.ok(text.includes('"仅测试"'))
+    assert.ok(text.includes('未接入微信渠道账单'))
+    assert.equal(text.includes(proof.providerTransactionId as string), false)
+    assert.equal(text.includes('已结算'), false)
+  })
+
+  await t.test('PAY-09: existing conflict evidence and duplicated provider events are located', async () => {
+    const all = await api(
+      w.app, 'GET', paymentReconciliationRoutes.list + '?status=difference&pageSize=100',
+      { session: w.admin },
+    )
+    assert.equal(all.status, 200, await all.text())
+    const list = paymentDifferencesResponseSchema.parse(await all.json())
+    assert.ok(list.items.some((item) =>
+      item.orderId === scenario.exhaustedOrder.id && item.reason === 'provider_exception'))
+    assert.ok(list.items.some((item) =>
+      item.orderId === scenario.lateOrder.id && item.reason === 'provider_exception'))
+    assert.equal(list.items.some((item) => item.status === 'consistent'), false)
+
+    const order = await registerOrder(w, w.residentA, w.productA)
+    const intent = await createMockIntent(w, w.residentA, order)
+    const at = now()
+    for (let i = 0; i < 2; i++) {
+      w.db.insert(paymentEvents).values({
+        id: randomUUID(),
+        paymentIntentId: intent.id,
+        paymentAttemptId: null,
+        eventType: 'payment.channel_notification',
+        source: 'channel',
+        fromStatus: 'pending',
+        toStatus: 'pending',
+        providerEventRef: 'PAY09-DUPLICATE-EVENT',
+        dedupeKey: 'pay09-duplicate-event-' + i + '-' + intent.id,
+        createdAt: at,
+      }).run()
+    }
+    const duplicated = await api(
+      w.app, 'GET',
+      paymentReconciliationRoutes.list + '?reason=duplicate_provider_event',
+      { session: w.admin },
+    )
+    assert.equal(duplicated.status, 200, await duplicated.text())
+    const matches = paymentDifferencesResponseSchema.parse(await duplicated.json())
+    assert.ok(matches.items.some((value) => value.intentId === intent.id))
+  })
+
+  await t.test('PAY-09: cross-community, grid and anonymous list/detail/export access denied', async () => {
+    // A second-community intent exists, so 404 from detail genuinely proves scoping.
+    const other = insertPendingChannelIntent(w, scenario.communityBOrder, 'mock')
+    const where = '?communityId=' + w.communityB
+    for (const path of [paymentReconciliationRoutes.list, paymentReconciliationRoutes.exportCsv]) {
+      const unauth = await api(w.app, 'GET', path)
+      assert.equal(unauth.status, 401)
+      const grid = await api(w.app, 'GET', path, { session: w.grid })
+      assert.equal(grid.status, 403)
+      const outside = await api(w.app, 'GET', path + where, { session: w.operator })
+      assert.equal(outside.status, 403)
+      assert.equal(await errorCode(outside), 'forbidden')
+    }
+    const detailPath = paymentReconciliationRoutes.detail.replace(':intentId', other.id)
+    assert.equal((await api(w.app, 'GET', detailPath, { session: w.grid })).status, 403)
+    assert.equal((await api(w.app, 'GET', detailPath, { session: w.operator })).status, 404)
+    assert.equal((await api(w.app, 'GET', detailPath)).status, 401)
+    const scoped = await api(
+      w.app, 'GET', paymentReconciliationRoutes.list + '?pageSize=100',
+      { session: w.operator },
+    )
+    assert.equal(scoped.status, 200)
+    const rows = paymentDifferencesResponseSchema.parse(await scoped.json()).items
+    assert.ok(rows.every((item) => item.communityId === w.communityA))
+    const invalid = await api(
+      w.app, 'GET', paymentReconciliationRoutes.exportCsv + '?unknownFilter=1',
+      { session: w.admin },
+    )
+    assert.equal(invalid.status, 400)
+    assert.match(invalid.headers.get('content-type') ?? '', /json/u)
+  })
+
 })
