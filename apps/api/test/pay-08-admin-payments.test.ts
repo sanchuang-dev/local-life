@@ -1215,8 +1215,9 @@ test('PAY-08 back-office payment read', async (t) => {
     const listResponse = await api(
       w.app, 'GET', route + '?source=mock&status=consistent&pageSize=1', { session: w.admin },
     )
-    assert.equal(listResponse.status, 200, await listResponse.text())
-    const list = paymentDifferencesResponseSchema.parse(await listResponse.json())
+    const listText = await listResponse.text()
+    assert.equal(listResponse.status, 200, listText)
+    const list = paymentDifferencesResponseSchema.parse(JSON.parse(listText))
     assert.ok(list.total >= 1)
     assert.equal(list.pageSize, 1)
     const clean = list.items.find((value) => value.intentId === intent.id)
@@ -1234,8 +1235,9 @@ test('PAY-08 back-office payment read', async (t) => {
       w.app, 'GET', paymentReconciliationRoutes.detail.replace(':intentId', intent.id),
       { session: w.admin },
     )
-    assert.equal(detail.status, 200, await detail.text())
-    const body = await detail.json() as { order: AdminLocalOrderDetail; reason: string }
+    const detailText = await detail.text()
+    assert.equal(detail.status, 200, detailText)
+    const body = JSON.parse(detailText) as { order: AdminLocalOrderDetail; reason: string }
     assert.equal(body.reason, 'local_consistent')
     assert.equal(adminLocalOrderDetailSchema.parse(body.order).paymentSection.bankSettlement.status, 'unverified')
 
@@ -1253,9 +1255,9 @@ test('PAY-08 back-office payment read', async (t) => {
       paymentReconciliationRoutes.exportCsv + '?source=mock&status=consistent',
       { session: w.admin },
     )
-    assert.equal(csv.status, 200, await csv.text())
-    assert.match(csv.headers.get('content-type') ?? '', /text\/csv/u)
     const text = await csv.text()
+    assert.equal(csv.status, 200, text)
+    assert.match(csv.headers.get('content-type') ?? '', /text\/csv/u)
     assert.ok(text.startsWith('\uFEFF'))
     assert.ok(text.includes('"净应付(分)"'))
     assert.ok(text.includes('"3980"'))
@@ -1270,8 +1272,9 @@ test('PAY-08 back-office payment read', async (t) => {
       w.app, 'GET', paymentReconciliationRoutes.list + '?status=difference&pageSize=100',
       { session: w.admin },
     )
-    assert.equal(all.status, 200, await all.text())
-    const list = paymentDifferencesResponseSchema.parse(await all.json())
+    const allText = await all.text()
+    assert.equal(all.status, 200, allText)
+    const list = paymentDifferencesResponseSchema.parse(JSON.parse(allText))
     assert.ok(list.items.some((item) =>
       item.orderId === scenario.exhaustedOrder.id && item.reason === 'provider_exception'))
     assert.ok(list.items.some((item) =>
@@ -1300,8 +1303,9 @@ test('PAY-08 back-office payment read', async (t) => {
       paymentReconciliationRoutes.list + '?reason=duplicate_provider_event',
       { session: w.admin },
     )
-    assert.equal(duplicated.status, 200, await duplicated.text())
-    const matches = paymentDifferencesResponseSchema.parse(await duplicated.json())
+    const dupText = await duplicated.text()
+    assert.equal(duplicated.status, 200, dupText)
+    const matches = paymentDifferencesResponseSchema.parse(JSON.parse(dupText))
     assert.ok(matches.items.some((value) => value.intentId === intent.id))
   })
 
