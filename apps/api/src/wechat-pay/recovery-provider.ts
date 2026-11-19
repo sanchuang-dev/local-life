@@ -12,7 +12,12 @@ const querySchema = z.object({
     'SUCCESS', 'REFUND', 'NOTPAY', 'CLOSED', 'REVOKED', 'USERPAYING', 'PAYERROR',
   ]),
   success_time: z.string().datetime({ offset: true }).optional(),
-  amount: z.object({ total: z.number().int().positive(), currency: z.literal('CNY') }),
+  // APIv3 query marks amount/total/currency optional, especially for NOTPAY
+  // and CLOSED. Successful payments still require positive provider proof.
+  amount: z.object({
+    total: z.number().int().positive().optional(),
+    currency: z.literal('CNY').optional(),
+  }).optional(),
 })
 export type WechatVerifiedQuery = z.infer<typeof querySchema>
 
@@ -117,7 +122,8 @@ export async function queryWechatOrder(input: {
     return { kind: 'uncertain', reason: 'response_identity_or_schema_mismatch', responseHash }
   }
   if (result.data.trade_state === 'SUCCESS' &&
-      (!result.data.transaction_id || !result.data.success_time)) {
+      (!result.data.transaction_id || !result.data.success_time ||
+       result.data.amount?.total === undefined || result.data.amount?.currency !== 'CNY')) {
     return { kind: 'uncertain', reason: 'paid_missing_proof', responseHash }
   }
   return {

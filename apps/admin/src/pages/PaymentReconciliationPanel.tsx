@@ -257,6 +257,17 @@ export function PaymentReconciliationPanel() {
               <Descriptions.Item label="渠道账单">未接入，不可判定匹配</Descriptions.Item>
               <Descriptions.Item label="银行结算">未核实</Descriptions.Item>
             </Descriptions>
+            {detail.recoveryChecks.length > 0 && (
+              <Card size="small" title="微信渠道恢复核查（只读）">
+                <Space orientation="vertical" size={6}>
+                  {detail.recoveryChecks.map((check, i) => (
+                    <Typography.Text key={i} type="secondary">
+                      {check.createdAt} · {check.operation} · {check.result} · {check.detailCode}
+                    </Typography.Text>
+                  ))}
+                </Space>
+              </Card>
+            )}
             <OrderPaymentSection order={detail.order}/>
           </Space>
         )}

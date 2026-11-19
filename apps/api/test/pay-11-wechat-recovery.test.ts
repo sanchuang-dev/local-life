@@ -13,6 +13,7 @@ import {
 import { createApp } from '../src/app.js'
 import { loadConfig } from '../src/config.js'
 import { createDatabase, type AppDatabase } from '../src/db/client.js'
+import { listPaymentDifferences, paymentDifferenceDetail } from '../src/ledger/payment-reconciliation.js'
 import {
   communities, localOrders, localProducts, paymentIntents,
   paymentEvents, paymentOutbox, localOrderOnlineCompletions,
@@ -136,6 +137,7 @@ async function setup(
 function encryptedNotification(world: World, overrides: {
   appid?: string; mchid?: string; amount?: number; tradeNo?: string;
   transactionId?: string; id?: string; ciphertext?: string; eventType?: string; successTime?: string;
+  associatedData?: string | null; extraSize?: number;
 } = {}) {
   const timestamp = Math.floor(Date.now() / 1_000).toString()
   const nonce = 'PAY11SIGNNONCE0123456789ABCDEF1234'
@@ -148,10 +150,13 @@ function encryptedNotification(world: World, overrides: {
     trade_state: 'SUCCESS',
     success_time: overrides.successTime ?? new Date().toISOString(),
     amount: { total: overrides.amount ?? 3980, currency: 'CNY' },
+    ...(overrides.extraSize ? { testPadding: 'x'.repeat(overrides.extraSize) } : {}),
   })
+  const aad = overrides.associatedData === undefined ? 'transaction'
+    : overrides.associatedData ?? ''
   const tagNonce = '123456789012'
   const cipher = createCipheriv('aes-256-gcm', Buffer.from(API_KEY), Buffer.from(tagNonce))
-  cipher.setAAD(Buffer.from('transaction'))
+  cipher.setAAD(Buffer.from(aad))
   const encrypted = Buffer.concat([
     cipher.update(transaction, 'utf8'), cipher.final(), cipher.getAuthTag(),
   ]).toString('base64')
@@ -163,7 +168,8 @@ function encryptedNotification(world: World, overrides: {
     resource: {
       original_type: 'transaction',
       algorithm: 'AEAD_AES_256_GCM',
-      nonce: tagNonce, associated_data: 'transaction',
+      nonce: tagNonce,
+      ...(overrides.associatedData === null ? {} : { associated_data: aad }),
       ciphertext: overrides.ciphertext ?? encrypted,
     },
   })
@@ -188,16 +194,117 @@ function internal(world: World, path: string) {
   })
 }
 
-function fakeQuery(world: World, tradeState: string, amount = 3980) {
+function fakeQuery(world: World, tradeState: string, amount = 3980, includeAmount = true) {
   return JSON.stringify({
     appid: TEST_APPID, mchid: TEST_MCHID,
     out_trade_no: world.merchantOrderNo,
     transaction_id: '420000000020261119TESTPAY11TXN',
     trade_state: tradeState,
     success_time: new Date().toISOString(),
-    amount: { total: amount, currency: 'CNY' },
+    ...(includeAmount ? { amount: { total: amount, currency: 'CNY' } } : {}),
   })
 }
+
+test('PAY-11 optional AAD, >64KB genuine signed notification, and tamper rejection', async (t) => {
+  const w = await setup(t, () => ({ status: 200, body: '{}' }))
+  const large = encryptedNotification(w, { associatedData: null, extraSize: 81_920 })
+  assert.ok(Buffer.byteLength(large.body) > 64 * 1024)
+  assert.equal((await notify(w, large)).status, 200)
+  assert.equal(w.db.select().from(paymentOutbox).all().length, 1)
+  assert.equal((await notify(w, encryptedNotification(w, { associatedData: '' }))).status, 200)
+
+  const changedAad = encryptedNotification(w, { associatedData: null })
+  const parsed = JSON.parse(changedAad.body) as { resource: Record<string, unknown> }
+  parsed.resource.associated_data = 'wrong-AAD'
+  const body = JSON.stringify(parsed)
+  const signed = {
+    body,
+    headers: {
+      ...changedAad.headers,
+      'wechatpay-signature': signWechatResponse(
+        TEST_PLATFORM_PRIVATE_KEY, changedAad.headers['wechatpay-timestamp'],
+        changedAad.headers['wechatpay-nonce'], body,
+      ),
+    },
+  }
+  assert.equal((await notify(w, signed)).status, 400)
+})
+
+test('PAY-11 SUCCESS without provider amount never becomes paid', async (t) => {
+  let world: World
+  const w = await setup(t, () => ({ status: 200, body: fakeQuery(world, 'SUCCESS', 3980, false) }))
+  world = w
+  const path = PAYMENT_WECHAT_ROUTES.query.replace(':paymentIntentId', w.intentId)
+  const response = await internal(w, path)
+  assert.equal(response.status, 202)
+  assert.equal(w.db.select().from(paymentIntents).where(eq(paymentIntents.id, w.intentId)).get()?.status, 'pending')
+  assert.equal(w.db.select().from(paymentOutbox).all().length, 0)
+  assert.equal(w.db.select().from(wechatPayRecoveryChecks).all()[0]?.detailCode, 'paid_missing_proof')
+})
+
+test('PAY-11 recovery fairness reaches later intents despite 20 earlier unknown results and restart', async (t) => {
+  const w = await setup(t, () => ({ status: 503, body: '{"code":"CHANNEL_UNAVAILABLE"}' }))
+  const baseOrder = w.db.select().from(localOrders).get()
+  const baseIntent = w.db.select().from(paymentIntents).get()
+  assert.ok(baseOrder)
+  assert.ok(baseIntent)
+  const ids = [w.intentId]
+  // Every intent has a separate valid local order. More than one batch must
+  // be necessary, and none of the provider responses resolves its intent.
+  for (let i = 1; i <= 25; i++) {
+    const orderId = randomUUID()
+    const intentId = randomUUID()
+    w.db.insert(localOrders).values({
+      ...baseOrder, id: orderId, idempotencyKey: 'pay11-many-orders-' + i,
+    }).run()
+    w.db.insert(paymentIntents).values({
+      ...baseIntent, id: intentId, localOrderId: orderId,
+      merchantOrderNo: 'PAY-' + String(i).padStart(28, '0'),
+      idempotencyKey: 'pay11-many-intents-' + i,
+    }).run()
+    ids.push(intentId)
+  }
+  const { recoverDueWechatPayments } = await import('../src/wechat-pay/recovery-service.js')
+  const now = new Date(Date.now() + 3_600_000)
+  const first = await recoverDueWechatPayments(w.db, w.config.wechatPay!, 20, now)
+  assert.equal(first.checked, 20)
+  assert.ok(first.results.every((item) => item.outcome === 'uncertain'))
+  // Reopen against the same durable SQLite file, not in-memory cursor state.
+  const reopened = createDatabase(w.dbPath, MIGRATIONS)
+  t.after(() => reopened.sqlite.close())
+  const second = await recoverDueWechatPayments(reopened.db, w.config.wechatPay!, 20, now)
+  assert.equal(second.checked, 20)
+  const seen = new Set(reopened.db.select().from(wechatPayRecoveryChecks).all()
+    .map((row) => row.paymentIntentId))
+  assert.equal(seen.size, ids.length, 'all 26 pending intents reached after two bounded batches')
+  assert.ok(ids.every((id) => seen.has(id)))
+  assert.equal(reopened.db.select().from(paymentOutbox).all().length, 0)
+})
+
+test('PAY-11 recovery audit is append-only and PAY-09 exposes a scoped human-readable exception', async (t) => {
+  let world: World
+  const w = await setup(t, () => ({ status: 200, body: fakeQuery(world, 'REFUND', 3980, false) }))
+  world = w
+  const path = PAYMENT_WECHAT_ROUTES.query.replace(':paymentIntentId', w.intentId)
+  const reply = await internal(w, path)
+  assert.equal(reply.status, 202)
+  const admin = { role: 'admin' as const, staffId: randomUUID(), userId: randomUUID() }
+  const list = listPaymentDifferences(w.db, admin, {
+    page: 1, pageSize: 20, source: 'wechat_jsapi', status: 'difference',
+  })
+  assert.ok(list.items.some((row) =>
+    row.intentId === w.intentId && row.reason === 'provider_exception'))
+  const detail = paymentDifferenceDetail(w.db, admin, w.intentId)
+  assert.equal(detail.recoveryChecks.length, 1)
+  assert.equal(detail.recoveryChecks[0]?.detailCode, 'refund_requires_manual_review')
+  assert.equal(detail.recoveryChecks[0]?.result, 'uncertain')
+  assert.throws(() => w.sqlite.prepare(
+    'UPDATE wechat_pay_recovery_checks SET result = ?',
+  ).run('verified'), /append-only/u)
+  assert.throws(() => w.sqlite.prepare(
+    'DELETE FROM wechat_pay_recovery_checks',
+  ).run(), /append-only/u)
+})
 
 test('PAY-11 authentic signed AES-GCM notification confirms exactly once and cannot be spoofed', async (t) => {
   const w = await setup(t, () => ({ status: 200, body: '{}' }))
@@ -256,7 +363,7 @@ test('PAY-11 verified NOTPAY -> close acknowledgment -> verified CLOSED, never d
       state = 'CLOSED'
       return { status: 204, body: '' }
     }
-    return { status: 200, body: fakeQuery(world, state) }
+    return { status: 200, body: fakeQuery(world, state, 3980, false) }
   })
   world = w
   const closePath = PAYMENT_WECHAT_ROUTES.close.replace(':paymentIntentId', w.intentId)

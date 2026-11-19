@@ -24,3 +24,15 @@ CREATE TABLE `wechat_pay_recovery_checks` (
 --> statement-breakpoint
 CREATE INDEX `wechat_pay_recovery_checks_intent_created_idx`
   ON `wechat_pay_recovery_checks` (`payment_intent_id`, `created_at`);
+--> statement-breakpoint
+CREATE TRIGGER `wechat_pay_recovery_checks_no_update`
+BEFORE UPDATE ON `wechat_pay_recovery_checks`
+BEGIN
+  SELECT RAISE(ABORT, 'PAY-11 recovery audit is append-only');
+END;
+--> statement-breakpoint
+CREATE TRIGGER `wechat_pay_recovery_checks_no_delete`
+BEFORE DELETE ON `wechat_pay_recovery_checks`
+BEGIN
+  SELECT RAISE(ABORT, 'PAY-11 recovery audit is append-only');
+END;

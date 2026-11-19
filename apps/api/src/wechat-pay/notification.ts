@@ -19,9 +19,10 @@ const envelopeSchema = z.object({
   resource: z.object({
     algorithm: z.literal('AEAD_AES_256_GCM'),
     original_type: z.literal('transaction'),
-    ciphertext: z.string().min(24).max(32_768),
+    ciphertext: z.string().min(24).max(1_048_576),
     nonce: z.string().length(12),
-    associated_data: z.string().max(1_024),
+    // Official APIv3 notification AAD is optional; absent means empty bytes.
+    associated_data: z.string().max(16).optional(),
   }),
 })
 const transactionSchema = z.object({
@@ -90,7 +91,7 @@ export function verifyAndDecryptWechatNotification(input: {
     const decipher = createDecipheriv('aes-256-gcm', input.runtime.apiV3Key, Buffer.from(nonce), {
       authTagLength: 16,
     })
-    decipher.setAAD(Buffer.from(associated_data, 'utf8'))
+    decipher.setAAD(Buffer.from(associated_data ?? '', 'utf8'))
     decipher.setAuthTag(data.subarray(data.length - 16))
     plaintext = Buffer.concat([
       decipher.update(data.subarray(0, data.length - 16)),

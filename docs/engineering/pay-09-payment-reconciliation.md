@@ -26,3 +26,6 @@
 - 变更只影响只读查询与 Admin 局部 UI：可通过 revert 此 PR 回滚，不触及支付事实或锁定账本。
 - 验证入口：`pnpm --filter @sanchuang-dev/local-life-api exec node --import tsx --test test/pay-08-admin-payments.test.ts`（包含 PAY-09 子用例）、`pnpm --filter @sanchuang-dev/local-life-api typecheck`、`pnpm --filter @sanchuang-dev/local-life-admin typecheck`、`pnpm check`。
 - 无微信真实商户权限及渠道账单接线：只能验证本地事实及注入的异常，不得宣传真实微信渠道对账、退款或银行入账。
+\n## PAY-11 扩展（#286）
+- 既有支付意图列表增加 PAY-11 恢复审计的**最近核查结果**投影：未知查单、退款人工复核、关单已发送但未证实、已关单后的异常二次查单均提示 `provider_exception`；最新可信结果恢复正常时不永久把过往暂时性网络故障当成当前异常。
+- 详情按原有服务端社区/角色权限读取最近 20 条脱敏恢复摘要（操作、状态、原因、时间），不返回微信原始响应、密文、证书、AppSecret、交易号；列表 CSV 仍保持现有字段和本地金额含义。`wechat_pay_recovery_checks` 属于 PAY-11 只追加审计，不是银行结算或微信账单勾对。

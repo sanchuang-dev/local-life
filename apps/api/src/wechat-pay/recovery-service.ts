@@ -102,7 +102,7 @@ export async function checkWechatPayment(
     return { intentId, outcome: 'uncertain', tradeState: null }
   }
   const txn = result.transaction
-  if (txn.amount.total !== intent.netPayableCents) {
+  if (txn.amount?.total !== undefined && txn.amount.total !== intent.netPayableCents) {
     // The trusted query may reveal a bad amount. Let PAY-03 preserve that
     // evidence as an immutable mismatch rather than deleting the anomaly.
     const mismatch: PaymentEvidence = paymentEvidenceSchema.parse({
@@ -133,7 +133,9 @@ export async function checkWechatPayment(
     channel: 'wechat_jsapi',
     providerStatus: status,
     providerTransactionId: status === 'paid' ? txn.transaction_id! : null,
-    amountCents: txn.amount.total,
+    // For non-paid statuses the frozen amount only satisfies PAY-03 evidence;
+    // it is not a provider-confirmed receipt.
+    amountCents: txn.amount?.total ?? intent.netPayableCents,
     currency: 'CNY',
     merchantAppId: txn.appid,
     merchantId: txn.mchid,
@@ -196,6 +198,11 @@ export async function recoverDueWechatPayments(
   db: AppDatabase, runtime: WechatPayRuntimeConfig,
   limit = 10, now = new Date(),
 ): Promise<{ checked: number; results: WechatRecoveryResult[] }> {
+  // Choose least recently checked eligible intents, not always the oldest.
+  // The audit survives restart and prevents indefinite starvation.
+  const lastCheckedAt = sql<number>`COALESCE((SELECT MAX(rc.created_at)
+    FROM wechat_pay_recovery_checks rc
+    WHERE rc.payment_intent_id = ${paymentIntents.id}), 0)`
   const ids = db.selectDistinct({ id: paymentIntents.id })
     .from(paymentIntents)
     .leftJoin(wechatPayPrepayAttempts, eq(wechatPayPrepayAttempts.paymentIntentId, paymentIntents.id))
@@ -207,7 +214,7 @@ export async function recoverDueWechatPayments(
         inArray(wechatPayPrepayAttempts.status, ['uncertain', 'requesting']),
       ),
     ))
-    .orderBy(asc(paymentIntents.createdAt))
+    .orderBy(asc(lastCheckedAt), asc(paymentIntents.createdAt), asc(paymentIntents.id))
     .limit(Math.min(Math.max(limit, 1), 20))
     .all()
   const results: WechatRecoveryResult[] = []

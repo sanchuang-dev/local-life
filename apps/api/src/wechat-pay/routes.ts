@@ -55,11 +55,11 @@ export function registerWechatPaymentRoutes(
     const runtime = runtimeOrError(c, true)
     if (runtime instanceof Response) return runtime
     const bytes = Number(c.req.header('content-length') ?? '0')
-    if (bytes > 64 * 1024) {
+    if (bytes > 1_100_000) {
       return fail(c, 400, API_ERROR_CODES.invalidRequest, '微信支付通知体过大')
     }
     const body = await c.req.text().catch(() => '')
-    if (!body || Buffer.byteLength(body) > 64 * 1024) {
+    if (!body || Buffer.byteLength(body) > 1_100_000) {
       return fail(c, 400, API_ERROR_CODES.invalidRequest, '微信支付通知体格式错误')
     }
     try {

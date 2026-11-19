@@ -6,6 +6,9 @@
 
 - 微信通知公网入口 `POST /api/payments/wechat/notify`（Caddy `/api/*` 代理至 Hono `/payments/wechat/notify`）。先按原始 HTTP body、Wechatpay-* 签名头、平台信任锚与 5 分钟时间窗验签，再以 32 字节 APIv3 密钥 AES-256-GCM 解密 ciphertext、nonce、associated_data 和认证 tag。签名/解密错误拒绝；不记录明文、密钥、OpenID 或密文。
 - 仅 `TRANSACTION.SUCCESS` 且 `trade_state=SUCCESS` 可以进入 PAY-03；商户 AppID/mchid、商户订单号、渠道交易号、冻结整数分和 CNY 均接受服务端校验。`prepay_id` 只是预下单凭据，不等于交易号。通知重放、主动查单竞态和终态冲突交给 PAY-03 的事务内证据去重、异常队列与唯一 `payment.paid.v1` outbox；PAY-05/PAY-06 继续负责唯一订单完成、线上收款及业务投影。下游消费失败保留 outbox，不能把浏览器结果当成功事实。
+- **APIv3 的可选字段兼容**：查单在 NOTPAY/CLOSED/REVOKED 等非已付状态可能不返回 amount、total、currency；这些状态只在微信验签可信、商户号/AppID/商户订单号完全匹配时用于更新状态，不据此制造渠道已收款。SUCCESS 仍强制有渠道 total、CNY、transaction_id、success_time 并与冻结净应付校验；缺少实付证据一律 unresolved，不以本地金额填充“成功支付”。支付通知 resource.associated_data 可能省略或为空，按空字节参与 AES-GCM 验证；密文允许官方 1,048,576 字符范围，整个 JSON 通知最大 1,100,000 字节以防资源滥用。
+- **运营核查**：PAY-11 的最新未知、退款待复核、关单请求未二次确认会在 PAY-09 现有支付差异列表分类为 provider_exception；服务端沿用运营员社区权限，详情最多展示最近 20 条脱敏审计摘要（操作、结果、代码、时间），不含原始微信响应、密钥、交易明文；0039 另用 SQLite UPDATE/DELETE 阻断触发器实现真正 append-only。
+- **恢复公平性**：批量恢复按持久审计的最近查单时间升序、再按创建时间升序，优先处理未查的意图；连续故障的最老一批不能无限占住 20 个槽位。重启后不丢轮转顺序，仍须由服务端内部可信调度调用，未自动发布周期任务。
 - 查单：签名 `GET /v3/pay/transactions/out-trade-no/{out_trade_no}?mchid=...`，只有微信签名可信的 200 响应、商户/订单/金额匹配才能确认为支付状态；其他结果标未知并保留审计。
 - 关单：签名 `POST /v3/pay/transactions/out-trade-no/{out_trade_no}/close`，**HTTP 204 仅是发送成功，不是订单已关闭**。仅查得 `NOTPAY` 才发起关单，发送后必须再次可信查单出现 `CLOSED`/`REVOKED` 才允许 PAY-03 进入关闭终态。`USERPAYING`、超时、预支付过期、关单 204 与失败/未知一律不自动释放可重付资金机会。
 - `PAYERROR` = 失败，不能显示为待付；`REFUND` 只记录需人工复核，不自动退款、冲账或分润；已关闭后的迟到成功是持久异常，不把终态回退为 paid。
@@ -38,6 +41,6 @@ NODE_USE_ENV_PROXY=0 pnpm --filter @sanchuang-dev/local-life-api exec node --imp
 pnpm lint
 ```
 
-本卡真实 Hono/SQLite 测试覆盖成功通知、伪造/错证/时间过期、AES-GCM 篡改、错商户/错金额、通知与查单竞争、重放、下游去重、进程重启、查单、关单 204 但未确认关闭、迟到成功、退款边界、内网权限。微信服务器仅是本地受控假 HTTP 服务；**无真实微信商户实付、证书轮换现场或银行对账证据**，须由总卡 #275 另行验收。无自动退款/分账/对账写路径。
+维护者复审补充了省略 AAD、大于 64KiB 的有效通知、无 amount 的 NOTPAY/CLOSED、缺支付金额的 SUCCESS 不可伪造收款、26 笔异常批量恢复经重启轮转、PAY-09 社区授权只读异常可见性及不可变审计负例。跨 PAY-08/PAY-10/PAY-11 运行证据详见 PR #303 最终 HEAD 的审查报告。\n\n本卡真实 Hono/SQLite 测试覆盖成功通知、伪造/错证/时间过期、AES-GCM 篡改、错商户/错金额、通知与查单竞争、重放、下游去重、进程重启、查单、关单 204 但未确认关闭、迟到成功、退款边界、内网权限。微信服务器仅是本地受控假 HTTP 服务；**无真实微信商户实付、证书轮换现场或银行对账证据**，须由总卡 #275 另行验收。无自动退款/分账/对账写路径。
 
 回滚：撤回 PAY-11 路由/代码与内网恢复调度，恢复已验证商户配置。迁移 0039 为附加式审计，不改变已存在支付意图、不可变账本和发券记录；绝不为了回滚删除真实可信支付或 PAY-03 outbox。
