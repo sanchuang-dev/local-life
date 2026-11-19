@@ -66,3 +66,123 @@
 .activity-confirm p:last-child {
   margin-bottom: 0;
 }
+
+/* The activity editor is a full route, not a squeezed drawer.
+ * Quiet tabs and one content column; no nested cards or marketing chrome. */
+.activity-editor-page {
+  max-width: 1100px;
+  min-height: calc(100vh - 130px);
+  margin-inline: auto;
+  padding-bottom: 18px;
+}
+.activity-editor-heading { margin-bottom: 20px; }
+.activity-editor-back.ant-btn {
+  color: var(--ant-color-text-secondary, #667085);
+  padding-inline: 0;
+  margin-bottom: 12px;
+}
+.activity-editor-heading-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+}
+.activity-editor-heading .activity-editor-title.ant-typography {
+  margin: 0 0 5px;
+  font-weight: 600;
+  font-size: clamp(21px, 2vw, 27px);
+}
+.activity-editor-tabs {
+  display: flex;
+  gap: 30px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--ant-color-border-secondary, #e8eaed);
+}
+.activity-editor-tab {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--ant-color-text-secondary, #667085);
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  margin-bottom: -1px;
+  padding: 12px 2px;
+  white-space: nowrap;
+}
+.activity-editor-tab.is-active {
+  border-bottom-color: currentColor;
+  color: var(--ant-color-primary, #176f61);
+  font-weight: 600;
+}
+.activity-editor-tab:focus-visible {
+  outline: 2px solid var(--ant-color-primary, #176f61);
+  outline-offset: -3px;
+}
+.activity-editor-content {
+  max-width: 850px;
+  padding-top: 26px;
+}
+.activity-editor-content .activity-form { width: 100%; }
+.activity-editor-content .ant-form-item { margin-bottom: 19px; }
+.activity-editor-content .ant-form-item-explain,
+.activity-editor-content .ant-form-item-extra { font-size: 12px; }
+.activity-editor-section-title.ant-typography {
+  margin: 0 0 20px;
+  font-weight: 600;
+}
+.activity-editor-intro.ant-typography {
+  font-size: 13px;
+  margin: -12px 0 24px;
+}
+.activity-editor-disclosure {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 4px 0 18px;
+}
+.activity-editor-disclosure .ant-btn {
+  font-weight: 600;
+  padding-inline: 0 6px;
+}
+.activity-editor-disclosure .ant-typography,
+.activity-editor-tip.ant-typography {
+  font-size: 12px;
+}
+.activity-editor-budget {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+  margin: 4px 0 20px;
+}
+.activity-editor-budget > span:first-child { font-size: 13px; font-weight: 600; }
+.activity-editor-budget .ant-typography:last-child { font-size: 12px; }
+.activity-editor-budget.is-over-limit { color: var(--ant-color-error, #c43637); }
+.activity-editor-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
+  margin-top: 28px;
+  padding: 15px 0;
+  min-height: 74px;
+  background: var(--ant-color-bg-container, #fff);
+  border-top: 1px solid var(--ant-color-border-secondary, #e8eaed);
+}
+.activity-editor-footer-hint.ant-typography {
+  font-size: 12px;
+  text-align: right;
+}
+.activity-editor-footer .activity-form-actions { margin-top: 0; flex-shrink: 0; }
+@media (max-width: 700px) {
+  .activity-editor-page { padding-inline: 4px; }
+  .activity-editor-tabs { gap: 22px; }
+  .activity-editor-content { padding-top: 20px; }
+  .activity-editor-footer { flex-wrap: wrap; gap: 6px 14px; }
+  .activity-editor-footer-hint { width: 100%; }
+}
