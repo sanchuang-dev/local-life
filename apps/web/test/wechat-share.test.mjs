@@ -29,6 +29,64 @@ test('share content uses exact source URL and cover URL respects MVP/Pages base'
   ).imgUrl, 'https://sanchuang-dev.github.io/local-life/images/silver-neighborhood-hero.webp')
 })
 
+test('JS-SDK metadata follows the current activity visual config, including fallbacks', () => {
+  const origin = 'https://local.proto.3cgroup.cn'
+  const configured = createWechatActivityShareData(
+    {
+      title: '社区健康筛查',
+      summary: '免费测血压。',
+      visualConfig: {
+        themeKey: 'health-blue',
+        heroImageUrl: 'https://cdn.example.com/hero.jpg',
+        posterImageUrl: 'https://cdn.example.com/poster.jpg',
+        promoTitle: '健康筛查进社区',
+        promoSubtitle: '本周六上午，先到先得',
+      },
+    },
+    link,
+    origin,
+    '/',
+  )
+  assert.equal(configured.title, '健康筛查进社区')
+  assert.equal(configured.desc, '本周六上午，先到先得')
+  assert.equal(configured.imgUrl, 'https://cdn.example.com/poster.jpg')
+  // Invitation/activity parameters are the same real URL, untouched.
+  assert.equal(configured.link, link)
+  assert.equal(new URL(configured.link).searchParams.get('activityId'), id)
+  assert.equal(new URL(configured.link).searchParams.get('invite'), invite)
+
+  const heroOnly = createWechatActivityShareData(
+    {
+      title: '社区健康筛查',
+      summary: null,
+      visualConfig: {
+        themeKey: 'health-blue',
+        heroImageUrl: 'https://cdn.example.com/hero.jpg',
+        posterImageUrl: null,
+        promoTitle: '  ',
+        promoSubtitle: null,
+      },
+    },
+    link,
+    origin,
+    '/',
+  )
+  assert.equal(heroOnly.title, '社区健康筛查')
+  assert.equal(heroOnly.desc, '来社区一起参加活动，认识更多街坊。')
+  assert.equal(heroOnly.imgUrl, 'https://cdn.example.com/hero.jpg')
+
+  // A historical activity without visual config keeps the original artwork.
+  const legacy = createWechatActivityShareData(
+    { title: '历史银发活动', summary: '和街坊一起参加活动。' },
+    link,
+    origin,
+    '/',
+  )
+  assert.equal(legacy.title, '历史银发活动')
+  assert.equal(legacy.desc, '和街坊一起参加活动。')
+  assert.equal(legacy.imgUrl, 'https://local.proto.3cgroup.cn/images/silver-neighborhood-hero.webp')
+})
+
 test('real service configures friend + timeline cards with identical invitation URL', async () => {
   const calls = []
   let ready
