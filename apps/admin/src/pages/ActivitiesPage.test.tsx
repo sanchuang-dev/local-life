@@ -15,6 +15,7 @@ import type {
   ActivityRuleVersion,
   AdminActivityDetail,
   AdminActivitySummary,
+  ActivityVisualConfig,
   PurchaseRewardPlan,
 } from '@sanchuang-dev/local-life-contracts'
 import {
@@ -22,6 +23,7 @@ import {
   SHANGHAI_OFFSET_MINUTES,
   keyRulesFromForm,
   toFormValues,
+  visualConfigFromForm,
 } from './ActivitiesPage'
 
 /**
@@ -55,6 +57,15 @@ const PUBLIC_RULES = {
   prizeClaim: '凭核销码领取，每人限一次',
 }
 
+/** Default visual config returned by the API when nothing was configured (#309). */
+const DEFAULT_VISUAL_CONFIG: ActivityVisualConfig = {
+  themeKey: 'community-green',
+  heroImageUrl: null,
+  promoTitle: null,
+  promoSubtitle: null,
+  posterImageUrl: null,
+}
+
 function summary(overrides: Partial<AdminActivitySummary> = {}): AdminActivitySummary {
   return {
     id: ACTIVITY_ID,
@@ -83,6 +94,7 @@ function detail(overrides: Partial<AdminActivityDetail> = {}): AdminActivityDeta
     currentRuleVersionId: VERSION_ID,
     rewardPlan: null,
     purchaseRewardPlan: null,
+    visualConfig: DEFAULT_VISUAL_CONFIG,
     ...overrides,
   }
 }
@@ -314,7 +326,7 @@ describe('ActivitiesPage real data rendering', () => {
 })
 
 describe('Standalone activity editor routes', () => {
-  it('preserves a draft form across all three tabs and saves through the existing PATCH contract', async () => {
+  it('preserves a draft form across all four tabs and saves through the existing PATCH contract', async () => {
     let patchBody: unknown
     stubApi((url, init) => {
       if (url.startsWith('/api/admin/communities')) return json({ items: [COMMUNITY_A] })
@@ -345,11 +357,32 @@ describe('Standalone activity editor routes', () => {
     expect(screen.getByRole('tab', { name: '签到奖励' }).getAttribute('aria-selected')).toBe('true')
     fireEvent.click(screen.getByRole('tab', { name: '消费奖励' }))
     expect(screen.getByRole('tab', { name: '消费奖励' }).getAttribute('aria-selected')).toBe('true')
+    // The fourth tab shares the same Form: its values survive a tab round trip.
+    fireEvent.click(screen.getByRole('tab', { name: '界面风格' }))
+    expect(screen.getByRole('tab', { name: '界面风格' }).getAttribute('aria-selected')).toBe('true')
+    fireEvent.click(screen.getByRole('radio', { name: '节庆红' }))
+    fireEvent.change(screen.getByLabelText('宣传标题（选填）'), {
+      target: { value: '社区敬老欢乐季' },
+    })
     fireEvent.click(screen.getByRole('tab', { name: '活动信息' }))
     expect((screen.getByLabelText('活动标题') as HTMLInputElement).value).toBe('社区活动新名称')
+    fireEvent.click(screen.getByRole('tab', { name: '界面风格' }))
+    expect(screen.getByRole('radio', { name: '节庆红' }).getAttribute('aria-checked')).toBe('true')
+    expect((screen.getByLabelText('宣传标题（选填）') as HTMLInputElement).value).toBe(
+      '社区敬老欢乐季',
+    )
     fireEvent.click(screen.getByRole('button', { name: '保存修改' }))
     await waitFor(() => expect(patchBody).toBeTruthy())
     expect(patchBody).toMatchObject({ title: '社区活动新名称' })
+    expect(patchBody).toMatchObject({
+      visualConfig: {
+        themeKey: 'festival-red',
+        heroImageUrl: null,
+        promoTitle: '社区敬老欢乐季',
+        promoSubtitle: null,
+        posterImageUrl: null,
+      },
+    })
   })
 
   it('opens a new activity as a full page without an activity drawer', async () => {
@@ -364,7 +397,8 @@ describe('Standalone activity editor routes', () => {
     fireEvent.click(await screen.findByRole('button', { name: /新建活动/ }))
     expect(await screen.findByText('新建活动草稿')).toBeTruthy()
     expect(screen.getByRole('tablist', { name: '活动编辑区域' })).toBeTruthy()
-    expect(screen.getAllByRole('tab')).toHaveLength(3)
+    expect(screen.getAllByRole('tab')).toHaveLength(4)
+    expect(screen.getByRole('tab', { name: '界面风格' })).toBeTruthy()
     expect(document.querySelector('.activity-editor-page .ant-drawer')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '← 返回活动列表' }))
     expect(await screen.findByText('活动管理')).toBeTruthy()
@@ -1073,5 +1107,305 @@ describe('ActivitiesPage purchase reward plan form (LL-PUR-002)', () => {
 
     expect(await screen.findByText('只读快照，不可编辑或删除')).toBeTruthy()
     expect(screen.getByText(/团队实付门槛 ¥200\.00 · 每人券面额 ¥20\.00/)).toBeTruthy()
+  })
+})
+
+describe('ActivitiesPage visual style tab (LL-ACT-VIS-001)', () => {
+  const STORED_VISUAL: ActivityVisualConfig = {
+    themeKey: 'warm-gold',
+    heroImageUrl: 'https://cdn.example.com/hero.jpg',
+    promoTitle: '暖阳敬老月',
+    promoSubtitle: '健康讲座与义诊',
+    posterImageUrl: 'https://cdn.example.com/poster.jpg',
+  }
+
+  it('maps the stored visual config onto the form and validates through the shared contract', () => {
+    const values = toFormValues(detail({ visualConfig: STORED_VISUAL }))
+    expect(values.visualThemeKey).toBe('warm-gold')
+    expect(values.visualHeroImageUrl).toBe('https://cdn.example.com/hero.jpg')
+    expect(values.visualPromoTitle).toBe('暖阳敬老月')
+    expect(values.visualPromoSubtitle).toBe('健康讲座与义诊')
+    expect(values.visualPosterImageUrl).toBe('https://cdn.example.com/poster.jpg')
+
+    const roundTrip = visualConfigFromForm(values)
+    expect(roundTrip.ok).toBe(true)
+    if (roundTrip.ok) {
+      expect(roundTrip.visualConfig).toEqual(STORED_VISUAL)
+    }
+
+    // Only choosing a theme is a valid visual configuration.
+    const themeOnly = visualConfigFromForm({
+      ...values,
+      visualThemeKey: 'health-blue',
+      visualHeroImageUrl: '',
+      visualPromoTitle: '',
+      visualPromoSubtitle: '',
+      visualPosterImageUrl: '',
+    })
+    expect(themeOnly.ok).toBe(true)
+    if (themeOnly.ok) {
+      expect(themeOnly.visualConfig).toEqual({
+        themeKey: 'health-blue',
+        heroImageUrl: null,
+        promoTitle: null,
+        promoSubtitle: null,
+        posterImageUrl: null,
+      })
+    }
+
+    // An unknown theme or a non-http(s) URL never reaches the write request.
+    const badTheme = visualConfigFromForm({
+      ...values,
+      visualThemeKey: 'neon-pink' as never,
+    })
+    expect(badTheme.ok).toBe(false)
+    if (!badTheme.ok) expect(badTheme.message).toMatch(/themeKey/)
+
+    const badUrl = visualConfigFromForm({
+      ...values,
+      visualHeroImageUrl: 'javascript:alert(1)',
+    })
+    expect(badUrl.ok).toBe(false)
+    if (!badUrl.ok) expect(badUrl.message).toMatch(/heroImageUrl/)
+
+    // Blank copy clears instead of inventing content.
+    const cleared = visualConfigFromForm({
+      ...values,
+      visualThemeKey: 'community-green',
+      visualHeroImageUrl: '  ',
+      visualPromoTitle: '',
+      visualPromoSubtitle: '   ',
+      visualPosterImageUrl: '',
+    })
+    expect(cleared.ok).toBe(true)
+    if (cleared.ok) {
+      expect(cleared.visualConfig).toEqual(DEFAULT_VISUAL_CONFIG)
+    }
+  })
+
+  it('previews the live form values and all four themes instead of a hard-coded sample', async () => {
+    stubApi((url) => {
+      if (url.startsWith('/api/admin/communities')) return json({ items: [COMMUNITY_A] })
+      if (url.startsWith('/api/admin/activities?')) {
+        return json({ items: [summary()], total: 1, page: 1, pageSize: 20 })
+      }
+      if (url === `/api/admin/activities/${ACTIVITY_ID}`) {
+        return json(detail())
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+
+    renderPage(ADMIN_SESSION)
+    expect(await screen.findByText('银发社区欢乐季')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '编辑' }))
+    fireEvent.click(await screen.findByRole('tab', { name: '界面风格' }))
+
+    const preview = document.querySelector('.activity-preview-phone') as HTMLElement | null
+    expect(preview).toBeTruthy()
+    // Real activity title + location from the loaded detail, not sample copy.
+    expect(within(preview!).getByText('银发社区欢乐季')).toBeTruthy()
+    expect(within(preview!).getByText('幸福社区党群服务中心')).toBeTruthy()
+    // A published activity's preview CTA follows its real status.
+    expect(within(preview!).getByText('立即参与活动')).toBeTruthy()
+    expect(preview!.getAttribute('data-theme')).toBe('community-green')
+
+    // All four palettes are selectable and repaint the preview.
+    for (const [label, key] of [
+      ['节庆红', 'festival-red'],
+      ['健康蓝', 'health-blue'],
+      ['暖阳金', 'warm-gold'],
+      ['社区绿', 'community-green'],
+    ] as const) {
+      fireEvent.click(screen.getByRole('radio', { name: label }))
+      expect(screen.getByRole('radio', { name: label }).getAttribute('aria-checked')).toBe('true')
+      await waitFor(() => expect(preview!.getAttribute('data-theme')).toBe(key))
+    }
+
+    fireEvent.change(screen.getByLabelText('宣传标题（选填）'), {
+      target: { value: '重阳节社区专场' },
+    })
+    await waitFor(() => expect(within(preview!).getByText('重阳节社区专场')).toBeTruthy())
+    // The activity title is still visible when no promo title is typed.
+    fireEvent.change(screen.getByLabelText('宣传标题（选填）'), { target: { value: '' } })
+    await waitFor(() => expect(within(preview!).getByText('银发社区欢乐季')).toBeTruthy())
+
+    fireEvent.change(screen.getByLabelText('宣传副标题（选填）'), {
+      target: { value: '免费量血压与健康咨询' },
+    })
+    await waitFor(() =>
+      expect(within(preview!).getByText('免费量血压与健康咨询')).toBeTruthy(),
+    )
+
+    // The poster preview is separate and never claims a share happened.
+    const poster = screen.getByLabelText('宣传海报预览')
+    expect(within(poster).getByText('填写海报 URL 后在此预览')).toBeTruthy()
+    expect(screen.queryByText(/已分享/)).toBeNull()
+    expect(within(poster).queryByRole('button')).toBeNull()
+  })
+
+  it('saves a published activity visual-only change without a rule version and re-reads the detail', async () => {
+    let patchBody: unknown
+    let detailGets = 0
+    let currentDetail = detail({ visualConfig: DEFAULT_VISUAL_CONFIG })
+    const patchedDetail = detail({
+      visualConfig: {
+        themeKey: 'health-blue',
+        heroImageUrl: null,
+        promoTitle: '健康义诊专场',
+        promoSubtitle: null,
+        posterImageUrl: null,
+      },
+    })
+    stubApi((url, init) => {
+      if (url.startsWith('/api/admin/communities')) return json({ items: [COMMUNITY_A] })
+      if (url.startsWith('/api/admin/activities?')) {
+        return json({ items: [summary()], total: 1, page: 1, pageSize: 20 })
+      }
+      if (url === `/api/admin/activities/${ACTIVITY_ID}` && init?.method === 'PATCH') {
+        patchBody = JSON.parse(String(init.body))
+        currentDetail = patchedDetail
+        return json(patchedDetail)
+      }
+      if (url === `/api/admin/activities/${ACTIVITY_ID}`) {
+        detailGets += 1
+        return json(currentDetail)
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+
+    renderPage(ADMIN_SESSION)
+    expect(await screen.findByText('银发社区欢乐季')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '编辑' }))
+    fireEvent.click(await screen.findByRole('tab', { name: '界面风格' }))
+    fireEvent.click(screen.getByRole('radio', { name: '健康蓝' }))
+    fireEvent.change(screen.getByLabelText('宣传标题（选填）'), {
+      target: { value: '健康义诊专场' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '保存修改' }))
+
+    await waitFor(() => expect(patchBody).toBeTruthy())
+    // Visual-only PATCH: no keyRules, so the frozen reward/rules stay untouched.
+    expect(patchBody).toEqual({
+      expectedUpdatedAt: '2026-11-02T02:00:00.000Z',
+      visualConfig: {
+        themeKey: 'health-blue',
+        heroImageUrl: null,
+        promoTitle: '健康义诊专场',
+        promoSubtitle: null,
+        posterImageUrl: null,
+      },
+    })
+    expect(screen.queryByText('修改已发布规则将生成新版本')).toBeNull()
+    expect(await screen.findByText('活动已更新')).toBeTruthy()
+    // The editor re-reads the server detail after a successful save.
+    await waitFor(() => expect(detailGets).toBeGreaterThanOrEqual(2))
+    await waitFor(() =>
+      expect(screen.getByRole('radio', { name: '健康蓝' }).getAttribute('aria-checked')).toBe('true'),
+    )
+    expect((screen.getByLabelText('宣传标题（选填）') as HTMLInputElement).value).toBe(
+      '健康义诊专场',
+    )
+  })
+
+  it('clears artwork, reports image load failures and blocks a non-http(s) URL', async () => {
+    let patchBody: unknown
+    let patchCalls = 0
+    stubApi((url, init) => {
+      if (url.startsWith('/api/admin/communities')) return json({ items: [COMMUNITY_A] })
+      if (url.startsWith('/api/admin/activities?')) {
+        return json({
+          items: [summary({ status: 'draft', ruleVersion: null, publishedAt: null })],
+          total: 1, page: 1, pageSize: 20,
+        })
+      }
+      if (url === `/api/admin/activities/${ACTIVITY_ID}` && init?.method === 'PATCH') {
+        patchCalls += 1
+        patchBody = JSON.parse(String(init.body))
+        return json(
+          detail({
+            status: 'draft',
+            ruleVersion: null,
+            publishedAt: null,
+            visualConfig: DEFAULT_VISUAL_CONFIG,
+          }),
+        )
+      }
+      if (url === `/api/admin/activities/${ACTIVITY_ID}`) {
+        return json(
+          detail({
+            status: 'draft',
+            ruleVersion: null,
+            publishedAt: null,
+            visualConfig: STORED_VISUAL,
+          }),
+        )
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+
+    renderPage(ADMIN_SESSION)
+    expect(await screen.findByText('银发社区欢乐季')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '编辑' }))
+    fireEvent.click(await screen.findByRole('tab', { name: '界面风格' }))
+
+    const heroInput = (await screen.findByLabelText('活动头图 URL')) as HTMLInputElement
+    expect(heroInput.value).toBe('https://cdn.example.com/hero.jpg')
+    const heroPreview = screen.getByAltText('头图链接预览') as HTMLImageElement
+    expect(heroPreview.getAttribute('src')).toBe('https://cdn.example.com/hero.jpg')
+    fireEvent.error(heroPreview)
+    expect(await screen.findByText('头图加载失败')).toBeTruthy()
+
+    // An invalid URL fails both the inline field and the save; nothing is posted.
+    fireEvent.change(heroInput, { target: { value: 'javascript:alert(1)' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存修改' }))
+    expect(
+      (await screen.findAllByText(/请输入以 http:\/\/ 或 https:\/\/ 开头的可访问图片地址/)).length,
+    ).toBeGreaterThan(0)
+    expect(patchCalls).toBe(0)
+
+    // Restore a valid URL, then clear it: the save sends an explicit null.
+    fireEvent.change(heroInput, { target: { value: 'https://cdn.example.com/hero-v2.jpg' } })
+    fireEvent.click(screen.getByRole('button', { name: '清空头图' }))
+    expect((screen.getByLabelText('活动头图 URL') as HTMLInputElement).value).toBe('')
+    fireEvent.click(screen.getByRole('button', { name: '清空海报' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存修改' }))
+
+    await waitFor(() => expect(patchBody).toBeTruthy())
+    expect(patchBody).toMatchObject({
+      visualConfig: {
+        themeKey: 'warm-gold',
+        heroImageUrl: null,
+        promoSubtitle: '健康讲座与义诊',
+        posterImageUrl: null,
+      },
+    })
+  })
+
+  it('warns before leaving an editor with unsaved visual changes', async () => {
+    stubApi((url) => {
+      if (url.startsWith('/api/admin/communities')) return json({ items: [COMMUNITY_A] })
+      if (url.startsWith('/api/admin/activities?')) {
+        return json({ items: [summary()], total: 1, page: 1, pageSize: 20 })
+      }
+      if (url === `/api/admin/activities/${ACTIVITY_ID}`) return json(detail())
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+
+    renderPage(ADMIN_SESSION)
+    expect(await screen.findByText('银发社区欢乐季')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '编辑' }))
+    fireEvent.click(await screen.findByRole('tab', { name: '界面风格' }))
+    fireEvent.click(screen.getByRole('radio', { name: '暖阳金' }))
+
+    fireEvent.click(screen.getByRole('button', { name: '← 返回活动列表' }))
+    expect((await screen.findAllByText('放弃未保存的修改？')).length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('button', { name: '继续编辑' }))
+    await waitFor(() => expect(screen.queryAllByText('放弃未保存的修改？')).toHaveLength(0))
+    expect(screen.getByRole('button', { name: '保存修改' })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: '暖阳金' }).getAttribute('aria-checked')).toBe('true')
+
+    fireEvent.click(screen.getByRole('button', { name: '← 返回活动列表' }))
+    fireEvent.click((await screen.findAllByRole('button', { name: '放弃修改' }))[0])
+    expect(await screen.findByText('活动管理')).toBeTruthy()
   })
 })

@@ -13,6 +13,7 @@ import {
 } from 'drizzle-orm/sqlite-core'
 import type {
   ActivityStatus,
+  ActivityThemeKey,
   CrmBusinessType,
   CrmLeadSourceType,
   CrmLeadStatus,
@@ -651,6 +652,24 @@ export const activities = sqliteTable(
      * before any version exists and is NULL when no purchase plan is set.
      */
     purchaseRewardPlanJson: text('purchase_reward_plan_json'),
+    /**
+     * Visual configuration for the resident H5 (#309, LL-ACT-VIS-001). These are
+     * presentation-only columns: unlike the rule plans above they are *not* part
+     * of a frozen rule version, so an operator may adjust them after publication
+     * without changing activity status, reward rules or `ruleVersion`.
+     *
+     * `theme_key` is NOT NULL with the historical green default; the four image
+     * and copy columns stay NULL for every pre-#309 activity so the H5 can keep
+     * using its existing artwork fallback. No migration backfills promo copy.
+     */
+    themeKey: text('theme_key')
+      .$type<ActivityThemeKey>()
+      .notNull()
+      .default('community-green'),
+    heroImageUrl: text('hero_image_url'),
+    promoTitle: text('promo_title'),
+    promoSubtitle: text('promo_subtitle'),
+    posterImageUrl: text('poster_image_url'),
     currentRuleVersionId: text('current_rule_version_id').references(
       () => activityRuleVersions.id,
       { onDelete: 'set null' },

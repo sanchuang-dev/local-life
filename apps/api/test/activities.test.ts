@@ -931,6 +931,7 @@ test('public payloads never leak budgets, caps, creator identity or audit data',
       'summary',
       'title',
       'updatedAt',
+      'visualConfig',
     ])
     assert.equal(detail.purchaseReward, null, 'no plan must be exposed as null, not a fake tier')
     assert.deepEqual(Object.keys(list.items[0]!).sort(), [
@@ -944,6 +945,7 @@ test('public payloads never leak budgets, caps, creator identity or audit data',
       'summary',
       'title',
       'updatedAt',
+      'visualConfig',
     ])
 
     // The admin payload is the internal control: it must still carry them.

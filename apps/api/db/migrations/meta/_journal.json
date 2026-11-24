@@ -295,6 +295,13 @@
       "when": 1795482000000,
       "tag": "0041_resident_contact_phone",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1795491000000,
+      "tag": "0042_activity_visual_config",
+      "breakpoints": true
     }
   ]
 }
