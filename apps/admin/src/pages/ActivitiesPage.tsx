@@ -1020,8 +1020,11 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
   const editorMode: 'create' | 'edit' = editMatch ? 'edit' : 'create'
   const editingActivityId = editMatch?.[1] ?? null
   const [activeSection, setActiveSection] = useState<'info' | 'checkin' | 'purchase'>('info')
-  const [publicRulesOpen, setPublicRulesOpen] = useState(false)
+  const [notesOpen, setNotesOpen] = useState(false)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [form] = Form.useForm<ActivityFormValues>()
+  const checkinEnabled = Form.useWatch('rewardPlanEnabled', form)
+  const purchaseEnabled = Form.useWatch('purchaseRewardEnabled', form)
   const role = session.staff.role
   const isAdmin = role === 'admin'
   const assignedCommunities = session.staff.communities
@@ -1139,6 +1142,7 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
     // The create-page Form is mounted before this effect, and tab changes
     // never reset it; the initial community is set only on route entry.
     form.resetFields()
+    setHasUnsavedChanges(false)
     const defaultCommunity = isAdmin
       ? communities[0]?.id
       : (assignedCommunities[0]?.id ?? communities[0]?.id)
@@ -1248,11 +1252,12 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
   function openCreate() {
     detailRequestRef.current += 1
     setActiveSection('info')
-    setPublicRulesOpen(false)
+    setNotesOpen(false)
     setDetail(null)
     setDetailError(null)
     setDetailLoading(false)
     setSaveError(null)
+    setHasUnsavedChanges(false)
     navigate('/activities/new')
   }
 
@@ -1267,6 +1272,7 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
       if (detailRequestRef.current !== request) return
       setDetail(result)
       form.setFieldsValue(toFormValues(result))
+      setHasUnsavedChanges(false)
     } catch (cause: unknown) {
       if (detailRequestRef.current !== request) return
       setDetailError(describeError(cause, '无法读取活动详情'))
@@ -1280,8 +1286,9 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
   useEffect(() => {
     if (!editorOpen || editorMode !== 'edit' || !editingActivityId) return
     setActiveSection('info')
-    setPublicRulesOpen(false)
+    setNotesOpen(false)
     setSaveError(null)
+    setHasUnsavedChanges(false)
     void loadDetail(editingActivityId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editorMode, editorOpen, editingActivityId])
@@ -1290,15 +1297,42 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
     detailRequestRef.current += 1
     setSaveError(null)
     setActiveSection('info')
-    setPublicRulesOpen(false)
+    setNotesOpen(false)
     navigate('/activities/' + row.id + '/edit')
   }
 
-  const closeEditor = () => {
+  // The editor is also reachable directly via its URL. Guard explicit exits,
+  // and use the native browser prompt when refreshing or closing the tab.
+  useEffect(() => {
+    if (!editorOpen || !hasUnsavedChanges) return
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warnBeforeUnload)
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload)
+  }, [editorOpen, hasUnsavedChanges])
+
+  const leaveEditor = () => {
     detailRequestRef.current += 1
-    setSaving(false)
+    setHasUnsavedChanges(false)
     setDetailLoading(false)
     navigate('/activities')
+  }
+
+  const closeEditor = () => {
+    if (!hasUnsavedChanges) {
+      leaveEditor()
+      return
+    }
+    modal.confirm({
+      title: '放弃未保存的修改？',
+      content: '当前表单内容尚未保存，离开后将无法恢复。',
+      okText: '放弃修改',
+      okButtonProps: { danger: true },
+      cancelText: '继续编辑',
+      onOk: leaveEditor,
+    })
   }
 
   async function loadVersions(activityId: string) {
@@ -1360,6 +1394,7 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
     try {
       const result = await operation()
       message.success(buildSuccessMessage(result))
+      setHasUnsavedChanges(false)
       setDetail(null)
       refreshList()
       navigate('/activities')
@@ -1405,7 +1440,7 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
       }
       await runWrite(
         () => createActivity(session.csrfToken, parsed.data),
-        () => '活动草稿已创建，可在列表中继续编辑或发布。',
+        () => '活动草稿已创建，返回活动列表。',
       )
       return
     }
@@ -1688,12 +1723,15 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
                 {drawerTitle}
               </Typography.Title>
               <Typography.Text type="secondary">
-                {editorMode === 'create' ? '先保存草稿，确认奖励规则后再发布' : '活动资料与奖励独立管理，发布后受原有规则版本约束'}
+                {editorMode === 'create'
+                  ? '填写活动信息，按需配置签到或消费奖励，保存后返回活动列表。'
+                  : '活动资料及两类奖励独立查看；保存时统一校验，已发布规则受版本约束。'}
               </Typography.Text>
             </div>
             {detail ? <Tag color={ACTIVITY_STATUS_META[detail.status].color}>{ACTIVITY_STATUS_META[detail.status].label}</Tag> : null}
           </div>
         </div>
+        <div className="activity-editor-surface">
         <nav className="activity-editor-tabs" role="tablist" aria-label="活动编辑区域">
           {([
             ['info', '活动信息'],
@@ -1705,11 +1743,19 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
               type="button"
               role="tab"
               aria-selected={activeSection === key}
+              aria-label={label}
               aria-controls={'activity-editor-' + key}
               className={activeSection === key ? 'activity-editor-tab is-active' : 'activity-editor-tab'}
               onClick={() => setActiveSection(key)}
             >
-              {label}
+              <span>{label}</span>
+              {key !== 'info' ? (
+                <span className="activity-editor-tab-state">
+                  {key === 'purchase' && detail && detail.status !== 'draft'
+                    ? '已冻结'
+                    : (key === 'checkin' ? checkinEnabled : purchaseEnabled) ? '已配置' : '未配置'}
+                </span>
+              ) : null}
             </button>
           ))}
         </nav>
@@ -1795,14 +1841,13 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
             layout="vertical"
             className="activity-form"
             onFinish={submitEditor}
+            onValuesChange={() => setHasUnsavedChanges(true)}
             onFinishFailed={({ errorFields }) => {
               const name = String(errorFields[0]?.name[0] ?? '')
               const section = name.startsWith('reward') ? 'checkin'
                 : name.startsWith('purchase') ? 'purchase' : 'info'
               setActiveSection(section)
-              if (section === 'info' && ['eligibility', 'checkin', 'purchase', 'prizeClaim', 'notes'].includes(name)) {
-                setPublicRulesOpen(true)
-              }
+              if (name === 'notes') setNotesOpen(true)
               setSaveError('有必填项或格式需要检查，已为你切换到相应区域。')
             }}
           >
@@ -1822,8 +1867,8 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
               aria-label="活动信息"
               style={{ display: activeSection === 'info' ? undefined : 'none' }}
             >
-            <Typography.Title level={5} className="activity-editor-section-title">活动信息</Typography.Title>
-<Form.Item
+            <div className="activity-editor-group-heading">基本资料</div>
+            <Form.Item
               name="title"
               label="活动标题"
               rules={[
@@ -1834,23 +1879,39 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
               <Input maxLength={80} placeholder="例如：银发社区欢乐季" />
             </Form.Item>
 
-            <Form.Item
-              name="communityId"
-              label="所属社区"
-              rules={[{ required: true, message: '请选择所属社区' }]}
-              tooltip={editorMode === 'edit' ? '活动创建后不能更换社区' : undefined}
-            >
-              <Select
-                showSearch
-                optionFilterProp="label"
-                disabled={editorMode === 'edit'}
-                placeholder="选择社区"
-                options={communities.map((community) => ({
-                  value: community.id,
-                  label: community.name,
-                }))}
-              />
-            </Form.Item>
+            <Row gutter={[20, 0]} className="activity-editor-field-row">
+              <Col xs={24} sm={12}>
+                <Form.Item
+                  name="communityId"
+                  label="所属社区"
+                  rules={[{ required: true, message: '请选择所属社区' }]}
+                  tooltip={editorMode === 'edit' ? '活动创建后不能更换社区' : undefined}
+                >
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    disabled={editorMode === 'edit'}
+                    placeholder="选择社区"
+                    options={communities.map((community) => ({
+                      value: community.id,
+                      label: community.name,
+                    }))}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item
+                  name="location"
+                  label="举办地点"
+                  rules={[
+                    { required: true, whitespace: true, message: '请填写举办地点' },
+                    { min: 2, max: 120, message: '地点长度需为 2-120 个字符' },
+                  ]}
+                >
+                  <Input maxLength={120} placeholder="例如：幸福社区党群服务中心" />
+                </Form.Item>
+              </Col>
+            </Row>
 
             <Form.Item
               name="range"
@@ -1878,17 +1939,7 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
               />
             </Form.Item>
 
-            <Form.Item
-              name="location"
-              label="举办地点"
-              rules={[
-                { required: true, whitespace: true, message: '请填写举办地点' },
-                { min: 2, max: 120, message: '地点长度需为 2-120 个字符' },
-              ]}
-            >
-              <Input maxLength={120} placeholder="例如：幸福社区党群服务中心" />
-            </Form.Item>
-
+            <div className="activity-editor-group-heading">资源限制</div>
             <Row gutter={12}>
               <Col xs={24} sm={12}>
                 <Form.Item
@@ -1922,13 +1973,10 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
               </Col>
             </Row>
 
-            <div className="activity-editor-disclosure">
-              <Button type="text" onClick={() => setPublicRulesOpen((v) => !v)} aria-expanded={publicRulesOpen}>
-                {publicRulesOpen ? '收起' : '展开'}参与说明（居民端展示）
-              </Button>
-              <Typography.Text type="secondary">参与资格、签到、购买与领取说明（居民端只读）</Typography.Text>
-            </div>
-            <div style={{ display: publicRulesOpen ? undefined : 'none' }}>
+            <div className="activity-editor-group-heading">居民参与规则</div>
+            <Typography.Paragraph className="activity-editor-group-intro" type="secondary">
+              下列说明会展示给居民，请按实际活动规则填写。
+            </Typography.Paragraph>
 
             <Form.Item
               name="eligibility"
@@ -1994,14 +2042,25 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
               />
             </Form.Item>
 
-            <Form.Item
-              name="notes"
-              label="备注（选填）"
-              rules={[{ max: 500, message: '最多 500 个字符' }]}
-            >
-              <Input.TextArea rows={2} maxLength={500} showCount placeholder="补充说明，可留空" />
-            </Form.Item>
-
+            <div className="activity-editor-disclosure">
+              <button
+                type="button"
+                className="activity-editor-disclosure-trigger"
+                aria-expanded={notesOpen}
+                onClick={() => setNotesOpen((value) => !value)}
+              >
+                <span>备注（可选）</span>
+                <span className="activity-editor-disclosure-action">{notesOpen ? '收起 −' : '展开 +'}</span>
+              </button>
+            </div>
+            <div style={{ display: notesOpen ? undefined : 'none' }}>
+              <Form.Item
+                name="notes"
+                label="备注"
+                rules={[{ max: 500, message: '最多 500 个字符' }]}
+              >
+                <Input.TextArea rows={2} maxLength={500} showCount placeholder="补充说明，可留空" />
+              </Form.Item>
             </div>
             </section>
 
@@ -2011,7 +2070,6 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
               aria-label="签到奖励"
               style={{ display: activeSection === 'checkin' ? undefined : 'none' }}
             >
-              <Typography.Title level={5} className="activity-editor-section-title">签到奖励</Typography.Title>
               <Typography.Paragraph type="secondary" className="activity-editor-intro">
                 三人团队完成有效签到后，按活动配置领取实物奖励。
               </Typography.Paragraph>
@@ -2052,7 +2110,6 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
               aria-label="消费奖励"
               style={{ display: activeSection === 'purchase' ? undefined : 'none' }}
             >
-              <Typography.Title level={5} className="activity-editor-section-title">消费奖励</Typography.Title>
               <Typography.Paragraph type="secondary" className="activity-editor-intro">
                 三人团队达成消费门槛后，每人领取一张同面额平台券。
               </Typography.Paragraph>
@@ -2111,20 +2168,18 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
             </section>
 
             <div className="activity-editor-footer">
-              <Typography.Text type="secondary" className="activity-editor-footer-hint">
-                {editorMode === 'create' ? '先保存草稿，发布操作仍在活动列表中进行' : '保存前会检查三个区域的全部必填项'}
-              </Typography.Text>
               <Space className="activity-form-actions">
               <Button onClick={closeEditor} disabled={saving}>
                 取消
               </Button>
               <Button type="primary" htmlType="submit" loading={saving}>
-                {editorMode === 'create' ? '保存草稿' : '保存修改'}
+                {editorMode === 'create' ? '创建草稿' : '保存修改'}
               </Button>
               </Space>
             </div>
           </Form>
         )}
+        </div>
         </div>
       </div>
       ) : null}
