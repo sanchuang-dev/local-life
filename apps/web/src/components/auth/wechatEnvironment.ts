@@ -3,6 +3,13 @@ export function isWeChatBrowser(userAgent: string): boolean {
   return /MicroMessenger/i.test(userAgent)
 }
 
+/** Preserve deep links, invitation parameters and HashRouter location in local preview. */
+export function developmentPreviewUrl(href: string): string {
+  const url = new URL(href)
+  url.searchParams.set('previewApp', '1')
+  return url.href
+}
+
 /** The resident H5 has a WeChat-only entry. Staff workbench stays browser-accessible. */
 export function shouldShowWeChatGate(options: {
   userAgent: string

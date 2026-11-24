@@ -222,9 +222,7 @@
   font-size: 13px;
 }
 .me-profile-drawer__state--error { color: #9b4c40; }
-.me-profile-drawer__state button,
-.me-profile-drawer__phone button,
-.me-profile-drawer__phone-cancel {
+.me-profile-drawer__state button {
   min-height: 36px;
   border: 1px solid #d9e7db;
   border-radius: 10px;
@@ -258,49 +256,16 @@
 .me-profile-drawer__identity-card small { display: block; }
 .me-profile-drawer__identity-card strong { font-size: 15px; color: #284432; }
 .me-profile-drawer__identity-card small { margin-top: 3px; color: #718076; font-size: 11px; }
-.me-profile-drawer__phone {
-  padding: 14px;
-  border: 1px solid #e4ece3;
-  border-radius: 15px;
-  background: #fff;
-}
-.me-profile-drawer__phone-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.me-profile-drawer__phone-heading > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: #294c32;
-  font-size: 14px;
-  font-weight: 680;
-}
-.me-profile-drawer__phone-heading svg { color: #65a579; }
-.me-profile-drawer__phone-heading button { padding: 0 10px; }
-.me-profile-drawer__phone-heading button:disabled { opacity: .55; cursor: not-allowed; }
-.me-profile-drawer__phone-current,
-.me-profile-drawer__phone-unavailable {
-  margin: 9px 0 0;
-  color: #68786c;
-  font-size: 12px;
-  line-height: 1.6;
-}
-.me-profile-drawer__phone-cancel { width: 100%; margin-top: 8px; }
 .me-profile-drawer__counter {
   justify-self: end;
   margin-top: -6px;
   color: #98a39a;
   font-size: 10px;
 }
-.me-profile-drawer__error,
-.me-profile-drawer__success {
+.me-profile-drawer__error {
   margin: -4px 0 0;
   font-size: 12px;
   line-height: 1.6;
 }
 .me-profile-drawer__error { color: #a6493b; }
-.me-profile-drawer__success { color: #368451; }
 .me-profile-drawer__footer button:disabled { opacity: .5; cursor: not-allowed; }

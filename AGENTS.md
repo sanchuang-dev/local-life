@@ -64,6 +64,7 @@ pnpm --filter @sanchuang-dev/local-life-api bootstrap-admin  # 初始化首个�
 - 所有对外错误使用 `packages/contracts` 的 `{ error: { code, message, requestId? } }` 结构。
 - 新增 DTO/schema 一律先改 `packages/contracts`，API 用 schema 校验输入/响应；客户端不得复制一份类型真相源。
 - SQLite + Drizzle 仅在 `apps/api` 内；schema 在 `apps/api/src/db/schema.ts`，迁移在 `apps/api/db/migrations/`，服务启动时执行迁移。不要在 H5/Admin 各自引入数据库或维护第二套数据。
+- 居民联系电话与联系地址是可直接填写的个人资料，不要求短信验证；认证手机号独立。现行契约见 [居民联系资料与认证身份](docs/engineering/resident-contact-profile.md)。
 - 居民主用户 UUID 是平台主键；微信身份以 `(appid, openid)` 唯一映射，unionid 可选，不以手机号/OpenID/商城 UID 代替平台用户 ID。
 - 后台账号关联平台用户；管理员可将已完成微信授权的居民用户关联为运营员/网格员，重复关联必须拒绝，不能静默合并。
 - `admin` 可管理全体社区；`operator` 与 `grid_worker` 必须通过 `staff_community_assignments` 获得社区范围。该表以 `assignment_kind` 区分运营员多社区授权（`operator_scope`）与网格员唯一片区（`grid_territory`），数据库部分唯一索引保证「一网格员一区、一区一网格员」；片区模型详见 [grid-territory.md](docs/engineering/grid-territory.md)。CRM 查询必须在服务端检查归属，居民列表只返回当前必要字段。

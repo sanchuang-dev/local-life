@@ -245,3 +245,24 @@
   .me-redesign__landscape { width: 390px; }
   .me-redesign__content { padding-inline: 26px; }
 }
+
+/* Success feedback lives outside the drawer so it survives closing. */
+.me-redesign__save-toast {
+  position: fixed;
+  z-index: 2000;
+  top: calc(24px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 20px;
+  border-radius: 10px;
+  background: #244b36;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 4px 18px rgba(25, 58, 38, .2);
+  pointer-events: none;
+}

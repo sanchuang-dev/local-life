@@ -789,6 +789,117 @@ export const activityKeyRulesWriteSchema = activityKeyRulesSchema.superRefine((v
 
 export type ActivityKeyRulesWrite = z.infer<typeof activityKeyRulesWriteSchema>
 
+/* -------------------------- Activity visual config ------------------------- */
+
+/**
+ * Curated themes for the resident activity page (LL-ACT-VIS-001, #309).
+ *
+ * This is a closed enum on purpose: the H5 maps each key to one reviewed set of
+ * scoped CSS variables, so an unknown key must never reach storage and silently
+ * fall back to an unstyled page.
+ */
+export const ACTIVITY_THEME_KEYS = [
+  'community-green',
+  'festival-red',
+  'health-blue',
+  'warm-gold',
+] as const
+
+export const activityThemeKeySchema = z.enum(ACTIVITY_THEME_KEYS)
+
+export type ActivityThemeKey = z.infer<typeof activityThemeKeySchema>
+
+/** Historical/default theme; matches the pre-#309 activity page styling. */
+export const DEFAULT_ACTIVITY_THEME_KEY: ActivityThemeKey = 'community-green'
+
+export const ACTIVITY_VISUAL_IMAGE_URL_MAX_LENGTH = 2048
+export const ACTIVITY_PROMO_TITLE_MAX_LENGTH = 40
+export const ACTIVITY_PROMO_SUBTITLE_MAX_LENGTH = 80
+
+/**
+ * Absolute http(s) URL with a non-empty host. Implemented as an anchored regex
+ * (rather than `new URL`) because this package is also type-checked without the
+ * DOM/Node `URL` global. Anything that is not http(s) — notably `javascript:`
+ * and `data:` — cannot match.
+ */
+const HTTP_IMAGE_URL_PATTERN = /^https?:\/\/[^\s/?#]+(?:[/?#][^\s]*)?$/iu
+
+/**
+ * A promotional image is an absolute, remote http(s) URL only.
+ *
+ * The admin form accepts a URL because there is no upload pipeline yet; that
+ * makes `javascript:`/`data:` payloads the main injection risk. Rejecting
+ * anything that does not match an absolute http(s) URL keeps both the H5
+ * `<img src>` and the WeChat JS-SDK `imgUrl` on a scheme the browser will not
+ * execute.
+ */
+export const activityVisualImageUrlSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(ACTIVITY_VISUAL_IMAGE_URL_MAX_LENGTH)
+  .refine(
+    (value) => HTTP_IMAGE_URL_PATTERN.test(value),
+    'image URL must be an absolute http(s) URL',
+  )
+
+/**
+ * Read shape of the visual configuration.
+ *
+ * Deliberately lenient (plain nullable strings, not the write URL schema): a
+ * stored row must stay readable even if an operator URL later becomes invalid,
+ * otherwise the whole activity detail would fail to parse and could not be
+ * repaired. Validation belongs to the write path only.
+ */
+export const activityVisualConfigSchema = z.object({
+  themeKey: activityThemeKeySchema,
+  heroImageUrl: z.string().nullable(),
+  promoTitle: z.string().nullable(),
+  promoSubtitle: z.string().nullable(),
+  posterImageUrl: z.string().nullable(),
+})
+
+export type ActivityVisualConfig = z.infer<typeof activityVisualConfigSchema>
+
+/**
+ * Treats an explicitly blank input (`''` / whitespace) as "clear this field".
+ * The admin form posts text inputs and cannot always distinguish blank from
+ * absent, while `undefined` (key omitted) must keep meaning "leave unchanged".
+ */
+function blankVisualFieldToNull(value: unknown): unknown {
+  return typeof value === 'string' && value.trim() === '' ? null : value
+}
+
+/**
+ * Write shape for the visual fields. Every key is optional so an ordinary edit
+ * that only touches, say, `title` cannot accidentally wipe the artwork. An
+ * explicit `null` (or blank string) clears that individual field; omitting the
+ * key leaves it untouched.
+ */
+export const activityVisualConfigInputSchema = z.object({
+  themeKey: activityThemeKeySchema.optional(),
+  heroImageUrl: z
+    .preprocess(blankVisualFieldToNull, activityVisualImageUrlSchema.nullable())
+    .optional(),
+  promoTitle: z
+    .preprocess(
+      blankVisualFieldToNull,
+      z.string().trim().max(ACTIVITY_PROMO_TITLE_MAX_LENGTH).nullable(),
+    )
+    .optional(),
+  promoSubtitle: z
+    .preprocess(
+      blankVisualFieldToNull,
+      z.string().trim().max(ACTIVITY_PROMO_SUBTITLE_MAX_LENGTH).nullable(),
+    )
+    .optional(),
+  posterImageUrl: z
+    .preprocess(blankVisualFieldToNull, activityVisualImageUrlSchema.nullable())
+    .optional(),
+})
+
+export type ActivityVisualConfigInput = z.infer<typeof activityVisualConfigInputSchema>
+
 export const createActivityRequestSchema = z.object({
   communityId: z.string().uuid(),
   title: z.string().trim().min(2).max(80),
@@ -797,6 +908,9 @@ export const createActivityRequestSchema = z.object({
   // Write path: applies the check-in-window cross-check (see the comment on
   // `activityKeyRulesWriteSchema` for why it is not on the read schema).
   keyRules: activityKeyRulesWriteSchema,
+  // Optional on create: omitting it yields the default green theme with no
+  // artwork/promo copy. `null` is accepted as the same "not configured" input.
+  visualConfig: activityVisualConfigInputSchema.nullable().optional(),
 })
 
 export type CreateActivityRequest = z.infer<typeof createActivityRequestSchema>
@@ -809,18 +923,36 @@ export const updateActivityRequestSchema = z
     description: z.string().trim().max(2000).optional(),
     // Write path only: an edit must not be able to move the window out of bounds.
     keyRules: activityKeyRulesWriteSchema.optional(),
+    /**
+     * Visual-only edits are allowed after publication and never create a rule
+     * version. `undefined` = leave as-is, `null` = clear all visual fields back
+     * to the default green theme, an object = patch the supplied keys.
+     */
+    visualConfig: activityVisualConfigInputSchema.nullable().optional(),
   })
   .superRefine((value, ctx) => {
     if (
       value.title === undefined &&
       value.summary === undefined &&
       value.description === undefined &&
-      value.keyRules === undefined
+      value.keyRules === undefined &&
+      value.visualConfig === undefined
     ) {
       ctx.addIssue({
         code: 'custom',
         message: 'at least one field must be provided',
         path: [],
+      })
+    }
+    if (
+      value.visualConfig !== undefined &&
+      value.visualConfig !== null &&
+      Object.keys(value.visualConfig).length === 0
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'visualConfig must include at least one field',
+        path: ['visualConfig'],
       })
     }
   })
@@ -857,6 +989,11 @@ export const publicActivitySummarySchema = z.object({
   status: activityPublicStatusSchema,
   ruleVersion: z.number().int().nullable(),
   updatedAt: isoTimestamp,
+  /**
+   * Public visual projection only (the same five fields as the admin read
+   * shape). Internal columns never join this object.
+   */
+  visualConfig: activityVisualConfigSchema,
 })
 
 export type PublicActivitySummary = z.infer<typeof publicActivitySummarySchema>
@@ -917,6 +1054,8 @@ export const adminActivityDetailSchema = adminActivitySummarySchema.extend({
    * admin form can read a draft back and round-trip it on the next save.
    */
   purchaseRewardPlan: purchaseRewardPlanSchema.nullable(),
+  /** Visual configuration for the resident H5 and share poster (#309). */
+  visualConfig: activityVisualConfigSchema,
 })
 
 export type AdminActivityDetail = z.infer<typeof adminActivityDetailSchema>

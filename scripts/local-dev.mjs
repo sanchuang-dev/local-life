@@ -6,7 +6,9 @@ import { fileURLToPath } from 'node:url'
 import { DEFAULT_LOCAL_PORTS, localPortAssignments, localTrustedOrigins, resolveLocalPorts } from './local-ports.mjs'
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const packageManager = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
+const packageManager = process.platform === 'win32' ? 'cmd.exe' : 'pnpm'
+// Windows batch launchers require cmd.exe; all arguments below are fixed internal commands.
+const packageManagerArgs = (args) => process.platform === 'win32' ? ['/d', '/c', 'pnpm.cmd', ...args] : args
 const localDatabase = '../../.data/local-life-dev.sqlite'
 // Created once, never overwritten; unlike apps/api/.env this is local-only.
 export const localEnvTemplate = [
@@ -115,7 +117,7 @@ export function isolatedLocalEnvironment(parentEnv, envPath, ports = DEFAULT_LOC
 }
 
 function runChecked(args, env) {
-  const result = spawnSync(packageManager, args, {
+  const result = spawnSync(packageManager, packageManagerArgs(args), {
     cwd: projectRoot,
     env,
     stdio: 'inherit',
@@ -152,7 +154,7 @@ function runDev(env, ports) {
   console.log('  管理台：http://localhost:' + ports.admin + '/')
   console.log('  API：   http://127.0.0.1:' + ports.api + '/healthz\n')
 
-  const child = spawn(packageManager, ['dev'], {
+  const child = spawn(packageManager, packageManagerArgs(['dev']), {
     cwd: projectRoot,
     env,
     stdio: 'inherit',

@@ -60,7 +60,7 @@ import { getResidentCommunityStatus } from '../resident-community/service.js'
  * with no such link is administrator-only. A direct detail id is filtered by
  * the same condition, so it cannot be used to probe accounts outside scope.
  *
- * #258 detail PII: only an administrator receives the complete verified phone
+ * #258 detail PII: only an administrator receives the complete resident-entered contact phone
  * and the resident-entered contact address (`contact.visibility === 'full'`).
  * Community-scoped staff keep the existing masked phone and receive neither the
  * full number nor the address; no caller ever receives an OpenID/unionid value,
@@ -712,16 +712,12 @@ export function getUserDirectory(
     .where(and(eq(wechatIdentities.userId, userId), isNotNull(wechatIdentities.unionId)))
     .get()
 
-  // #257: resident-entered contact address. The resident's profile row and phone
+  // #257: resident-entered contact phone and address. The resident's profile row and phone
   // identity are separate facts; neither is merged into the other.
   const canSeeFullContact = actor.role === 'admin'
-  const contactAddress = canSeeFullContact
-    ? db
-        .select({ contactAddress: residentProfiles.contactAddress })
-        .from(residentProfiles)
-        .where(eq(residentProfiles.userId, userId))
-        .get()?.contactAddress ?? null
-    : null
+  const contactProfile = db.select({ phone: residentProfiles.contactPhone, address: residentProfiles.contactAddress })
+    .from(residentProfiles).where(eq(residentProfiles.userId, userId)).get()
+  const contactAddress = canSeeFullContact ? contactProfile?.address ?? null : null
 
   return userDirectoryDetailSchema.parse({
     ...entry,
@@ -747,11 +743,12 @@ export function getUserDirectory(
             updatedAt: wechatProfile.profileUpdatedAt?.toISOString() ?? null,
           },
     maskedPhone: phone ? maskDirectoryPhone(phone.phone) : null,
+    maskedContactPhone: contactProfile?.phone ? maskDirectoryPhone(contactProfile.phone) : null,
     contact: {
       visibility: canSeeFullContact ? 'full' : 'masked',
       // A scoped caller receives neither the complete number nor the address;
-      // the masked phone on the entry stays the only phone-shaped data.
-      phone: canSeeFullContact ? phone?.phone ?? null : null,
+      // the masked contact number and masked authentication identity remain separate.
+      phone: canSeeFullContact ? contactProfile?.phone ?? null : null,
       address: contactAddress,
     },
     staffAccount,

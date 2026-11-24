@@ -1,8 +1,16 @@
 import { participationInviteCodeSchema } from '@sanchuang-dev/local-life-contracts'
-import { ACTIVITY_DETAIL_PATH } from '../../lib/communityHomeRoute'
+// Explicit `.ts` keeps this pure helper importable by the Node test runner.
+import { ACTIVITY_DETAIL_PATH } from '../../lib/communityHomeRoute.ts'
 
 /** Route of the resident-facing silver-neighborhood campaign page. */
 export const SILVER_NEIGHBORHOOD_ACTIVITY_PATH = ACTIVITY_DETAIL_PATH
+
+export type ActivityShareUrlOptions = {
+  /** Defaults to the running site origin; tests pass an explicit origin. */
+  origin?: string
+  /** Defaults to the Vite base; tests pass `/` or `/local-life/`. */
+  baseUrl?: string
+}
 
 /**
  * One share URL for the QR code, the native share sheet and "copy link".
@@ -12,15 +20,20 @@ export const SILVER_NEIGHBORHOOD_ACTIVITY_PATH = ACTIVITY_DETAIL_PATH
  * origin and the Vite base are read from the running site instead. `BASE_URL`
  * keeps the `/local-life/` Pages preview working; the online MVP uses clean
  * history paths so invitation URLs can be opened and refreshed directly.
+ *
+ * The optional arguments exist only so the URL construction can be unit-tested
+ * outside a browser; production callers keep passing just the activity/invite.
  */
 export function buildActivityShareUrl(
   activityId: string,
   inviteCode: string | null,
+  options: ActivityShareUrlOptions = {},
 ): string {
   const params = new URLSearchParams({ activityId })
   if (inviteCode) params.set('invite', inviteCode)
-  const origin = typeof window === 'undefined' ? '' : window.location.origin
-  const base = import.meta.env.BASE_URL
+  const origin =
+    options.origin ?? (typeof window === 'undefined' ? '' : window.location.origin)
+  const base = options.baseUrl ?? import.meta.env.BASE_URL
   const route = `${SILVER_NEIGHBORHOOD_ACTIVITY_PATH}?${params.toString()}`
   return base === '/' ? `${origin}${route}` : `${origin}${base}#${route}`
 }
