@@ -41,7 +41,7 @@
 
 `LocalOrderDetail` 新增 `residentContact { phone, address }`，只在订单详情返回：
 
-- 电话来自 `resident_phone_identities` 的已验证号码；
+- 电话来自 `resident_profiles.contact_phone` 的居民自填联系电话，与认证手机号无关；
 - 地址来自 `resident_profiles.contact_address`；
 - 缺失时返回 `null`，H5 显示「居民未提供联系电话」，不编造；
 - 订单列表不返回电话。

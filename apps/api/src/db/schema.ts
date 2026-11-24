@@ -97,11 +97,16 @@ export const residentProfiles = sqliteTable(
     userId: text('user_id')
       .primaryKey()
       .references(() => users.id, { onDelete: 'cascade' }),
+    contactPhone: text('contact_phone'),
     contactAddress: text('contact_address'),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
   },
   (table) => [
+    check(
+      'resident_profiles_contact_phone_check',
+      sql`${table.contactPhone} IS NULL OR (length(${table.contactPhone}) = 11 AND substr(${table.contactPhone}, 1, 1) = '1' AND ${table.contactPhone} NOT GLOB '*[^0-9]*')`,
+    ),
     check(
       'resident_profiles_contact_address_check',
       sql`${table.contactAddress} IS NULL

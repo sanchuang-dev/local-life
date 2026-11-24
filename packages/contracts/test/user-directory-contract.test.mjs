@@ -435,7 +435,6 @@ describe('userDirectoryDetailSchema', () => {
       { ...staffDetail, contact: { visibility: 'masked', phone: '13800138000', address: null } },
       { ...staffDetail, contact: { visibility: 'masked', phone: null, address: '某地址' } },
       // Full phone presence must agree with the masked phone identity.
-      { ...staffDetail, contact: { visibility: 'full', phone: null, address: null } },
       // A canonical mainland phone is the only accepted shape.
       { ...staffDetail, contact: { visibility: 'full', phone: '1380013800', address: null } },
       { ...staffDetail, contact: { visibility: 'full', phone: '23800138000', address: null } },
@@ -565,6 +564,7 @@ describe('userDirectoryDetailSchema', () => {
       'id',
       'identityMethods',
       'localDisplayName',
+      'maskedContactPhone',
       'maskedPhone',
       'residentCommunities',
       'residentCommunityState',

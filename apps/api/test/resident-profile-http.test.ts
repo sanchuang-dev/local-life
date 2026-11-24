@@ -142,11 +142,12 @@ test('resident profile persists address and reads only verified identity facts',
     const saved = await context.app.request(RESIDENT_PROFILE_ROUTES.profile, {
       method: 'PATCH',
       headers: patchHeaders(session),
-      body: JSON.stringify({ contactAddress: '  韶关市武江区工业路 18 号  ' }),
+      body: JSON.stringify({ contactAddress: '  韶关市武江区工业路 18 号  ', contactPhone: ' 13900139000 ' }),
     })
     assert.equal(saved.status, 200)
     const savedBody = residentProfileResponseSchema.parse(await saved.json())
     assert.equal(savedBody.contactAddress, '韶关市武江区工业路 18 号')
+    assert.equal(savedBody.contactPhone, '13900139000')
     assert.ok(savedBody.updatedAt)
     assert.equal(
       context.db.select().from(residentProfiles).where(eq(residentProfiles.userId, session.userId)).get()?.contactAddress,
@@ -166,10 +167,13 @@ test('resident profile persists address and reads only verified identity facts',
     const cleared = await context.app.request(RESIDENT_PROFILE_ROUTES.profile, {
       method: 'PATCH',
       headers: patchHeaders(session),
-      body: JSON.stringify({ contactAddress: '   ' }),
+      body: JSON.stringify({ contactAddress: '   ', contactPhone: '' }),
     })
     assert.equal(cleared.status, 200)
-    assert.equal(residentProfileResponseSchema.parse(await cleared.json()).contactAddress, null)
+    const clearedBody = residentProfileResponseSchema.parse(await cleared.json())
+    assert.equal(clearedBody.contactAddress, null)
+    assert.equal(clearedBody.contactPhone, null)
+    assert.equal(clearedBody.phone.maskedPhone, '138****8000')
   } finally {
     context.sqlite.close()
   }
@@ -227,7 +231,7 @@ test('resident profile enforces session, staff, CSRF, Origin, strict body and us
     const aliceSaved = await context.app.request(RESIDENT_PROFILE_ROUTES.profile, {
       method: 'PATCH',
       headers: patchHeaders(alice),
-      body: JSON.stringify({ contactAddress: 'A 的真实地址' }),
+      body: JSON.stringify({ contactAddress: 'A 的真实地址', contactPhone: '13700137000' }),
     })
     assert.equal(aliceSaved.status, 200)
 
@@ -238,6 +242,7 @@ test('resident profile enforces session, staff, CSRF, Origin, strict body and us
     const bobBody = residentProfileResponseSchema.parse(await bobRead.json())
     assert.equal(bobBody.userId, bob.userId)
     assert.equal(bobBody.contactAddress, null)
+    assert.equal(bobBody.contactPhone, null)
 
     assert.equal(
       context.db.select().from(residentProfiles).where(eq(residentProfiles.userId, alice.userId)).get()?.contactAddress,
@@ -247,6 +252,20 @@ test('resident profile enforces session, staff, CSRF, Origin, strict body and us
       context.db.select().from(residentProfiles).where(eq(residentProfiles.userId, bob.userId)).get(),
       undefined,
     )
+    const duplicate = await context.app.request(RESIDENT_PROFILE_ROUTES.profile, {
+      method: 'PATCH',
+      headers: patchHeaders(bob),
+      body: JSON.stringify({ contactAddress: null, contactPhone: '13700137000' }),
+    })
+    assert.equal(duplicate.status, 200)
+    assert.equal(residentProfileResponseSchema.parse(await duplicate.json()).contactPhone, '13700137000')
+    assert.equal(context.db.select().from(residentPhoneIdentities).all().length, 0)
+    const invalid = await context.app.request(RESIDENT_PROFILE_ROUTES.profile, {
+      method: 'PATCH',
+      headers: patchHeaders(bob),
+      body: JSON.stringify({ contactAddress: null, contactPhone: '123' }),
+    })
+    assert.equal(invalid.status, 400)
   } finally {
     context.sqlite.close()
   }

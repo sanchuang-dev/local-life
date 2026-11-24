@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ResidentProfileDrawer } from '../components/profile/ProfilePreviewDrawer'
 import {
-  CalendarCheck2, ChevronRight, ClipboardList, Gift, Home,
+  CalendarCheck2, CheckCircle2, ChevronRight, ClipboardList, Gift, Home,
   MapPin, ShieldCheck, UserRound,
 } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
@@ -37,6 +38,16 @@ export function MePage() {
   const auth = useResidentAuth()
   const [profileDrawerOpen, setProfileDrawerOpen] = useState(false)
   const closeProfileDrawer = useCallback(() => setProfileDrawerOpen(false), [])
+  const [profileSavedToast, setProfileSavedToast] = useState(0)
+  const handleProfileSaved = useCallback(() => {
+    setProfileDrawerOpen(false)
+    setProfileSavedToast((previous) => previous + 1)
+  }, [])
+  useEffect(() => {
+    if (!profileSavedToast) return
+    const timer = window.setTimeout(() => setProfileSavedToast(0), 2200)
+    return () => window.clearTimeout(timer)
+  }, [profileSavedToast])
   const [searchParams, setSearchParams] = useSearchParams()
   const [profileNotice] = useState(() => {
     const result = searchParams.get('wechat_profile')
@@ -170,8 +181,14 @@ export function MePage() {
 
         <MeAccountPanel auth={auth} onEditProfile={() => setProfileDrawerOpen(true)} />
       </div>
+      {profileSavedToast > 0 && createPortal(
+        <div className="me-redesign__save-toast" role="status" aria-live="polite">
+          <CheckCircle2 size={19} aria-hidden="true" />
+          <span>保存成功</span>
+        </div>, document.body,
+      )}
       {profileDrawerOpen && (
-        <ResidentProfileDrawer auth={auth} onClose={closeProfileDrawer} />
+        <ResidentProfileDrawer auth={auth} onClose={closeProfileDrawer} onSaved={handleProfileSaved} />
       )}
     </div>
   )
