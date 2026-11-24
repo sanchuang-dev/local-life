@@ -353,10 +353,13 @@ describe('Standalone activity editor routes', () => {
     const title = await screen.findByLabelText('活动标题')
     fireEvent.change(title, { target: { value: '社区活动新名称' } })
     expect((title as HTMLInputElement).value).toBe('社区活动新名称')
-    fireEvent.click(screen.getByRole('tab', { name: '签到奖励' }))
+    const checkinTab = screen.getByRole('tab', { name: '签到奖励' })
+    expect(checkinTab.textContent).toContain('未配置')
+    fireEvent.click(checkinTab)
     expect(screen.getByRole('tab', { name: '签到奖励' }).getAttribute('aria-selected')).toBe('true')
     fireEvent.click(screen.getByRole('tab', { name: '消费奖励' }))
     expect(screen.getByRole('tab', { name: '消费奖励' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('tab', { name: '消费奖励' }).textContent).toContain('未配置')
     // The fourth tab shares the same Form: its values survive a tab round trip.
     fireEvent.click(screen.getByRole('tab', { name: '界面风格' }))
     expect(screen.getByRole('tab', { name: '界面风格' }).getAttribute('aria-selected')).toBe('true')
@@ -385,6 +388,28 @@ describe('Standalone activity editor routes', () => {
     })
   })
 
+  it('warns before abandoning dirty create fields and preserves them on cancel', async () => {
+    stubApi((url) => {
+      if (url.startsWith('/api/admin/communities')) return json({ items: [COMMUNITY_A] })
+      if (url.startsWith('/api/admin/activities?')) {
+        return json({ items: [], total: 0, page: 1, pageSize: 20 })
+      }
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+
+    renderPage(ADMIN_SESSION)
+    fireEvent.click(await screen.findByRole('button', { name: /新建活动/ }))
+    const title = await screen.findByLabelText('活动标题')
+    fireEvent.change(title, { target: { value: '新的社区活动' } })
+    fireEvent.click(screen.getByRole('button', { name: '← 返回活动列表' }))
+    expect((await screen.findAllByText('放弃未保存的修改？')).length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('button', { name: '继续编辑' }))
+    expect((screen.getByLabelText('活动标题') as HTMLInputElement).value).toBe('新的社区活动')
+    fireEvent.click(screen.getByRole('button', { name: '← 返回活动列表' }))
+    fireEvent.click(await screen.findByRole('button', { name: '放弃修改' }))
+    expect(await screen.findByText('活动管理')).toBeTruthy()
+  })
+
   it('opens a new activity as a full page without an activity drawer', async () => {
     stubApi((url) => {
       if (url.startsWith('/api/admin/communities')) return json({ items: [COMMUNITY_A] })
@@ -397,10 +422,35 @@ describe('Standalone activity editor routes', () => {
     fireEvent.click(await screen.findByRole('button', { name: /新建活动/ }))
     expect(await screen.findByText('新建活动草稿')).toBeTruthy()
     expect(screen.getByRole('tablist', { name: '活动编辑区域' })).toBeTruthy()
+    expect(screen.getByText('基本资料')).toBeTruthy()
+    expect(screen.getByText('资源限制')).toBeTruthy()
+    expect(screen.getByText('居民参与规则')).toBeTruthy()
+    expect(screen.getByLabelText('参与资格')).toBeTruthy()
+    expect(screen.getByLabelText('签到 / 参与方式')).toBeTruthy()
+    expect(screen.getByLabelText('购买要求')).toBeTruthy()
+    expect(screen.getByLabelText('奖品领取')).toBeTruthy()
+    const titleField = screen.getByLabelText('活动标题') as HTMLInputElement
+    fireEvent.change(titleField, { target: { value: '社区活动体验' } })
+    fireEvent.click(screen.getByRole('tab', { name: '签到奖励' }))
+    expect(screen.getByRole('tab', { name: '签到奖励' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByText('启用签到奖励')).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: '消费奖励' }))
+    expect(screen.getByText('启用消费奖励')).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: '活动信息' }))
+    expect((screen.getByLabelText('活动标题') as HTMLInputElement).value).toBe('社区活动体验')
+    expect(document.querySelectorAll('.activity-editor-page form.activity-form')).toHaveLength(1)
+    const formSurface = document.querySelector('.activity-editor-page .activity-editor-surface')
+    expect(formSurface).toBeTruthy()
+    expect(document.querySelectorAll('.activity-editor-page .activity-editor-surface')).toHaveLength(1)
+    expect(formSurface?.querySelector('[role="tablist"]')).toBeTruthy()
+    expect(formSurface?.querySelector('form.activity-form')).toBeTruthy()
+    expect(formSurface?.querySelector('.activity-editor-footer button[type="submit"]')).toBeTruthy()
     expect(screen.getAllByRole('tab')).toHaveLength(4)
     expect(screen.getByRole('tab', { name: '界面风格' })).toBeTruthy()
     expect(document.querySelector('.activity-editor-page .ant-drawer')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '← 返回活动列表' }))
+    expect((await screen.findAllByText('放弃未保存的修改？')).length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('button', { name: '放弃修改' }))
     expect(await screen.findByText('活动管理')).toBeTruthy()
   })
 })
@@ -565,7 +615,7 @@ describe('ActivitiesPage in-flight detail race', () => {
     // The superseded detail request must not leave the create drawer spinning.
     expect(await screen.findByText('新建活动草稿')).toBeTruthy()
     await waitFor(() => expect(screen.queryByText('正在读取活动详情…')).toBeNull())
-    expect(screen.getByText('保存草稿')).toBeTruthy()
+    expect(screen.getByText('创建草稿')).toBeTruthy()
     expect(screen.getByText('参与资格')).toBeTruthy()
 
     // A late answer is ignored by the request guard and cannot flip the state.

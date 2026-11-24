@@ -83,11 +83,7 @@ H5 将 key 映射为 16 个有限语义 CSS variables（`--activity-primary`、`
 
 [0042_activity_visual_config.sql](../../apps/api/db/migrations/0042_activity_visual_config.sql) 只做五次 `ALTER TABLE activities ADD COLUMN`，**没有任何 UPDATE**：`theme_key` 以默认值让历史行获得社区绿，四个素材/文案列保持 `NULL`，因此历史银发活动保留原素材与原布局，其他活动也不会被写入伪造宣传标题。
 
-本分支的 journal 最后一条是 `idx: 41`、`tag: "0042_activity_visual_config"`（见 [meta/_journal.json](../../apps/api/db/migrations/meta/_journal.json)）。这是有意为之：
-
-- `0041` 已被 QA 分支的居民联系电话迁移占用；本分支**没有**创建、改名或修改 `0041` 文件，文件序号暂时留空不影响 drizzle 按 journal 顺序读取。
-- 合并集成时应先落入 `0041_resident_contact_phone.sql`，再将 0042 的 journal 条目改为 `idx: 42` 且保持 `when` 晚于 0041；顺序应为 0041 → 0042。
-- drizzle migrator 以 `__drizzle_migrations.created_at` 与 journal `when` 比较决定是否应用；若某环境已经记录 0042 的时间戳，后补一个更早 `when` 的 0041 不会自动补跑，需要显式处理。因此本分支不应在 0041 未合并前单独晋级/部署。
+集成后 journal 顺序为 `0041_resident_contact_phone`（idx 41）→ `0042_activity_visual_config`（idx 42），时间戳递增。Windows QA 已在保留原数据的数据库上执行两项迁移并核对实际列及迁移记录。不得修改已部署迁移的时间戳。
 
 ## 7. 已知偏差与验证缺口
 
