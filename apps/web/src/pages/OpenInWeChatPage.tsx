@@ -11,7 +11,10 @@ type DevelopmentLogin = {
 }
 
 /** Standalone external-browser entrance; no fake "open WeChat" deep link. */
-export function OpenInWeChatPage({ developmentLogin }: { developmentLogin?: DevelopmentLogin }) {
+export function OpenInWeChatPage({ developmentLogin, onDevelopmentPreview }: {
+  developmentLogin?: DevelopmentLogin
+  onDevelopmentPreview?: () => void
+}) {
   const [copyState, setCopyState] = useState<CopyState>('idle')
   const currentUrl = window.location.href
 
@@ -81,6 +84,12 @@ export function OpenInWeChatPage({ developmentLogin }: { developmentLogin?: Deve
           />
         )}
 
+        {import.meta.env.DEV && onDevelopmentPreview && (
+          <div className="wechat-open__dev-entry">
+            <button type="button" onClick={onDevelopmentPreview}>开发模式入口</button>
+          </div>
+        )}
+
         <section className="wechat-open__help" aria-labelledby="wechat-open-help-title">
           <h2 id="wechat-open-help-title">如何在微信中打开？</h2>
           <ol className="wechat-open__steps">
@@ -99,7 +108,7 @@ export function OpenInWeChatPage({ developmentLogin }: { developmentLogin?: Deve
           </ol>
         </section>
         <p className="wechat-open__footnote">复制后可发送给自己，再在微信聊天中点开。</p>
-        {developmentLogin && (
+        {import.meta.env.DEV && developmentLogin && (
           <div className="wechat-open__dev-entry">
             <button type="button" onClick={developmentLogin.onLogin} disabled={developmentLogin.busy}>
               {developmentLogin.busy ? '测试登录中…' : '开发环境测试登录'}

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { isWeChatBrowser, shouldShowWeChatGate } from '../src/components/auth/wechatEnvironment.ts'
+import { developmentPreviewUrl, isWeChatBrowser, shouldShowWeChatGate } from '../src/components/auth/wechatEnvironment.ts'
 
 const check = (overrides = {}) => shouldShowWeChatGate({
   userAgent: 'Mozilla/5.0 Chrome/123.0 Safari/537.36',
@@ -26,6 +26,13 @@ test('staff workbench remains accessible from external desktop browsers', () => 
   assert.equal(check({ pathname: '/workbench' }), false)
   assert.equal(check({ pathname: '/workbench/leads' }), false)
   assert.equal(check({ pathname: '/workbench-other' }), true)
+})
+
+test('development preview entrance preserves original deep links and invitation parameters', () => {
+  const url = developmentPreviewUrl('http://localhost:5222/local-life/?invite=abc#/me/orders')
+  assert.equal(url, 'http://localhost:5222/local-life/?invite=abc&previewApp=1#/me/orders')
+  assert.equal(check({ search: new URL(url).search, isDevelopment: true }), false)
+  assert.equal(check({ search: new URL(url).search, isDevelopment: false }), true)
 })
 
 test('local-only preview switch never bypasses the gate in production', () => {

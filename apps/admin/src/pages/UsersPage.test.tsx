@@ -175,6 +175,7 @@ function detail(overrides: Partial<UserDirectoryDetail> = {}): UserDirectoryDeta
       updatedAt: '2026-10-09T08:30:00.000Z',
     },
     maskedPhone: '138****8000',
+    maskedContactPhone: '138****8000',
     contact: {
       visibility: 'full',
       phone: '13800138000',
@@ -668,7 +669,7 @@ describe('UsersPage read-only detail drawer', () => {
     expect(within(body).getAllByText('未提供').length).toBe(4)
     expect(within(body).getByText('未关联 UnionID')).toBeTruthy()
     // No fabricated phone or address.
-    expect(within(body).getByText('未绑定手机号')).toBeTruthy()
+    expect(within(body).getByText('未填写联系电话')).toBeTruthy()
     expect(
       within(body).getByText('未填写（居民本人尚未填写联系地址）'),
     ).toBeTruthy()
@@ -792,7 +793,7 @@ describe('UsersPage legacy account without any persistent identity', () => {
     const body = drawerBody()
     expect(within(body).getByText('无持久身份')).toBeTruthy()
     expect(within(body).getByText('居民')).toBeTruthy()
-    expect(within(body).getByText('未绑定手机号')).toBeTruthy()
+    expect(within(body).getByText('未填写联系电话')).toBeTruthy()
     expect(within(body).getByText('未填写（居民本人尚未填写联系地址）')).toBeTruthy()
     expect(within(body).getByText('未关联 UnionID')).toBeTruthy()
     expect(within(body).getByText('0 个（仅计数）')).toBeTruthy()

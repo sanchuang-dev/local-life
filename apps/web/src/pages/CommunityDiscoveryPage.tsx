@@ -28,6 +28,7 @@ import { useResidentAuth } from '../hooks/useResidentAuth'
 import { useResidentCommunity } from '../hooks/useResidentCommunity'
 import { buildResidentLoginHref } from '../components/auth/residentLogin'
 import { ActivityArtwork } from '../components/activity/ActivityArtwork'
+import { resolveActivityArtworkImageUrl } from '../components/activity/activityVisual'
 import { EmptyState } from '../components/common/EmptyState'
 
 type AsyncList<T> = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; items: T[] }
@@ -412,7 +413,10 @@ export function CommunityDiscoveryPage() {
             <div className="community-home__activity-list">
               {activities.items.map((activity) => (
                 <Link key={activity.id} to={activityDetailHref(activity.id)} className="community-home__activity-card">
-                  <ActivityArtwork />
+                  <ActivityArtwork
+                    imageUrl={resolveActivityArtworkImageUrl(activity.visualConfig)}
+                    alt={`${activity.title}活动头图`}
+                  />
                   <span className="community-home__activity-info">
                     <span className="community-home__activity-top">
                       <span className="community-home__status-tag">{activityStatus(activity)}</span>

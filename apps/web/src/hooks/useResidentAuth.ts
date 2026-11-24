@@ -242,8 +242,9 @@ function useResidentAuthController() {
     return ((await response.json()) as { csrfToken: string }).csrfToken
   }, [])
 
-  const saveContactAddress = useCallback(async (
+  const saveContactProfile = useCallback(async (
     contactAddress: string | null,
+    contactPhone: string | null,
   ): Promise<ResidentProfileResponse> => {
     const owner = profileOwnerRef.current
     if (!owner) throw new Error('请先登录居民账户')
@@ -259,7 +260,7 @@ function useResidentAuthController() {
           'content-type': 'application/json',
           'x-csrf-token': token,
         },
-        body: JSON.stringify({ contactAddress }),
+        body: JSON.stringify({ contactAddress, contactPhone }),
       })
       if (!response.ok) throw new Error(await readError(response))
       const parsed = residentProfileResponseSchema.parse(await response.json())
@@ -434,7 +435,7 @@ function useResidentAuthController() {
     requestPhoneCode,
     loginWithPhone,
     bindPhone,
-    saveContactAddress,
+    saveContactProfile,
     refreshPhoneStatus: loadPhoneStatus,
     refreshWechatProfile: loadWechatProfile,
     refreshResidentProfile: loadResidentProfile,

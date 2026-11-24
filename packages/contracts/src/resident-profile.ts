@@ -14,8 +14,15 @@ export const residentContactAddressInputSchema = z.preprocess(
   z.string().max(200).nullable(),
 )
 
+/** Contact data is not an authenticated phone identity; duplicate numbers are allowed. */
+export const residentContactPhoneInputSchema = z.preprocess(
+  (value) => typeof value === 'string' ? (value.trim() || null) : value,
+  z.string().regex(/^1\d{10}$/).nullable(),
+)
+
 export const updateResidentProfileRequestSchema = z.strictObject({
   contactAddress: residentContactAddressInputSchema,
+  contactPhone: residentContactPhoneInputSchema.optional(),
 })
 export type UpdateResidentProfileRequest = z.infer<typeof updateResidentProfileRequestSchema>
 
@@ -31,6 +38,7 @@ export const residentProfileResponseSchema = z.strictObject({
   phone: z.strictObject({
     maskedPhone: z.string().nullable(),
   }),
+  contactPhone: z.string().regex(/^1\d{10}$/).nullable(),
   contactAddress: z.string().max(200).nullable(),
   updatedAt: isoTimestamp.nullable(),
 })

@@ -8,15 +8,26 @@ import {
   Share2,
 } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router'
-import { QRCodeSVG } from 'qrcode.react'
 import type { PublicActivityDetail } from '@sanchuang-dev/local-life-contracts'
 import { CampaignSheet } from '../components/CampaignSheet'
 import { ParticipationTeamCard } from '../components/activity/ParticipationTeamCard'
 import { PurchaseRewardCard } from '../components/activity/PurchaseRewardCard'
 import { RewardProgressCard } from '../components/activity/RewardProgressCard'
 import { DailyDrawCard } from '../components/activity/DailyDrawCard'
+import { ActivityImage } from '../components/activity/ActivityImage'
+import { ActivitySharePoster } from '../components/activity/ActivitySharePoster'
 import { ActivityLoginMarkerCleanup } from '../components/activity/ActivityLoginResult'
 import { readActivityLoginResult, type ActivityLoginResult } from '../components/activity/loginReturn'
+import {
+  activityThemeStyle,
+  isLegacySilverActivity,
+  normalizeActivityImageUrl,
+  resolveActivityHeroImageCandidates,
+  resolveActivityPagePromo,
+  resolveActivityPromoCopy,
+  resolveActivityThemeKey,
+} from '../components/activity/activityVisual'
+import '../components/activity/activityTheme.css'
 import {
   credentialExpiryText,
   formatRewardDateTime,
@@ -127,7 +138,7 @@ function ActivityCountdown({ activity }: { activity: PublicActivityDetail }) {
   const numberBlock = (value: number, label: string) => (
     <span
       aria-label={label}
-      className="inline-flex h-[27px] min-w-[28px] items-center justify-center rounded-sm bg-[#154f2c] px-1 text-[16px] font-bold leading-none text-white shadow-[0_2px_4px_rgba(12,67,34,0.18)] tabular-nums"
+      className="inline-flex h-[27px] min-w-[28px] items-center justify-center rounded-sm bg-[var(--activity-primary-strong)] px-1 text-[16px] font-bold leading-none text-[var(--activity-on-primary)] shadow-[0_2px_4px_rgba(12,67,34,0.18)] tabular-nums"
     >
       {twoDigits(value)}
     </span>
@@ -135,16 +146,16 @@ function ActivityCountdown({ activity }: { activity: PublicActivityDetail }) {
 
   return (
     <div className="relative z-[1] mx-3 -mt-2" role="timer" aria-label={phaseLabels[phase]}>
-      <div className="relative rounded-t-xl bg-gradient-to-b from-[#d8f0cc] via-[#e1f3d8]/85 to-transparent px-2.5 pb-5 pt-2.5 text-[#275942]">
+      <div className="activity-theme-countdown relative rounded-t-xl px-2.5 pb-5 pt-2.5">
         <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11px] leading-4">
           <span className={phaseTones[phase]}>{phaseLabels[phase]}</span>
-          <span className="font-medium text-[#375e40]">
+          <span className="font-medium text-[var(--activity-text)]">
             {formatShanghaiDateTime(activity.startsAt)} - {formatShanghaiDateTime(activity.endsAt)}
           </span>
-          <span className="text-[10px] font-medium text-[#52786c]">北京时间</span>
+          <span className="text-[10px] font-medium text-[var(--activity-text-muted)]">北京时间</span>
         </div>
         {showCountdown ? (
-          <div className="mt-1.5 flex items-center justify-center gap-1 text-[12px] font-semibold text-[#285039]">
+          <div className="mt-1.5 flex items-center justify-center gap-1 text-[12px] font-semibold text-[var(--activity-text)]">
             <span className="mr-0.5">{phase === 'upcoming' ? '距开始' : '还剩'}</span>
             {numberBlock(days, '天数')}
             <span className="mx-0.5">天</span>
@@ -181,10 +192,10 @@ function ActivityLoadNotice({
   if (state.status === 'loading') {
     return (
       <div className={wrapper} role="status" aria-live="polite">
-        <div className="rounded-t-xl bg-gradient-to-b from-[#d8f0cc] via-[#e1f3d8]/85 to-transparent px-3 pb-5 pt-3 text-[#275942]">
+        <div className="activity-theme-countdown rounded-t-xl px-3 pb-5 pt-3">
           <div className="flex items-center justify-center gap-2 text-[12px] font-semibold">
             <span
-              className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#126c38]/25 border-t-[#126c38]"
+              className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--activity-border)] border-t-[var(--activity-primary)]"
               aria-hidden="true"
             />
             正在加载活动信息…
@@ -197,9 +208,9 @@ function ActivityLoadNotice({
   if (state.status === 'empty') {
     return (
       <div className={wrapper} role="status">
-        <div className="rounded-t-xl bg-gradient-to-b from-[#d8f0cc] via-[#e1f3d8]/85 to-transparent px-3 pb-5 pt-3 text-center text-[#275942]">
+        <div className="activity-theme-countdown rounded-t-xl px-3 pb-5 pt-3 text-center">
           <p className="text-[14px] font-bold">当前没有已发布活动</p>
-          <p className="mt-1 text-[11px] leading-4 text-[#52786c]">
+          <p className="mt-1 text-[11px] leading-4 text-[var(--activity-text-muted)]">
             有新活动发布后，可以在这里查看活动详情。
           </p>
         </div>
@@ -251,6 +262,24 @@ export function SilverNeighborhoodCampaignPage() {
   const inviteParam = parseInviteParam(searchParams.get('invite'))
   const { state: activityState, retry: retryActivity } = usePublicActivity(requestedActivityId)
   const activity = activityState.status === 'ready' ? activityState.activity : null
+  // Activity-scoped visual config (#309): theme variables + hero + promo copy.
+  // Without a loaded activity the historical green theme keeps the page stable.
+  const themeStyle = activityThemeStyle(activity?.visualConfig.themeKey)
+  const themeName = resolveActivityThemeKey(activity?.visualConfig.themeKey)
+  // Headline falls back to the real activity title for a configured activity
+  // (hero/theme only); historical no-visual activities skip the duplicate band.
+  const promo = resolveActivityPromoCopy(activity?.visualConfig)
+  const pagePromo = resolveActivityPagePromo(activity, promo)
+  const heroCandidates = resolveActivityHeroImageCandidates(
+    activity?.visualConfig,
+    import.meta.env.BASE_URL,
+    activity?.title,
+  )
+  const configuredHeroImage = normalizeActivityImageUrl(activity?.visualConfig.heroImageUrl)
+  // Historical activities keep the original bundled artwork *and* its alt text.
+  const heroAlt = !configuredHeroImage && isLegacySilverActivity(activity?.title)
+    ? '银发社区欢乐季，三人成团·天天有礼。'
+    : `${activity?.title ?? '活动'}主视觉`
   const auth = useResidentAuth()
   // One-off `?auth=success` / `?auth_error=code` markers, read once before the
   // page-level cleanup strips them from the address bar (#92).
@@ -379,17 +408,18 @@ export function SilverNeighborhoodCampaignPage() {
   }
 
   return (
-    <div className="pb-7">
+    <div className="activity-page pb-7" style={themeStyle} data-activity-theme={themeName}>
       {/* Remove callback markers regardless of the current session branch. */}
       <ActivityLoginMarkerCleanup
         authenticated={auth.session !== null}
         loading={auth.loading}
       />
-      <section className="relative overflow-hidden bg-[#eaf5e9]" aria-label="活动信息">
+      <section className="activity-theme-hero relative overflow-hidden" aria-label="活动信息">
         <div className="relative">
-          <img
-            src={import.meta.env.BASE_URL + 'images/silver-neighborhood-hero.webp'}
-            alt="银发社区欢乐季，三人成团·天天有礼。三位长者在欢乐的社区活动中相聚。"
+          <ActivityImage
+            key={`hero:${activity?.id ?? 'no-activity'}:${heroCandidates.join('|')}`}
+            candidates={heroCandidates}
+            alt={heroAlt}
             className="block aspect-[4/3] w-full object-cover"
             fetchPriority="high"
           />
@@ -399,19 +429,33 @@ export function SilverNeighborhoodCampaignPage() {
         ) : (
           <ActivityLoadNotice state={activityState} onRetry={retryActivity} />
         )}
-        <div className="relative -mt-px bg-gradient-to-b from-[#edf8e9] via-[#e8f5ec] to-[#d8eee5] px-4 pb-16 pt-0">
+        <div className="activity-theme-body relative -mt-px px-4 pb-16 pt-0">
+          {pagePromo.visible ? (
+            <div className="mt-3 rounded-2xl border border-[var(--activity-border)] bg-[var(--activity-surface)] px-3.5 py-3">
+              {pagePromo.title ? (
+                <p className="break-words text-[18px] font-bold leading-7 text-[var(--activity-text)]">
+                  {pagePromo.title}
+                </p>
+              ) : null}
+              {pagePromo.subtitle ? (
+                <p className="mt-1 break-words text-[12px] leading-5 text-[var(--activity-text-muted)]">
+                  {pagePromo.subtitle}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           {activity ? (
             <>
               <div className="flex min-h-[48px] items-center justify-between gap-3 pt-1">
                 <h1 className="sr-only">{activity.title}</h1>
-                <p className="flex min-w-0 items-center gap-1.5 text-[12px] leading-5 text-[#4a6f61]">
+                <p className="flex min-w-0 items-center gap-1.5 text-[12px] leading-5 text-[var(--activity-text-muted)]">
                   <MapPin size={14} className="shrink-0" aria-hidden="true" />
                   <span className="min-w-0 break-words">{activity.location}</span>
                 </p>
                 <button
                   type="button"
                   onClick={() => openSheet('rules')}
-                  className="inline-flex min-h-[44px] shrink-0 items-center gap-1 px-1 text-[13px] font-medium text-[#27725b] hover:underline focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+                  className="inline-flex min-h-[44px] shrink-0 items-center gap-1 px-1 text-[13px] font-medium text-[var(--activity-primary)] hover:underline focus-visible:rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
                 >
                   <CircleHelp size={16} aria-hidden="true" />
                   活动规则
@@ -470,7 +514,7 @@ export function SilverNeighborhoodCampaignPage() {
         <section className="mx-4 mt-5" aria-labelledby="team-reward-heading">
           <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
             <div>
-              <p className="text-[11px] font-bold tracking-[0.16em] text-teal-700">TEAM REWARD</p>
+              <p className="text-[11px] font-bold tracking-[0.16em] text-[var(--activity-primary)]">TEAM REWARD</p>
               <h2 id="team-reward-heading" className="mt-1 text-[19px] font-bold tracking-tight text-slate-900">
                 团队签到奖励
               </h2>
@@ -479,14 +523,14 @@ export function SilverNeighborhoodCampaignPage() {
               <button
                 type="button"
                 onClick={() => openSheet('checkin-reward')}
-                className="min-h-[44px] rounded-lg px-3 text-[12px] font-bold text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+                className="min-h-[44px] rounded-lg px-3 text-[12px] font-bold text-[var(--activity-primary)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
               >
                 奖励说明
               </button>
               <button
                 type="button"
                 onClick={() => openSheet('my-rewards')}
-                className="min-h-[44px] rounded-lg bg-[#e8f6f0] px-3 text-[12px] font-bold text-teal-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+                className="activity-themed-chip min-h-[44px] rounded-lg px-3 text-[12px] font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
               >
                 我的奖励
               </button>
@@ -516,9 +560,9 @@ export function SilverNeighborhoodCampaignPage() {
       >
         {activity ? (
           <>
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#eef7f2] p-3">
-              <p className="text-[13px] font-bold text-[#225b44]">已发布规则快照</p>
-              <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-teal-700">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[var(--activity-surface-muted)] p-3">
+              <p className="text-[13px] font-bold text-[var(--activity-text)]">已发布规则快照</p>
+              <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-[var(--activity-primary)]">
                 {activity.ruleVersion === null ? '未记录版本号' : `第 ${activity.ruleVersion} 版`}
               </span>
             </div>
@@ -530,7 +574,7 @@ export function SilverNeighborhoodCampaignPage() {
                 { label: '奖品领取', text: activity.publicRules.prizeClaim },
               ].map((rule, index) => (
                 <li key={rule.label} className="flex gap-3 rounded-xl bg-slate-50 p-3">
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-teal-700 text-[12px] font-bold text-white">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--activity-primary-strong)] text-[12px] font-bold text-[var(--activity-on-primary)]">
                     {index + 1}
                   </span>
                   <span className="min-w-0 flex-1">
@@ -574,7 +618,7 @@ export function SilverNeighborhoodCampaignPage() {
                 <button
                   type="button"
                   onClick={handleSystemShare}
-                  className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-xl bg-teal-700 px-2 text-[13px] font-semibold text-white transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+                  className="activity-themed-cta flex min-h-[48px] items-center justify-center gap-1.5 rounded-xl px-2 text-[13px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
                 >
                   <Share2 size={17} aria-hidden="true" />
                   {wechatShare.isWechat ? '微信内分享' : '转发给好友'}
@@ -582,7 +626,7 @@ export function SilverNeighborhoodCampaignPage() {
                 <button
                   type="button"
                   onClick={() => void handleCopyLink()}
-                  className="flex min-h-[48px] items-center justify-center gap-1.5 rounded-xl border border-teal-200 bg-white px-2 text-[13px] font-semibold text-teal-700 transition-colors hover:bg-[#f2faf6] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+                  className="activity-themed-outline flex min-h-[48px] items-center justify-center gap-1.5 rounded-xl border bg-white px-2 text-[13px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
                 >
                   <Copy size={17} aria-hidden="true" />
                   复制链接
@@ -612,54 +656,14 @@ export function SilverNeighborhoodCampaignPage() {
           ) : undefined
         }
       >
-        {shareUrl ? (
-          <div className="mx-auto w-full max-w-[300px] overflow-hidden rounded-2xl border border-[#deebdf] bg-[#f4faf3] shadow-[0_9px_25px_rgba(26,88,62,0.08)]">
-            <img
-              src={import.meta.env.BASE_URL + 'images/silver-neighborhood-hero.webp'}
-              alt="银发社区欢乐季活动海报"
-              className="block aspect-[4/3] w-full object-cover"
-            />
-            <div className="px-3 pb-3 pt-3">
-              <div className="text-center">
-                <p className="text-[17px] font-bold leading-6 text-[#176149]">还差你，三人成团领好礼</p>
-                <p className="mt-1 text-[12px] text-[#547c6c]">
-                  {activity?.community.name ?? '本社区'} · 已有 {team?.seatsFilled ?? 0} / {team?.seatsTotal ?? 3} 位街坊
-                </p>
-              </div>
-              <div className="mt-3 rounded-xl border border-[#deece1] bg-white px-3 py-3 text-center">
-                <div className="relative mx-auto w-fit rounded-lg bg-white">
-                  <QRCodeSVG
-                    value={shareUrl}
-                    size={148}
-                    level="H"
-                    marginSize={3}
-                    fgColor="#195B4C"
-                    bgColor="#FFFFFF"
-                    title="银发社区欢乐季活动直达二维码"
-                  />
-                  {selfParticipation ? (
-                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                      <span
-                        aria-label="我的团席位"
-                        className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#247D67] text-[13px] font-bold text-white shadow-sm"
-                      >
-                        我
-                      </span>
-                    </div>
-                  ) : null}
-                </div>
-                <p className="mt-2 text-[12px] font-semibold text-[#2f765f]">
-                  扫码打开本活动 · 邻里一起领好礼
-                </p>
-              </div>
-              <p className="mt-2 text-center text-[11px] leading-4 text-slate-500">
-                好友打开链接后，需主动确认加入三人团。
-              </p>
-              <p className="mt-1 text-center text-[11px] leading-4 text-slate-400">
-                线上正式域名待配置；本地开发时该链接仅本机可访问。
-              </p>
-            </div>
-          </div>
+        {shareUrl && activity ? (
+          <ActivitySharePoster
+            activity={activity}
+            shareUrl={shareUrl}
+            seatsFilled={team?.seatsFilled ?? null}
+            seatsTotal={team?.seatsTotal ?? null}
+            selfParticipation={Boolean(selfParticipation)}
+          />
         ) : (
           <p className="rounded-xl bg-slate-50 p-3 text-[13px] leading-6 text-slate-500">
             当前没有可用的邀请码（团队可能已满员、已锁定或你尚未参与）。邀请入口已关闭，请刷新参与状态。
@@ -673,7 +677,7 @@ export function SilverNeighborhoodCampaignPage() {
         eyebrow="签到任务 · 团队奖励"
         onClose={() => setActiveSheet(null)}
       >
-        <div className="rounded-2xl bg-[#f2faf6] p-4">
+        <div className="rounded-2xl bg-[var(--activity-surface-muted)] p-4">
           <p className="text-[15px] font-bold text-slate-800">解锁条件</p>
           <p className="mt-1">
             三人团坐满 3 人，且三位团员各有一次经现场核验的有效签到后，团队解锁一份奖励。
@@ -755,7 +759,7 @@ export function SilverNeighborhoodCampaignPage() {
         footer={
           <Link
             to="/me/rewards"
-            className="flex min-h-[48px] w-full items-center justify-center rounded-xl bg-teal-700 px-4 text-[14px] font-bold text-white"
+            className="activity-themed-cta flex min-h-[48px] w-full items-center justify-center rounded-xl px-4 text-[14px] font-bold"
           >
             查看全部活动奖励
           </Link>

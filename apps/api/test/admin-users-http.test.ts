@@ -280,12 +280,14 @@ async function fixture() {
   db.insert(residentProfiles).values([
     {
       userId: wechatPhoneUser,
+      contactPhone: '13800138000',
       contactAddress: '杭州市西湖区文三路 100 号 3 幢 501 室',
       createdAt: at(110),
       updatedAt: at(110),
     },
     {
       userId: phoneOnlyUser,
+      contactPhone: '13900139000',
       contactAddress: null,
       createdAt: at(111),
       updatedAt: at(111),

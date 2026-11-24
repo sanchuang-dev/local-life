@@ -27,9 +27,15 @@ import {
 } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import utc from 'dayjs/plugin/utc'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import {
+  ACTIVITY_PROMO_SUBTITLE_MAX_LENGTH,
+  ACTIVITY_PROMO_TITLE_MAX_LENGTH,
+  ACTIVITY_THEME_KEYS,
+  DEFAULT_ACTIVITY_THEME_KEY,
   activityRewardPlanSchema,
+  activityVisualConfigInputSchema,
+  activityVisualImageUrlSchema,
   createActivityRequestSchema,
   PURCHASE_REWARD_MAX_TOTAL_BUDGET_CENTS,
   PURCHASE_REWARD_TEAM_SIZE,
@@ -43,6 +49,9 @@ import {
   type ActivityRewardPlan,
   type ActivityRuleVersion,
   type ActivityStatus,
+  type ActivityThemeKey,
+  type ActivityVisualConfig,
+  type ActivityVisualConfigInput,
   type AdminActivityDetail,
   type AdminActivitySummary,
   type PurchaseRewardPlan,
@@ -125,6 +134,16 @@ interface ActivityFormValues {
   purchaseCouponFaceValueYuan?: number | null
   purchaseMaxRewardedTeams?: number | null
   purchaseRewardPlanBaseline?: PurchaseRewardPlan | null
+  /**
+   * Visual configuration (LL-ACT-VIS-001, #309). These live on the same form as
+   * the business fields so switching tabs never drops them; empty strings are
+   * just the input representation of a cleared field.
+   */
+  visualThemeKey?: ActivityThemeKey
+  visualHeroImageUrl?: string
+  visualPromoTitle?: string
+  visualPromoSubtitle?: string
+  visualPosterImageUrl?: string
 }
 
 const ACTIVITY_STATUS_META: Record<ActivityStatus, { label: string; color: string }> = {
@@ -503,6 +522,151 @@ function keyRulesEqual(detail: AdminActivityDetail, next: ActivityKeyRules): boo
   return JSON.stringify(current) === JSON.stringify(normalizeKeyRules(next))
 }
 
+/* --------------------------- Activity visual config ------------------------ */
+
+interface ActivityThemeVisual {
+  key: ActivityThemeKey
+  label: string
+  description: string
+  primary: string
+  surface: string
+  accentSoft: string
+  text: string
+}
+
+/**
+ * Preview tokens for the four curated themes (#309).
+ *
+ * The admin page only previews the palette; the resident H5 owns the real
+ * mapping. These values mirror the approved warm/community/health/festival
+ * families so an operator can tell the themes apart before saving.
+ */
+const ACTIVITY_THEME_VISUAL_META: Record<
+  ActivityThemeKey,
+  Omit<ActivityThemeVisual, 'key'>
+> = {
+  'community-green': {
+    label: '社区绿',
+    description: '社区日常与邻里活动，默认主题',
+    primary: '#176f61',
+    surface: '#eaf5e9',
+    accentSoft: '#d8eee5',
+    text: '#275942',
+  },
+  'festival-red': {
+    label: '节庆红',
+    description: '节日、庆典与热闹场次',
+    primary: '#b3342b',
+    surface: '#fdf0ee',
+    accentSoft: '#f7d7d1',
+    text: '#7a2a22',
+  },
+  'health-blue': {
+    label: '健康蓝',
+    description: '义诊、健康筛查与公益服务',
+    primary: '#1d6fb8',
+    surface: '#eef5fc',
+    accentSoft: '#d6e8f8',
+    text: '#204e77',
+  },
+  'warm-gold': {
+    label: '暖阳金',
+    description: '敬老、助老与温暖关怀',
+    primary: '#8f6514',
+    surface: '#fdf5e6',
+    accentSoft: '#f6e3bd',
+    text: '#6b4513',
+  },
+}
+
+export const ACTIVITY_THEME_VISUALS: readonly ActivityThemeVisual[] = ACTIVITY_THEME_KEYS.map(
+  (key) => ({ key, ...ACTIVITY_THEME_VISUAL_META[key] }),
+)
+
+export function activityThemeVisual(key: ActivityThemeKey | undefined): ActivityThemeVisual {
+  const resolved: ActivityThemeKey =
+    key && (ACTIVITY_THEME_KEYS as readonly string[]).includes(key)
+      ? key
+      : DEFAULT_ACTIVITY_THEME_KEY
+  return { key: resolved, ...ACTIVITY_THEME_VISUAL_META[resolved] }
+}
+
+function blankVisualText(value: string | null | undefined): string | null {
+  const trimmed = value?.trim() ?? ''
+  return trimmed === '' ? null : trimmed
+}
+
+/** Projects the server read shape onto the shared form's input fields. */
+export function visualConfigToForm(
+  config: ActivityVisualConfig | null | undefined,
+): Partial<ActivityFormValues> {
+  return {
+    visualThemeKey: config?.themeKey ?? DEFAULT_ACTIVITY_THEME_KEY,
+    visualHeroImageUrl: config?.heroImageUrl ?? '',
+    visualPromoTitle: config?.promoTitle ?? '',
+    visualPromoSubtitle: config?.promoSubtitle ?? '',
+    visualPosterImageUrl: config?.posterImageUrl ?? '',
+  }
+}
+
+export type VisualConfigResult =
+  | { ok: true; visualConfig: ActivityVisualConfigInput }
+  | { ok: false; message: string }
+
+/**
+ * Reads the visual tab into the shared write contract.
+ *
+ * Only the theme is mandatory for a useful visual configuration, so every
+ * artwork/copy field may stay blank; blanks become explicit `null`s. The
+ * contract remains the single validation source for URL scheme/length and copy
+ * length, so an invalid value can never be posted as "saved".
+ */
+export function visualConfigFromForm(values: ActivityFormValues): VisualConfigResult {
+  const candidate = {
+    themeKey: values.visualThemeKey ?? DEFAULT_ACTIVITY_THEME_KEY,
+    heroImageUrl: blankVisualText(values.visualHeroImageUrl),
+    promoTitle: blankVisualText(values.visualPromoTitle),
+    promoSubtitle: blankVisualText(values.visualPromoSubtitle),
+    posterImageUrl: blankVisualText(values.visualPosterImageUrl),
+  }
+  const parsed = activityVisualConfigInputSchema.safeParse(candidate)
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: `界面风格配置不符合共享契约：${formatIssues(parsed.error.issues)}`,
+    }
+  }
+  return { ok: true, visualConfig: parsed.data }
+}
+
+function normalizeVisualConfig(
+  config: ActivityVisualConfig | ActivityVisualConfigInput | null | undefined,
+) {
+  return {
+    themeKey: config?.themeKey ?? DEFAULT_ACTIVITY_THEME_KEY,
+    heroImageUrl: blankVisualText(config?.heroImageUrl),
+    promoTitle: blankVisualText(config?.promoTitle),
+    promoSubtitle: blankVisualText(config?.promoSubtitle),
+    posterImageUrl: blankVisualText(config?.posterImageUrl),
+  }
+}
+
+/** True when saving would actually change the stored visual configuration. */
+export function visualConfigChanged(
+  detail: ActivityVisualConfig,
+  next: ActivityVisualConfigInput,
+): boolean {
+  return JSON.stringify(normalizeVisualConfig(detail)) !== JSON.stringify(normalizeVisualConfig(next))
+}
+
+/** Shared-contract URL check reused by the head/poster inputs and their previews. */
+export function visualImageUrlError(value: string | null | undefined): string | null {
+  const trimmed = value?.trim() ?? ''
+  if (!trimmed) return null
+  const parsed = activityVisualImageUrlSchema.safeParse(trimmed)
+  return parsed.success ? null : '请输入以 http:// 或 https:// 开头的可访问图片地址'
+}
+
 export function toFormValues(detail: AdminActivityDetail): ActivityFormValues {
   return {
     title: detail.title,
@@ -520,6 +684,7 @@ export function toFormValues(detail: AdminActivityDetail): ActivityFormValues {
     notes: detail.publicRules.notes ?? '',
     ...rewardPlanToForm(detail.rewardPlan ?? null),
     ...purchaseRewardPlanToForm(detail.purchaseRewardPlan ?? null),
+    ...visualConfigToForm(detail.visualConfig),
   }
 }
 
@@ -966,6 +1131,272 @@ function PurchaseRewardPlanFields() {
   )
 }
 
+interface ThemeSwatchPickerProps {
+  value?: ActivityThemeKey
+  onChange?: (value: ActivityThemeKey) => void
+}
+
+/** Four curated theme swatches; the value lives in the shared activity Form. */
+function ThemeSwatchPicker({ value, onChange }: ThemeSwatchPickerProps) {
+  const selected = value ?? DEFAULT_ACTIVITY_THEME_KEY
+  return (
+    <div className="activity-theme-swatches" role="radiogroup" aria-label="活动主题">
+      {ACTIVITY_THEME_VISUALS.map((theme) => {
+        const checked = selected === theme.key
+        return (
+          <button
+            key={theme.key}
+            type="button"
+            role="radio"
+            aria-checked={checked}
+            aria-label={theme.label}
+            className={checked ? 'activity-theme-swatch is-selected' : 'activity-theme-swatch'}
+            onClick={() => onChange?.(theme.key)}
+            style={
+              {
+                '--activity-theme-primary': theme.primary,
+                '--activity-theme-surface': theme.surface,
+              } as CSSProperties
+            }
+          >
+            <span className="activity-theme-swatch-dot" aria-hidden="true" />
+            <span className="activity-theme-swatch-copy">
+              <strong>{theme.label}</strong>
+              <small>{theme.description}</small>
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+interface VisualImageUrlFieldProps {
+  value?: string
+  onChange?: (value: string) => void
+  /** Injected by Form.Item so its label points at the URL input. */
+  id?: string
+  kind: 'hero' | 'poster'
+}
+
+/**
+ * URL input + load/replace/clear preview for the head image and the single
+ * poster. Previewing is deliberately local: the admin never uploads or proxies
+ * the file, so a broken/hotlink-protected URL must say so instead of looking
+ * configured.
+ */
+function VisualImageUrlField({ value, onChange, id, kind }: VisualImageUrlFieldProps) {
+  const raw = value ?? ''
+  const trimmed = raw.trim()
+  const invalidReason = visualImageUrlError(trimmed)
+  const canPreview = trimmed !== '' && invalidReason === null
+  // Derive the phase from the URL instead of resetting it in an effect: a new
+  // URL is "loading" until its own <img> reports load/error.
+  const [preview, setPreview] = useState<{
+    url: string
+    phase: 'loading' | 'loaded' | 'error'
+  }>({ url: '', phase: 'loading' })
+  const phase = preview.url === trimmed ? preview.phase : 'loading'
+
+  const noun = kind === 'hero' ? '头图' : '海报'
+  return (
+    <div className="activity-visual-image-field">
+      <div className="activity-visual-image-input">
+        <Input
+          id={id}
+          value={raw}
+          placeholder={
+            kind === 'hero' ? 'https://…/activity-hero.jpg' : 'https://…/activity-poster.jpg'
+          }
+          onChange={(event) => onChange?.(event.target.value)}
+        />
+        <Button
+          type="default"
+          aria-label={`清空${noun}`}
+          disabled={trimmed === ''}
+          onClick={() => onChange?.('')}
+        >
+          清空
+        </Button>
+      </div>
+      {canPreview ? (
+        <div className={`activity-visual-image-preview is-${kind}`}>
+          <img
+            key={trimmed}
+            src={trimmed}
+            alt={`${noun}链接预览`}
+            onLoad={() => setPreview({ url: trimmed, phase: 'loaded' })}
+            onError={() => setPreview({ url: trimmed, phase: 'error' })}
+          />
+          {phase === 'loading' ? (
+            <Typography.Text type="secondary" className="activity-visual-image-status">
+              正在加载{noun}预览…
+            </Typography.Text>
+          ) : null}
+          {phase === 'error' ? (
+            <Alert
+              className="activity-visual-image-status"
+              type="warning"
+              showIcon
+              title={`${noun}加载失败`}
+              description="请确认该 http(s) 地址可直接访问、指向图片文件，且未限制外链。"
+            />
+          ) : null}
+        </div>
+      ) : trimmed !== '' ? (
+        <Typography.Text type="danger" className="activity-visual-image-status">
+          无法预览：{invalidReason}
+        </Typography.Text>
+      ) : (
+        <Typography.Text type="secondary" className="activity-visual-image-status">
+          {kind === 'hero'
+            ? '填写头图 URL 后在此预览；建议 4:3 横图。'
+            : '填写海报 URL 后在此预览；建议 3:4 或 9:16 竖图。'}
+        </Typography.Text>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Compact phone-shaped preview fed by the live form values.
+ *
+ * Every visible value is read from the same Form as the editor, so the operator
+ * sees the real theme/title/copy instead of a hard-coded sample. The poster has
+ * its own preview below and no share/QR mock is drawn here.
+ */
+function ActivityVisualPreview({
+  status,
+  location,
+}: {
+  status: ActivityStatus | null
+  location?: string
+}) {
+  const title = Form.useWatch('title')
+  const themeKey = Form.useWatch('visualThemeKey') as ActivityThemeKey | undefined
+  const heroImageUrl = Form.useWatch('visualHeroImageUrl')
+  const promoTitle = Form.useWatch('visualPromoTitle')
+  const promoSubtitle = Form.useWatch('visualPromoSubtitle')
+  const theme = activityThemeVisual(themeKey)
+  const hero = (heroImageUrl ?? '').trim()
+  const heroInvalid = visualImageUrlError(hero)
+  const heroViewable = hero !== '' && heroInvalid === null
+  const [heroPreview, setHeroPreview] = useState<{
+    url: string
+    phase: 'loading' | 'loaded' | 'error'
+  }>({ url: '', phase: 'loading' })
+  const heroPhase = heroPreview.url === hero ? heroPreview.phase : 'loading'
+
+  const ctaLabel =
+    status === 'published'
+      ? '立即参与活动'
+      : status === 'paused'
+        ? '活动已暂停'
+        : status === 'ended'
+          ? '活动已结束'
+          : '活动未发布'
+  const headline = promoTitle?.trim() || title?.trim() || '填写活动标题后预览'
+  const subline = promoSubtitle?.trim() || '填写宣传副标题后在此预览'
+
+  return (
+    <aside className="activity-visual-preview" aria-label="活动页实时预览">
+      <div className="activity-visual-preview-head">
+        <Typography.Text strong>居民端实时预览</Typography.Text>
+        <Typography.Text type="secondary">读取当前表单值</Typography.Text>
+      </div>
+      <div
+        className="activity-preview-phone"
+        data-theme={theme.key}
+        style={
+          {
+            '--activity-preview-primary': theme.primary,
+            '--activity-preview-surface': theme.surface,
+            '--activity-preview-accent': theme.accentSoft,
+            '--activity-preview-text': theme.text,
+          } as CSSProperties
+        }
+      >
+        <div className="activity-preview-hero">
+          {heroViewable ? (
+            <>
+              <img
+                src={hero}
+                alt="居民端头图预览"
+                onLoad={() => setHeroPreview({ url: hero, phase: 'loaded' })}
+                onError={() => setHeroPreview({ url: hero, phase: 'error' })}
+              />
+              {heroPhase === 'error' ? (
+                <span className="activity-preview-hero-error" role="status">
+                  头图加载失败，请检查链接
+                </span>
+              ) : null}
+            </>
+          ) : (
+            <span className="activity-preview-hero-empty">
+              {hero !== '' ? '头图地址无效，无法预览' : '填写头图 URL 后在此预览（建议 4:3）'}
+            </span>
+          )}
+        </div>
+        <div className="activity-preview-body">
+          <span className="activity-preview-theme-label">{theme.label}</span>
+          <h3 className="activity-preview-title">{headline}</h3>
+          <p className="activity-preview-subtitle">{subline}</p>
+          <p className="activity-preview-location">
+            {location?.trim() || '活动地点来自「活动信息」'}
+          </p>
+          <span className="activity-preview-cta" aria-hidden="true">
+            {ctaLabel}
+          </span>
+        </div>
+      </div>
+    </aside>
+  )
+}
+
+/** Single vertical poster preview; no share card, QR code or "shared" state. */
+function ActivityPosterPreview() {
+  const posterImageUrl = Form.useWatch('visualPosterImageUrl')
+  const poster = (posterImageUrl ?? '').trim()
+  const invalidReason = visualImageUrlError(poster)
+  const [posterPreview, setPosterPreview] = useState<{
+    url: string
+    phase: 'loading' | 'loaded' | 'error'
+  }>({ url: '', phase: 'loading' })
+  const phase = posterPreview.url === poster ? posterPreview.phase : 'loading'
+
+  return (
+    <div className="activity-visual-poster" aria-label="宣传海报预览">
+      <div className="activity-visual-poster-head">
+        <Typography.Title level={5}>宣传海报（单张竖版）</Typography.Title>
+        <Typography.Text type="secondary">
+          建议 3:4 或 9:16 竖图；此处只预览主视觉，不生成分享卡片或二维码。
+        </Typography.Text>
+      </div>
+      <div className="activity-poster-frame">
+        {poster !== '' && invalidReason === null ? (
+          <>
+            <img
+              src={poster}
+              alt="海报预览"
+              onLoad={() => setPosterPreview({ url: poster, phase: 'loaded' })}
+              onError={() => setPosterPreview({ url: poster, phase: 'error' })}
+            />
+            {phase === 'error' ? (
+              <span className="activity-poster-status" role="status">
+                海报加载失败，请检查链接是否可直接访问
+              </span>
+            ) : null}
+          </>
+        ) : (
+          <span className="activity-poster-status">
+            {poster !== '' ? `无法预览：${invalidReason}` : '填写海报 URL 后在此预览'}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function PublicRulesDescriptions({ rules }: { rules: ActivityPublicRules }) {
   return (
     <Descriptions size="small" column={1} colon={false} className="activity-snapshot">
@@ -1019,7 +1450,7 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
   const editorOpen = location.pathname === '/activities/new' || Boolean(editMatch)
   const editorMode: 'create' | 'edit' = editMatch ? 'edit' : 'create'
   const editingActivityId = editMatch?.[1] ?? null
-  const [activeSection, setActiveSection] = useState<'info' | 'checkin' | 'purchase'>('info')
+  const [activeSection, setActiveSection] = useState<'info' | 'checkin' | 'purchase' | 'visual'>('info')
   const [notesOpen, setNotesOpen] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [form] = Form.useForm<ActivityFormValues>()
@@ -1152,6 +1583,8 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
       // the fields usable starting values for when the operator turns it on.
       ...rewardPlanToForm(null),
       ...purchaseRewardPlanToForm(null),
+      // Only the default theme is pre-selected; the artwork/copy stay blank.
+      ...visualConfigToForm(null),
     })
     // Only entering the create route resets; later community refreshes
     // must not wipe what the operator is typing.
@@ -1298,11 +1731,12 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
     setSaveError(null)
     setActiveSection('info')
     setNotesOpen(false)
+    setHasUnsavedChanges(false)
     navigate('/activities/' + row.id + '/edit')
   }
 
-  // The editor is also reachable directly via its URL. Guard explicit exits,
-  // and use the native browser prompt when refreshing or closing the tab.
+  // The editor is URL-addressable, so guard refresh/close as well as the
+  // in-page back button. Loading or saving clears the flag again.
   useEffect(() => {
     if (!editorOpen || !hasUnsavedChanges) return
     const warnBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -1316,6 +1750,7 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
   const leaveEditor = () => {
     detailRequestRef.current += 1
     setHasUnsavedChanges(false)
+    setSaving(false)
     setDetailLoading(false)
     navigate('/activities')
   }
@@ -1395,9 +1830,29 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
       const result = await operation()
       message.success(buildSuccessMessage(result))
       setHasUnsavedChanges(false)
-      setDetail(null)
       refreshList()
-      navigate('/activities')
+      if (editorMode === 'edit' && result?.id) {
+        // Re-read the persisted detail after a save instead of trusting the
+        // form: a visual-only save must be verified against the server, and
+        // the operator stays in the editor so the saved values are visible.
+        const request = detailRequestRef.current + 1
+        detailRequestRef.current = request
+        try {
+          const refreshed = await getActivity(result.id)
+          if (detailRequestRef.current === request) {
+            setDetail(refreshed)
+            form.setFieldsValue(toFormValues(refreshed))
+          }
+        } catch {
+          if (detailRequestRef.current === request) {
+            setDetail(result)
+            form.setFieldsValue(toFormValues(result))
+          }
+        }
+      } else {
+        setDetail(null)
+        navigate('/activities')
+      }
     } catch (cause: unknown) {
       setSaveError(describeError(cause, '保存失败'))
       if (isActivityApiError(cause) && cause.status === 409) {
@@ -1427,12 +1882,22 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
       return
     }
     const keyRules = keyRulesResult.keyRules
+    const visualResult = visualConfigFromForm(values)
+    if (!visualResult.ok) {
+      setActiveSection('visual')
+      setSaveError(visualResult.message)
+      return
+    }
+    const visualConfig = visualResult.visualConfig
 
     if (editorMode === 'create') {
       const parsed = createActivityRequestSchema.safeParse({
         communityId: values.communityId,
         title: values.title.trim(),
         keyRules,
+        // A brand-new activity may pick only a theme; the artwork/copy stay
+        // explicit `null`s so the H5 shows its own safe defaults.
+        visualConfig,
       })
       if (!parsed.success) {
         setSaveError(formatIssues(parsed.error.issues))
@@ -1455,7 +1920,10 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
     if (nextTitle !== detail.title) changes.title = nextTitle
     const keyRulesChanged = !keyRulesEqual(detail, keyRules)
     if (keyRulesChanged) changes.keyRules = keyRules
-    if (!changes.title && !changes.keyRules) {
+    const visualChanged =
+      !detail.visualConfig || visualConfigChanged(detail.visualConfig, visualConfig)
+    if (visualChanged) changes.visualConfig = visualConfig
+    if (!changes.title && !changes.keyRules && !changes.visualConfig) {
       message.info('没有需要保存的修改。')
       return
     }
@@ -1737,6 +2205,7 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
             ['info', '活动信息'],
             ['checkin', '签到奖励'],
             ['purchase', '消费奖励'],
+            ['visual', '界面风格'],
           ] as const).map(([key, label]) => (
             <button
               key={key}
@@ -1749,7 +2218,7 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
               onClick={() => setActiveSection(key)}
             >
               <span>{label}</span>
-              {key !== 'info' ? (
+              {key === 'checkin' || key === 'purchase' ? (
                 <span className="activity-editor-tab-state">
                   {key === 'purchase' && detail && detail.status !== 'draft'
                     ? '已冻结'
@@ -1845,7 +2314,8 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
             onFinishFailed={({ errorFields }) => {
               const name = String(errorFields[0]?.name[0] ?? '')
               const section = name.startsWith('reward') ? 'checkin'
-                : name.startsWith('purchase') ? 'purchase' : 'info'
+                : name.startsWith('purchase') ? 'purchase'
+                : name.startsWith('visual') ? 'visual' : 'info'
               setActiveSection(section)
               if (name === 'notes') setNotesOpen(true)
               setSaveError('有必填项或格式需要检查，已为你切换到相应区域。')
@@ -2165,6 +2635,106 @@ function ActivityConsole({ session }: { session: AuthenticatedSession }) {
                 草稿修改不生成规则版本；发布后奖励规则按原有合同冻结。
               </Typography.Text>
             ) : null}
+            </section>
+
+            <section
+              id="activity-editor-visual"
+              role="tabpanel"
+              aria-label="界面风格"
+              style={{ display: activeSection === 'visual' ? undefined : 'none' }}
+            >
+              <Typography.Title level={5} className="activity-editor-section-title">界面风格</Typography.Title>
+              <Typography.Paragraph type="secondary" className="activity-editor-intro">
+                配置居民 H5 活动页的主题、头图、宣传文案与单张海报；只选择主题也可以保存，其余字段可留空。
+              </Typography.Paragraph>
+
+              <div className="activity-visual-layout">
+                <div className="activity-visual-fields">
+                  <Form.Item
+                    name="visualThemeKey"
+                    label="活动主题"
+                    extra="四种主题只影响活动页配色，不改变活动状态或奖励规则。"
+                  >
+                    <ThemeSwatchPicker />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="visualHeroImageUrl"
+                    label="活动头图 URL"
+                    rules={[
+                      {
+                        validator: async (_rule, value: unknown) => {
+                          const message = visualImageUrlError(
+                            typeof value === 'string' ? value : '',
+                          )
+                          if (message) throw new Error(message)
+                        },
+                      },
+                    ]}
+                    extra="建议 4:3 横图；仅支持可直接访问的 http(s) 图片地址，留空则使用默认视觉。"
+                  >
+                    <VisualImageUrlField kind="hero" />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="visualPosterImageUrl"
+                    label="宣传海报 URL（单张竖版）"
+                    rules={[
+                      {
+                        validator: async (_rule, value: unknown) => {
+                          const message = visualImageUrlError(
+                            typeof value === 'string' ? value : '',
+                          )
+                          if (message) throw new Error(message)
+                        },
+                      },
+                    ]}
+                    extra="建议 3:4 或 9:16 竖图；用于分享海报主视觉，留空则回退使用头图。"
+                  >
+                    <VisualImageUrlField kind="poster" />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="visualPromoTitle"
+                    label="宣传标题（选填）"
+                    rules={[
+                      {
+                        max: ACTIVITY_PROMO_TITLE_MAX_LENGTH,
+                        message: `最多 ${ACTIVITY_PROMO_TITLE_MAX_LENGTH} 个字符`,
+                      },
+                    ]}
+                    extra={`最多 ${ACTIVITY_PROMO_TITLE_MAX_LENGTH} 个字符；留空时居民端使用活动标题。`}
+                  >
+                    <Input
+                      maxLength={ACTIVITY_PROMO_TITLE_MAX_LENGTH}
+                      showCount
+                      placeholder="填写面向居民的活动宣传标题"
+                    />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="visualPromoSubtitle"
+                    label="宣传副标题（选填）"
+                    rules={[
+                      {
+                        max: ACTIVITY_PROMO_SUBTITLE_MAX_LENGTH,
+                        message: `最多 ${ACTIVITY_PROMO_SUBTITLE_MAX_LENGTH} 个字符`,
+                      },
+                    ]}
+                    extra={`最多 ${ACTIVITY_PROMO_SUBTITLE_MAX_LENGTH} 个字符；留空时居民端不显示副标题。`}
+                  >
+                    <Input
+                      maxLength={ACTIVITY_PROMO_SUBTITLE_MAX_LENGTH}
+                      showCount
+                      placeholder="填写一句补充说明，例如时间或亮点"
+                    />
+                  </Form.Item>
+                </div>
+
+                <ActivityVisualPreview status={detail?.status ?? null} location={detail?.location} />
+              </div>
+
+              <ActivityPosterPreview />
             </section>
 
             <div className="activity-editor-footer">

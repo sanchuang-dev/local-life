@@ -38,7 +38,6 @@ import {
   localOrderOnlineConflicts,
   localOrders,
   paymentIntents,
-  residentPhoneIdentities,
   residentProfiles,
   staffAccounts,
   staffCommunityAssignments,
@@ -333,14 +332,12 @@ function toDetail(row: OrderRow, db: AppDatabase): LocalOrderDetail {
   const events = eventRows(db, row.id)
   const maps = refMaps(db, [row], events)
   const lastNote = [...events].reverse().find((event) => event.note)?.note ?? null
-  const phone = db.select({ phone: residentPhoneIdentities.phone })
-    .from(residentPhoneIdentities)
-    .where(eq(residentPhoneIdentities.userId, row.residentUserId))
-    .get()?.phone ?? null
-  const address = db.select({ contactAddress: residentProfiles.contactAddress })
+  const profile = db.select({ phone: residentProfiles.contactPhone, address: residentProfiles.contactAddress })
     .from(residentProfiles)
     .where(eq(residentProfiles.userId, row.residentUserId))
-    .get()?.contactAddress ?? null
+    .get()
+  const phone = profile?.phone ?? null
+  const address = profile?.address ?? null
   // PAY-05: the online completion projection is read from its own immutable
   // table, never derived from `verified_*` (a manual fact check) or a receipt.
   const completion = db.select()

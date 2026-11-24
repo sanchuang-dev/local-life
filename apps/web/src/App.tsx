@@ -2,7 +2,7 @@ import { Navigate, Route, Routes, useLocation } from 'react-router'
 import { AppShell } from './components/shell/AppShell'
 import { RequireResidentAuth } from './components/auth/RequireResidentAuth'
 import { ResidentSiteGate } from './components/auth/ResidentSiteGate'
-import { shouldShowWeChatGate } from './components/auth/wechatEnvironment'
+import { developmentPreviewUrl, shouldShowWeChatGate } from './components/auth/wechatEnvironment'
 import { ResidentAuthProvider } from './hooks/useResidentAuth'
 import { OpenInWeChatPage } from './pages/OpenInWeChatPage'
 import { CommunityDiscoveryPage } from './pages/CommunityDiscoveryPage'
@@ -67,7 +67,11 @@ export default function App() {
     search: window.location.search,
     isDevelopment: import.meta.env.DEV,
     previewSessionEnabled: developmentPreviewEnabled,
-  })) return <OpenInWeChatPage />
+  })) return <OpenInWeChatPage
+    onDevelopmentPreview={import.meta.env.DEV
+      ? () => window.location.assign(developmentPreviewUrl(window.location.href))
+      : undefined}
+  />
 
   return (
     <ResidentAuthProvider>

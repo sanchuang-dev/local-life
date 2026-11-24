@@ -31,9 +31,9 @@ type Progress = ReturnType<typeof useRewardProgress>
 type Feedback = { tone: 'success' | 'error'; text: string } | null
 
 const primaryButton =
-  'flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 text-[14px] font-bold text-white transition-colors hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600'
+  'activity-themed-cta flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl px-4 text-[14px] font-bold text-white transition-colors disabled:cursor-not-allowed disabled:bg-slate-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600'
 const secondaryButton =
-  'flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-teal-200 bg-white px-4 text-[12px] font-semibold text-teal-700 transition-colors hover:bg-[#f2f8f5] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600'
+  'activity-themed-outline flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-teal-200 bg-white px-4 text-[12px] font-semibold text-teal-700 transition-colors disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600'
 
 function ProgressBar({ value, total, label }: { value: number; total: number; label: string }) {
   const percent = total > 0 ? Math.min(100, Math.round((value / total) * 100)) : 0

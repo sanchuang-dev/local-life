@@ -1,7 +1,6 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, Copy, MapPin, Phone, UserRound, X } from 'lucide-react'
-import { PhoneVerificationForm } from '../auth/PhoneVerificationForm'
 import type { useResidentAuth } from '../../hooks/useResidentAuth'
 import { residentProfileViewState } from './profileViewModel'
 import './ProfilePreviewDrawer.css'
@@ -9,29 +8,24 @@ import './ProfilePreviewDrawer.css'
 type ResidentProfileDrawerProps = {
   auth: ReturnType<typeof useResidentAuth>
   onClose: () => void
+  onSaved: () => void
 }
 
 /** Resident-owned profile editor backed only by real account/profile APIs. */
-export function ResidentProfileDrawer({ auth, onClose }: ResidentProfileDrawerProps) {
+export function ResidentProfileDrawer({ auth, onClose, onSaved }: ResidentProfileDrawerProps) {
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
   const [address, setAddress] = useState(auth.residentProfile?.contactAddress ?? '')
-  const [phoneEditing, setPhoneEditing] = useState(false)
-  const [savedNotice, setSavedNotice] = useState<string | null>(null)
+  const [phone, setPhone] = useState(auth.residentProfile?.contactPhone ?? '')
   const dialogRef = useRef<HTMLElement>(null)
   const titleId = useId()
   const addressId = useId()
+  const phoneId = useId()
   const profile = auth.residentProfile
-  const maskedPhone = profile?.phone.maskedPhone ?? auth.phoneStatus?.maskedPhone ?? null
-  const phoneConfigured = auth.phoneStatus?.configured === true
   const view = residentProfileViewState({
     loading: auth.residentProfileLoading,
     saving: auth.residentProfileSaving,
     error: auth.residentProfileError,
     hasProfile: profile !== null,
-    phoneStatusKnown: auth.phoneStatus !== null,
-    phoneConfigured,
-    maskedPhone,
-    changingPhone: phoneEditing,
   })
 
   useEffect(() => {
@@ -39,7 +33,10 @@ export function ResidentProfileDrawer({ auth, onClose }: ResidentProfileDrawerPr
   }, [auth.refreshResidentProfile])
 
   useEffect(() => {
-    if (profile) setAddress(profile.contactAddress ?? '')
+    if (profile) {
+      setAddress(profile.contactAddress ?? '')
+      setPhone(profile.contactPhone ?? '')
+    }
   }, [profile])
 
   useEffect(() => {
@@ -102,13 +99,11 @@ export function ResidentProfileDrawer({ auth, onClose }: ResidentProfileDrawerPr
     }
   }
 
-  const saveAddress = async (event: FormEvent<HTMLFormElement>) => {
+  const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setSavedNotice(null)
     try {
-      const saved = await auth.saveContactAddress(address)
-      setAddress(saved.contactAddress ?? '')
-      setSavedNotice('联系地址已保存。')
+      await auth.saveContactProfile(address, phone)
+      onSaved()
     } catch {
       // The auth controller owns the API error so retrying never hides it.
     }
@@ -156,7 +151,7 @@ export function ResidentProfileDrawer({ auth, onClose }: ResidentProfileDrawerPr
         )}
 
         {view.status === 'ready' && (
-          <form id="resident-profile-form" onSubmit={(event) => void saveAddress(event)} className="me-profile-drawer__form">
+          <form id="resident-profile-form" onSubmit={(event) => void saveProfile(event)} className="me-profile-drawer__form">
             <div className="me-profile-drawer__identity-card">
               <div className="me-profile-drawer__avatar">
                 {profile?.wechat?.avatarUrl
@@ -170,67 +165,22 @@ export function ResidentProfileDrawer({ auth, onClose }: ResidentProfileDrawerPr
               </div>
             </div>
 
-            <section className="me-profile-drawer__phone">
-              <div className="me-profile-drawer__phone-heading">
-                <span><Phone size={17} aria-hidden="true" />联系电话</span>
-                {view.phoneMode === 'bound' && (
-                  <button type="button" disabled={!phoneConfigured} onClick={() => setPhoneEditing(true)}>
-                    {phoneConfigured ? '更换' : '短信未启用'}
-                  </button>
-                )}
-              </div>
-              {view.phoneMode === 'bound' && (
-                <p className="me-profile-drawer__phone-current">已验证 {maskedPhone}</p>
-              )}
-              {view.phoneMode === 'unknown' && (
-                <div className="me-profile-drawer__phone-unavailable">
-                  <p>暂时无法读取手机号服务状态；联系地址仍可正常保存。</p>
-                  <button type="button" onClick={() => void auth.refreshPhoneStatus()}>重新读取手机号状态</button>
-                </div>
-              )}
-              {view.phoneMode === 'unavailable' && (
-                <p className="me-profile-drawer__phone-unavailable">
-                  短信服务未配置，暂不能绑定或更换手机号；联系地址仍可正常保存。
-                </p>
-              )}
-              {(view.phoneMode === 'bind' || view.phoneMode === 'change') && (
-                <>
-                  <PhoneVerificationForm
-                    purpose="bind"
-                    configured={true}
-                    title={view.phoneMode === 'change' ? '验证新的手机号' : '绑定手机号'}
-                    description={view.phoneMode === 'change'
-                      ? '新号码验证成功后会替换当前手机号，居民账号、活动和奖励记录保持不变。'
-                      : '通过短信验证码确认本人手机号，不自动合并其他居民账户。'}
-                    submitLabel={view.phoneMode === 'change' ? '确认更换' : '确认绑定'}
-                    onRequestCode={(phone) => auth.requestPhoneCode(phone, 'bind')}
-                    onSubmit={(phone, code) => auth.bindPhone(phone, code).then(() => undefined)}
-                    onSuccess={() => {
-                      setPhoneEditing(false)
-                      setSavedNotice(maskedPhone ? '手机号已更换。' : '手机号已绑定。')
-                    }}
-                  />
-                  {view.phoneMode === 'change' && (
-                    <button type="button" className="me-profile-drawer__phone-cancel"
-                      onClick={() => setPhoneEditing(false)}>取消更换</button>
-                  )}
-                </>
-              )}
-            </section>
+            <div className="me-profile-drawer__field">
+              <label htmlFor={phoneId}><Phone size={17} aria-hidden="true" />联系电话</label>
+              <input id={phoneId} type="tel" inputMode="tel" autoComplete="tel" maxLength={11}
+                pattern="1[0-9]{10}" placeholder="请输入联系电话" value={phone}
+                onChange={(event) => setPhone(event.target.value)} />
+            </div>
 
             <div className="me-profile-drawer__field">
               <label htmlFor={addressId}><MapPin size={17} aria-hidden="true" />联系地址</label>
               <textarea id={addressId} autoComplete="street-address" rows={3} maxLength={200}
                 placeholder="请输入街道、门牌号等详细地址"
                 value={address}
-                onChange={(event) => {
-                  setAddress(event.target.value)
-                  setSavedNotice(null)
-                }} />
+                onChange={(event) => setAddress(event.target.value)} />
               <small className="me-profile-drawer__counter">{address.length}/200</small>
             </div>
             {auth.residentProfileError && <p className="me-profile-drawer__error" role="alert">{auth.residentProfileError}</p>}
-            {savedNotice && <p className="me-profile-drawer__success" role="status">{savedNotice}</p>}
           </form>
         )}
 
@@ -238,7 +188,7 @@ export function ResidentProfileDrawer({ auth, onClose }: ResidentProfileDrawerPr
           <button type="button" className="me-profile-drawer__cancel" onClick={onClose}>关闭</button>
           <button type="submit" form="resident-profile-form" className="me-profile-drawer__save"
             disabled={view.saveDisabled}>
-            {auth.residentProfileSaving ? '保存中…' : '保存地址'}
+            {auth.residentProfileSaving ? '保存中…' : '保存资料'}
           </button>
         </div>
       </section>
