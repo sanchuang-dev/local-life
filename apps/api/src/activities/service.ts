@@ -2,15 +2,17 @@ import { randomUUID } from 'node:crypto'
 import { and, count, desc, eq, inArray, sql, type SQL } from 'drizzle-orm'
 import {
   API_ERROR_CODES,
+  DEFAULT_ACTIVITY_THEME_KEY,
   activityAuditEntryListResponseSchema,
   activityKeyRulesSchema,
   activityKeyRulesWriteSchema,
-  findCheckinWindowIssues,
   activityPublicRulesSchema,
   activityRewardPlanSchema,
   activityRuleVersionListResponseSchema,
+  activityVisualConfigSchema,
   adminActivityDetailSchema,
   adminActivityListResponseSchema,
+  findCheckinWindowIssues,
   publicActivityDetailSchema,
   publicActivityListResponseSchema,
   purchaseRewardPlanSchema,
@@ -20,6 +22,8 @@ import {
   type ActivityRewardPlan,
   type ActivityRuleVersionListResponse,
   type ActivityStatus,
+  type ActivityThemeKey,
+  type ActivityVisualConfig,
   type AdminActivityDetail,
   type AdminActivityListResponse,
   type ApiErrorCode,
@@ -82,6 +86,11 @@ const adminSelection = {
   publicRulesJson: activities.publicRulesJson,
   rewardPlanJson: activities.rewardPlanJson,
   purchaseRewardPlanJson: activities.purchaseRewardPlanJson,
+  themeKey: activities.themeKey,
+  heroImageUrl: activities.heroImageUrl,
+  promoTitle: activities.promoTitle,
+  promoSubtitle: activities.promoSubtitle,
+  posterImageUrl: activities.posterImageUrl,
   currentRuleVersionId: activities.currentRuleVersionId,
   ruleVersion: activityRuleVersions.version,
   createdAt: activities.createdAt,
@@ -107,6 +116,11 @@ interface ActivityRow {
   publicRulesJson: string
   rewardPlanJson: string | null
   purchaseRewardPlanJson: string | null
+  themeKey: ActivityThemeKey
+  heroImageUrl: string | null
+  promoTitle: string | null
+  promoSubtitle: string | null
+  posterImageUrl: string | null
   currentRuleVersionId: string | null
   ruleVersion: number | null
   createdAt: Date
@@ -204,6 +218,24 @@ function toPublicPurchaseReward(json: string | null): PublicPurchaseReward | nul
     thresholdCents: plan.thresholdCents,
     couponFaceValueCents: plan.couponFaceValueCents,
   }
+}
+
+/**
+ * Reads the presentation-only visual columns into the shared read shape.
+ *
+ * The H5 and the admin editor must receive the same five fields; anything else
+ * on the activity row stays internal. Nullable artwork/copy is intentional: a
+ * NULL hero/poster lets the H5 keep its existing artwork fallback instead of
+ * rendering a broken image.
+ */
+function toVisualConfig(row: ActivityRow): ActivityVisualConfig {
+  return activityVisualConfigSchema.parse({
+    themeKey: row.themeKey,
+    heroImageUrl: row.heroImageUrl,
+    promoTitle: row.promoTitle,
+    promoSubtitle: row.promoSubtitle,
+    posterImageUrl: row.posterImageUrl,
+  })
 }
 
 /**
@@ -383,6 +415,7 @@ function toAdminDetail(row: ActivityRow): AdminActivityDetail {
     currentRuleVersionId: row.currentRuleVersionId,
     rewardPlan: parseRewardPlan(row.rewardPlanJson),
     purchaseRewardPlan: parsePurchaseRewardPlan(row.purchaseRewardPlanJson),
+    visualConfig: toVisualConfig(row),
   })
 }
 
@@ -398,6 +431,7 @@ function toPublicSummary(row: ActivityRow) {
     status: row.status,
     ruleVersion: row.ruleVersion ?? null,
     updatedAt: iso(row.updatedAt),
+    visualConfig: toVisualConfig(row),
   }
 }
 
@@ -663,6 +697,11 @@ export function createActivity(
             keyRules.purchaseRewardPlan === null
               ? null
               : JSON.stringify(keyRules.purchaseRewardPlan),
+          themeKey: body.visualConfig?.themeKey ?? DEFAULT_ACTIVITY_THEME_KEY,
+          heroImageUrl: body.visualConfig?.heroImageUrl ?? null,
+          promoTitle: body.visualConfig?.promoTitle ?? null,
+          promoSubtitle: body.visualConfig?.promoSubtitle ?? null,
+          posterImageUrl: body.visualConfig?.posterImageUrl ?? null,
           currentRuleVersionId: null,
           createdByUserId: actor.userId,
           createdAt: now,
@@ -719,6 +758,37 @@ export function updateActivity(
       if (body.title !== undefined) set.title = body.title
       if (body.summary !== undefined) set.summary = body.summary
       if (body.description !== undefined) set.description = body.description
+
+      /**
+       * Presentation-only patch. It is intentionally separate from the key-rules
+       * branch below: changing the theme/artwork/copy after publication is
+       * allowed and must *not* create an `activity_rule_version`, touch the
+       * frozen reward/budget data or change status/ruleVersion.
+       *
+       * Three-way semantics (same idea as the reward plans):
+       *   - `undefined` (key omitted) -> leave every visual column untouched;
+       *   - `null`                    -> clear all and restore the default theme;
+       *   - object with a key         -> patch just that key; `null`/blank
+       *                                  clears the individual field.
+       */
+      if (body.visualConfig !== undefined) {
+        const visual = body.visualConfig
+        if (visual === null) {
+          set.themeKey = DEFAULT_ACTIVITY_THEME_KEY
+          set.heroImageUrl = null
+          set.promoTitle = null
+          set.promoSubtitle = null
+          set.posterImageUrl = null
+        } else {
+          if (visual.themeKey !== undefined) set.themeKey = visual.themeKey
+          if (visual.heroImageUrl !== undefined) set.heroImageUrl = visual.heroImageUrl
+          if (visual.promoTitle !== undefined) set.promoTitle = visual.promoTitle
+          if (visual.promoSubtitle !== undefined) set.promoSubtitle = visual.promoSubtitle
+          if (visual.posterImageUrl !== undefined) {
+            set.posterImageUrl = visual.posterImageUrl
+          }
+        }
+      }
 
       let createdVersion: number | null = null
       // `rewardPlan` absent means "leave the plan as it is"; an explicit `null`

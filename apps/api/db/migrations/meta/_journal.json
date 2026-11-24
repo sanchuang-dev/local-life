@@ -288,6 +288,13 @@
       "when": 1795063800000,
       "tag": "0040_restore_payment_immutable_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1795491000000,
+      "tag": "0042_activity_visual_config",
+      "breakpoints": true
     }
   ]
 }
