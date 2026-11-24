@@ -212,9 +212,9 @@ export function ParticipationTeamCard({
             type="button"
             disabled={!data.joinable || participation.confirming}
             onClick={() => void handleConfirm()}
-            className={`mt-3 flex min-h-[48px] w-full items-center justify-center rounded-xl px-4 text-[14px] font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 ${
+            className={`activity-themed-cta mt-3 flex min-h-[48px] w-full items-center justify-center rounded-xl px-4 text-[14px] font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 ${
               data.joinable
-                ? 'bg-teal-700 text-white hover:bg-teal-800 disabled:cursor-wait disabled:opacity-70'
+                ? 'text-white disabled:cursor-wait disabled:opacity-70'
                 : 'cursor-not-allowed bg-slate-100 text-slate-500'
             }`}
           >
@@ -330,7 +330,7 @@ export function ParticipationTeamCard({
             <button
               type="button"
               onClick={onShare}
-              className="mt-3 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 text-[14px] font-bold text-white transition-colors hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+              className="activity-themed-cta mt-3 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl px-4 text-[14px] font-bold text-white transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
             >
               <Share2 size={17} aria-hidden="true" />
               邀请 {remaining} 位街坊加入三人团

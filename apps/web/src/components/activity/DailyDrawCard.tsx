@@ -209,12 +209,12 @@ export function DailyDrawCard({
           ) : null}
 
           {!userId && !authLoading ? (
-            <Link to={loginHref} className="mt-3 flex min-h-[48px] items-center justify-center rounded-xl bg-teal-700 px-4 text-[14px] font-bold text-white">
+            <Link to={loginHref} className="activity-themed-cta mt-3 flex min-h-[48px] items-center justify-center rounded-xl px-4 text-[14px] font-bold text-white">
               登录后参与抽奖
             </Link>
           ) : (
             <button type="button" onClick={() => void runDraw()} disabled={disabled}
-              className="mt-3 inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 text-[14px] font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600">
+              className="activity-themed-cta mt-3 inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl px-4 text-[14px] font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600">
               <Sparkles size={18} aria-hidden="true" />
               {busy ? '正在开奖…' : state?.available ? '抽一次' : '暂不能抽奖'}
             </button>

@@ -1,4 +1,6 @@
-import type { PublicActivityDetail } from '@sanchuang-dev/local-life-contracts'
+import type { ActivityVisualConfig, PublicActivityDetail } from '@sanchuang-dev/local-life-contracts'
+// Explicit `.ts` keeps this pure helper importable by the Node test runner.
+import { resolveActivityPromoCopy, resolveWechatShareImageUrl } from './activityVisual.ts'
 
 /** Minimum WeChat JS-SDK surface required by the real activity share flow. */
 export interface WechatShareData {
@@ -6,6 +8,20 @@ export interface WechatShareData {
   desc: string
   link: string
   imgUrl: string
+}
+
+/** Public activity data the share card is built from. */
+export type WechatShareActivity = Pick<PublicActivityDetail, 'title' | 'summary'> & {
+  /**
+   * Optional so older callers/tests that predate #309 keep working; the real
+   * hook always passes the public detail's visual config.
+   */
+  visualConfig?:
+    | Pick<
+        ActivityVisualConfig,
+        'heroImageUrl' | 'posterImageUrl' | 'promoTitle' | 'promoSubtitle'
+      >
+    | null
 }
 
 export interface WechatSdk {
@@ -31,18 +47,24 @@ export function isWechatBrowser(userAgent: string): boolean {
  * Build the WeChat payload from the same real URL used by QR and copy.
  * The caller owns invite eligibility; this utility NEVER generates invite codes.
  * With no eligible invite, use the existing activity-only URL.
+ *
+ * Title/description follow the current activity's promo copy (falling back to
+ * the activity title/summary), and the cover uses its publicly reachable poster
+ * or hero image, falling back to the bundled legacy artwork. Nothing here is
+ * hard-coded to the historical silver-neighbourhood campaign.
  */
 export function createWechatActivityShareData(
-  activity: Pick<PublicActivityDetail, 'title' | 'summary'>,
+  activity: WechatShareActivity,
   link: string,
   origin: string,
   baseUrl: string,
 ): WechatShareData {
+  const promo = resolveActivityPromoCopy(activity.visualConfig)
   return {
-    title: activity.title,
-    desc: activity.summary?.trim() || '来社区一起参加活动，认识更多街坊。',
+    title: promo.title ?? activity.title,
+    desc: promo.subtitle?.trim() || activity.summary?.trim() || '来社区一起参加活动，认识更多街坊。',
     link,
-    imgUrl: new URL(`${baseUrl}images/silver-neighborhood-hero.webp`, origin).href,
+    imgUrl: resolveWechatShareImageUrl(activity.visualConfig, origin, baseUrl),
   }
 }
 
