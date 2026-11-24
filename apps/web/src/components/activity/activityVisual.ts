@@ -130,7 +130,7 @@ export const ACTIVITY_THEME_TOKENS: Record<ActivityThemeKey, ActivityThemeTokens
     border: '#ecd9ad',
     text: '#574010',
     textMuted: '#7a6434',
-    button: '#a27112',
+    button: '#8f6514',
     buttonStrong: '#7f590b',
     buttonText: '#ffffff',
     onPrimary: '#ffffff',
@@ -251,14 +251,69 @@ export function resolveActivityPromoCopy(
   return { title: title || null, subtitle: subtitle || null }
 }
 
+export type ActivityPagePromo = {
+  /** Whether the page renders the promo band at all. */
+  visible: boolean
+  /** Configured promo title, or the real activity title for a configured activity. */
+  title: string | null
+  /** Configured promo subtitle only; never a duplicated activity title. */
+  subtitle: string | null
+}
+
+/**
+ * Page promo band copy for the activity detail page.
+ *
+ * A new activity may configure only a hero image or a theme (P2 allows this), so
+ * the resident page must still show the real activity title: the headline falls
+ * back to `activity.title` whenever any visual is configured. Historical
+ * activities with no visual config (default green, no hero/promo) keep the
+ * pre-#309 page instead of stacking a second title over the bundled artwork,
+ * which already carries its campaign title.
+ */
+export function resolveActivityPagePromo(
+  activity:
+    | {
+        title: string
+        visualConfig: Pick<
+          ActivityVisualConfig,
+          'themeKey' | 'heroImageUrl' | 'posterImageUrl' | 'promoTitle' | 'promoSubtitle'
+        >
+      }
+    | null
+    | undefined,
+  /** Optional pre-parsed promo copy, so callers do not parse the config twice. */
+  promo: ActivityPromoCopy = resolveActivityPromoCopy(activity?.visualConfig),
+): ActivityPagePromo {
+  if (!activity) return { visible: false, title: null, subtitle: null }
+
+  const hasConfiguredVisual =
+    promo.title !== null ||
+    promo.subtitle !== null ||
+    normalizeActivityImageUrl(activity.visualConfig.heroImageUrl) !== null ||
+    normalizeActivityImageUrl(activity.visualConfig.posterImageUrl) !== null ||
+    resolveActivityThemeKey(activity.visualConfig.themeKey) !== DEFAULT_ACTIVITY_THEME_KEY
+
+  if (!hasConfiguredVisual) return { visible: false, title: null, subtitle: null }
+
+  return {
+    visible: true,
+    title: promo.title ?? activity.title,
+    subtitle: promo.subtitle,
+  }
+}
+
 export type ActivityPosterCopy = {
+  /** Current activity headline: promo title, else the real activity title. */
   title: string
+  /** Configured promo subtitle, else community/seats line. */
   subtitle: string
 }
 
 /**
- * Poster copy: the configured promo copy wins; an activity without visual config
- * keeps the historical poster wording instead of turning blank.
+ * Poster copy: the poster headline is always derived from *this* activity
+ * (configured promo title, else the real activity title). The old fixed silver
+ * slogan is deliberately not reused as a headline, so a non-silver activity can
+ * never inherit another campaign's promotional title.
  */
 export function resolveActivityPosterCopy(
   activity: {
@@ -271,7 +326,7 @@ export function resolveActivityPosterCopy(
 ): ActivityPosterCopy {
   const promo = resolveActivityPromoCopy(activity.visualConfig)
   return {
-    title: promo.title ?? '还差你，三人成团领好礼',
+    title: promo.title ?? activity.title,
     subtitle:
       promo.subtitle ??
       `${activity.community.name} · 已有 ${seatsFilled ?? 0} / ${seatsTotal ?? 3} 位街坊`,

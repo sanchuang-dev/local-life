@@ -22,6 +22,7 @@ import {
   activityThemeStyle,
   normalizeActivityImageUrl,
   resolveActivityHeroImageCandidates,
+  resolveActivityPagePromo,
   resolveActivityPromoCopy,
   resolveActivityThemeKey,
 } from '../components/activity/activityVisual'
@@ -264,7 +265,10 @@ export function SilverNeighborhoodCampaignPage() {
   // Without a loaded activity the historical green theme keeps the page stable.
   const themeStyle = activityThemeStyle(activity?.visualConfig.themeKey)
   const themeName = resolveActivityThemeKey(activity?.visualConfig.themeKey)
+  // Headline falls back to the real activity title for a configured activity
+  // (hero/theme only); historical no-visual activities skip the duplicate band.
   const promo = resolveActivityPromoCopy(activity?.visualConfig)
+  const pagePromo = resolveActivityPagePromo(activity, promo)
   const heroCandidates = resolveActivityHeroImageCandidates(
     activity?.visualConfig,
     import.meta.env.BASE_URL,
@@ -424,16 +428,16 @@ export function SilverNeighborhoodCampaignPage() {
           <ActivityLoadNotice state={activityState} onRetry={retryActivity} />
         )}
         <div className="activity-theme-body relative -mt-px px-4 pb-16 pt-0">
-          {activity && (promo.title || promo.subtitle) ? (
+          {pagePromo.visible ? (
             <div className="mt-3 rounded-2xl border border-[var(--activity-border)] bg-[var(--activity-surface)] px-3.5 py-3">
-              {promo.title ? (
+              {pagePromo.title ? (
                 <p className="break-words text-[18px] font-bold leading-7 text-[var(--activity-text)]">
-                  {promo.title}
+                  {pagePromo.title}
                 </p>
               ) : null}
-              {promo.subtitle ? (
+              {pagePromo.subtitle ? (
                 <p className="mt-1 break-words text-[12px] leading-5 text-[var(--activity-text-muted)]">
-                  {promo.subtitle}
+                  {pagePromo.subtitle}
                 </p>
               ) : null}
             </div>

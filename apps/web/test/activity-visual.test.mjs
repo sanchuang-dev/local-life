@@ -11,6 +11,7 @@ import {
   normalizeActivityImageUrl,
   resolveActivityArtworkImageUrl,
   resolveActivityHeroImageCandidates,
+  resolveActivityPagePromo,
   resolveActivityPosterCopy,
   resolveActivityPosterImageCandidates,
   resolveActivityPromoCopy,
@@ -123,7 +124,78 @@ test('unsafe or non-absolute artwork URLs never reach an image source', () => {
   assert.equal(resolveActivityArtworkImageUrl({ heroImageUrl: 'data:image/png;base64,AA' }), null)
 })
 
-test('promo copy and poster copy keep historical wording when nothing is configured', () => {
+test('page promo band always shows a real title for a configured activity', () => {
+  const baseConfig = {
+    themeKey: 'community-green',
+    heroImageUrl: null,
+    posterImageUrl: null,
+    promoTitle: null,
+    promoSubtitle: null,
+  }
+  const activity = {
+    title: '社区健康筛查',
+    visualConfig: baseConfig,
+  }
+
+  // F1: hero configured, promoTitle empty -> the real activity title is visible.
+  assert.deepEqual(
+    resolveActivityPagePromo({
+      ...activity,
+      visualConfig: { ...baseConfig, heroImageUrl: 'https://cdn.example.com/hero.jpg' },
+    }),
+    { visible: true, title: '社区健康筛查', subtitle: null },
+  )
+
+  // F1: only promoSubtitle -> headline falls back to the activity title.
+  assert.deepEqual(
+    resolveActivityPagePromo({
+      ...activity,
+      visualConfig: { ...baseConfig, promoSubtitle: '本周六上午，先到先得' },
+    }),
+    { visible: true, title: '社区健康筛查', subtitle: '本周六上午，先到先得' },
+  )
+
+  // Theme-only configuration is still a configured activity.
+  assert.deepEqual(
+    resolveActivityPagePromo({
+      ...activity,
+      visualConfig: { ...baseConfig, themeKey: 'health-blue' },
+    }),
+    { visible: true, title: '社区健康筛查', subtitle: null },
+  )
+
+  // A poster-only configuration is also a new campaign, so its title is visible.
+  assert.deepEqual(
+    resolveActivityPagePromo({
+      ...activity,
+      visualConfig: { ...baseConfig, posterImageUrl: 'https://cdn.example.com/poster.jpg' },
+    }),
+    { visible: true, title: '社区健康筛查', subtitle: null },
+  )
+
+  // Configured promo title wins over the activity title.
+  assert.deepEqual(
+    resolveActivityPagePromo({
+      ...activity,
+      visualConfig: { ...baseConfig, promoTitle: '健康筛查进社区' },
+    }),
+    { visible: true, title: '健康筛查进社区', subtitle: null },
+  )
+
+  // Historical no-visual activity keeps the pre-#309 page (bundled image title).
+  assert.deepEqual(resolveActivityPagePromo(activity), {
+    visible: false,
+    title: null,
+    subtitle: null,
+  })
+  assert.deepEqual(resolveActivityPagePromo(null), {
+    visible: false,
+    title: null,
+    subtitle: null,
+  })
+})
+
+test('poster headline is this activity title, never the old template slogan', () => {
   assert.deepEqual(resolveActivityPromoCopy(null), { title: null, subtitle: null })
   assert.deepEqual(
     resolveActivityPromoCopy({ promoTitle: '  ', promoSubtitle: ' 周末见 ' }),
@@ -131,14 +203,40 @@ test('promo copy and poster copy keep historical wording when nothing is configu
   )
 
   const legacy = {
-    title: '银发活动',
+    title: '银发社区欢乐季',
     community: { name: '幸福社区' },
     visualConfig: { promoTitle: null, promoSubtitle: null },
   }
+  // F2: the poster headline is the current activity title, not the old template slogan.
   assert.deepEqual(resolveActivityPosterCopy(legacy, 1, 3), {
-    title: '还差你，三人成团领好礼',
+    title: '银发社区欢乐季',
     subtitle: '幸福社区 · 已有 1 / 3 位街坊',
   })
+  assert.notEqual(resolveActivityPosterCopy(legacy, 1, 3).title, '还差你，三人成团领好礼')
+
+  // A brand-new activity without promo copy behaves the same way (no stale campaign title).
+  const newActivity = {
+    title: '社区健康筛查',
+    community: { name: '幸福社区' },
+    visualConfig: { promoTitle: null, promoSubtitle: null },
+  }
+  assert.deepEqual(resolveActivityPosterCopy(newActivity, 0, 3), {
+    title: '社区健康筛查',
+    subtitle: '幸福社区 · 已有 0 / 3 位街坊',
+  })
+
+  // Only a promo subtitle: headline stays the real activity title.
+  assert.deepEqual(
+    resolveActivityPosterCopy(
+      { ...newActivity, visualConfig: { promoTitle: null, promoSubtitle: '本周六上午' } },
+      2,
+      3,
+    ),
+    {
+      title: '社区健康筛查',
+      subtitle: '本周六上午',
+    },
+  )
 
   const configured = {
     ...legacy,
@@ -148,6 +246,43 @@ test('promo copy and poster copy keep historical wording when nothing is configu
     title: '健康筛查进社区',
     subtitle: '本周六上午，先到先得',
   })
+})
+
+test('every theme button/buttonText pair meets WCAG AA contrast (>= 4.5)', () => {
+  const channel = (value) => {
+    const normalized = value / 255
+    return normalized <= 0.03928
+      ? normalized / 12.92
+      : ((normalized + 0.055) / 1.055) ** 2.4
+  }
+  const luminance = (hex) => {
+    const match = /^#([0-9a-f]{6})$/i.exec(hex)
+    assert.ok(match, `${hex} must be a 6-digit hex colour`)
+    const value = Number.parseInt(match[1], 16)
+    return (
+      0.2126 * channel((value >> 16) & 0xff) +
+      0.7152 * channel((value >> 8) & 0xff) +
+      0.0722 * channel(value & 0xff)
+    )
+  }
+  const contrast = (foreground, background) => {
+    const lighter = Math.max(luminance(foreground), luminance(background))
+    const darker = Math.min(luminance(foreground), luminance(background))
+    return (lighter + 0.05) / (darker + 0.05)
+  }
+
+  // F3 regression: the previous warm-gold #a27112 on white was 4.28:1.
+  assert.ok(contrast('#ffffff', '#a27112') < 4.5)
+  assert.equal(ACTIVITY_THEME_TOKENS['warm-gold'].button, '#8f6514')
+
+  for (const themeKey of ACTIVITY_THEME_KEYS) {
+    const tokens = ACTIVITY_THEME_TOKENS[themeKey]
+    const ratio = contrast(tokens.buttonText, tokens.button)
+    assert.ok(
+      ratio >= 4.5,
+      `${themeKey} primary button contrast ${ratio.toFixed(2)} must be >= 4.5`,
+    )
+  }
 })
 
 test('WeChat cover prefers poster, then hero, then the bundled legacy image', () => {
