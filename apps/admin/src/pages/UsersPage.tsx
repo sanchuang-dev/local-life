@@ -239,19 +239,19 @@ function WechatProfileValue({
  */
 function contactPhoneNode(detail: UserDirectoryDetail): ReactNode {
   if (detail.contact.visibility === 'masked') {
-    return detail.maskedPhone ? (
+    return detail.maskedContactPhone ? (
       <Space size={4} wrap>
-        <Typography.Text>{detail.maskedPhone}</Typography.Text>
+        <Typography.Text>{detail.maskedContactPhone}</Typography.Text>
         <Tag>当前角色仅可见脱敏号码</Tag>
       </Space>
     ) : (
-      <Typography.Text type="secondary">未绑定手机号</Typography.Text>
+      <Typography.Text type="secondary">未填写联系电话</Typography.Text>
     )
   }
   return detail.contact.phone ? (
     <Typography.Text>{detail.contact.phone}</Typography.Text>
   ) : (
-    <Typography.Text type="secondary">未绑定手机号</Typography.Text>
+    <Typography.Text type="secondary">未填写联系电话</Typography.Text>
   )
 }
 
@@ -709,7 +709,7 @@ export function UsersPage({ session }: UsersPageProps) {
             </Descriptions>
 
             <Descriptions size="small" column={1} bordered title="联系方式（只读）">
-              <Descriptions.Item label="手机号">
+              <Descriptions.Item label="联系电话">
                 {contactPhoneNode(detail)}
               </Descriptions.Item>
               <Descriptions.Item label="联系地址">

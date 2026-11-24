@@ -25,7 +25,7 @@ import {
  * Minimum-necessary data only. These DTOs deliberately have no OpenID/unionid
  * value, no AppSecret/token/session/cookie, no password hash and no fabricated
  * login history. The masked phone is the only phone shape the list ever returns;
- * a complete verified phone and the resident-entered address appear exclusively
+ * a complete resident-entered contact phone and the resident-entered address appear exclusively
  * in the detail response for a caller authorized as `full` (an administrator
  * today), never in the list.
  */
@@ -115,7 +115,7 @@ export type UserWechatSex = z.infer<typeof userWechatSexSchema>
 /**
  * Contact visibility for the *caller* of a detail request.
  *
- * `full` exposes the complete verified phone and the resident-entered contact
+ * `full` exposes the complete resident-entered contact phone and the resident-entered contact
  * address; `masked` means both are withheld. The flag exists so the admin UI can
  * tell 「未填写」 apart from 「当前角色不可见」 instead of rendering a fabricated
  * value. Only an administrator gets `full` today: the community-scoped operator
@@ -252,12 +252,12 @@ export type UserWechatProfileDetail = z.infer<typeof userWechatProfileDetailSche
  *
  * This is the only place a complete phone may appear, and only with
  * `visibility: 'full'`. In `masked` mode both fields are `null` — the caller
- * still gets `maskedPhone` on the entry, but must not infer an address or a full
+ * still gets `maskedContactPhone` on the detail, but must not infer an address or a full
  * number from an absent field. OpenID/unionid values never appear here.
  */
 export const userDirectoryContactSchema = z.strictObject({
   visibility: userContactVisibilitySchema,
-  /** Complete verified mainland phone in `full` mode; `null` when absent/withheld. */
+  /** Complete resident-entered contact phone in `full` mode; `null` when absent/withheld. */
   phone: z
     .string()
     .regex(/^1\d{10}$/u, 'must be a canonical mainland phone')
@@ -474,6 +474,7 @@ const userDirectoryDetailBaseSchema = userDirectoryBaseSchema.extend({
     .regex(/^1\d{2}\*{4}\d{4}$/, 'must be a masked mainland phone like 138****8000')
     .nullable(),
   /** Complete contact data allowed for this caller; see {@link userDirectoryContactSchema}. */
+  maskedContactPhone: z.string().regex(/^1\d{2}\*{4}\d{4}$/).nullable().optional(),
   contact: userDirectoryContactSchema,
   /** Back-office account attached to this platform user, or `null`. */
   staffAccount: userStaffAccountSchema.nullable(),
@@ -526,8 +527,7 @@ export const userDirectoryDetailSchema = userDirectoryDetailBaseSchema.superRefi
       })
     }
     // Contact visibility is structural: a masked caller cannot receive either
-    // field, and a privileged caller's full phone must agree with the masked
-    // identity presence. The address may be null independently (未填写).
+    // field, and a privileged caller's full phone must agree with the contact profile, independently of the authentication identity.
     if (value.contact.visibility === 'masked') {
       if (value.contact.phone !== null || value.contact.address !== null) {
         ctx.addIssue({
@@ -536,12 +536,6 @@ export const userDirectoryDetailSchema = userDirectoryDetailBaseSchema.superRefi
           path: ['contact'],
         })
       }
-    } else if ((value.contact.phone === null) !== (value.maskedPhone === null)) {
-      ctx.addIssue({
-        code: 'custom',
-        message: '完整手机号与脱敏手机号必须同时存在或同时为空',
-        path: ['contact', 'phone'],
-      })
     }
   },
 )

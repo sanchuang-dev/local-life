@@ -60,6 +60,7 @@ function residentProfilePayload(db: AppDatabase, userId: string) {
     phone: {
       maskedPhone: phone ? maskMainlandPhone(phone.phone) : null,
     },
+    contactPhone: profile?.contactPhone ?? null,
     contactAddress: profile?.contactAddress ?? null,
     updatedAt: profile?.updatedAt.toISOString() ?? null,
   })
@@ -96,18 +97,19 @@ export function registerResidentProfileRoutes(
       await c.req.json().catch(() => null),
       updateResidentProfileRequestSchema,
     )
-    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '联系地址格式不正确')
+    if (!body) return fail(c, 400, API_ERROR_CODES.invalidRequest, '联系电话或联系地址格式不正确')
 
     const current = now()
     const existing = db.select().from(residentProfiles).where(eq(residentProfiles.userId, session.userId)).get()
     if (existing) {
       db.update(residentProfiles)
-        .set({ contactAddress: body.contactAddress, updatedAt: current })
+        .set({ contactAddress: body.contactAddress, ...(body.contactPhone !== undefined ? { contactPhone: body.contactPhone } : {}), updatedAt: current })
         .where(eq(residentProfiles.userId, session.userId))
         .run()
-    } else if (body.contactAddress !== null) {
+    } else if (body.contactAddress !== null || body.contactPhone != null) {
       db.insert(residentProfiles).values({
         userId: session.userId,
+        contactPhone: body.contactPhone ?? null,
         contactAddress: body.contactAddress,
         createdAt: current,
         updatedAt: current,

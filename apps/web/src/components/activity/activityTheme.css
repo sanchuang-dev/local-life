@@ -1,0 +1,104 @@
+/*
+ * Activity-scoped theme styling (LL-ACT-VIS-001 / #309).
+ *
+ * The CSS custom properties are written as an inline style on the activity
+ * detail page root only. Every selector below is scoped to `.activity-page` or
+ * to a component that is only rendered inside that page, so the four presets
+ * never leak into the rest of the H5. Business status colours (upcoming,
+ * active, paused, ended, warning, error) intentionally keep their own tokens
+ * and are not dyed by the activity theme.
+ */
+
+.activity-page {
+  color: var(--activity-text, #1f4d3c);
+}
+
+/* Page header: hero background and the long body gradient behind the cards. */
+.activity-theme-hero {
+  background-color: var(--activity-bg, #eaf5e9);
+}
+
+.activity-theme-body {
+  background: linear-gradient(
+    to bottom,
+    var(--activity-bg-soft, #edf8e9) 0%,
+    var(--activity-bg, #e8f5ec) 55%,
+    var(--activity-bg-deep, #d8eee5) 100%
+  );
+}
+
+/* Countdown / loading panel keeps the pre-#309 soft gradient, per theme. */
+.activity-theme-countdown {
+  background: linear-gradient(
+    to bottom,
+    var(--activity-countdown, #d8f0cc) 0%,
+    var(--activity-countdown-mid, #e1f3d8) 70%,
+    transparent 100%
+  );
+  color: var(--activity-text, #275942);
+}
+
+/*
+ * Primary / outlined actions. Fallback values preserve the old teal controls
+ * when the component is rendered outside a themed activity page.
+ */
+.activity-themed-cta:not(:disabled) {
+  background-color: var(--activity-button, #0f766e);
+  color: var(--activity-button-text, #ffffff);
+}
+
+.activity-themed-cta:not(:disabled):hover {
+  background-color: var(--activity-button-strong, #115e59);
+}
+
+.activity-themed-outline:not(:disabled) {
+  border-color: var(--activity-border, #a7d7c5);
+  color: var(--activity-primary, #0f766e);
+}
+
+.activity-themed-outline:not(:disabled):hover {
+  background-color: var(--activity-surface-muted, #f2faf6);
+}
+
+.activity-themed-chip {
+  background-color: var(--activity-surface-muted, #eef7f2);
+  color: var(--activity-primary, #126c38);
+}
+
+/*
+ * CampaignSheet is a shared component; only inside the activity page does its
+ * eyebrow follow the activity theme. The structural selector targets the header
+ * eyebrow only, never status copy elsewhere in a sheet.
+ */
+.activity-page [role='dialog'] > div:first-child > div:first-child > p:first-child {
+  color: var(--activity-primary, #0f766e);
+}
+
+/* Single share poster: image, copy and a fixed white QR area below it. */
+.activity-poster {
+  border-color: var(--activity-border, #deebdf);
+  background-color: var(--activity-surface-muted, #f4faf3);
+}
+
+.activity-poster__title {
+  color: var(--activity-primary, #176149);
+}
+
+.activity-poster__subtitle {
+  color: var(--activity-text-muted, #547c6c);
+}
+
+.activity-poster__qr {
+  border-color: var(--activity-border, #deece1);
+  background-color: #ffffff;
+}
+
+.activity-poster__caption {
+  color: var(--activity-primary, #2f765f);
+}
+
+/* Last-resort placeholder when even the bundled artwork cannot load. */
+.activity-image-fallback {
+  display: block;
+  background: var(--activity-surface-muted, #eef2ef);
+}

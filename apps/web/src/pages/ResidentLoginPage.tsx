@@ -108,7 +108,7 @@ export function ResidentLoginPage() {
           onSubmit={(phone, code) => auth.loginWithPhone(phone, code)}
         />
       ) : undefined}
-      extraActions={auth.methods?.developmentResidentLogin ? (
+      extraActions={import.meta.env.DEV && auth.methods?.developmentResidentLogin ? (
         <button
           type="button"
           onClick={() => void auth.developmentLogin()}

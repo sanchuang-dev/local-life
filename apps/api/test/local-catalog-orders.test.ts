@@ -2300,6 +2300,7 @@ test('grid verification immediately creates community facts once, without manual
     }).run()
     db.insert(residentProfiles).values({
       userId: world.resident.userId,
+      contactPhone: '13900000000',
       contactAddress: '幸福路 1 号',
       createdAt: contactNow,
       updatedAt: contactNow,
@@ -2308,7 +2309,7 @@ test('grid verification immediately creates community facts once, without manual
       await api(app, 'GET', `/admin/local-orders/${order.id}`, { session: admin }),
     )
     assert.deepEqual(withContact.residentContact, {
-      phone: '13800000000',
+      phone: '13900000000',
       address: '幸福路 1 号',
     })
 

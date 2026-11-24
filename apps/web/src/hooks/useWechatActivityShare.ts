@@ -27,8 +27,6 @@ export function useWechatActivityShare(
   const [status, setStatus] = useState<WechatShareStatus>(isWechat ? 'idle' : 'outside')
 
   const activityId = activity?.id ?? null
-  const activityTitle = activity?.title ?? ''
-  const activitySummary = activity?.summary ?? null
 
   // No open team / full / ineligible: share the public activity without an
   // invite parameter. Never carry an old invite code into a new team state.
@@ -36,14 +34,16 @@ export function useWechatActivityShare(
   const targetUrl = inviteShareUrl ?? activityOnlyUrl
 
   const payload = useMemo(() => {
-    if (!activityId || !targetUrl) return null
+    if (!activity || !targetUrl) return null
+    // Share metadata follows *this* activity: promo title/subtitle and its
+    // public poster/hero image, with the legacy artwork as the last fallback.
     return createWechatActivityShareData(
-      { title: activityTitle, summary: activitySummary },
+      activity,
       targetUrl,
       window.location.origin,
       import.meta.env.BASE_URL,
     )
-  }, [activityId, activityTitle, activitySummary, targetUrl])
+  }, [activity, targetUrl])
 
   useEffect(() => {
     if (!isWechat) {
