@@ -52,7 +52,7 @@ test('hero has a real candidate chain and keeps the historical fallback last', (
   assert.match(image, /candidates\[failedCount\]/)
   assert.match(image, /activity-image-fallback/)
   assert.match(visual, /resolveActivityHeroImageCandidates/)
-  assert.match(visual, /activityFallbackImageUrl\(baseUrl\)/)
+  assert.match(visual, /activityFallbackImageUrl\(baseUrl, activityTitle\)/)
 })
 
 test('share poster is one real poster image with a fixed separate white QR area', () => {

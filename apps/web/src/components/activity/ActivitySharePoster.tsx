@@ -36,6 +36,7 @@ export function ActivitySharePoster({
   const candidates = resolveActivityPosterImageCandidates(
     activity.visualConfig,
     import.meta.env.BASE_URL,
+    activity.title,
   )
   const copy = resolveActivityPosterCopy(activity, seatsFilled, seatsTotal)
   const tokens = ACTIVITY_THEME_TOKENS[resolveActivityThemeKey(activity.visualConfig?.themeKey)]

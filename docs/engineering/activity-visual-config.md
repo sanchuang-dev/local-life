@@ -35,7 +35,7 @@
 
 H5 将 key 映射为 16 个有限语义 CSS variables（`--activity-primary`、`-background`、`-surface`、`-border`、`-text`、`-button`、`-on-primary`、`-countdown` 等），以 inline style 只作用于活动详情页根节点 `.activity-page`；[activityTheme.css](../../apps/web/src/components/activity/activityTheme.css) 的选择器不命中 `:root`/`body`/`html`，不影响全站。业务状态色（进行中/暂停/结束、错误/警告、奖励档位）保持不变，不随主题染色。
 
-`community-green` 的 token 与 #309 前一致；未知或缺失 key 在 H5 侧防御性回退到社区绿（写路径本身拒绝非法枚举）。暖阳金按钮使用 `#8f6514`，白字对比度 5.20:1；后台预览色板的已知偏差见 §7。
+`community-green` 的 token 与 #309 前一致；未知或缺失 key 在 H5 侧防御性回退到社区绿（写路径本身拒绝非法枚举）。暖阳金按钮和后台预览主色统一使用 `#8f6514`。
 
 后台编辑器在既有活动表单内新增第四个「界面风格」Tab：四主题色板、头图/海报 URL 输入与预览/替换/清空、宣传标题/副标题，以及读取当前表单值的手机比例实时预览；仅选择主题也可以保存。
 
@@ -59,9 +59,9 @@ H5 将 key 映射为 16 个有限语义 CSS variables（`--activity-primary`、`
 
 所有远程图片在使用前由 H5 重新校验：trim 后必须是绝对 `http(s)` URL 且 ≤ 2048 字符；不合法的存储值按“未配置”处理，绝不写入 `<img src>` 或微信 `imgUrl`。
 
-- **头图**：配置的 `heroImageUrl` → 内置 `images/silver-neighborhood-hero.webp`；加载失败自动尝试下一候选，全部失败显示带主题色的占位块，不出现破图。
+- **头图**：配置的 `heroImageUrl` → 通用 `images/community-activity-artwork.webp`（仅原名「银发社区欢乐季」兼容原头图）；加载失败自动尝试下一候选，全部失败显示带主题色的占位块，不出现破图。
 - **分享海报**：`posterImageUrl` → `heroImageUrl` → 内置兼容图（去重后按序尝试），加载失败同样逐级回退。
-- **宣传带**：只要配置了宣传标题/副标题、头图、海报或非默认主题，就显示宣传带；标题为 `promoTitle ?? activity.title`，副标题只取 `promoSubtitle`，不覆盖活动真实地点、时间、规则信息。默认绿且完全没有视觉配置的历史活动不渲染宣传带，保留 #309 前布局，避免与图内标题重复。
+- **宣传带**：只要配置了宣传标题/副标题、头图、海报或非默认主题，就显示宣传带；标题为 `promoTitle ?? activity.title`，副标题只取 `promoSubtitle`，不覆盖活动真实地点、时间、规则信息。仅原名「银发社区欢乐季」且默认绿、完全没有视觉配置时不渲染宣传带；其他活动始终展示真实标题，保留 #309 前布局，避免与图内标题重复。
 - **海报文案**：标题为 `promoTitle ?? activity.title`；副标题为 `promoSubtitle ?? 社区名 + 当前席位`。活动详情分享不再复用旧银发口号。
 - **微信 JS-SDK**：好友/朋友圈标题 = `promoTitle ?? activity.title`；描述 = `promoSubtitle ?? activity.summary ??` 通用邀请语；封面 = 海报 → 头图 → 绝对化后的内置兼容图。
 - **活动列表**：只复用 `heroImageUrl`；未配置或加载失败回退到共享 `ActivityArtwork` 插画，没有真实头图时不伪造。
@@ -94,9 +94,9 @@ H5 将 key 映射为 16 个有限语义 CSS variables（`--activity-primary`、`
 以下内容如实记录，不视为已验收通过：
 
 1. **未挂路由的旧分享组件**：`ActivityHomePage` / `components/home/ActivityShareSheet.tsx` 当前未被 `App.tsx` 引用，仍保留旧海报口号且未接入 `visualConfig`；本轮明确在范围外，活动详情分享抽屉已使用新实现。
-2. **后台预览色差**：管理台暖阳金预览按钮仍为 `#a9681a`（白字约 4.49:1），H5 实际为 `#8f6514`（5.20:1）。`apps/admin` 不在本轮修复范围，预览只是近似色板；真实主题以 H5 token 为准。
+2. 后台暖阳金预览已与 H5 主色统一。
 3. **无真实浏览器验收**：375×812 与 320 宽度只做了静态宽度审计（未发现 >320 固定宽），没有 Playwright/Puppeteer 截图或真机走查；视觉验收留给维护者。
-4. **默认绿 + 无任何视觉配置**：宣传带隐藏并保留旧布局，避免与内置图上的活动标题重复。仅选择默认绿主题、未填任何素材/文案的新活动会与历史活动表现相同；若产品要求默认绿也显示独立宣传标题，需另立后续任务。
+4. 仅原名「银发社区欢乐季」未配置视觉时保留旧图与布局；其他活动使用通用插画并展示真实标题。
 5. **不包含**：图片上传/素材库、图片生成、海报编辑器、任意二维码坐标、多套海报、截图下载，以及真实微信/线上环境验证。测试是 Node/纯函数/jsdom 静态与组件级验证，不等于线上可用。
 
 ## 8. 契约测试与验证入口

@@ -178,7 +178,13 @@ export function activityThemeStyle(themeKey: string | null | undefined): CSSProp
 }
 
 /** Bundled legacy artwork; also the last fallback for hero and poster. */
-export const ACTIVITY_FALLBACK_IMAGE_PATH = 'images/silver-neighborhood-hero.webp'
+export const ACTIVITY_FALLBACK_IMAGE_PATH = 'images/community-activity-artwork.webp'
+const LEGACY_SILVER_IMAGE_PATH = 'images/silver-neighborhood-hero.webp'
+
+// Narrow compatibility for the original named campaign, not every new activity.
+export function isLegacySilverActivity(title?: string | null): boolean {
+  return title?.trim() === '银发社区欢乐季'
+}
 
 const HTTP_IMAGE_URL_PATTERN = /^https?:\/\/[^\s]+$/iu
 const MAX_IMAGE_URL_LENGTH = 2048
@@ -195,8 +201,8 @@ export function normalizeActivityImageUrl(value: string | null | undefined): str
   return trimmed
 }
 
-export function activityFallbackImageUrl(baseUrl: string): string {
-  return `${baseUrl}${ACTIVITY_FALLBACK_IMAGE_PATH}`
+export function activityFallbackImageUrl(baseUrl: string, activityTitle?: string | null): string {
+  return `${baseUrl}${isLegacySilverActivity(activityTitle) ? LEGACY_SILVER_IMAGE_PATH : ACTIVITY_FALLBACK_IMAGE_PATH}`
 }
 
 /**
@@ -206,9 +212,10 @@ export function activityFallbackImageUrl(baseUrl: string): string {
 export function resolveActivityHeroImageCandidates(
   visualConfig: Pick<ActivityVisualConfig, 'heroImageUrl'> | null | undefined,
   baseUrl: string,
+  activityTitle?: string | null,
 ): string[] {
   const configured = normalizeActivityImageUrl(visualConfig?.heroImageUrl)
-  const fallback = activityFallbackImageUrl(baseUrl)
+  const fallback = activityFallbackImageUrl(baseUrl, activityTitle)
   return configured ? [configured, fallback] : [fallback]
 }
 
@@ -219,11 +226,12 @@ export function resolveActivityHeroImageCandidates(
 export function resolveActivityPosterImageCandidates(
   visualConfig: ActivityVisualSource,
   baseUrl: string,
+  activityTitle?: string | null,
 ): string[] {
   const candidates = [
     normalizeActivityImageUrl(visualConfig?.posterImageUrl),
     normalizeActivityImageUrl(visualConfig?.heroImageUrl),
-    activityFallbackImageUrl(baseUrl),
+    activityFallbackImageUrl(baseUrl, activityTitle),
   ].filter((value): value is string => Boolean(value))
   return [...new Set(candidates)]
 }
@@ -293,7 +301,7 @@ export function resolveActivityPagePromo(
     normalizeActivityImageUrl(activity.visualConfig.posterImageUrl) !== null ||
     resolveActivityThemeKey(activity.visualConfig.themeKey) !== DEFAULT_ACTIVITY_THEME_KEY
 
-  if (!hasConfiguredVisual) return { visible: false, title: null, subtitle: null }
+  if (!hasConfiguredVisual && isLegacySilverActivity(activity.title)) return { visible: false, title: null, subtitle: null }
 
   return {
     visible: true,
@@ -341,10 +349,11 @@ export function resolveWechatShareImageUrl(
   visualConfig: Pick<ActivityVisualConfig, 'heroImageUrl' | 'posterImageUrl'> | null | undefined,
   origin: string,
   baseUrl: string,
+  activityTitle?: string | null,
 ): string {
   const remote =
     normalizeActivityImageUrl(visualConfig?.posterImageUrl) ??
     normalizeActivityImageUrl(visualConfig?.heroImageUrl)
   if (remote) return remote
-  return new URL(`${baseUrl}${ACTIVITY_FALLBACK_IMAGE_PATH}`, origin).href
+  return new URL(activityFallbackImageUrl(baseUrl, activityTitle), origin).href
 }

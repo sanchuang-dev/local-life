@@ -64,7 +64,7 @@ export function createWechatActivityShareData(
     title: promo.title ?? activity.title,
     desc: promo.subtitle?.trim() || activity.summary?.trim() || '来社区一起参加活动，认识更多街坊。',
     link,
-    imgUrl: resolveWechatShareImageUrl(activity.visualConfig, origin, baseUrl),
+    imgUrl: resolveWechatShareImageUrl(activity.visualConfig, origin, baseUrl, activity.title),
   }
 }
 

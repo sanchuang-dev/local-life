@@ -572,7 +572,7 @@ const ACTIVITY_THEME_VISUAL_META: Record<
   'warm-gold': {
     label: '暖阳金',
     description: '敬老、助老与温暖关怀',
-    primary: '#a9681a',
+    primary: '#8f6514',
     surface: '#fdf5e6',
     accentSoft: '#f6e3bd',
     text: '#6b4513',

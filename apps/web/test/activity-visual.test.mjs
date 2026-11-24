@@ -182,8 +182,11 @@ test('page promo band always shows a real title for a configured activity', () =
     { visible: true, title: '健康筛查进社区', subtitle: null },
   )
 
-  // Historical no-visual activity keeps the pre-#309 page (bundled image title).
-  assert.deepEqual(resolveActivityPagePromo(activity), {
+  // New default activities always show their real title; only the original campaign keeps its embedded title.
+  assert.deepEqual(resolveActivityPagePromo(activity), { visible: true, title: activity.title, subtitle: null })
+  assert.deepEqual(resolveActivityHeroImageCandidates(null, base, '银发社区欢乐季'), [`${base}images/silver-neighborhood-hero.webp`])
+  assert.deepEqual(resolveActivityHeroImageCandidates(null, base, '社区健康筛查'), [fallback])
+  assert.deepEqual(resolveActivityPagePromo({ ...activity, title: '银发社区欢乐季' }), {
     visible: false,
     title: null,
     subtitle: null,
@@ -308,6 +311,6 @@ test('WeChat cover prefers poster, then hero, then the bundled legacy image', ()
   )
   assert.equal(
     resolveWechatShareImageUrl(null, origin, '/local-life/'),
-    'https://sanchuang-dev.github.io/local-life/images/silver-neighborhood-hero.webp',
+    'https://sanchuang-dev.github.io/local-life/images/community-activity-artwork.webp',
   )
 })

@@ -19,14 +19,14 @@ test('share content uses exact source URL and cover URL respects MVP/Pages base'
   )
   assert.deepEqual(data, {
     title: '真实银发活动', desc: '和街坊一起参加活动。',
-    link, imgUrl: 'https://local.proto.3cgroup.cn/images/silver-neighborhood-hero.webp',
+    link, imgUrl: 'https://local.proto.3cgroup.cn/images/community-activity-artwork.webp',
   })
   assert.equal(new URL(data.link).searchParams.get('activityId'), id)
   assert.equal(new URL(data.link).searchParams.get('invite'), invite)
   assert.equal(createWechatActivityShareData(
     { title: 'Pages 活动', summary: null }, link,
     'https://sanchuang-dev.github.io', '/local-life/',
-  ).imgUrl, 'https://sanchuang-dev.github.io/local-life/images/silver-neighborhood-hero.webp')
+  ).imgUrl, 'https://sanchuang-dev.github.io/local-life/images/community-activity-artwork.webp')
 })
 
 test('JS-SDK metadata follows the current activity visual config, including fallbacks', () => {
@@ -77,12 +77,12 @@ test('JS-SDK metadata follows the current activity visual config, including fall
 
   // A historical activity without visual config keeps the original artwork.
   const legacy = createWechatActivityShareData(
-    { title: '历史银发活动', summary: '和街坊一起参加活动。' },
+    { title: '银发社区欢乐季', summary: '和街坊一起参加活动。' },
     link,
     origin,
     '/',
   )
-  assert.equal(legacy.title, '历史银发活动')
+  assert.equal(legacy.title, '银发社区欢乐季')
   assert.equal(legacy.desc, '和街坊一起参加活动。')
   assert.equal(legacy.imgUrl, 'https://local.proto.3cgroup.cn/images/silver-neighborhood-hero.webp')
 })

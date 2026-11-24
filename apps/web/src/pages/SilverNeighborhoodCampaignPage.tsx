@@ -20,6 +20,7 @@ import { ActivityLoginMarkerCleanup } from '../components/activity/ActivityLogin
 import { readActivityLoginResult, type ActivityLoginResult } from '../components/activity/loginReturn'
 import {
   activityThemeStyle,
+  isLegacySilverActivity,
   normalizeActivityImageUrl,
   resolveActivityHeroImageCandidates,
   resolveActivityPagePromo,
@@ -272,12 +273,13 @@ export function SilverNeighborhoodCampaignPage() {
   const heroCandidates = resolveActivityHeroImageCandidates(
     activity?.visualConfig,
     import.meta.env.BASE_URL,
+    activity?.title,
   )
   const configuredHeroImage = normalizeActivityImageUrl(activity?.visualConfig.heroImageUrl)
   // Historical activities keep the original bundled artwork *and* its alt text.
-  const heroAlt = configuredHeroImage
-    ? `${activity?.title ?? '活动'}主视觉`
-    : '银发社区欢乐季，三人成团·天天有礼。三位长者在欢乐的社区活动中相聚。'
+  const heroAlt = !configuredHeroImage && isLegacySilverActivity(activity?.title)
+    ? '银发社区欢乐季，三人成团·天天有礼。'
+    : `${activity?.title ?? '活动'}主视觉`
   const auth = useResidentAuth()
   // One-off `?auth=success` / `?auth_error=code` markers, read once before the
   // page-level cleanup strips them from the address bar (#92).
